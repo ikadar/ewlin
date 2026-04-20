@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Similarity Badge Playground — Flux Scheduler</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-muted: rgb(128, 128, 128);
+
+    /* Badge colors */
+    --badge-neutral: rgb(82, 82, 91);      /* zinc-600 */
+    --badge-match: rgb(52, 211, 153);      /* emerald-400 */
+    --badge-mismatch: rgb(251, 146, 60);   /* orange-400 */
+    --badge-partial: rgb(234, 179, 8);     /* amber-500 */
+
+    /* Per-criterion family colors (used in axis 3 = per-criterion) */
+    --family-inking: rgb(99, 102, 241);    /* indigo-500 */
+    --family-paper: rgb(217, 119, 6);      /* amber-600 */
+    --family-format: rgb(14, 165, 233);    /* sky-500 */
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base); color: var(--flux-text-primary);
+    min-height: 100vh; display: grid; grid-template-columns: 320px 1fr;
+    gap: 0;
+  }
+
+  /* ─── CONTROLS PANEL ───────────────────────────────────────── */
+  .controls {
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    padding: 20px 18px; overflow-y: auto;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .controls h1 { font-size: 14px; font-weight: 600; color: var(--flux-text-primary); margin-bottom: 4px; }
+  .controls .subtitle { font-size: 11px; color: var(--flux-text-muted); margin-bottom: 20px; line-height: 1.4; }
+
+  fieldset {
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 10px 12px 12px;
+    margin-bottom: 12px;
+    background: var(--flux-elevated);
+  }
+  legend {
+    padding: 0 6px;
+    font-size: 11px; font-weight: 600;
+    color: var(--flux-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .radio-group { display: flex; flex-direction: column; gap: 4px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 4px;
+    font-size: 12px; color: var(--flux-text-secondary);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .radio-group label:hover { background: rgba(255, 255, 255, 0.04); }
+  .radio-group input[type="radio"] { cursor: pointer; accent-color: rgb(59, 130, 246); }
+  .radio-group label.checked { background: rgba(59, 130, 246, 0.1); color: var(--flux-text-primary); }
+
+  .threshold-wrap {
+    display: flex; gap: 8px; align-items: center;
+    margin-top: 6px; font-size: 11px; color: var(--flux-text-muted);
+  }
+  .threshold-wrap input[type="range"] { flex: 1; accent-color: rgb(59, 130, 246); }
+
+  .export-btn {
+    width: 100%; margin-top: 8px;
+    padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    border: 1px solid rgb(59, 130, 246);
+    background: rgb(37, 99, 235); color: white;
+    cursor: pointer;
+  }
+  .export-btn:hover { background: rgb(29, 78, 216); }
+  .export-output {
+    margin-top: 10px;
+    padding: 8px; background: var(--flux-base); border: 1px solid var(--flux-border);
+    border-radius: 4px; font-family: "SF Mono", Menlo, monospace;
+    font-size: 10px; color: var(--flux-text-secondary);
+    white-space: pre-wrap; max-height: 200px; overflow-y: auto;
+    display: none;
+  }
+  .export-output.visible { display: block; }
+
+  /* ─── RENDER PANEL ─────────────────────────────────────────── */
+  .stage { padding: 20px 24px 60px; overflow-x: auto; }
+  .stage h2 {
+    font-size: 13px; font-weight: 600; color: var(--flux-text-primary);
+    margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--flux-border);
+  }
+  .stage h2:first-child { margin-top: 0; }
+  .stage .scen-note {
+    font-size: 11px; color: var(--flux-text-muted); margin-bottom: 10px; line-height: 1.4;
+  }
+
+  .scenario-row {
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;
+    margin-bottom: 16px;
+  }
+
+  .pair-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 110px;
+  }
+  .pair-label {
+    font-size: 10px; color: var(--flux-text-muted); margin-bottom: 6px;
+    text-align: center; line-height: 1.3;
+  }
+  .pair-label strong { color: var(--flux-text-secondary); font-weight: 600; }
+
+  /* Station column (holds prev+badge+curr stacked vertically) */
+  .station-col {
+    position: relative;
+    width: 110px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 4px; padding: 3px;
+    display: flex; flex-direction: column;
+  }
+  .station-col.side-column { padding-right: 34px; }
+  .station-col .side-column-track {
+    position: absolute; top: 3px; bottom: 3px; right: 3px; width: 28px;
+    display: flex; flex-direction: column;
+    justify-content: space-around; align-items: center;
+    pointer-events: none;
+  }
+
+  .tile-mock {
+    position: relative;
+    width: 100%;
+    padding: 6px 8px; border-radius: 3px;
+    background: rgba(74, 123, 201, 0.55);
+    color: var(--flux-text-primary);
+    font-size: 11px; font-weight: 600;
+    margin-bottom: var(--gap, 4px);
+  }
+  .tile-mock:last-child { margin-bottom: 0; }
+  .tile-mock.short { padding: 3px 8px; font-size: 10px; }
+  .tile-mock .sub { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.7); margin-top: 1px; }
+  .tile-mock .long-label { font-size: 10px; font-weight: 500; display: block; }
+
+  /* ─── BADGE STYLES (driven by data-attrs set in JS) ─────── */
+
+  /* Position = between: overlaps junction top/bottom */
+  .badge.pos-between {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    z-index: 2;
+  }
+  /* Position = left-edge: inside successor tile, left border */
+  .badge.pos-left-edge {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* Position = side-column: inside dedicated right track */
+  .badge.pos-side-column {
+    position: static;
+  }
+  /* Position = junction-overlay: centered on frontier line, zero empiètement */
+  .badge.pos-junction-overlay {
+    position: absolute;
+    left: 50%; transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+
+  /* Size */
+  .badge.sz-micro { min-width: 6px; min-height: 6px; padding: 0; border-radius: 50%; font-size: 0; }
+  .badge.sz-small { min-height: 14px; padding: 1px 5px; border-radius: 7px; font-size: 10px; font-weight: 600; }
+  .badge.sz-medium { min-height: 18px; padding: 2px 7px; border-radius: 9px; font-size: 11px; font-weight: 600; }
+  .badge.sz-annotation {
+    left: 0 !important; right: 0; width: 100%; transform: none !important;
+    min-height: 16px; padding: 2px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 500; text-align: center;
+  }
+
+  /* Base look + color semantics */
+  .badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: var(--badge-bg, var(--badge-neutral));
+    color: var(--badge-fg, white);
+    white-space: nowrap;
+    cursor: default;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    tabular-nums: true;
+  }
+  .badge .dim-chip {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  }
+  .badge.ghost { opacity: 0.3; }
+
+  /* Hover tooltip (axis 7 = hover-tooltip) */
+  .badge.interactive-hover { cursor: help; }
+  .badge .tooltip {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: 100%; margin-bottom: 6px;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 10px; font-weight: 400; color: var(--flux-text-secondary);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    pointer-events: none; opacity: 0; transition: opacity 0.15s;
+    z-index: 10;
+  }
+  .badge.interactive-hover:hover .tooltip { opacity: 1; }
+  .badge .tooltip strong { color: var(--flux-text-primary); }
+
+  /* Color semantic helpers (set as inline style or dataset-driven) */
+
+  /* Density special styling: side-column displays stacked mini-badges */
+  .side-column-track .badge.sz-micro { margin: 2px 0; }
+  .side-column-track .badge.sz-small { margin: 2px 0; }
+
+  /* Breakdown chips inline (axis 2 = breakdown) */
+  .breakdown-chips { display: inline-flex; gap: 2px; }
+  .breakdown-chips .chip {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Click-expand inline (axis 7 = click-expand) */
+  .badge.interactive-click { cursor: pointer; }
+  .badge .expand {
+    display: none;
+    position: absolute; left: 50%; transform: translateX(-50%);
+    top: 100%; margin-top: 6px;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    padding: 8px 10px; border-radius: 4px;
+    min-width: 160px;
+    font-size: 10px; font-weight: 400; color: var(--flux-text-secondary);
+    text-align: left; line-height: 1.5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 10;
+  }
+  .badge.interactive-click.expanded .expand { display: block; }
+
+  /* Legend / meta info */
+  .legend {
+    margin-top: 40px; padding: 16px; background: var(--flux-surface);
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    font-size: 11px; color: var(--flux-text-muted); line-height: 1.6;
+  }
+  .legend strong { color: var(--flux-text-secondary); }
+  .legend code {
+    background: var(--flux-elevated); padding: 1px 4px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 10px;
+  }
+</style>
+</head>
+<body>
+  <!-- ─── CONTROLS ───────────────────────────────────────────── -->
+  <aside class="controls">
+    <h1>Similarity Badge</h1>
+    <div class="subtitle">Matrice interactive 7 axes. Tourne les potards, le rendu se met à jour en live. Clic "Exporter" pour sérialiser la combinaison en JSON.</div>
+
+    <fieldset>
+      <legend>1. Position</legend>
+      <div class="radio-group" data-axis="position">
+        <label><input type="radio" name="position" value="between" checked> Entre les tuiles (chevauchement)</label>
+        <label><input type="radio" name="position" value="left-edge"> Bord gauche du successeur</label>
+        <label><input type="radio" name="position" value="side-column"> Colonne latérale</label>
+        <label><input type="radio" name="position" value="junction-overlay"> Overlay à la jonction (sans empiètement)</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Info density</legend>
+      <div class="radio-group" data-axis="infoDensity">
+        <label><input type="radio" name="infoDensity" value="symbol"> Symbole seul</label>
+        <label><input type="radio" name="infoDensity" value="numeric" checked> Numérique seul</label>
+        <label><input type="radio" name="infoDensity" value="symbol-numeric"> Symbole + numérique</label>
+        <label><input type="radio" name="infoDensity" value="breakdown"> Breakdown (pastilles par critère)</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>3. Sémantique couleur</legend>
+      <div class="radio-group" data-axis="color">
+        <label><input type="radio" name="color" value="binary"> Binaire (match / neutre)</label>
+        <label><input type="radio" name="color" value="continuous" checked> Gradient continu (points/maxPoints)</label>
+        <label><input type="radio" name="color" value="per-criterion"> Par famille de critère</label>
+        <label><input type="radio" name="color" value="mono"> Monochrome</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>4. Taille</legend>
+      <div class="radio-group" data-axis="size">
+        <label><input type="radio" name="size" value="micro"> Micro (dot ~8px)</label>
+        <label><input type="radio" name="size" value="small" checked> Small (~14px)</label>
+        <label><input type="radio" name="size" value="medium"> Medium (~20px)</label>
+        <label><input type="radio" name="size" value="annotation"> Annotation pleine largeur</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>5. Visibilité</legend>
+      <div class="radio-group" data-axis="visibility">
+        <label><input type="radio" name="visibility" value="always"> Toujours</label>
+        <label><input type="radio" name="visibility" value="positive-only" checked> Si points > 0</label>
+        <label><input type="radio" name="visibility" value="threshold"> Si points/max > seuil</label>
+        <label><input type="radio" name="visibility" value="ghost-zero"> Toujours, discret si 0</label>
+      </div>
+      <div class="threshold-wrap">
+        Seuil: <input type="range" min="0" max="100" value="30" step="5" id="threshold"> <span id="threshold-val">30%</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>6. Normalisation</legend>
+      <div class="radio-group" data-axis="normalization">
+        <label><input type="radio" name="normalization" value="absolute" checked> Absolue (3 pts)</label>
+        <label><input type="radio" name="normalization" value="fraction"> Fraction (3/7)</label>
+        <label><input type="radio" name="normalization" value="percent"> Pourcentage (43 %)</label>
+        <label><input type="radio" name="normalization" value="visual-only"> Visuel seul (pas de nombre)</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>7. Interaction</legend>
+      <div class="radio-group" data-axis="interaction">
+        <label><input type="radio" name="interaction" value="static" checked> Statique</label>
+        <label><input type="radio" name="interaction" value="hover-tooltip"> Hover → tooltip</label>
+        <label><input type="radio" name="interaction" value="click-expand"> Click → expand</label>
+        <label><input type="radio" name="interaction" value="none"> Pas d'interaction</label>
+      </div>
+    </fieldset>
+
+    <button class="export-btn" id="export-btn">Exporter la config</button>
+    <pre class="export-output" id="export-output"></pre>
+  </aside>
+
+  <!-- ─── STAGE ──────────────────────────────────────────────── -->
+  <main class="stage">
+    <h2>Presses Offset — toute l'échelle 0 → 7</h2>
+    <div class="scen-note">8 paires, une par valeur possible du score. maxPoints = 7. Les paires factices sont colorées pareil (même client) pour rester discrètes ; le badge seul doit porter le signal.</div>
+    <div class="scenario-row" id="scen-offset"></div>
+
+    <h2>Pelliculeuses — le cas du 0.5 fractionnaire</h2>
+    <div class="scen-note">maxPoints = 3. paper_type seul = 0.5 (cas unique parmi toutes les catégories). Teste le rendu d'un nombre non-entier avec chaque normalisation.</div>
+    <div class="scenario-row" id="scen-pellicul"></div>
+
+    <h2>Massicots — maxPoints minimal</h2>
+    <div class="scen-note">maxPoints = 1. Sur fraction/pourcentage ça donne "1/1" et "100 %" au moindre match — attention au signal comparé à l'Offset.</div>
+    <div class="scenario-row" id="scen-massicot"></div>
+
+    <h2>Finition — cas standard 2 critères</h2>
+    <div class="scen-note">maxPoints = 3. paper_weight seul = 0 (sans format il n'apporte rien), pair total = 3.</div>
+    <div class="scenario-row" id="scen-finition"></div>
+
+    <h2>Cas bords</h2>
+    <div class="scen-note">Catégorie sans règles, première tuile (pas de prédécesseur), neutralisation complète, neutralisation partielle.</div>
+    <div class="scenario-row" id="scen-edges"></div>
+
+    <h2>Stress tests visuels</h2>
+    <div class="scen-note">Tuile très courte, tuiles strictement collées (gap = 0), label long qui croise le badge, densité haute.</div>
+    <div class="scenario-row" id="scen-stress"></div>
+
+    <div class="legend">
+      <strong>Notes de lecture.</strong><br>
+      • Les couleurs "Per famille" utilisent : <code>inking</code> indigo, <code>paper</code> ambre, <code>format</code> ciel.<br>
+      • Le gradient continu va de <code>neutre</code> (0) à <code>emerald</code> (max).<br>
+      • La normalisation s'applique uniquement au <strong>texte</strong> du badge ; la couleur s'appuie toujours sur <code>points/maxPoints</code> quand elle est continue.<br>
+      • Le bouton <strong>Exporter</strong> produit un JSON réutilisable par le composant React (B5 du plan).
+    </div>
+  </main>
+
+<script>
+  // ─── DOMAIN DATA ────────────────────────────────────────────
+  // Each pair: category, maxPoints, score, matched rules (for breakdown/tooltip),
+  // neutralized codes, prev/curr label + color, edge flags.
+  const PAIRS = {
+    offset: [
+      { label: '0 — tout différent', cat: 'Offset', max: 7, score: 0, matched: [], neutralized: [] },
+      { label: '2 — format seul', cat: 'Offset', max: 7, score: 2, matched: [{ codes: ['paper_format'], pts: 2, group: 'paper' }], neutralized: [] },
+      { label: '3 — type+format', cat: 'Offset', max: 7, score: 3, matched: [{ codes: ['paper_type', 'paper_format'], pts: 3, group: 'paper' }], neutralized: [] },
+      { label: '4 — encrage seul', cat: 'Offset', max: 7, score: 4, matched: [{ codes: ['inking'], pts: 4, group: null }], neutralized: [] },
+      { label: '6 — encrage + format', cat: 'Offset', max: 7, score: 6, matched: [{ codes: ['inking'], pts: 4, group: null }, { codes: ['paper_format'], pts: 2, group: 'paper' }], neutralized: [] },
+      { label: '6 — encrage + type', cat: 'Offset', max: 7, score: 4, matched: [{ codes: ['inking'], pts: 4, group: null }], neutralized: [] },
+      { label: '7 — tout match', cat: 'Offset', max: 7, score: 7, matched: [{ codes: ['inking'], pts: 4, group: null }, { codes: ['paper_type', 'paper_format'], pts: 3, group: 'paper' }], neutralized: [] },
+    ],
+    pellicul: [
+      { label: '0 — tout diff', cat: 'Pellic.', max: 3, score: 0, matched: [], neutralized: [] },
+      { label: '0.5 — type seul', cat: 'Pellic.', max: 3, score: 0.5, matched: [{ codes: ['paper_type'], pts: 0.5, group: 'paper' }], neutralized: [] },
+      { label: '1 — format seul', cat: 'Pellic.', max: 3, score: 1, matched: [{ codes: ['paper_format'], pts: 1, group: 'paper' }], neutralized: [] },
+      { label: '3 — type+format', cat: 'Pellic.', max: 3, score: 3, matched: [{ codes: ['paper_type', 'paper_format'], pts: 3, group: 'paper' }], neutralized: [] },
+    ],
+    massicot: [
+      { label: '0 — format diff', cat: 'Mass.', max: 1, score: 0, matched: [], neutralized: [] },
+      { label: '1 — format match', cat: 'Mass.', max: 1, score: 1, matched: [{ codes: ['paper_format'], pts: 1, group: null }], neutralized: [] },
+    ],
+    finition: [
+      { label: '0 — tout diff', cat: 'Finition', max: 3, score: 0, matched: [], neutralized: [] },
+      { label: '0 — weight seul (inutile)', cat: 'Finition', max: 3, score: 0, matched: [], neutralized: [] },
+      { label: '1 — format seul', cat: 'Finition', max: 3, score: 1, matched: [{ codes: ['paper_format'], pts: 1, group: 'paper' }], neutralized: [] },
+      { label: '3 — weight+format', cat: 'Finition', max: 3, score: 3, matched: [{ codes: ['paper_weight', 'paper_format'], pts: 3, group: 'paper' }], neutralized: [] },
+    ],
+    edges: [
+      { label: 'Typographie (0 règles)', cat: 'Typo', max: 0, score: 0, matched: [], neutralized: [], noRules: true },
+      { label: 'Première tuile (pas de préd.)', cat: 'Offset', max: 7, score: 0, matched: [], neutralized: [], firstTile: true },
+      { label: 'Neutralisé total (toutes specs nulles)', cat: 'Offset', max: 7, score: 0, matched: [], neutralized: ['paper_type', 'paper_format', 'inking'] },
+      { label: 'Neutralisation partielle', cat: 'Offset', max: 7, score: 3, matched: [{ codes: ['paper_type', 'paper_format'], pts: 3, group: 'paper' }], neutralized: ['inking'] },
+    ],
+    stress: [
+      { label: 'Tuile très courte (30 px)', cat: 'Offset', max: 7, score: 4, matched: [{ codes: ['inking'], pts: 4, group: null }], neutralized: [], shortTile: true },
+      { label: 'Tuiles collées (gap=0)', cat: 'Offset', max: 7, score: 6, matched: [{ codes: ['inking'], pts: 4, group: null }, { codes: ['paper_format'], pts: 2, group: 'paper' }], neutralized: [], gluedTiles: true },
+      { label: 'Label long (job+client)', cat: 'Offset', max: 7, score: 3, matched: [{ codes: ['paper_type', 'paper_format'], pts: 3, group: 'paper' }], neutralized: [], longLabel: true },
+      { label: 'Densité haute (6 consécutives)', cat: 'Offset', max: 7, score: -1, matched: [], neutralized: [], denseStation: true },
+    ],
+  };
+
+  const CODE_TO_FAMILY = {
+    inking: 'inking',
+    paper_type: 'paper',
+    paper_weight: 'paper',
+    paper_format: 'format',
+  };
+  const FAMILY_COLOR_VAR = {
+    inking: 'var(--family-inking)',
+    paper: 'var(--family-paper)',
+    format: 'var(--family-format)',
+  };
+  const FAMILY_LABEL_FR = {
+    inking: 'Encrage',
+    paper: 'Papier',
+    format: 'Format',
+  };
+
+  // ─── STATE ──────────────────────────────────────────────────
+  const state = {
+    position: 'between',
+    infoDensity: 'numeric',
+    color: 'continuous',
+    size: 'small',
+    visibility: 'positive-only',
+    normalization: 'absolute',
+    interaction: 'static',
+    threshold: 0.3,
+  };
+
+  // ─── HELPERS ────────────────────────────────────────────────
+  function interpolateColor(t) {
+    // t in [0,1] : from neutral (gray) to emerald
+    t = Math.max(0, Math.min(1, t));
+    const from = [82, 82, 91];   // zinc-600
+    const to = [52, 211, 153];   // emerald-400
+    const r = Math.round(from[0] + (to[0] - from[0]) * t);
+    const g = Math.round(from[1] + (to[1] - from[1]) * t);
+    const b = Math.round(from[2] + (to[2] - from[2]) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  function shouldRender(pair) {
+    if (pair.noRules || pair.firstTile) return false;
+    const ratio = pair.max > 0 ? pair.score / pair.max : 0;
+    switch (state.visibility) {
+      case 'always': return true;
+      case 'positive-only': return pair.score > 0;
+      case 'threshold': return ratio >= state.threshold;
+      case 'ghost-zero': return true;
+    }
+    return true;
+  }
+
+  function isGhost(pair) {
+    return state.visibility === 'ghost-zero' && pair.score <= 0;
+  }
+
+  function formatText(pair) {
+    if (state.normalization === 'visual-only') return '';
+    if (pair.max === 0) return '—';
+    const pts = Number.isInteger(pair.score) ? pair.score : pair.score.toFixed(1);
+    switch (state.normalization) {
+      case 'absolute': return `${pts}`;
+      case 'fraction': return `${pts}/${pair.max}`;
+      case 'percent': return `${Math.round((pair.score / pair.max) * 100)} %`;
+    }
+    return `${pts}`;
+  }
+
+  function tooltipText(pair) {
+    if (pair.matched.length === 0 && pair.neutralized.length === 0) return 'Aucune affinité';
+    const lines = [];
+    for (const r of pair.matched) {
+      const codes = r.codes.map(c => FAMILY_LABEL_FR[CODE_TO_FAMILY[c]] || c).join(' + ');
+      lines.push(`${codes} +${r.pts}`);
+    }
+    if (pair.neutralized.length > 0) {
+      lines.push(`Neutralisé : ${pair.neutralized.join(', ')}`);
+    }
+    return lines.join('<br>');
+  }
+
+  function colorFor(pair) {
+    const ratio = pair.max > 0 ? pair.score / pair.max : 0;
+    switch (state.color) {
+      case 'binary':
+        return pair.score > 0 ? 'var(--badge-match)' : 'var(--badge-neutral)';
+      case 'continuous':
+        return interpolateColor(ratio);
+      case 'per-criterion':
+        // For single-criterion badges, use family color; for multi, use neutral w/ chips
+        if (pair.matched.length === 1 && pair.matched[0].codes.length === 1) {
+          return FAMILY_COLOR_VAR[CODE_TO_FAMILY[pair.matched[0].codes[0]]] || 'var(--badge-neutral)';
+        }
+        return 'var(--badge-neutral)';
+      case 'mono':
+        return 'var(--badge-neutral)';
+    }
+    return 'var(--badge-neutral)';
+  }
+
+  function textColorFor(pair) {
+    if (state.color === 'mono') return 'var(--flux-text-primary)';
+    return 'white';
+  }
+
+  // ─── BADGE BUILDER ──────────────────────────────────────────
+  function buildBadge(pair) {
+    if (!shouldRender(pair)) return null;
+
+    const badge = document.createElement('span');
+    badge.className = [
+      'badge',
+      `pos-${state.position}`,
+      `sz-${state.size}`,
+      `interactive-${state.interaction}`,
+      isGhost(pair) ? 'ghost' : '',
+    ].filter(Boolean).join(' ');
+    badge.style.setProperty('--badge-bg', colorFor(pair));
+    badge.style.setProperty('--badge-fg', textColorFor(pair));
+
+    // Inner content
+    const contentWrap = document.createElement('span');
+    if (state.infoDensity === 'symbol') {
+      // Just a symbol. A single dot for size=micro; "◆" for small+.
+      contentWrap.textContent = state.size === 'micro' ? '' : '◆';
+    } else if (state.infoDensity === 'numeric') {
+      contentWrap.textContent = formatText(pair);
+    } else if (state.infoDensity === 'symbol-numeric') {
+      const sym = state.size === 'micro' ? '' : '◆ ';
+      contentWrap.textContent = sym + formatText(pair);
+    } else if (state.infoDensity === 'breakdown') {
+      // Pastilles: one colored chip per matched rule (after group resolution)
+      const chips = document.createElement('span');
+      chips.className = 'breakdown-chips';
+      for (const r of pair.matched) {
+        const fam = CODE_TO_FAMILY[r.codes[0]] || 'paper';
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.style.background = FAMILY_COLOR_VAR[fam];
+        chips.appendChild(chip);
+      }
+      contentWrap.appendChild(chips);
+      if (state.normalization !== 'visual-only') {
+        const n = document.createElement('span');
+        n.style.marginLeft = '4px';
+        n.textContent = formatText(pair);
+        contentWrap.appendChild(n);
+      }
+    }
+    badge.appendChild(contentWrap);
+
+    // Interaction overlays
+    if (state.interaction === 'hover-tooltip') {
+      const tip = document.createElement('span');
+      tip.className = 'tooltip';
+      tip.innerHTML = tooltipText(pair);
+      badge.appendChild(tip);
+    }
+    if (state.interaction === 'click-expand') {
+      const exp = document.createElement('span');
+      exp.className = 'expand';
+      exp.innerHTML = tooltipText(pair);
+      badge.appendChild(exp);
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        badge.classList.toggle('expanded');
+      });
+    }
+
+    return badge;
+  }
+
+  // ─── PAIR RENDER ────────────────────────────────────────────
+  function renderPair(pair) {
+    const wrap = document.createElement('div');
+    wrap.className = 'pair-wrap';
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'pair-label';
+    labelEl.innerHTML = `<strong>${pair.cat}</strong><br>${pair.label}`;
+    wrap.appendChild(labelEl);
+
+    const col = document.createElement('div');
+    col.className = 'station-col' + (state.position === 'side-column' ? ' side-column' : '');
+    col.style.setProperty('--gap', pair.gluedTiles ? '0' : '4px');
+
+    // Helper to build a tile element
+    const buildTile = (labelContent, short = false) => {
+      const t = document.createElement('div');
+      t.className = 'tile-mock' + (short ? ' short' : '');
+      if (pair.longLabel) {
+        t.innerHTML = `<span class="long-label">REF-2024-05-Acme Corp BusinessCards ${labelContent}</span>`;
+      } else {
+        t.innerHTML = `${labelContent}<div class="sub">—</div>`;
+      }
+      return t;
+    };
+
+    // Special rendering: dense station (6 tiles)
+    if (pair.denseStation) {
+      for (let i = 0; i < 6; i++) {
+        col.appendChild(buildTile(`J${i + 1}`, true));
+        if (i < 5) {
+          // insert an inline badge BETWEEN this and the next with alternating scores
+          const scores = [3, 0, 6, 2, 7];
+          const fakePair = {
+            ...pair, score: scores[i], max: 7,
+            matched: scores[i] > 0 ? [{ codes: ['paper_format'], pts: scores[i], group: null }] : [],
+          };
+          if (state.position === 'between' || state.position === 'junction-overlay') {
+            const anchor = col.lastChild;
+            const b = buildBadge(fakePair);
+            if (b) {
+              b.style.top = 'auto';
+              b.style.bottom = state.position === 'junction-overlay' ? '-9px' : '-6px';
+              anchor.appendChild(b);
+              anchor.style.position = 'relative';
+            }
+          }
+        }
+      }
+      wrap.appendChild(col);
+      return wrap;
+    }
+
+    // Single predecessor tile (or none for firstTile)
+    if (!pair.firstTile) {
+      col.appendChild(buildTile('J1', pair.shortTile));
+    }
+
+    // Build the successor tile with the badge attached
+    const currTile = buildTile('J2', pair.shortTile);
+    currTile.style.position = 'relative';
+    col.appendChild(currTile);
+
+    // If only one tile (firstTile case), show N/A indicator
+    if (pair.firstTile) {
+      const na = document.createElement('div');
+      na.style.fontSize = '9px'; na.style.color = 'var(--flux-text-muted)';
+      na.style.textAlign = 'center'; na.style.padding = '4px 0';
+      na.textContent = '(pas de prédécesseur, pas de badge)';
+      wrap.appendChild(col); wrap.appendChild(na);
+      return wrap;
+    }
+
+    const badge = buildBadge(pair);
+    if (badge) {
+      if (state.position === 'between') {
+        badge.style.top = 'auto';
+        badge.style.bottom = `-${pair.gluedTiles ? 0 : 2}px`;
+        const anchor = col.children[0];
+        anchor.appendChild(badge);
+        anchor.style.position = 'relative';
+      } else if (state.position === 'junction-overlay') {
+        badge.style.top = '-1px';
+        currTile.appendChild(badge);
+      } else if (state.position === 'left-edge') {
+        currTile.appendChild(badge);
+        currTile.style.paddingLeft = '24px';
+      } else if (state.position === 'side-column') {
+        let track = col.querySelector('.side-column-track');
+        if (!track) {
+          track = document.createElement('div');
+          track.className = 'side-column-track';
+          col.appendChild(track);
+        }
+        track.appendChild(badge);
+      } else if (state.position === 'junction-overlay') {
+        currTile.appendChild(badge);
+      }
+    }
+
+    if (state.size === 'annotation' && badge) {
+      // annotation: full-width bar BETWEEN the two tiles
+      badge.style.position = 'static';
+      badge.style.transform = 'none';
+      badge.style.margin = '2px 0';
+      col.insertBefore(badge, currTile);
+    }
+
+    wrap.appendChild(col);
+    return wrap;
+  }
+
+  // ─── RENDER ALL SCENARIOS ───────────────────────────────────
+  function renderAll() {
+    const map = {
+      'scen-offset': PAIRS.offset,
+      'scen-pellicul': PAIRS.pellicul,
+      'scen-massicot': PAIRS.massicot,
+      'scen-finition': PAIRS.finition,
+      'scen-edges': PAIRS.edges,
+      'scen-stress': PAIRS.stress,
+    };
+    for (const [id, pairs] of Object.entries(map)) {
+      const container = document.getElementById(id);
+      container.innerHTML = '';
+      for (const p of pairs) {
+        container.appendChild(renderPair(p));
+      }
+    }
+    updateCheckedStyle();
+  }
+
+  // ─── UI WIRING ──────────────────────────────────────────────
+  function updateCheckedStyle() {
+    document.querySelectorAll('.radio-group label').forEach(l => {
+      const input = l.querySelector('input');
+      l.classList.toggle('checked', input && input.checked);
+    });
+  }
+
+  document.querySelectorAll('input[type="radio"]').forEach(input => {
+    input.addEventListener('change', (e) => {
+      state[e.target.name] = e.target.value;
+      renderAll();
+    });
+  });
+
+  const thresholdSlider = document.getElementById('threshold');
+  const thresholdVal = document.getElementById('threshold-val');
+  thresholdSlider.addEventListener('input', (e) => {
+    state.threshold = parseInt(e.target.value, 10) / 100;
+    thresholdVal.textContent = `${e.target.value}%`;
+    renderAll();
+  });
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    const exportState = { ...state };
+    if (state.visibility !== 'threshold') delete exportState.threshold;
+    out.textContent = JSON.stringify(exportState, null, 2);
+    out.classList.add('visible');
+    // Also copy to clipboard if possible
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(JSON.stringify(exportState, null, 2)).catch(() => {});
+    }
+  });
+
+  // Initial render
+  renderAll();
+</script>
+</body>
+</html>
