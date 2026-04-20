@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Similarity Badge Refinement — Pill / Micro / Stepped / Junction</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-muted: rgb(128, 128, 128);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base); color: var(--flux-text-primary);
+    min-height: 100vh; display: grid; grid-template-columns: 340px 1fr;
+  }
+
+  aside.controls {
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    padding: 20px 18px; overflow-y: auto;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .controls h1 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .controls .subtitle { font-size: 11px; color: var(--flux-text-muted); margin-bottom: 12px; line-height: 1.5; }
+  .locked {
+    background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    border-radius: 6px; padding: 10px 12px; margin-bottom: 14px;
+    font-size: 10px; line-height: 1.6; color: var(--flux-text-muted);
+  }
+  .locked code { color: var(--flux-text-secondary); background: transparent; }
+  .locked strong { color: var(--flux-text-secondary); }
+
+  fieldset {
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    padding: 10px 12px 12px; margin-bottom: 12px;
+    background: var(--flux-elevated);
+  }
+  legend {
+    padding: 0 6px; font-size: 11px; font-weight: 600;
+    color: var(--flux-text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .radio-group, .slider-group { display: flex; flex-direction: column; gap: 4px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 4px;
+    font-size: 12px; color: var(--flux-text-secondary); cursor: pointer;
+  }
+  .radio-group label:hover { background: rgba(255,255,255,0.04); }
+  .radio-group label.checked { background: rgba(59, 130, 246, 0.1); color: var(--flux-text-primary); }
+  .radio-group input[type="radio"] { accent-color: rgb(59, 130, 246); }
+  .slider-row { display: grid; grid-template-columns: 72px 1fr 34px; align-items: center; gap: 6px; font-size: 11px; color: var(--flux-text-muted); }
+  .slider-row input[type="range"] { accent-color: rgb(59, 130, 246); }
+  .swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .swatch {
+    border: 1px solid var(--flux-border); border-radius: 4px;
+    padding: 6px; cursor: pointer; background: var(--flux-elevated);
+    display: flex; flex-direction: column; gap: 2px; align-items: center;
+  }
+  .swatch.checked { border-color: rgb(59, 130, 246); background: rgba(59, 130, 246, 0.08); }
+  .swatch .swatch-label { font-size: 9px; color: var(--flux-text-muted); }
+  .swatch .swatch-chips { display: flex; gap: 1px; }
+  .swatch .swatch-chips > span { width: 10px; height: 10px; border-radius: 50%; }
+
+  .export-btn {
+    width: 100%; margin-top: 6px;
+    padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    border: 1px solid rgb(59, 130, 246);
+    background: rgb(37, 99, 235); color: white; cursor: pointer;
+  }
+  .export-btn.prompt { background: rgb(22, 101, 52); border-color: rgb(34, 134, 74); }
+  .export-btn:hover { filter: brightness(1.1); }
+  .export-output {
+    margin-top: 10px; padding: 8px; background: var(--flux-base);
+    border: 1px solid var(--flux-border); border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 10px;
+    color: var(--flux-text-secondary);
+    white-space: pre-wrap; max-height: 280px; overflow-y: auto;
+    display: none;
+  }
+  .export-output.visible { display: block; }
+
+  /* ─── STAGE ───────────────────────────────────────────────── */
+  main.stage { padding: 24px 28px 60px; overflow-x: auto; }
+  .stage h2 {
+    font-size: 13px; font-weight: 600; margin: 18px 0 8px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--flux-border);
+  }
+  .stage h2:first-child { margin-top: 0; }
+  .stage .scen-note {
+    font-size: 11px; color: var(--flux-text-muted); margin-bottom: 12px; line-height: 1.5;
+  }
+
+  .zoom-wrap {
+    background: var(--flux-surface); border: 1px solid var(--flux-border);
+    border-radius: 8px; padding: 24px;
+    display: flex; gap: 20px; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .zoom-scale { transform: scale(5); transform-origin: center; display: inline-block; }
+  .zoom-scale-x3 { transform: scale(3); }
+  .zoom-scale-x2 { transform: scale(2); }
+  .scale-controls { font-size: 10px; color: var(--flux-text-muted); margin-left: auto; }
+  .scale-controls label { display: inline-flex; gap: 4px; margin-right: 6px; cursor: pointer; }
+
+  .scenario-row {
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .pair-wrap { display: flex; flex-direction: column; align-items: center; min-width: 88px; }
+  .pair-label { font-size: 10px; color: var(--flux-text-muted); margin-bottom: 4px; text-align: center; }
+  .pair-label strong { color: var(--flux-text-secondary); }
+  .station-col {
+    position: relative; width: 88px;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    border-radius: 4px; padding: 3px;
+    display: flex; flex-direction: column;
+  }
+  .tile-mock {
+    width: 100%; padding: 5px 7px; border-radius: 3px;
+    background: rgba(74, 123, 201, 0.55);
+    font-size: 10px; font-weight: 600; margin-bottom: 4px;
+  }
+  .tile-mock:last-child { margin-bottom: 0; }
+  .tile-mock .sub { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.7); margin-top: 1px; }
+
+  /* ─── BADGE — focused pill/micro/numeric/stepped/junction variant ─── */
+  .badge {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, -50%);
+    transform-origin: center;
+    z-index: 2;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--badge-bg);
+    color: var(--badge-fg, white);
+    font-weight: var(--fw, 600);
+    font-size: var(--fs, 9px);
+    min-width: var(--h, 12px);
+    height: var(--h, 12px);
+    padding: 0 var(--px, 3px);
+    border-radius: var(--radius, 7px);
+    border: var(--border, none);
+    box-shadow: var(--shadow, none);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .badge.align-left { left: 6px; transform: translateY(-50%); }
+  .badge.align-right { left: auto; right: 6px; transform: translateY(-50%); }
+
+  .legend {
+    margin-top: 32px; padding: 16px; background: var(--flux-surface);
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    font-size: 11px; color: var(--flux-text-muted); line-height: 1.6;
+  }
+  .legend strong { color: var(--flux-text-secondary); }
+  .legend code { background: var(--flux-elevated); padding: 1px 4px; border-radius: 3px; font-family: "SF Mono", Menlo, monospace; font-size: 10px; }
+</style>
+</head>
+<body>
+  <!-- ─── CONTROLS ───────────────────────────────────────────── -->
+  <aside class="controls">
+    <h1>Badge Refinement</h1>
+    <div class="subtitle">Focus sur la config déjà retenue (pill / micro / numeric / stepped / junction-overlay). Les axes verrouillés apparaissent ci-dessous ; seuls les ajustements fins restent tunables.</div>
+
+    <div class="locked">
+      <strong>Config verrouillée :</strong><br>
+      • <code>shape = pill</code><br>
+      • <code>infoDensity = numeric</code><br>
+      • <code>visibility = positive-only</code><br>
+      • <code>normalization = absolute</code><br>
+      • <code>interaction = static</code>
+    </div>
+
+    <fieldset>
+      <legend>Position (autour de junction-overlay)</legend>
+      <div class="radio-group" data-axis="align">
+        <label><input type="radio" name="align" value="center" checked> Centré sur la ligne de jonction</label>
+        <label><input type="radio" name="align" value="left"> Ancré à gauche (bord-de-ligne)</label>
+        <label><input type="radio" name="align" value="right"> Ancré à droite (bord-de-ligne)</label>
+      </div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span>Offset Y</span>
+        <input type="range" id="offsetY" min="-4" max="4" step="1" value="0">
+        <span id="offsetY-val">0 px</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Typographie (autour de numeric)</legend>
+      <div class="radio-group" data-axis="weight">
+        <label><input type="radio" name="weight" value="500"> Medium (500)</label>
+        <label><input type="radio" name="weight" value="600" checked> Semibold (600)</label>
+        <label><input type="radio" name="weight" value="700"> Bold (700)</label>
+      </div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span>Font-size</span>
+        <input type="range" id="fs" min="7" max="11" step="1" value="9">
+        <span id="fs-val">9 px</span>
+      </div>
+      <div class="radio-group" data-axis="numFmt" style="margin-top:8px;">
+        <label><input type="radio" name="numFmt" value="plain" checked> Entier brut ("3")</label>
+        <label><input type="radio" name="numFmt" value="plus"> Préfixe plus ("+3")</label>
+        <label><input type="radio" name="numFmt" value="dot"> Style pip ("•3")</label>
+        <label><input type="radio" name="numFmt" value="decimal"> Toujours 1 décimale ("3.0")</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Palette stepped</legend>
+      <div class="swatch-grid" id="palette-grid"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Seuils stepped</legend>
+      <div class="radio-group" data-axis="thresholds">
+        <label><input type="radio" name="thresholds" value="33-66" checked> Classique (33 % / 66 %) — 3 paliers</label>
+        <label><input type="radio" name="thresholds" value="50"> Binaire (50 %) — pass/fail</label>
+        <label><input type="radio" name="thresholds" value="25-50-75"> Fin (25 / 50 / 75 %) — 4 paliers</label>
+        <label><input type="radio" name="thresholds" value="abs-2-4"> Absolu 2 / 4 pts (≥ 4 = "excellent")</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Taille micro — ajustements</legend>
+      <div class="slider-row">
+        <span>Hauteur</span>
+        <input type="range" id="h" min="10" max="18" step="1" value="12">
+        <span id="h-val">12 px</span>
+      </div>
+      <div class="slider-row">
+        <span>Padding H</span>
+        <input type="range" id="px" min="2" max="8" step="1" value="3">
+        <span id="px-val">3 px</span>
+      </div>
+      <div class="slider-row">
+        <span>Border-rad.</span>
+        <input type="range" id="radius" min="0" max="10" step="1" value="7">
+        <span id="radius-val">7 px</span>
+      </div>
+      <div class="radio-group" data-axis="border" style="margin-top:8px;">
+        <label><input type="radio" name="border" value="none" checked> Sans bordure</label>
+        <label><input type="radio" name="border" value="tonal"> Bordure tonale (mêmes couleurs, plus sombre)</label>
+        <label><input type="radio" name="border" value="contrast"> Bordure contrastée (fond tuile)</label>
+      </div>
+      <div class="radio-group" data-axis="shadow" style="margin-top:8px;">
+        <label><input type="radio" name="shadow" value="none"> Sans ombre</label>
+        <label><input type="radio" name="shadow" value="subtle" checked> Ombre discrète</label>
+        <label><input type="radio" name="shadow" value="medium"> Ombre franche</label>
+      </div>
+    </fieldset>
+
+    <button class="export-btn" id="export-btn">Exporter la config</button>
+    <button class="export-btn prompt" id="prompt-btn">Générer le prompt Claude</button>
+    <pre class="export-output" id="export-output"></pre>
+  </aside>
+
+  <!-- ─── STAGE ──────────────────────────────────────────────── -->
+  <main class="stage">
+    <h2>Aperçu zoomé ×5 — un échantillon sur chaque palier</h2>
+    <div class="scen-note">Pour inspecter au pixel près. La tuile et le badge sont à leur taille réelle ensuite en dessous. Le score est indiqué au-dessus.</div>
+    <div class="zoom-wrap">
+      <div class="scale-controls">
+        <label><input type="radio" name="zoom" value="2"> ×2</label>
+        <label><input type="radio" name="zoom" value="3"> ×3</label>
+        <label><input type="radio" name="zoom" value="5" checked> ×5</label>
+      </div>
+    </div>
+    <div class="scenario-row" id="scen-zoom"></div>
+
+    <h2>Taille réelle — balayage complet des scores</h2>
+    <div class="scen-note">Comme ça se présentera dans la grille de planning.</div>
+    <div class="scenario-row" id="scen-real"></div>
+
+    <h2>Cas bords et minimums</h2>
+    <div class="scen-note">Pelliculeuses 0.5 (fractionnaire), Massicots 1/1 (seuls 100 %), Offset 2 (bas de la fourchette).</div>
+    <div class="scenario-row" id="scen-edges"></div>
+
+    <div class="legend">
+      <strong>Lecture.</strong><br>
+      • Seuils <code>stepped</code> : par ratio (<code>score / maxPoints</code>) ou absolu (palier en points bruts).<br>
+      • La palette <em>Classique</em> suit la convention feu tricolore (red-400 / amber-400 / emerald-400).<br>
+      • Palette <em>Sobre</em> reste en tons verts (zinc-500 → emerald-400) pour une lecture moins alarmiste.<br>
+      • Palette <em>Chaud-froid</em> passe du bleu (rare) au vert (fréquent) — évite le rouge qui porte une connotation "erreur".<br>
+      • Palette <em>Mono</em> joue uniquement sur l'opacité.<br>
+      • Le bouton <strong>Prompt Claude</strong> produit un prompt prêt-à-coller reprenant exactement la config affichée.
+    </div>
+  </main>
+
+<script>
+  // ─── DATA ──────────────────────────────────────────────────
+  const PAIRS = {
+    zoom: [
+      { cat: 'Offset', max: 7, score: 2 },
+      { cat: 'Offset', max: 7, score: 4 },
+      { cat: 'Offset', max: 7, score: 7 },
+      { cat: 'Pellic.', max: 3, score: 0.5 },
+      { cat: 'Finition', max: 3, score: 3 },
+    ],
+    real: [
+      { cat: 'Offset', max: 7, score: 2 },
+      { cat: 'Offset', max: 7, score: 3 },
+      { cat: 'Offset', max: 7, score: 4 },
+      { cat: 'Offset', max: 7, score: 6 },
+      { cat: 'Offset', max: 7, score: 7 },
+      { cat: 'Pellic.', max: 3, score: 1 },
+      { cat: 'Pellic.', max: 3, score: 3 },
+      { cat: 'Mass.', max: 1, score: 1 },
+      { cat: 'Finition', max: 3, score: 1 },
+      { cat: 'Finition', max: 3, score: 3 },
+    ],
+    edges: [
+      { cat: 'Pellic.', max: 3, score: 0.5 },
+      { cat: 'Mass.', max: 1, score: 1 },
+      { cat: 'Offset', max: 7, score: 2 },
+    ],
+  };
+
+  const PALETTES = {
+    classic: {
+      label: 'Classique',
+      description: 'Feu tricolore',
+      low:  'rgb(248, 113, 113)',   // red-400
+      mid:  'rgb(251, 191, 36)',    // amber-400
+      high: 'rgb(52, 211, 153)',    // emerald-400
+      extraHigh: 'rgb(16, 185, 129)', // emerald-500 (for 4-palier)
+    },
+    sober: {
+      label: 'Sobre',
+      description: 'Tons verts',
+      low:  'rgb(113, 113, 122)',   // zinc-500
+      mid:  'rgb(132, 204, 22)',    // lime-500
+      high: 'rgb(52, 211, 153)',    // emerald-400
+      extraHigh: 'rgb(16, 185, 129)',
+    },
+    warmcold: {
+      label: 'Chaud-froid',
+      description: 'Bleu → vert',
+      low:  'rgb(96, 165, 250)',    // blue-400
+      mid:  'rgb(45, 212, 191)',    // teal-400
+      high: 'rgb(52, 211, 153)',    // emerald-400
+      extraHigh: 'rgb(16, 185, 129)',
+    },
+    mono: {
+      label: 'Mono',
+      description: 'Opacité seule',
+      low:  'rgba(52, 211, 153, 0.35)',
+      mid:  'rgba(52, 211, 153, 0.65)',
+      high: 'rgba(52, 211, 153, 1.0)',
+      extraHigh: 'rgba(16, 185, 129, 1.0)',
+    },
+  };
+
+  // ─── STATE ─────────────────────────────────────────────────
+  const state = {
+    // Position
+    align: 'center',
+    offsetY: 0,
+    // Typography
+    weight: 600,
+    fs: 9,
+    numFmt: 'plain',
+    // Palette + thresholds
+    palette: 'classic',
+    thresholds: '33-66',
+    // Size
+    h: 12,
+    px: 3,
+    radius: 7,
+    border: 'none',
+    shadow: 'subtle',
+    // Zoom
+    zoom: 5,
+  };
+
+  // ─── HELPERS ───────────────────────────────────────────────
+  function classify(score, max) {
+    const ratio = max > 0 ? score / max : 0;
+    switch (state.thresholds) {
+      case '33-66':
+        if (ratio < 1 / 3) return 'low';
+        if (ratio < 2 / 3) return 'mid';
+        return 'high';
+      case '50':
+        return ratio < 0.5 ? 'low' : 'high';
+      case '25-50-75':
+        if (ratio < 0.25) return 'low';
+        if (ratio < 0.5) return 'mid';
+        if (ratio < 0.75) return 'high';
+        return 'extraHigh';
+      case 'abs-2-4':
+        if (score < 2) return 'low';
+        if (score < 4) return 'mid';
+        return 'high';
+    }
+    return 'mid';
+  }
+
+  function bgColorFor(pair) {
+    const p = PALETTES[state.palette];
+    const k = classify(pair.score, pair.max);
+    return p[k] ?? p.mid;
+  }
+
+  function fgColorFor(pair) {
+    if (state.palette === 'mono') return 'white';
+    return 'white';
+  }
+
+  function darkerForBorder(rgbStr) {
+    // crude: reduce each channel by 25% for tonal border
+    const m = /rgba?\(([^,]+),([^,]+),([^,]+)(?:,([^)]+))?\)/.exec(rgbStr);
+    if (!m) return rgbStr;
+    const [r, g, b] = [+m[1], +m[2], +m[3]].map(n => Math.max(0, Math.round(n * 0.65)));
+    const a = m[4] ? parseFloat(m[4]) : 1;
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function formatNumber(score) {
+    const i = Math.floor(score);
+    const frac = score - i;
+    const isFrac = frac >= 0.05;
+    switch (state.numFmt) {
+      case 'plain':
+        return isFrac ? score.toFixed(1) : String(i);
+      case 'plus':
+        return '+' + (isFrac ? score.toFixed(1) : String(i));
+      case 'dot':
+        return '•' + (isFrac ? score.toFixed(1) : String(i));
+      case 'decimal':
+        return score.toFixed(1);
+    }
+    return String(i);
+  }
+
+  function shadowFor() {
+    switch (state.shadow) {
+      case 'none': return 'none';
+      case 'subtle': return '0 1px 2px rgba(0,0,0,0.3)';
+      case 'medium': return '0 2px 6px rgba(0,0,0,0.5)';
+    }
+    return 'none';
+  }
+
+  function borderFor(bg) {
+    if (state.border === 'none') return 'none';
+    if (state.border === 'tonal') return `1px solid ${darkerForBorder(bg)}`;
+    if (state.border === 'contrast') return `1px solid var(--flux-elevated)`;
+    return 'none';
+  }
+
+  // ─── BADGE BUILDER ────────────────────────────────────────
+  function buildBadge(pair) {
+    if (pair.score <= 0) return null;  // visibility = positive-only (locked)
+
+    const b = document.createElement('span');
+    b.className = 'badge' + (state.align === 'left' ? ' align-left' : state.align === 'right' ? ' align-right' : '');
+    const bg = bgColorFor(pair);
+    b.style.setProperty('--badge-bg', bg);
+    b.style.setProperty('--badge-fg', fgColorFor(pair));
+    b.style.setProperty('--fw', state.weight);
+    b.style.setProperty('--fs', `${state.fs}px`);
+    b.style.setProperty('--h', `${state.h}px`);
+    b.style.setProperty('--px', `${state.px}px`);
+    b.style.setProperty('--radius', `${state.radius}px`);
+    b.style.setProperty('--shadow', shadowFor());
+    b.style.setProperty('--border', borderFor(bg));
+    if (state.align === 'center') {
+      b.style.top = `${state.offsetY}px`;
+    } else {
+      b.style.top = `${state.offsetY}px`;
+    }
+    b.textContent = formatNumber(pair.score);
+    return b;
+  }
+
+  // ─── RENDER ───────────────────────────────────────────────
+  function renderPair(pair, zoomClass = '') {
+    const wrap = document.createElement('div');
+    wrap.className = 'pair-wrap';
+    const label = document.createElement('div');
+    label.className = 'pair-label';
+    label.innerHTML = `<strong>${pair.cat}</strong><br>score ${pair.score} / ${pair.max}`;
+    wrap.appendChild(label);
+
+    const scaler = zoomClass ? document.createElement('div') : null;
+    if (scaler) scaler.className = `zoom-scale ${zoomClass}`;
+
+    const col = document.createElement('div');
+    col.className = 'station-col';
+    col.innerHTML = `
+      <div class="tile-mock">J1<div class="sub">—</div></div>
+      <div class="tile-mock" style="position: relative;">J2<div class="sub">—</div></div>
+    `;
+    const currTile = col.children[1];
+    const b = buildBadge(pair);
+    if (b) currTile.appendChild(b);
+
+    if (scaler) {
+      scaler.appendChild(col);
+      wrap.appendChild(scaler);
+    } else {
+      wrap.appendChild(col);
+    }
+    return wrap;
+  }
+
+  function renderAll() {
+    const zoomClass = state.zoom === 5 ? 'zoom-scale' : state.zoom === 3 ? 'zoom-scale zoom-scale-x3' : 'zoom-scale zoom-scale-x2';
+
+    const rz = document.getElementById('scen-zoom');
+    rz.innerHTML = '';
+    PAIRS.zoom.forEach((p) => rz.appendChild(renderPair(p, zoomClass)));
+
+    const rr = document.getElementById('scen-real');
+    rr.innerHTML = '';
+    PAIRS.real.forEach((p) => rr.appendChild(renderPair(p)));
+
+    const re = document.getElementById('scen-edges');
+    re.innerHTML = '';
+    PAIRS.edges.forEach((p) => re.appendChild(renderPair(p)));
+
+    updateRadioStyle();
+    updatePaletteStyle();
+  }
+
+  // ─── WIRING ───────────────────────────────────────────────
+  function updateRadioStyle() {
+    document.querySelectorAll('.radio-group label').forEach(l => {
+      const i = l.querySelector('input');
+      l.classList.toggle('checked', i && i.checked);
+    });
+  }
+
+  function buildPaletteSwatches() {
+    const grid = document.getElementById('palette-grid');
+    grid.innerHTML = '';
+    Object.entries(PALETTES).forEach(([key, p]) => {
+      const s = document.createElement('div');
+      s.className = 'swatch' + (state.palette === key ? ' checked' : '');
+      s.dataset.key = key;
+      s.innerHTML = `
+        <div class="swatch-chips">
+          <span style="background:${p.low}"></span>
+          <span style="background:${p.mid}"></span>
+          <span style="background:${p.high}"></span>
+        </div>
+        <div class="swatch-label">${p.label}</div>
+      `;
+      s.addEventListener('click', () => {
+        state.palette = key;
+        updatePaletteStyle();
+        renderAll();
+      });
+      grid.appendChild(s);
+    });
+  }
+  function updatePaletteStyle() {
+    document.querySelectorAll('.swatch').forEach(s => {
+      s.classList.toggle('checked', s.dataset.key === state.palette);
+    });
+  }
+
+  document.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.addEventListener('change', (e) => {
+      const name = e.target.name;
+      const val = e.target.value;
+      if (name === 'weight' || name === 'offsetY') {
+        state[name] = parseInt(val, 10);
+      } else if (name === 'zoom') {
+        state.zoom = parseInt(val, 10);
+      } else {
+        state[name] = val;
+      }
+      renderAll();
+    });
+  });
+
+  const sliders = [
+    ['offsetY', 'px'], ['fs', 'px'], ['h', 'px'], ['px', 'px'], ['radius', 'px'],
+  ];
+  sliders.forEach(([id, unit]) => {
+    const input = document.getElementById(id);
+    const out = document.getElementById(`${id}-val`);
+    input.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      state[id] = v;
+      out.textContent = `${v} ${unit}`;
+      renderAll();
+    });
+  });
+
+  // ─── EXPORT / PROMPT ──────────────────────────────────────
+  function currentRefinement() {
+    return {
+      // Base locked config (carried verbatim for the downstream prompt)
+      base: {
+        shape: 'pill',
+        position: 'junction-overlay',
+        infoDensity: 'numeric',
+        color: 'stepped',
+        size: 'micro',
+        visibility: 'positive-only',
+        normalization: 'absolute',
+        interaction: 'static',
+      },
+      // Fine-tuning on top of that base
+      refine: {
+        align: state.align,
+        offsetY: state.offsetY,
+        fontWeight: state.weight,
+        fontSizePx: state.fs,
+        numberFormat: state.numFmt,
+        palette: state.palette,
+        thresholds: state.thresholds,
+        heightPx: state.h,
+        paddingHPx: state.px,
+        borderRadiusPx: state.radius,
+        border: state.border,
+        shadow: state.shadow,
+      },
+      computed: {
+        paletteColors: PALETTES[state.palette],
+      },
+    };
+  }
+
+  function buildPrompt(cfg) {
+    const json = JSON.stringify(cfg, null, 2);
+    return `# Tâche — implémenter \`SimilarityBadge\` (Phase 2, B5 du plan)
+
+## Contexte
+
+Je viens de valider la config UX du badge de practicité via le playground
+\`apps/web/playgrounds/similarity-badge-refine.html\`. Implémente maintenant
+le composant React qui rend cette config sur les tuiles du planning.
+
+Config de base : **pill / numeric / stepped / micro / junction-overlay**.
+Les valeurs \`refine\` en-dessous sont les ajustements fins retenus —
+implémente-les telles quelles (pas d'autres interprétations).
+
+## Config retenue
+
+\`\`\`json
+${json}
+\`\`\`
+
+## Fichiers à créer / modifier
+
+- **Créer** \`apps/web/src/components/Tile/SimilarityBadge.tsx\`
+  - Props : \`{ score: SimilarityScore }\` — le type vient de \`@flux/types\`.
+  - Header du fichier : cite littéralement la config JSON ci-dessus dans un
+    commentaire pour garantir la traçabilité playground → React.
+  - Rend un \`<span>\` positionné en absolu (position: 'absolute', top: 0,
+    left/right selon \`refine.align\`, transform: translate(-50%, -50%)
+    pour center, seul translateY pour left/right), avec :
+    - hauteur = \`refine.heightPx\`, min-width idem
+    - padding horizontal = \`refine.paddingHPx\`
+    - border-radius = \`refine.borderRadiusPx\`
+    - font-weight = \`refine.fontWeight\`, font-size = \`refine.fontSizePx\`
+    - fond = palette\`[classe du score]\` où classe = low/mid/high/extraHigh
+      selon \`refine.thresholds\` (33-66 | 50 | 25-50-75 | abs-2-4)
+    - bordure + ombre selon les axes correspondants
+  - Retourne \`null\` si \`score.points <= 0\` (visibility = positive-only).
+
+- **Modifier** \`apps/web/src/components/Tile/Tile.tsx\`
+  - Monter \`<SimilarityBadge score={similarityScore} />\` dans le wrapper
+    interne de la tuile (position: relative parent) quand \`similarityScore\`
+    existe dans les props.
+
+- **Modifier** \`apps/web/src/utils/stationTileData.ts\`
+  - Appeler \`computeSimilarityScore(prevElement?.spec, element.spec, category)\`
+    depuis \`./similarityScore\` (livré en B3).
+  - Stocker dans \`CachedTileData.similarityScore\`.
+
+## Invariants
+
+- Pas de badge sur la première tuile d'une station (pas de prédécesseur) —
+  \`prev\` null ⇒ \`score\` non fourni ⇒ \`null\`.
+- Pas de badge quand \`similarityScoreRules\` est vide sur la catégorie
+  (Typographie) — \`score.maxPoints === 0\` ⇒ le calculator rend \`points = 0\`
+  ⇒ \`null\` via positive-only.
+- Aucune régression sur \`Tile.test.tsx\`.
+
+## Parité playground
+
+Pour vérifier la bonne implémentation : un job offset avec score 4 doit
+donner un badge avec fond = palette.mid (palette \`classic\` → amber-400),
+hauteur 12 px (si non modifié), police ${state.weight} à ${state.fs} px,
+affichant "4" (si numberFormat = plain). Le playground reste l'oracle —
+pixel-pour-pixel identique attendu.
+
+## Vérification
+
+- \`cd apps/web && npx tsc -b --force\` — aucune nouvelle erreur TS
+- \`cd apps/web && npx vitest run src/components/Tile\` — vert
+- Dev server + check visuel sur deux jobs similaires d'une presse offset
+`;
+  }
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    out.textContent = JSON.stringify(currentRefinement(), null, 2);
+    out.classList.add('visible');
+    if (navigator.clipboard) navigator.clipboard.writeText(out.textContent).catch(() => {});
+  });
+  document.getElementById('prompt-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    out.textContent = buildPrompt(currentRefinement());
+    out.classList.add('visible');
+    if (navigator.clipboard) navigator.clipboard.writeText(out.textContent).catch(() => {});
+  });
+
+  buildPaletteSwatches();
+  renderAll();
+</script>
+</body>
+</html>
