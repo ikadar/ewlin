@@ -15,6 +15,22 @@ import { getPrerequisiteBlockingInfo } from './prerequisites';
 import { getTirageLabel } from './tileLabelResolver';
 import { computeSimilarityScore } from './similarityScore';
 
+/**
+ * A calage overlay pre-computed in tile-local pixel space using the same
+ * collapse-aware `timeToYPosition` mapping that produced the tile's own
+ * height. Using linear `minutes × pixelsPerHour` inside `Tile` overflowed
+ * past the rendered bottom whenever the tile straddled a collapse band
+ * (e.g. an overnight tile with a lunch-time recalage rendered 400 px below
+ * its own bottom and bled into the next tile's visual area).
+ */
+export interface CalageGeometry {
+  kind: 'setup' | 'recalage';
+  /** Offset from the tile's top, in collapse-aware pixels. */
+  top: number;
+  /** Height in collapse-aware pixels (min 4). */
+  height: number;
+}
+
 export interface CachedTileData {
   jobId: string;
   element: Element | undefined;
@@ -23,9 +39,16 @@ export interface CachedTileData {
   top: number;
   /** Collapse-aware pixel height — bottomY - topY through `timeToYPosition`. */
   height: number;
+  /**
+   * Pre-computed calage overlays (initial setup + any recalages).
+   * Each entry is already clamped within the tile's rendered bounds.
+   */
+  calageGeometries: readonly CalageGeometry[];
   similarityResults: ReturnType<typeof compareSimilarity> | undefined;
   /** Practicity score vs the previous tile on this station (Phase 2). */
   similarityScore: SimilarityScore | undefined;
+  /** Station category — drives SimilarityBadge's dynamic level derivation. */
+  category: StationCategory | undefined;
   hasConflict: boolean;
   tileState: ReturnType<typeof computeTileState>;
   blocked: boolean;
@@ -93,12 +116,42 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       if (!job || !isInternalTask(task)) return;
 
       const blocking = element ? elementBlockingCache.get(element.id) : undefined;
-      const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate, collapses);
+      const scheduledStart = new Date(assignment.scheduledStart);
+      const top = timeToYPosition(scheduledStart, startHour, pixelsPerHour, startDate, collapses);
       // Collapse-aware bottom — when the tile straddles a band, the span
       // here is smaller than the raw wall-clock duration. Without this,
       // Tile would self-compute a linear height and overflow past bands.
       const bottom = timeToYPosition(new Date(assignment.scheduledEnd), startHour, pixelsPerHour, startDate, collapses);
       const height = Math.max(bottom - top, 1);
+
+      // Pre-compute calage overlays in tile-local, collapse-aware pixel space.
+      // Using a linear minute→pixel conversion inside `Tile` silently positioned
+      // recalage bands hundreds of pixels past the tile's rendered bottom
+      // whenever a night/lunch collapse sat between `scheduledStart` and the
+      // recalage — those orphan bands then bled into the visual area of the
+      // tile directly below, creating the phantom "second calage" look.
+      const projectWindow = (startMs: number, endMs: number): { top: number; height: number } | null => {
+        if (!(endMs > startMs)) return null;
+        const yStart = timeToYPosition(new Date(startMs), startHour, pixelsPerHour, startDate, collapses);
+        const yEnd = timeToYPosition(new Date(endMs), startHour, pixelsPerHour, startDate, collapses);
+        // Clamp within the tile's rendered bounds.
+        const clampedTop = Math.max(0, Math.min(yStart - top, height));
+        const clampedBottom = Math.max(0, Math.min(yEnd - top, height));
+        const rawHeight = clampedBottom - clampedTop;
+        if (rawHeight <= 0) return null;
+        return { top: clampedTop, height: Math.max(rawHeight, 4) };
+      };
+
+      const calageGeometries: CalageGeometry[] = [];
+      const setupEnd = assignment.setupEnd ? new Date(assignment.setupEnd).getTime() : null;
+      if (setupEnd !== null) {
+        const setupGeom = projectWindow(scheduledStart.getTime(), setupEnd);
+        if (setupGeom) calageGeometries.push({ kind: 'setup', ...setupGeom });
+      }
+      for (const rc of assignment.recalages ?? []) {
+        const rcGeom = projectWindow(new Date(rc.start).getTime(), new Date(rc.end).getTime());
+        if (rcGeom) calageGeometries.push({ kind: 'recalage', ...rcGeom });
+      }
 
       let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
       let similarityScore: SimilarityScore | undefined = undefined;
@@ -135,8 +188,10 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
 
       cache.set(assignment.id, {
         jobId: job.id, element, task, job, top, height,
+        calageGeometries,
         similarityResults,
         similarityScore,
+        category,
         hasConflict, tileState,
         blocked: blocking?.blocked ?? false,
         blockingInfo: blocking?.blockingInfo,

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
-import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore } from '@flux/types';
+import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { TileTooltip } from './TileTooltip';
 import { getStateColorClasses, getStateRgb } from './colorUtils';
@@ -10,6 +10,7 @@ import { SimilarityBadge } from './SimilarityBadge';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useTooltipDelay } from '../../hooks';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
+import type { CalageGeometry } from '../../utils/stationTileData';
 
 export interface TileProps {
   /** Task assignment data */
@@ -32,6 +33,8 @@ export interface TileProps {
   similarityResults?: SimilarityResult[];
   /** Practicity score vs previous tile on this station (Phase 2). */
   similarityScore?: SimilarityScore;
+  /** Station category — drives SimilarityBadge's dynamic reachable-level count. */
+  category?: StationCategory;
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
   hasConflict?: boolean;
   /** Callback when pin icon is clicked (inline state indicator when pinned) */
@@ -62,6 +65,14 @@ export interface TileProps {
   sawtoothTop?: boolean;
   /** Task interruption indicator — another assignment of the same task exists later */
   sawtoothBottom?: boolean;
+  /**
+   * Pre-computed calage overlays (initial setup + recalages) already in
+   * tile-local collapse-aware pixel space. Supplied by the station grid;
+   * when absent the tile falls back to a linear `setupMinutes` projection
+   * for callers that don't yet produce collapse-aware geometries
+   * (focus view, tests).
+   */
+  calageGeometries?: readonly CalageGeometry[];
 }
 
 /**
@@ -101,6 +112,8 @@ export const Tile = memo(function Tile({
   sawtoothTop = false,
   sawtoothBottom = false,
   similarityScore,
+  category,
+  calageGeometries,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -110,7 +123,6 @@ export const Tile = memo(function Tile({
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;
   // Tile only paints.
-  const startTime = new Date(assignment.scheduledStart);
   const totalHeight = height;
 
   // Setup height = real wall-clock duration, projected from scheduledStart.
@@ -209,7 +221,7 @@ export const Tile = memo(function Tile({
         if (e.key === 'Enter') handleClick();
       }}
     >
-      {similarityScore && <SimilarityBadge score={similarityScore} />}
+      {similarityScore && category && <SimilarityBadge score={similarityScore} category={category} />}
       {/* Clipped body wrapper. The clip-path is applied here (not on the root)
           so that the folder-tab and other overflow-outside children (label
           overlay, tooltip) are not clipped away on tiles with teeth. The
@@ -218,45 +230,36 @@ export const Tile = memo(function Tile({
         className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border} ${colorClasses.runBg}`}
         style={{ clipPath, borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px` }}
       >
-        {/* Setup overlay (if has setup time). Paints the same tile color on
-            top of the wrapper so the setup zone stacks to a slightly more
-            opaque blue than the run zone — mirrors TileSegment which
-            applies `colors.bg` inline to its calage overlays. The dotted
-            black divider comes from the data-testid CSS rule. */}
-        {hasSetup && (
-          <div
-            className={`absolute left-0 right-0 ${colorClasses.runBg}`}
-            style={{
-              top: 0,
-              height: `${setupHeight}px`,
-            }}
-            data-testid="tile-setup-section"
-          />
-        )}
-
-        {/* Re-calage overlays (post-peremption setup reruns reported by the
-            engine). Same stacking as the setup overlay; the dashed red
-            divider comes from the data-testid CSS rule in index.css. */}
-        {(assignment.recalages ?? []).map((rc, idx) => {
-          const rcStartMs = new Date(rc.start).getTime();
-          const rcEndMs = new Date(rc.end).getTime();
-          const offsetMinutes = (rcStartMs - startTime.getTime()) / 60000;
-          const durationMinutes = (rcEndMs - rcStartMs) / 60000;
-          if (durationMinutes <= 0) return null;
-          const rcTop = minutesToPixels(offsetMinutes, pixelsPerHour);
-          // Minimum 4 px so a 1-tick recalage still reads as a band — at
-          // default 64 px/h, a 15-min zone is ~16 px but smaller zooms
-          // collapse it to a pixel or two.
-          const rcHeight = Math.max(minutesToPixels(durationMinutes, pixelsPerHour), 4);
-          return (
+        {/* Calage overlays (initial setup + post-peremption recalages).
+            The station grid supplies collapse-aware geometries precomputed
+            via `timeToYPosition`, so recalages whose linear minute offset
+            would overflow past a collapse (e.g. a 13 h lunch-time
+            recalage on an overnight tile) stay clamped inside the tile's
+            rendered bounds instead of bleeding into the neighbour below.
+            When no geometries are supplied (focus view, tests), fall back
+            to the previous linear `setupMinutes` projection so those
+            callsites keep working. */}
+        {calageGeometries && calageGeometries.length > 0 ? (
+          calageGeometries.map((geom, idx) => (
             <div
-              key={`recalage-${idx}`}
+              key={geom.kind === 'setup' ? 'setup' : `recalage-${idx}`}
               className={`absolute left-0 right-0 ${colorClasses.runBg}`}
-              style={{ top: `${rcTop}px`, height: `${rcHeight}px` }}
-              data-testid="tile-recalage-section"
+              style={{ top: `${geom.top}px`, height: `${geom.height}px` }}
+              data-testid={geom.kind === 'setup' ? 'tile-setup-section' : 'tile-recalage-section'}
             />
-          );
-        })}
+          ))
+        ) : (
+          hasSetup && (
+            <div
+              className={`absolute left-0 right-0 ${colorClasses.runBg}`}
+              style={{
+                top: 0,
+                height: `${setupHeight}px`,
+              }}
+              data-testid="tile-setup-section"
+            />
+          )
+        )}
 
         {/* Sawtooth stroke lines for interrupted tiles */}
         {hasSaw && (

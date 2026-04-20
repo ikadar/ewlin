@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { StationCategory } from '@flux/types';
-import { computeSimilarityScore } from './similarityScore';
+import { computeSimilarityScore, reachableLevels } from './similarityScore';
 
 function makeOffsetCategory(): StationCategory {
   return {
@@ -72,6 +72,32 @@ function makeFinitionCategory(): StationCategory {
     ],
   };
 }
+
+describe('reachableLevels', () => {
+  it('Offset with R4: enumerates 7 levels', () => {
+    const offset = makeOffsetCategory();
+    expect(reachableLevels(offset.similarityScoreRules)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('Pelliculeuses: 3 levels including the 0.5 fractional', () => {
+    const pell = makePelliculeusesCategory();
+    expect(reachableLevels(pell.similarityScoreRules)).toEqual([0.5, 1, 3]);
+  });
+
+  it('Massicots: single level', () => {
+    const mass = makeMassicotsCategory();
+    expect(reachableLevels(mass.similarityScoreRules)).toEqual([1]);
+  });
+
+  it('Finition: 2 levels', () => {
+    const fin = makeFinitionCategory();
+    expect(reachableLevels(fin.similarityScoreRules)).toEqual([1, 3]);
+  });
+
+  it('empty rule set: no reachable levels', () => {
+    expect(reachableLevels([])).toEqual([]);
+  });
+});
 
 describe('computeSimilarityScore — Offset truth table (max = 7)', () => {
   const cat = makeOffsetCategory();

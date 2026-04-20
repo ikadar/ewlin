@@ -26,6 +26,70 @@ import type {
 import { parsePapierDSL } from './papierDSL';
 import { longSide } from './formatDSL';
 
+/**
+ * Enumerate every reachable non-zero score level given a rule set. The result
+ * is sorted ascending and deduplicated. Drives the "N indicators per category"
+ * badge rendering — one indicator per entry in the returned list, the nth
+ * indicator lit when `score.points >= levels[n]`.
+ *
+ * Algorithm: split rules into non-grouped (each fires independently) and
+ * per-group (only one rule per group can fire, best-in-group). Cartesian-
+ * product every non-grouped on/off with every group's {none + each rule's
+ * points}. Dedupe and filter > 0.
+ *
+ * Note: we enumerate as if format-descending rules could fire like any
+ * other — physical exclusivity with their same-group equality rules is
+ * ignored for the level set, but the actual `compute()` path still does the
+ * right thing per transition. This keeps the level list simple and honest
+ * about "what scores can legitimately appear".
+ */
+export function reachableLevels(rules: SimilarityScoreRule[]): number[] {
+  if (rules.length === 0) return [];
+
+  const nonGrouped: SimilarityScoreRule[] = [];
+  const byGroup = new Map<string, SimilarityScoreRule[]>();
+  for (const r of rules) {
+    if (r.group === null || r.group === undefined) {
+      nonGrouped.push(r);
+    } else {
+      const bucket = byGroup.get(r.group) ?? [];
+      bucket.push(r);
+      byGroup.set(r.group, bucket);
+    }
+  }
+
+  // Subset sums of non-grouped rules (each either fires or not)
+  let ngSums: number[] = [0];
+  for (const r of nonGrouped) {
+    ngSums = [...ngSums, ...ngSums.map((s) => s + r.points)];
+  }
+
+  // For each group, the possible contribution is 0 (none fires) or one rule's points
+  const groupChoices: number[][] = [];
+  for (const grp of byGroup.values()) {
+    groupChoices.push([0, ...grp.map((r) => r.points)]);
+  }
+
+  // Cartesian product across all group choices
+  let combos: number[] = [0];
+  for (const choices of groupChoices) {
+    const next: number[] = [];
+    for (const combo of combos) {
+      for (const c of choices) next.push(combo + c);
+    }
+    combos = next;
+  }
+
+  const all = new Set<number>();
+  for (const ng of ngSums) {
+    for (const c of combos) {
+      all.add(ng + c);
+    }
+  }
+
+  return [...all].filter((s) => s > 0).sort((a, b) => a - b);
+}
+
 type SpecInput = ElementSpec | Record<string, unknown> | null | undefined;
 type MatchState = true | false; // true = MATCHED, false = UNMATCHED. Absent key = NEUTRALIZED.
 

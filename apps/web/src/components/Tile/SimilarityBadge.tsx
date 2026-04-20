@@ -1,112 +1,94 @@
 /**
- * SimilarityBadge — gauge horizontale à hauteur de microdot, fill mono-emerald.
+ * SimilarityBadge — N indicateurs par catégorie, remplissage ordinal.
  *
- * Rend le score de practicité entre la tuile prédécesseur et la tuile courante
- * d'une même station. Pas de chiffre ; l'info passe par la largeur remplie
- * (ratio score/maxPoints) et l'opacité (palette mono stepped).
+ * Rend un indicateur par niveau atteignable sur la catégorie de station.
+ * Le Nème indicateur est allumé ssi `score.points >= levels[n]`. Les niveaux
+ * sont dérivés dynamiquement depuis `category.similarityScoreRules` via
+ * {@link reachableLevels} — si une règle s'ajoute côté serveur (ex. R4 sur
+ * Offset) le composant s'adapte sans toucher à ce fichier.
  *
- * ## Config UX verrouillée (source : `apps/web/playgrounds/similarity-badge-refine.html`)
+ * ## Config UX verrouillée (source : `apps/web/playgrounds/similarity-badge-links.html`)
  *
  * ```json
  * {
  *   "base": {
- *     "shape": "gauge",
- *     "infoDensity": "visual-only",
- *     "position": "junction-overlay",
- *     "color": "stepped",
- *     "visibility": "positive-only",
- *     "interaction": "static"
+ *     "indicatorModel": "n-per-category",
+ *     "ordinalFill": true,
+ *     "visibility": "positive-only"
  *   },
  *   "refine": {
- *     "gaugeHeightPx": 6,
- *     "widthMode": "fixed",
- *     "unitWidthPx": 4,
- *     "fixedWidthPx": 28,
- *     "borderRadiusPx": 3,
- *     "trackShade": "light",
- *     "trackOpacityPct": 100,
- *     "trackDepth": "flat",
- *     "fillInsetPx": 0,
- *     "fillCap": "inherit",
- *     "fillHighlight": "none",
- *     "fillStyle": "solid",
- *     "palette": "mono",
- *     "thresholds": "33-66",
- *     "align": "center",
- *     "offsetYPx": -2,
- *     "border": "contrast",
- *     "shadow": "none"
+ *     "shape": "links",
+ *     "sizePx": 10,
+ *     "gapPx": 2,
+ *     "fillColor": "emerald",
+ *     "emptyColor": "zinc-light",
+ *     "modulation": "none"
  *   }
  * }
  * ```
  *
- * Le playground reste l'oracle visuel — sous la même config, le rendu React
- * doit être pixel-pour-pixel identique.
+ * Le playground reste l'oracle visuel — sous la même config, le composant
+ * React doit rendre des chaînes identiques pixel-pour-pixel.
  *
- * @see apps/web/src/utils/similarityScore.ts pour le calcul du score.
+ * @see apps/web/src/utils/similarityScore.ts pour `reachableLevels` et `computeSimilarityScore`.
  */
 
-import type { SimilarityScore } from '@flux/types';
+import { Link as LinkIcon, Unlink as UnlinkIcon } from 'lucide-react';
+import type { SimilarityScore, StationCategory } from '@flux/types';
+import { reachableLevels } from '../../utils/similarityScore';
 
 interface SimilarityBadgeProps {
   score: SimilarityScore;
+  category: StationCategory;
 }
 
-/** Palette mono — emerald à 3 opacités + emerald-500 full pour extraHigh. */
-const PALETTE_MONO = {
-  low:  'rgba(52, 211, 153, 0.35)',
-  mid:  'rgba(52, 211, 153, 0.65)',
-  high: 'rgba(52, 211, 153, 1.0)',
-  extraHigh: 'rgb(16, 185, 129)',
-} as const;
+// ─── Refine (see playground config above) ───
+const SIZE_PX = 10;
+const GAP_PX = 2;
+const FILL_COLOR = 'rgb(52, 211, 153)';    // emerald-400
+const EMPTY_COLOR = 'rgb(113, 113, 122)';  // zinc-500
 
-/** Classification stepped 33-66 (ratio = points / maxPoints). */
-function classifyScore(points: number, maxPoints: number): keyof typeof PALETTE_MONO {
-  const ratio = maxPoints > 0 ? points / maxPoints : 0;
-  if (ratio < 1 / 3) return 'low';
-  if (ratio < 2 / 3) return 'mid';
-  return 'high';
-}
-
-// Geometry (from refine)
-const GAUGE_HEIGHT_PX = 6;
-const GAUGE_WIDTH_PX = 28;
-const BORDER_RADIUS_PX = Math.min(3, GAUGE_HEIGHT_PX / 2);
+// ─── Positioning (inherited from the earlier gauge iteration) ───
+// Badge sits centered on the top edge of the successor tile, pulled 2 px up
+// so the indicators straddle the junction between prev and curr tiles.
 const OFFSET_Y_PX = -2;
-const TRACK_COLOR = 'rgb(63, 63, 70)';          // zinc-700 (trackShade=light)
-const BORDER_COLOR = 'rgb(36, 36, 36)';         // --flux-elevated (border=contrast)
 
-export function SimilarityBadge({ score }: SimilarityBadgeProps) {
+export function SimilarityBadge({ score, category }: SimilarityBadgeProps) {
   if (score.points <= 0) return null;
 
-  const fillBg = PALETTE_MONO[classifyScore(score.points, score.maxPoints)];
-  const fillWidth =
-    score.maxPoints > 0 ? (score.points / score.maxPoints) * GAUGE_WIDTH_PX : 0;
+  const rules = category.similarityScoreRules ?? [];
+  if (rules.length === 0) return null;
+
+  const levels = reachableLevels(rules);
+  if (levels.length === 0) return null;
 
   return (
     <span
       aria-hidden
-      className="absolute block overflow-hidden pointer-events-none"
+      className="absolute block pointer-events-none"
       style={{
         top: 0,
         left: '50%',
         transform: `translate(-50%, calc(-50% + ${OFFSET_Y_PX}px))`,
-        width: `${GAUGE_WIDTH_PX}px`,
-        height: `${GAUGE_HEIGHT_PX}px`,
-        borderRadius: `${BORDER_RADIUS_PX}px`,
-        background: TRACK_COLOR,
-        border: `1px solid ${BORDER_COLOR}`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: `${GAP_PX}px`,
         zIndex: 2,
       }}
     >
-      <span
-        className="block h-full"
-        style={{
-          width: `${fillWidth}px`,
-          background: fillBg,
-          borderRadius: 'inherit',
-        }}
-      />
+      {levels.map((level, idx) => {
+        const filled = score.points >= level;
+        const Icon = filled ? LinkIcon : UnlinkIcon;
+        return (
+          <Icon
+            key={idx}
+            size={SIZE_PX}
+            strokeWidth={2.5}
+            color={filled ? FILL_COLOR : EMPTY_COLOR}
+            style={{ flexShrink: 0 }}
+          />
+        );
+      })}
     </span>
   );
 }
