@@ -297,6 +297,53 @@
     background: var(--badge-bg);
   }
 
+  /* Pips: ultra-thin microdots (3-4px), 1 per point, no track */
+  .badge.shape-bar-pips { gap: 1px; }
+  .badge.shape-bar-pips > .pip {
+    width: var(--pip-sz, 3px); height: var(--pip-sz, 3px); border-radius: 50%;
+    background: var(--badge-bg);
+    flex-shrink: 0;
+  }
+  .badge.shape-bar-pips > .pip.half {
+    background: linear-gradient(to right, var(--badge-bg) 0 50%, rgba(255,255,255,0.15) 50% 100%);
+  }
+
+  /* Pips with track: always show maxPoints positions, fill up to score */
+  .badge.shape-bar-pips-track { gap: 1px; }
+  .badge.shape-bar-pips-track > .pip {
+    width: var(--pip-sz, 3px); height: var(--pip-sz, 3px); border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .badge.shape-bar-pips-track > .pip.filled { background: var(--badge-bg); }
+  .badge.shape-bar-pips-track > .pip.empty { background: var(--flux-border); }
+  .badge.shape-bar-pips-track > .pip.half {
+    background: linear-gradient(to right, var(--badge-bg) 0 50%, var(--flux-border) 50% 100%);
+  }
+
+  /* Dots grouped by rule: 1 dot per point, gap between rules for decomposition */
+  .badge.shape-bar-dots-grouped { gap: 4px; }
+  .badge.shape-bar-dots-grouped > .group { display: inline-flex; gap: 1px; }
+  .badge.shape-bar-dots-grouped > .group > .dot {
+    width: var(--dot-sz, 5px); height: var(--dot-sz, 5px); border-radius: 50%;
+    background: var(--seg-color, var(--badge-bg));
+    flex-shrink: 0;
+  }
+
+  /* Continuous bar with track: fill + empty track visible */
+  .badge.shape-bar-continuous-track {
+    height: var(--bar-h, 8px);
+    background: var(--flux-border);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    display: inline-block;
+  }
+  .badge.shape-bar-continuous-track > .fill {
+    display: block; height: 100%;
+    background: var(--badge-bg);
+    border-radius: 2px;
+  }
+
   /* Stacked bar: one segment per fired rule, width = rule points */
   .badge.shape-bar-stacked { gap: 1px; border-radius: 2px; overflow: hidden; }
   .badge.shape-bar-stacked > .seg {
@@ -443,6 +490,10 @@
         <label><input type="radio" name="shape" value="bar-continuous"> Barre continue (largeur = score)</label>
         <label><input type="radio" name="shape" value="bar-dots"> Rangée de dots (1 dot / point)</label>
         <label><input type="radio" name="shape" value="bar-levels"> Microdots par niveau (1 dot / niveau atteignable)</label>
+        <label><input type="radio" name="shape" value="bar-pips"> Pips ultra-fins (3 px, 1 par point)</label>
+        <label><input type="radio" name="shape" value="bar-pips-track"> Pips avec track (fille les pos. manquantes)</label>
+        <label><input type="radio" name="shape" value="bar-dots-grouped"> Microdots groupés par règle</label>
+        <label><input type="radio" name="shape" value="bar-continuous-track"> Barre continue avec track</label>
         <label><input type="radio" name="shape" value="bar-stacked"> Segments empilés par règle</label>
         <label><input type="radio" name="shape" value="bar-segmented"> Barre avec ticks unitaires</label>
         <label><input type="radio" name="shape" value="bar-staircase"> Staircase (hauteur croissante)</label>
@@ -835,6 +886,104 @@
           d.className = 'lvl' + (pair.score >= lvl ? ' reached' : '');
           badge.appendChild(d);
         }
+        break;
+      }
+      case 'bar-pips': {
+        if (showPlaceholder) {
+          const ph = document.createElement('span');
+          ph.className = 'empty-placeholder';
+          badge.appendChild(ph);
+          break;
+        }
+        const fullPips = Math.floor(pair.score);
+        const halfPip = pair.score - fullPips >= 0.25;
+        // Pip size: compact. size=micro → 3px, small → 4px, medium → 5px, annotation → 6px.
+        const pipSz = Math.max(3, unit - 1);
+        badge.style.setProperty('--pip-sz', `${pipSz}px`);
+        for (let i = 0; i < fullPips; i++) {
+          const p = document.createElement('span');
+          p.className = 'pip';
+          badge.appendChild(p);
+        }
+        if (halfPip) {
+          const p = document.createElement('span');
+          p.className = 'pip half';
+          badge.appendChild(p);
+        }
+        break;
+      }
+      case 'bar-pips-track': {
+        // Always show maxPoints pip slots; fill the first N for score.
+        const pipSz = Math.max(3, unit - 1);
+        badge.style.setProperty('--pip-sz', `${pipSz}px`);
+        const fullPips = Math.floor(pair.score);
+        const halfPip = pair.score - fullPips >= 0.25;
+        // For fractional max (Pelliculeuses: 0.5/1/3 peaks at 3; but score can be 0.5).
+        // Round up to total "slots" = Math.ceil(max).
+        const totalSlots = Math.max(1, Math.ceil(pair.max));
+        for (let i = 0; i < totalSlots; i++) {
+          const p = document.createElement('span');
+          if (i < fullPips) {
+            p.className = 'pip filled';
+          } else if (i === fullPips && halfPip) {
+            p.className = 'pip half';
+          } else {
+            p.className = 'pip empty';
+          }
+          badge.appendChild(p);
+        }
+        break;
+      }
+      case 'bar-dots-grouped': {
+        if (pair.matched.length === 0) {
+          if (showPlaceholder) {
+            const ph = document.createElement('span');
+            ph.className = 'empty-placeholder';
+            badge.appendChild(ph);
+          }
+          break;
+        }
+        const dotSz = Math.max(3, unit);
+        badge.style.setProperty('--dot-sz', `${dotSz}px`);
+        for (const rule of pair.matched) {
+          const group = document.createElement('span');
+          group.className = 'group';
+          const n = Math.max(1, Math.round(rule.pts));
+          const halfDot = rule.pts % 1 >= 0.25;
+          for (let i = 0; i < Math.floor(rule.pts); i++) {
+            const d = document.createElement('span');
+            d.className = 'dot';
+            d.style.setProperty('--seg-color', segmentColorFor(rule, pair));
+            group.appendChild(d);
+          }
+          if (halfDot) {
+            const d = document.createElement('span');
+            d.className = 'dot';
+            d.style.setProperty('--seg-color', segmentColorFor(rule, pair));
+            // Visual half: reduce width or use inline opacity — keep simple with smaller size
+            d.style.width = `${Math.max(2, Math.round(dotSz / 2))}px`;
+            d.style.height = `${Math.max(2, Math.round(dotSz / 2))}px`;
+            group.appendChild(d);
+          }
+          // Handle degenerate case (no full and no half): single small dot
+          if (group.childElementCount === 0 && n > 0) {
+            const d = document.createElement('span');
+            d.className = 'dot';
+            d.style.setProperty('--seg-color', segmentColorFor(rule, pair));
+            group.appendChild(d);
+          }
+          badge.appendChild(group);
+        }
+        break;
+      }
+      case 'bar-continuous-track': {
+        // Fixed track width = maxPoints × unit ; fill width = score × unit.
+        const trackW = Math.max(1, pair.max) * unit;
+        badge.style.width = `${trackW}px`;
+        const fill = document.createElement('span');
+        fill.className = 'fill';
+        fill.style.width = `${Math.max(0, pair.score) * unit}px`;
+        badge.appendChild(fill);
         break;
       }
       case 'bar-stacked': {
