@@ -48,10 +48,14 @@ const GAP_PX = 2;
 const FILL_COLOR = 'rgb(52, 211, 153)';    // emerald-400
 const EMPTY_COLOR = 'rgb(113, 113, 122)';  // zinc-500
 
-// ─── Positioning (inherited from the earlier gauge iteration) ───
-// Badge sits centered on the top edge of the successor tile, pulled 2 px up
-// so the indicators straddle the junction between prev and curr tiles.
+// ─── Positioning ───
+// Badge anchored to the right edge of the successor tile, straddling the
+// junction line (top edge of the tile) with a 2 px upward shift.
+// z-index 30 sits above the day-collapse bands (z-20) so the indicators
+// stay visible when a collapse band overlaps their junction.
 const OFFSET_Y_PX = -2;
+const RIGHT_INSET_PX = 4;
+const Z_INDEX = 30;
 
 export function SimilarityBadge({ score, category }: SimilarityBadgeProps) {
   if (score.points <= 0) return null;
@@ -68,12 +72,12 @@ export function SimilarityBadge({ score, category }: SimilarityBadgeProps) {
       className="absolute block pointer-events-none"
       style={{
         top: 0,
-        left: '50%',
-        transform: `translate(-50%, calc(-50% + ${OFFSET_Y_PX}px))`,
+        right: `${RIGHT_INSET_PX}px`,
+        transform: `translateY(calc(-50% + ${OFFSET_Y_PX}px))`,
         display: 'inline-flex',
         alignItems: 'center',
         gap: `${GAP_PX}px`,
-        zIndex: 2,
+        zIndex: Z_INDEX,
       }}
     >
       {levels.map((level, idx) => {
