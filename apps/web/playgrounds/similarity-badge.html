@@ -286,6 +286,17 @@
     background: linear-gradient(to right, var(--badge-bg) 0 50%, rgba(255,255,255,0.15) 50% 100%);
   }
 
+  /* Levels: one microdot per reachable score level in the category, filled up to current level */
+  .badge.shape-bar-levels { gap: 2px; }
+  .badge.shape-bar-levels > .lvl {
+    width: var(--dot-sz, 6px); height: var(--dot-sz, 6px); border-radius: 50%;
+    background: var(--flux-border);
+    flex-shrink: 0;
+  }
+  .badge.shape-bar-levels > .lvl.reached {
+    background: var(--badge-bg);
+  }
+
   /* Stacked bar: one segment per fired rule, width = rule points */
   .badge.shape-bar-stacked { gap: 1px; border-radius: 2px; overflow: hidden; }
   .badge.shape-bar-stacked > .seg {
@@ -431,6 +442,7 @@
         <label><input type="radio" name="shape" value="pill" checked> Pill (utilise axes 1–7)</label>
         <label><input type="radio" name="shape" value="bar-continuous"> Barre continue (largeur = score)</label>
         <label><input type="radio" name="shape" value="bar-dots"> Rangée de dots (1 dot / point)</label>
+        <label><input type="radio" name="shape" value="bar-levels"> Microdots par niveau (1 dot / niveau atteignable)</label>
         <label><input type="radio" name="shape" value="bar-stacked"> Segments empilés par règle</label>
         <label><input type="radio" name="shape" value="bar-segmented"> Barre avec ticks unitaires</label>
         <label><input type="radio" name="shape" value="bar-staircase"> Staircase (hauteur croissante)</label>
@@ -541,6 +553,17 @@
     inking: 'Encrage',
     paper: 'Papier',
     format: 'Format',
+  };
+
+  // Reachable non-zero score levels per category (sorted ascending).
+  // In the real React component these will be derived from similarityScoreRules
+  // at runtime via subset enumeration + group resolution.
+  const LEVELS_BY_CATEGORY = {
+    'Offset':   [2, 3, 4, 6, 7],
+    'Pellic.':  [0.5, 1, 3],
+    'Mass.':    [1],
+    'Finition': [1, 3],
+    'Typo':     [],
   };
 
   // ─── STATE ──────────────────────────────────────────────────
@@ -793,6 +816,23 @@
         if (halfDot) {
           const d = document.createElement('span');
           d.className = 'dot half';
+          badge.appendChild(d);
+        }
+        break;
+      }
+      case 'bar-levels': {
+        // One microdot per reachable level in the category.
+        // Dots corresponding to levels <= current score are filled.
+        const levels = LEVELS_BY_CATEGORY[pair.cat] ?? [];
+        if (levels.length === 0) {
+          const ph = document.createElement('span');
+          ph.className = 'empty-placeholder';
+          badge.appendChild(ph);
+          break;
+        }
+        for (const lvl of levels) {
+          const d = document.createElement('span');
+          d.className = 'lvl' + (pair.score >= lvl ? ' reached' : '');
           badge.appendChild(d);
         }
         break;
