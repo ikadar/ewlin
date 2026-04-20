@@ -504,6 +504,7 @@
     </fieldset>
 
     <button class="export-btn" id="export-btn">Exporter la config</button>
+    <button class="export-btn" id="prompt-btn" style="margin-top: 6px; background: rgb(22, 101, 52); border-color: rgb(34, 134, 74);">Générer le prompt Claude</button>
     <pre class="export-output" id="export-output"></pre>
   </aside>
 
@@ -1209,15 +1210,107 @@
     renderAll();
   });
 
-  document.getElementById('export-btn').addEventListener('click', () => {
-    const out = document.getElementById('export-output');
+  function currentConfig() {
     const exportState = { ...state };
     if (state.visibility !== 'threshold') delete exportState.threshold;
-    out.textContent = JSON.stringify(exportState, null, 2);
+    // When shape != pill, position + size (for height/padding) are ignored in
+    // the actual component. Strip them from the exported config to keep the
+    // downstream consumer (React component) honest.
+    if (exportState.shape !== 'pill') {
+      delete exportState.position;
+    }
+    return exportState;
+  }
+
+  function buildPrompt(cfg) {
+    const cfgJson = JSON.stringify(cfg, null, 2);
+    const isShape = cfg.shape && cfg.shape !== 'pill';
+
+    const shapeNote = isShape
+      ? `La config est en mode **shape** (axe 8) : \`shape=${cfg.shape}\`. Les axes "position" et "size visuelle" sont ignorés par le rendu ; \`size\` ne pilote que l'épaisseur/unit-width. Positionnement : le badge est rendu entre les deux tuiles comme un bloc.`
+      : `La config est en mode **pill** (comportement historique). Axes 1–7 actifs, axe 8 absent du rendu.`;
+
+    return `# Tâche — implémenter \`SimilarityBadge\` (Phase 2, B5 du plan)
+
+## Contexte
+
+Je viens de valider la config UX du badge de practicité via le playground
+\`apps/web/playgrounds/similarity-badge.html\`. Implémente maintenant le
+composant React qui rend cette config sur les tuiles du planning.
+
+${shapeNote}
+
+## Config retenue
+
+\`\`\`json
+${cfgJson}
+\`\`\`
+
+## Fichiers à créer / modifier
+
+- **Créer** \`apps/web/src/components/Tile/SimilarityBadge.tsx\`
+  - Props : \`{ score: SimilarityScore; categoryId?: string }\` — le type
+    \`SimilarityScore\` vient de \`@flux/types\`.
+  - Le header du fichier **cite littéralement la config ci-dessus** en
+    commentaire pour garantir la traçabilité playground → React.
+  - Reproduit fidèlement le rendu du playground pour cette config (voir le
+    switch \`buildShapeContent\` / \`buildPillContent\` dans le playground
+    comme référence d'algorithme).
+  - Tailwind uniquement, pas de nouvelle dépendance.
+  - Utilise les couleurs du thème Flux (\`emerald-400\` pour match,
+    \`zinc-700\` pour track, \`indigo-500\` / \`amber-600\` / \`sky-500\`
+    pour les familles encrage/papier/format).
+- **Modifier** \`apps/web/src/components/Tile/Tile.tsx\`
+  - Monter \`<SimilarityBadge>\` quand la tuile a un \`similarityScore\` en
+    \`CachedTileData\` et que \`score.points > 0\` (ou selon la règle de
+    visibilité de la config).
+  - Le positionnement dépend de la config (\`axe 1\` en mode pill, "entre
+    les tuiles" en mode shape).
+- **Modifier** \`apps/web/src/utils/stationTileData.ts\`
+  - Appeler \`computeSimilarityScore(prevElement?.spec, element.spec, category)\`
+    depuis \`apps/web/src/utils/similarityScore.ts\` (déjà livré en B3).
+  - Stocker le résultat dans \`CachedTileData.similarityScore\`.
+
+## Invariants
+
+- Pas de badge sur la première tuile d'une station (pas de prédécesseur).
+- Pas de badge quand \`similarityScoreRules\` est vide sur la catégorie
+  (Typographie aujourd'hui).
+- Badge grisé / masqué selon l'axe \`visibility\` retenu — respecte la config.
+- Aucune régression sur les tests vitest existants de \`Tile.test.tsx\`.
+
+## Vérification
+
+- \`cd apps/web && npx tsc -b --force\` — aucune nouvelle erreur TS
+- \`cd apps/web && npx vitest run src/components/Tile src/utils/similarityScore.test.ts\` — vert
+- Dev server + check visuel sur deux jobs similaires d'une presse offset
+  (\`papier\` + \`format\` + \`impression\` identiques → score 7)
+
+## Parité avec le playground
+
+Pour vérifier que le composant rend exactement comme le playground : pour
+une paire donnée, le rendu React et le rendu HTML du playground doivent être
+pixel-pour-pixel identiques sous la même config.
+`;
+  }
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    const cfg = currentConfig();
+    out.textContent = JSON.stringify(cfg, null, 2);
     out.classList.add('visible');
-    // Also copy to clipboard if possible
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(JSON.stringify(exportState, null, 2)).catch(() => {});
+      navigator.clipboard.writeText(JSON.stringify(cfg, null, 2)).catch(() => {});
+    }
+  });
+
+  document.getElementById('prompt-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    const prompt = buildPrompt(currentConfig());
+    out.textContent = prompt;
+    out.classList.add('visible');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(prompt).catch(() => {});
     }
   });
 
