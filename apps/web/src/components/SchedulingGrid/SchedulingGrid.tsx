@@ -13,6 +13,9 @@ import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
 import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../TimelineLens';
 import { computeStationUnavailabilitySegments } from '../TimelineLens/unavailability';
+import { COLLAPSED_BAND_PX, type Collapse } from './collapseConfig';
+import { CollapseBand } from './CollapseBand';
+import { yPositionToTime } from '../DragPreview/snapUtils';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -87,6 +90,8 @@ export interface SchedulingGridProps {
   shippedJobIds?: Set<string>;
   /** All operators (for operator name display on tiles) */
   operators?: Operator[];
+  /** Collapse bands to render across all columns. Computed by parent from operator schedules. */
+  collapses?: readonly Collapse[];
 }
 
 /**
@@ -121,6 +126,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       lateJobIds,
       shippedJobIds,
       operators,
+      collapses,
     },
     ref
   ) {
@@ -141,12 +147,24 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     // v0.3.46: Calculate day height from pixels per hour
     const dayHeightPx = 24 * pixelsPerHour;
 
+    // Normalize: parent may pass undefined.
+    const effectiveCollapses = useMemo<readonly Collapse[]>(() => collapses ?? [], [collapses]);
+
+    // useVirtualScroll thinks linearly. After collapse, scrollTop is compressed,
+    // so dividing by linear dayHeightPx yields wrong day indices → overlays + grid
+    // lines vanish. Convert via yPositionToTime to a linear-equivalent scrollTop.
+    const linearScrollTop = useMemo(() => {
+      if (effectiveCollapses.length === 0 || !startDate) return scrollTop;
+      const t = yPositionToTime(scrollTop, startHour, startDate, pixelsPerHour, effectiveCollapses);
+      return ((t.getTime() - startDate.getTime()) / 3_600_000) * pixelsPerHour;
+    }, [scrollTop, effectiveCollapses, startDate, startHour, pixelsPerHour]);
+
     // v0.3.46: Virtual scroll calculation
     const virtualScroll = useVirtualScroll({
       totalDays,
       bufferDays,
       dayHeightPx,
-      scrollTop,
+      scrollTop: linearScrollTop,
       viewportHeight,
     });
 
@@ -219,11 +237,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     };
   }, []);
 
-  // v0.3.46: Use virtual scroll total height for proper scrollbar sizing
-  const totalHeight = virtualScroll.totalHeight;
+  // v0.3.46: Use virtual scroll total height for proper scrollbar sizing.
+  // Collapse-aware: each band trades its real height for its kind-specific heightPx.
+  const totalHeight = useMemo(() => {
+    let h = virtualScroll.totalHeight;
+    for (const c of effectiveCollapses) {
+      const realPx = c.durationHours * pixelsPerHour;
+      h -= (realPx - c.heightPx);
+    }
+    return h;
+  }, [virtualScroll.totalHeight, effectiveCollapses, pixelsPerHour]);
 
-  // Calculate now line position (multi-day aware)
-  const nowPosition = timeToYPosition(now, startHour, pixelsPerHour, startDate);
+  // Calculate now line position (multi-day aware, collapse-aware)
+  const nowPosition = timeToYPosition(now, startHour, pixelsPerHour, startDate, effectiveCollapses);
 
   // Create lookup maps for jobs and tasks
   const jobMap = useMemo(() => {
@@ -424,10 +450,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     elementsByJobId, stationMap, categoryMap, assemblyStationIds,
     operatorNameMap, conflictTaskIds, shippedJobIds, lateJobIds,
     startHour, pixelsPerHour, startDate, now,
+    collapses: effectiveCollapses,
   }), [assignmentsByStation, taskMap, jobMap, elementMap, elementBlockingCache,
       elementsByJobId, stationMap, categoryMap, assemblyStationIds,
       startHour, pixelsPerHour, startDate, shippedJobIds, lateJobIds,
-      conflictTaskIds, now, operatorNameMap]);
+      conflictTaskIds, now, operatorNameMap, effectiveCollapses]);
 
   // ── Timeline magnifying lens ────────────────────────────────────────────
   // Hook is view-agnostic; we feed it tile/column info via event delegation
@@ -583,12 +610,16 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
     const colRect = colEl.getBoundingClientRect();
     const relativeY = e.clientY - colRect.top;
-    const gridOriginMs = startDate?.getTime() ?? Date.now();
-    const centerMs = gridOriginMs + (relativeY / pixelsPerHour) * 3_600_000;
+    // Collapse-aware reverse: lands on band.from if cursor is over a band, so the
+    // membership check below catches it before the lens chases an empty time range.
+    const cursorTime = yPositionToTime(relativeY, startHour, startDate, pixelsPerHour, effectiveCollapses);
+    const cursorMs = cursorTime.getTime();
+    const inBand = effectiveCollapses.some(c => cursorMs >= c.from.getTime() && cursorMs < c.to.getTime());
+    if (inBand) return;
 
     lens.handlers.handleColumnMouseMove({
       columnId: stationId,
-      centerTimeMs: centerMs,
+      centerTimeMs: cursorMs,
       anchor: {
         columnLeft: colRect.left,
         columnRight: colRect.right,
@@ -606,7 +637,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     // In multi-day mode (when startDate provided), always show the marker
     // In single-day mode, only show if departure is today
     if (startDate) {
-      departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour, startDate);
+      departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour, startDate, effectiveCollapses);
     } else {
       const today = new Date();
       if (
@@ -668,6 +699,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               showNowLine={false}
               pixelsPerHour={pixelsPerHour}
               visibleDayRange={virtualScroll.visibleRange}
+              gridStartDate={startDate}
+              collapses={effectiveCollapses}
             />
           </div>
 
@@ -694,6 +727,17 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               />
             )}
 
+            {/* Collapse bands — full-width (across stations area only). The TimelineColumn
+                renders its own decorative cover at the same Y range, and skips hour labels
+                inside bands. */}
+            {effectiveCollapses.map((c) => (
+              <CollapseBand
+                key={c.id}
+                collapse={c}
+                topPx={timeToYPosition(c.from, startHour, pixelsPerHour, startDate, effectiveCollapses)}
+              />
+            ))}
+
             {/* Station columns */}
             {stations.map((station) => {
               const stationAssignments = assignmentsByStation.get(station.id) || [];
@@ -715,6 +759,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   displayMode={displayMode}
                   category={category}
                   onDeselect={onDeselect}
+                  collapses={effectiveCollapses}
                 >
                   {stationAssignments.map((assignment) => {
                     const cached = tileDataCache.get(assignment.id);

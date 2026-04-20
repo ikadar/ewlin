@@ -28,6 +28,8 @@ import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { Toast } from './components/Toast';
 import { useToast, useMassUnschedule } from './hooks';
+import { computeCollapses } from './utils/computeCollapses';
+import { yPositionToTime } from './components/DragPreview/snapUtils';
 import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
@@ -781,6 +783,16 @@ function AppContent() {
     return today;
   }, [lookbackDays]);
 
+  // ---- Collapse empty periods (mirror of OperatorSchedulePage wiring) ----
+  const gridEndDate = useMemo(
+    () => new Date(gridStartDate.getTime() + DAY_COUNT * 24 * 60 * 60 * 1000),
+    [gridStartDate],
+  );
+  const effectiveCollapses = useMemo(
+    () => computeCollapses(snapshot.operators ?? [], gridStartDate, gridEndDate),
+    [snapshot.operators, gridStartDate, gridEndDate],
+  );
+
   // Category lookup map (for getStationXOffset)
   const categoryMap = useMemo(() => {
     const map = new Map<string, import('@flux/types').StationCategory>();
@@ -907,9 +919,12 @@ function AppContent() {
     const currentPixelsPerHour = pixelsPerHourRef.current;
     const viewportHeight = gridRef.current?.getViewportHeight() ?? 600;
 
-    // Viewport hours — update immediately (no debounce)
-    const startHourFromGridStart = scrollTop / currentPixelsPerHour;
-    const endHourFromGridStart = (scrollTop + viewportHeight) / currentPixelsPerHour;
+    // Viewport hours — collapse-aware. Linear `scrollTop / pxPerHour` would
+    // mis-report the visible time span when bands compress the Y range.
+    const topTime = yPositionToTime(scrollTop, START_HOUR, gridStartDate, currentPixelsPerHour, effectiveCollapses);
+    const bottomTime = yPositionToTime(scrollTop + viewportHeight, START_HOUR, gridStartDate, currentPixelsPerHour, effectiveCollapses);
+    const startHourFromGridStart = (topTime.getTime() - gridStartDate.getTime()) / 3_600_000;
+    const endHourFromGridStart = (bottomTime.getTime() - gridStartDate.getTime()) / 3_600_000;
     setViewportStartHour(startHourFromGridStart);
     setViewportEndHour(endHourFromGridStart);
 
@@ -919,12 +934,12 @@ function AppContent() {
     }
     scrollTimeoutRef.current = requestAnimationFrame(() => {
       const centerY = scrollTop + viewportHeight / 2;
-      const hoursFromStart = centerY / currentPixelsPerHour;
-      const focusedTime = new Date(gridStartDate);
-      focusedTime.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
+      // Collapse-aware reverse mapping: yPositionToTime walks the band offsets
+      // so the focused date stays correct even when bands compress the Y range.
+      const focusedTime = yPositionToTime(centerY, START_HOUR, gridStartDate, currentPixelsPerHour, effectiveCollapses);
       setFocusedDate(focusedTime);
     });
-  }, [gridStartDate]);
+  }, [gridStartDate, effectiveCollapses]);
 
   // v0.3.47: Recalculate viewport when zoom (pixelsPerHour) changes
   // This ensures the viewport indicator stays on the correct day after zoom
@@ -1950,6 +1965,7 @@ function AppContent() {
           lateJobIds={lateJobIds}
           shippedJobIds={shippedJobIds}
           operators={snapshot.operators}
+          collapses={effectiveCollapses}
         />
         {isMinimapVisible && (
           <Minimap

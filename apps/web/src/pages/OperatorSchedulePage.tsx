@@ -38,6 +38,10 @@ import { getTasksForJob } from '../utils';
 import { getErrorMessage } from '../store/api/errorNormalization';
 import { ZOOM_LEVELS } from '../utils/zoom';
 import { computeTileSlices, getOperatorDaySchedule, type TileSlice } from '../utils/operatorTileSlices';
+import { computeCollapses } from '../utils/computeCollapses';
+import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
+import { CollapseBand } from '../components/SchedulingGrid/CollapseBand';
+import { yPositionToTime } from '../components/DragPreview/snapUtils';
 import { isInternalTask } from '@flux/types';
 import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../components/TimelineLens';
 import { computeOperatorUnavailabilitySegments } from '../components/TimelineLens/unavailability';
@@ -161,15 +165,43 @@ export default function OperatorSchedulePage() {
   const [viewportHeight, setViewportHeight] = useState(600);
   const dayHeightPx = 24 * pixelsPerHour;
 
+  // ---- Collapse empty periods ----
+  // Compute collapses across the full grid range (gridStartDate → +DAY_COUNT days).
+  const gridEndDate = useMemo(
+    () => new Date(gridStartDate.getTime() + DAY_COUNT * 24 * 60 * 60 * 1000),
+    [gridStartDate],
+  );
+  const effectiveCollapses = useMemo<readonly Collapse[]>(
+    () => computeCollapses(operators, gridStartDate, gridEndDate),
+    [operators, gridStartDate, gridEndDate],
+  );
+
+  // Virtual scroll thinks linearly (`start = floor(scrollTop / dayHeightPx)`).
+  // After collapse, scrollTop is collapse-aware (smaller than linear), so feeding
+  // it raw produces wrong day indices → tiles, gridLines, overlays disappear.
+  // Convert via yPositionToTime → linear equivalent before handing to the hook.
+  const linearScrollTop = useMemo(() => {
+    if (effectiveCollapses.length === 0) return scrollTop;
+    const t = yPositionToTime(scrollTop, START_HOUR, gridStartDate, pixelsPerHour, effectiveCollapses);
+    return ((t.getTime() - gridStartDate.getTime()) / 3_600_000) * pixelsPerHour;
+  }, [scrollTop, effectiveCollapses, gridStartDate, pixelsPerHour]);
+
   const virtualScroll = useVirtualScroll({
     totalDays: DAY_COUNT,
     bufferDays: 3,
     dayHeightPx,
-    scrollTop,
+    scrollTop: linearScrollTop,
     viewportHeight,
   });
 
-  const totalHeight = virtualScroll.totalHeight;
+  // Collapse-aware total height: each band trades real height for its heightPx.
+  const totalHeight = useMemo(() => {
+    let h = virtualScroll.totalHeight;
+    for (const c of effectiveCollapses) {
+      h -= (c.durationHours * pixelsPerHour - c.heightPx);
+    }
+    return h;
+  }, [virtualScroll.totalHeight, effectiveCollapses, pixelsPerHour]);
 
   // Track scroll position for virtual scrolling + DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
@@ -184,17 +216,22 @@ export default function OperatorSchedulePage() {
       const newScrollTop = container.scrollTop;
       setScrollTop(newScrollTop);
 
-      // Sync focused date for DateStrip — use center of viewport (same as App.tsx)
+      // Sync focused date for DateStrip — use center of viewport.
+      // Collapse-aware: yPositionToTime resolves piecewise so the focused date
+      // stays correct when bands consume part of the visible Y range.
       const viewportH = container.clientHeight;
       const centerY = newScrollTop + viewportH / 2;
-      const hoursFromStart = centerY / pixelsPerHour;
-      const fd = new Date(gridStartDate);
-      fd.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
+      const fd = yPositionToTime(centerY, START_HOUR, gridStartDate, pixelsPerHour, effectiveCollapses);
       setFocusedDate(fd);
 
-      // Viewport hour range — absolute hours from grid start (NOT % 24)
-      const startH = newScrollTop / pixelsPerHour;
-      const endH = (newScrollTop + viewportH) / pixelsPerHour;
+      // Viewport hour range — collapse-aware. With collapses, the visible Y span
+      // covers MORE wall-clock time than `viewportH / pxPerHour` linearly suggests
+      // (a 60-px band hides up to dozens of hours), so the DateStrip indicator
+      // must be derived from the actual top/bottom times.
+      const topTime = yPositionToTime(newScrollTop, START_HOUR, gridStartDate, pixelsPerHour, effectiveCollapses);
+      const bottomTime = yPositionToTime(newScrollTop + viewportH, START_HOUR, gridStartDate, pixelsPerHour, effectiveCollapses);
+      const startH = (topTime.getTime() - gridStartDate.getTime()) / 3_600_000;
+      const endH = (bottomTime.getTime() - gridStartDate.getTime()) / 3_600_000;
       setViewportStartHour(startH);
       setViewportEndHour(endH);
     };
@@ -205,7 +242,7 @@ export default function OperatorSchedulePage() {
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [scrollContainer, pixelsPerHour, gridStartDate]);
+  }, [scrollContainer, pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // Keep viewportHeight in sync with the container via ResizeObserver, so panel
   // toggles (JobDetailsPanel, sidebar, SmartCompact, Evaluation) that change
@@ -234,11 +271,11 @@ export default function OperatorSchedulePage() {
     const container = scrollContainer;
     requestAnimationFrame(() => {
       const now = new Date();
-      const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+      const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
       const vh = container.clientHeight;
       container.scrollTop = Math.max(0, y - vh / 3);
     });
-  }, [scrollContainer, pixelsPerHour, gridStartDate]);
+  }, [scrollContainer, pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // ---- Data lookups ----
   const jobMap = useMemo(() => {
@@ -305,9 +342,9 @@ export default function OperatorSchedulePage() {
   // ---- DateStrip date click ----
   const handleDateClick = useCallback((date: Date) => {
     if (!scrollContainerRef.current) return;
-    const y = timeToYPosition(date, START_HOUR, pixelsPerHour, gridStartDate);
+    const y = timeToYPosition(date, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
     scrollContainerRef.current.scrollTo({ top: y, behavior: 'smooth' });
-  }, [pixelsPerHour, gridStartDate]);
+  }, [pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // ---- Scroll grid to a specific operator slice (operatorId + from time) ----
   // Used by JobCard click (1st non-completed tile of job) and mini-row click in JobDetailsPanel.
@@ -318,7 +355,7 @@ export default function OperatorSchedulePage() {
     const operatorIndex = operators.findIndex((op) => op.id === operatorId);
     if (operatorIndex < 0) return;
 
-    const y = timeToYPosition(from, START_HOUR, pixelsPerHour, gridStartDate);
+    const y = timeToYPosition(from, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
     const top = Math.max(0, y - container.clientHeight * 0.2);
 
     // Timeline (48px sticky) + px-3 (12px) + index * (column + gap-3 (12px))
@@ -326,7 +363,7 @@ export default function OperatorSchedulePage() {
     const left = Math.max(0, columnX - container.clientWidth / 2 + OPERATOR_COLUMN_WIDTH / 2);
 
     container.scrollTo({ top, left, behavior: 'smooth' });
-  }, [operators, pixelsPerHour, gridStartDate]);
+  }, [operators, pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // ---- JobCard click: select + center grid on 1st non-completed tile of the job ----
   const handleSelectJob = useCallback((jobId: string | null) => {
@@ -523,7 +560,7 @@ export default function OperatorSchedulePage() {
         const container = scrollContainerRef.current;
         if (container) {
           const now = new Date();
-          const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+          const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
           const vh = container.clientHeight;
           container.scrollTo({ top: Math.max(0, y - vh / 2), behavior: 'smooth' });
         }
@@ -547,7 +584,7 @@ export default function OperatorSchedulePage() {
         e.preventDefault();
         if (selectedJob?.workshopExitDate && scrollContainerRef.current) {
           const departureDate = new Date(selectedJob.workshopExitDate);
-          const y = timeToYPosition(departureDate, START_HOUR, pixelsPerHour, gridStartDate);
+          const y = timeToYPosition(departureDate, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
           const vh = scrollContainerRef.current.clientHeight;
           scrollContainerRef.current.scrollTo({ top: Math.max(0, y - vh + 100), behavior: 'smooth' });
         }
@@ -661,7 +698,7 @@ export default function OperatorSchedulePage() {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
-  const nowPosition = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+  const nowPosition = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
   // Precompute tile slices for all operators (must be before early returns — hooks rule)
   const allTileSlices = useMemo(() => {
@@ -880,11 +917,15 @@ export default function OperatorSchedulePage() {
 
     const colRect = colEl.getBoundingClientRect();
     const relativeY = e.clientY - colRect.top;
-    const centerMs = gridStartDate.getTime() + (relativeY / pixelsPerHour) * 3_600_000;
+    // Collapse-aware reverse mapping; bail if the cursor lands in a band.
+    const cursorTime = yPositionToTime(relativeY, START_HOUR, gridStartDate, pixelsPerHour, effectiveCollapses);
+    const cursorMs = cursorTime.getTime();
+    const inBand = effectiveCollapses.some(c => cursorMs >= c.from.getTime() && cursorMs < c.to.getTime());
+    if (inBand) return;
 
     lens.handlers.handleColumnMouseMove({
       columnId: operatorId,
-      centerTimeMs: centerMs,
+      centerTimeMs: cursorMs,
       anchor: {
         columnLeft: colRect.left,
         columnRight: colRect.right,
@@ -928,8 +969,8 @@ export default function OperatorSchedulePage() {
     const isLate = lateJobIds.has(job.id) || (!assignment?.isCompleted && new Date(slice.to) < now);
     const tileState = computeTileState(false, isLate, false, false, assignment?.isCompleted ?? false);
 
-    const segTop = timeToYPosition(slice.from, START_HOUR, pixelsPerHour, gridStartDate);
-    const segBottom = timeToYPosition(slice.to, START_HOUR, pixelsPerHour, gridStartDate);
+    const segTop = timeToYPosition(slice.from, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
+    const segBottom = timeToYPosition(slice.to, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
     const segHeight = Math.max(segBottom - segTop, 8);
 
     const colWidth = OPERATOR_COLUMN_WIDTH - 8; // column minus padding
@@ -1073,6 +1114,8 @@ export default function OperatorSchedulePage() {
                     showNowLine={false}
                     pixelsPerHour={pixelsPerHour}
                     visibleDayRange={virtualScroll.visibleRange}
+                    gridStartDate={gridStartDate}
+                    collapses={effectiveCollapses}
                   />
                 </div>
 
@@ -1090,6 +1133,15 @@ export default function OperatorSchedulePage() {
                     data-testid="now-line"
                   />
 
+                  {/* Collapse bands — full-width across all operator columns */}
+                  {effectiveCollapses.map((c) => (
+                    <CollapseBand
+                      key={c.id}
+                      collapse={c}
+                      topPx={timeToYPosition(c.from, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses)}
+                    />
+                  ))}
+
                   {operators.map((op) => {
                     const opSlices = allTileSlices.get(op.id) ?? [];
                     return (
@@ -1103,6 +1155,7 @@ export default function OperatorSchedulePage() {
                         visibleDayRange={virtualScroll.visibleRange}
                         renderSlice={renderSlice}
                         onDeselect={() => setSelectedJobId(null)}
+                        collapses={effectiveCollapses}
                       />
                     );
                   })}
@@ -1202,6 +1255,7 @@ interface OperatorColumnProps {
   visibleDayRange: { start: number; end: number };
   renderSlice: (slice: TileSlice, operatorId: string) => React.ReactNode;
   onDeselect: () => void;
+  collapses?: readonly Collapse[];
 }
 
 /**
@@ -1217,21 +1271,33 @@ function OperatorColumn({
   visibleDayRange,
   renderSlice,
   onDeselect,
+  collapses,
 }: OperatorColumnProps) {
-  const numberOfDays = Math.ceil(totalHeight / (24 * pixelsPerHour));
+  const effectiveCollapses = collapses ?? [];
 
-  // Hour grid lines (only visible range)
+  // Hour grid lines (only visible range). Collapse-aware: skip lines whose Y
+  // resolves inside a band (the band cover hides them).
   const gridLines = useMemo(() => {
     const lines: number[] = [];
     const startDay = visibleDayRange.start;
     const endDay = visibleDayRange.end;
+    const useCollapse = effectiveCollapses.length > 0;
+
     for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
       for (let h = 0; h < 24; h++) {
-        lines.push((dayIndex * 24 + h) * pixelsPerHour);
+        if (!useCollapse) {
+          lines.push((dayIndex * 24 + h) * pixelsPerHour);
+          continue;
+        }
+        const hourDate = new Date(gridStartDate.getTime() + (dayIndex * 24 + h) * 3_600_000);
+        const ms = hourDate.getTime();
+        const inside = effectiveCollapses.some(c => ms > c.from.getTime() && ms < c.to.getTime());
+        if (inside) continue;
+        lines.push(timeToYPosition(hourDate, 0, pixelsPerHour, gridStartDate, effectiveCollapses));
       }
     }
     return lines;
-  }, [visibleDayRange, pixelsPerHour]);
+  }, [visibleDayRange, pixelsPerHour, effectiveCollapses, gridStartDate]);
 
   // Unavailability overlays (only visible range)
   const overlays = useMemo(() => {
@@ -1242,7 +1308,9 @@ function OperatorColumn({
     for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
       const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
       const daySchedule = getOperatorDaySchedule(operator, currentDate);
-      const dayYOffset = dayIndex * 24 * pixelsPerHour;
+      const dayYOffset = effectiveCollapses.length === 0
+        ? dayIndex * 24 * pixelsPerHour
+        : timeToYPosition(currentDate, 0, pixelsPerHour, gridStartDate, effectiveCollapses);
 
       elements.push(
         <UnavailabilityOverlay
@@ -1252,11 +1320,14 @@ function OperatorColumn({
           hoursToDisplay={24}
           pixelsPerHour={pixelsPerHour}
           yOffset={dayYOffset}
+          collapses={effectiveCollapses}
+          dayDate={currentDate}
+          gridStartDate={gridStartDate}
         />,
       );
     }
     return elements;
-  }, [operator, gridStartDate, pixelsPerHour, visibleDayRange]);
+  }, [operator, gridStartDate, pixelsPerHour, visibleDayRange, effectiveCollapses]);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Background click only (not tile clicks which stopPropagation)

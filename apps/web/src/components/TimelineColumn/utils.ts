@@ -1,4 +1,5 @@
 import { PIXELS_PER_HOUR } from './HourMarker';
+import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 /**
  * Calculate Y position from time.
@@ -6,12 +7,47 @@ import { PIXELS_PER_HOUR } from './HourMarker';
  * @param startHour - The starting hour of the timeline
  * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
  * @param startDate - Optional start date for multi-day grid (REQ-14)
+ * @param collapses - Optional sorted list of collapse bands. When present, the
+ *   mapping becomes piecewise-linear: each band earlier than `time` contributes
+ *   exactly COLLAPSED_BAND_PX (instead of its real height in pixels). A `time`
+ *   that lands inside a band is clamped to the band's start.
  */
 export function timeToYPosition(
   time: Date,
   startHour: number,
   pixelsPerHour: number = PIXELS_PER_HOUR,
-  startDate?: Date
+  startDate?: Date,
+  collapses?: readonly Collapse[],
+): number {
+  const linearY = linearTimeToY(time, startHour, pixelsPerHour, startDate);
+  if (!collapses || collapses.length === 0) return linearY;
+
+  let offset = 0;
+  const timeMs = time.getTime();
+  for (const c of collapses) {
+    const fromMs = c.from.getTime();
+    const toMs = c.to.getTime();
+    if (timeMs <= fromMs) break;
+
+    if (timeMs >= toMs) {
+      // Whole band is before `time` — replace its real height with the band's fixed kind-height.
+      const realPx = ((toMs - fromMs) / 3_600_000) * pixelsPerHour;
+      offset += c.heightPx - realPx;
+    } else {
+      // `time` is inside this band — clamp to band start (callers shouldn't ask for this,
+      // but lens / scroll-anchor math may hit it). Use linearY of band.from + accumulated offset.
+      const bandStartLinearY = linearTimeToY(c.from, startHour, pixelsPerHour, startDate);
+      return bandStartLinearY + offset;
+    }
+  }
+  return linearY + offset;
+}
+
+function linearTimeToY(
+  time: Date,
+  startHour: number,
+  pixelsPerHour: number,
+  startDate?: Date,
 ): number {
   const hours = time.getHours();
   const minutes = time.getMinutes();

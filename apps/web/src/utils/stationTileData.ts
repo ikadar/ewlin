@@ -9,6 +9,7 @@ import type {
 import { isInternalTask } from '@flux/types';
 import { compareSimilarity, computeTileState } from '../components/Tile';
 import { timeToYPosition } from '../components/TimelineColumn';
+import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { getPrerequisiteBlockingInfo } from './prerequisites';
 import { getTirageLabel } from './tileLabelResolver';
 
@@ -53,6 +54,8 @@ export interface ComputeTileDataCacheInput {
   pixelsPerHour: number;
   startDate?: Date;
   now: Date;
+  /** Optional list of collapse bands — when present, tile `top` uses the piecewise time→Y mapping. */
+  collapses?: readonly Collapse[];
 }
 
 /**
@@ -65,6 +68,7 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
     assignmentsByStation, taskMap, elementMap, jobMap, stationMap, categoryMap,
     elementsByJobId, elementBlockingCache, assemblyStationIds, operatorNameMap,
     conflictTaskIds, shippedJobIds, lateJobIds, startHour, pixelsPerHour, startDate, now,
+    collapses,
   } = input;
 
   const cache = new Map<string, CachedTileData>();
@@ -83,7 +87,7 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       if (!job || !isInternalTask(task)) return;
 
       const blocking = element ? elementBlockingCache.get(element.id) : undefined;
-      const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate);
+      const top = timeToYPosition(new Date(assignment.scheduledStart), startHour, pixelsPerHour, startDate, collapses);
 
       let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
       if (index > 0 && criteria.length > 0 && element?.spec) {

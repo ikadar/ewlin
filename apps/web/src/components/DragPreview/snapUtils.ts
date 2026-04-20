@@ -1,5 +1,6 @@
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { SNAP_INTERVAL_MINUTES } from '../../constants';
+import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export { SNAP_INTERVAL_MINUTES };
 
@@ -27,32 +28,76 @@ export function snapToGrid(y: number, pixelsPerHour: number = PIXELS_PER_HOUR): 
 /**
  * Convert a Y position to a Date, given the start hour of the grid.
  * Supports multi-day grids (REQ-14) where Y position can span multiple days.
+ *
  * @param y - Y position in pixels (relative to grid top)
  * @param startHour - Starting hour of the grid (e.g., 6 for 6:00 AM)
  * @param baseDate - Optional base date (defaults to today). For multi-day grids, this is the grid start date.
  * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
- * @returns Date representing the time at that Y position
+ * @param collapses - Optional sorted list of collapse bands. Inverse of timeToYPosition's
+ *   piecewise mapping. A `y` that lands inside a band's rendered range returns the band's
+ *   `from` time (matching the timeToY clamp behavior).
  */
-export function yPositionToTime(y: number, startHour: number, baseDate?: Date, pixelsPerHour: number = PIXELS_PER_HOUR): Date {
+export function yPositionToTime(
+  y: number,
+  startHour: number,
+  baseDate?: Date,
+  pixelsPerHour: number = PIXELS_PER_HOUR,
+  collapses?: readonly Collapse[],
+): Date {
+  if (!collapses || collapses.length === 0) {
+    // Original linear path — kept verbatim so drag callers don't shift behavior.
+    return linearYToTimeStartHour(y, startHour, pixelsPerHour, baseDate);
+  }
+
+  // Collapse-aware path. Mirrors timeToYPosition's multi-day convention:
+  // y = 0 corresponds to baseDate's exact moment (midnight in production usage).
+  // Each band consumes (COLLAPSED_BAND_PX - realPx) of rendered Y vs the linear mapping.
+  const baseRef = baseDate ?? new Date();
+  let cumulativeOffset = 0;
+  for (const c of collapses) {
+    const bandStartLinearY = linearTimeToYMultiDay(c.from, baseRef, pixelsPerHour);
+    const bandStartRenderedY = bandStartLinearY + cumulativeOffset;
+    const bandEndRenderedY = bandStartRenderedY + c.heightPx;
+
+    if (y < bandStartRenderedY) {
+      return linearYToTimeMultiDay(y - cumulativeOffset, baseRef, pixelsPerHour);
+    }
+    if (y < bandEndRenderedY) {
+      return new Date(c.from);
+    }
+    const realPx = ((c.to.getTime() - c.from.getTime()) / 3_600_000) * pixelsPerHour;
+    cumulativeOffset += c.heightPx - realPx;
+  }
+  return linearYToTimeMultiDay(y - cumulativeOffset, baseRef, pixelsPerHour);
+}
+
+/** Drag-compatible linear inverse: y=0 is baseDate's day at startHour. */
+function linearYToTimeStartHour(y: number, startHour: number, pixelsPerHour: number, baseDate?: Date): Date {
   const date = baseDate ? new Date(baseDate) : new Date();
-
-  // Calculate total hours from Y position
   const totalHours = y / pixelsPerHour;
-
-  // For multi-day support: calculate days and remaining hours
   const hoursPerDay = 24;
   const dayOffset = Math.floor(totalHours / hoursPerDay);
   const hoursInDay = totalHours - (dayOffset * hoursPerDay);
   const hours = Math.floor(hoursInDay);
   const minutes = Math.round((hoursInDay - hours) * 60);
-
-  // Add day offset to base date
   date.setDate(date.getDate() + dayOffset);
-
-  // Set the time (startHour + hours within the day)
   date.setHours(startHour + hours, minutes, 0, 0);
-
   return date;
+}
+
+/** Multi-day inverse matching timeToYPosition: y=0 is baseDate's exact moment. */
+function linearYToTimeMultiDay(y: number, baseDate: Date, pixelsPerHour: number): Date {
+  const totalMs = (y / pixelsPerHour) * 3_600_000;
+  return new Date(baseDate.getTime() + totalMs);
+}
+
+/** Multi-day forward matching timeToYPosition: hours since baseDate. */
+function linearTimeToYMultiDay(time: Date, baseDate: Date, pixelsPerHour: number): number {
+  const startDayUtc = Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+  const timeDayUtc = Date.UTC(time.getFullYear(), time.getMonth(), time.getDate());
+  const daysDiff = Math.round((timeDayUtc - startDayUtc) / (24 * 60 * 60 * 1000));
+  const totalHours = daysDiff * 24 + time.getHours() + time.getMinutes() / 60;
+  return totalHours * pixelsPerHour;
 }
 
 /**

@@ -1,5 +1,7 @@
 import type { DaySchedule } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
+import { timeToYPosition } from '../TimelineColumn/utils';
+import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface UnavailabilityOverlayProps {
   /** Day schedule containing operating time slots */
@@ -10,8 +12,14 @@ export interface UnavailabilityOverlayProps {
   hoursToDisplay: number;
   /** Pixels per hour for grid scaling (default: 80) */
   pixelsPerHour?: number;
-  /** Y offset in pixels for multi-day rendering (REQ-04) */
+  /** Y offset in pixels for multi-day rendering (REQ-04). Ignored when collapses is set. */
   yOffset?: number;
+  /** Optional collapse bands — each unavailability stripe is split where it intersects a band. */
+  collapses?: readonly Collapse[];
+  /** Absolute date this overlay's day-schedule corresponds to. Required when collapses is set. */
+  dayDate?: Date;
+  /** Grid origin date. Required when collapses is set — used as the baseDate for collapse-aware timeToY. */
+  gridStartDate?: Date;
 }
 
 interface UnavailablePeriod {
@@ -32,9 +40,6 @@ interface OperatingPeriod {
   endMinutes: number;
 }
 
-/**
- * Add gap before the first operating period (if any).
- */
 function addGapBeforeFirstPeriod(
   periods: UnavailablePeriod[],
   firstPeriodStart: number,
@@ -49,9 +54,6 @@ function addGapBeforeFirstPeriod(
   }
 }
 
-/**
- * Add gaps between consecutive operating periods.
- */
 function addGapsBetweenPeriods(
   periods: UnavailablePeriod[],
   operatingPeriods: OperatingPeriod[],
@@ -73,9 +75,6 @@ function addGapsBetweenPeriods(
   }
 }
 
-/**
- * Add gap after the last operating period, handling wrap-around days.
- */
 function addGapAfterLastPeriod(
   periods: UnavailablePeriod[],
   lastPeriodEnd: number,
@@ -89,11 +88,9 @@ function addGapAfterLastPeriod(
   const isWrapAround = displayEnd > MIDNIGHT;
 
   if (isWrapAround) {
-    // Gap from last slot to midnight
     if (lastPeriodEnd < MIDNIGHT) {
       periods.push({ startMinutes: lastPeriodEnd, endMinutes: MIDNIGHT });
     }
-    // Gap from midnight to first slot next day
     const wrappedFirstSlot = firstPeriodStart + MIDNIGHT;
     if (wrappedFirstSlot > MIDNIGHT) {
       periods.push({
@@ -109,10 +106,6 @@ function addGapAfterLastPeriod(
   }
 }
 
-/**
- * Calculate unavailable periods from operating time slots.
- * Returns periods in minutes since midnight.
- */
 function calculateUnavailablePeriods(
   daySchedule: DaySchedule,
   startHour: number,
@@ -147,9 +140,6 @@ function calculateUnavailablePeriods(
   return unavailablePeriods;
 }
 
-/**
- * Convert minutes to Y position in pixels, relative to grid start.
- */
 function minutesToYPosition(minutes: number, startHour: number, pixelsPerHour: number = PIXELS_PER_HOUR): number {
   const startMinutes = startHour * 60;
   const relativeMinutes = minutes - startMinutes;
@@ -159,6 +149,8 @@ function minutesToYPosition(minutes: number, startHour: number, pixelsPerHour: n
 /**
  * UnavailabilityOverlay - Displays hatched pattern overlay for non-operating periods.
  * REQ-04: Supports yOffset for multi-day grid rendering.
+ * Collapse-aware: when `collapses` + `dayDate` are provided, each stripe is split where
+ * it intersects a band (band's pixel range stays empty so the CollapseBand sits there).
  */
 export function UnavailabilityOverlay({
   daySchedule,
@@ -166,23 +158,77 @@ export function UnavailabilityOverlay({
   hoursToDisplay,
   pixelsPerHour = PIXELS_PER_HOUR,
   yOffset = 0,
+  collapses,
+  dayDate,
+  gridStartDate,
 }: UnavailabilityOverlayProps) {
   const unavailablePeriods = calculateUnavailablePeriods(daySchedule, startHour, hoursToDisplay);
+  const useCollapse = collapses && collapses.length > 0 && dayDate && gridStartDate;
 
+  if (!useCollapse) {
+    return (
+      <>
+        {unavailablePeriods.map((period) => {
+          const top = minutesToYPosition(period.startMinutes, startHour, pixelsPerHour) + yOffset;
+          const height = ((period.endMinutes - period.startMinutes) / 60) * pixelsPerHour;
+          return (
+            <div
+              key={`${period.startMinutes}-${period.endMinutes}-${yOffset}`}
+              className="absolute left-0 right-0 bg-stripes-dark pointer-events-none"
+              style={{ top: `${top}px`, height: `${height}px` }}
+              data-testid="unavailability-overlay"
+            />
+          );
+        })}
+      </>
+    );
+  }
+
+  // Collapse-aware path: split each unavailable period at every band boundary,
+  // then position each remaining slice via the collapse-aware timeToYPosition.
+  const fragments: Array<{ from: Date; to: Date; key: string }> = [];
+  const dayBaseMs = dayDate.getTime();
+  for (const period of unavailablePeriods) {
+    const startAbs = dayBaseMs + period.startMinutes * 60_000;
+    const endAbs = dayBaseMs + period.endMinutes * 60_000;
+    let slices: Array<{ from: number; to: number }> = [{ from: startAbs, to: endAbs }];
+    for (const c of collapses) {
+      const cFrom = c.from.getTime();
+      const cTo = c.to.getTime();
+      const next: typeof slices = [];
+      for (const s of slices) {
+        if (cTo <= s.from || cFrom >= s.to) {
+          next.push(s);
+          continue;
+        }
+        if (cFrom > s.from) next.push({ from: s.from, to: cFrom });
+        if (cTo < s.to) next.push({ from: cTo, to: s.to });
+      }
+      slices = next;
+    }
+    slices.forEach((s, idx) => {
+      fragments.push({
+        from: new Date(s.from),
+        to: new Date(s.to),
+        key: `${period.startMinutes}-${period.endMinutes}-${idx}`,
+      });
+    });
+  }
+
+  // Compute Y from gridStartDate (the column's true origin). This gives the same
+  // collapse-aware Y as every other consumer, so fragments line up with tiles + grid lines.
   return (
     <>
-      {unavailablePeriods.map((period) => {
-        const top = minutesToYPosition(period.startMinutes, startHour, pixelsPerHour) + yOffset;
-        const height = ((period.endMinutes - period.startMinutes) / 60) * pixelsPerHour;
-
+      {fragments.map((f) => {
+        const top = timeToYPosition(f.from, startHour, pixelsPerHour, gridStartDate, collapses);
+        const bottom = timeToYPosition(f.to, startHour, pixelsPerHour, gridStartDate, collapses);
+        const height = bottom - top;
+        if (height < 1) return null;
         return (
           <div
-            key={`${period.startMinutes}-${period.endMinutes}-${yOffset}`}
+            key={f.key}
             className="absolute left-0 right-0 bg-stripes-dark pointer-events-none"
-            style={{
-              top: `${top}px`,
-              height: `${height}px`,
-            }}
+            style={{ top: `${top}px`, height: `${height}px` }}
             data-testid="unavailability-overlay"
           />
         );

@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Playground — Repli des périodes vides (variantes graphiques)</title>
+<style>
+  :root {
+    /* zinc palette — matches apps/web */
+    --zinc-950: #09090b;
+    --zinc-900: #18181b;
+    --zinc-800: #27272a;
+    --zinc-700: #3f3f46;
+    --zinc-600: #52525b;
+    --zinc-500: #71717a;
+    --zinc-400: #a1a1aa;
+    --zinc-300: #d4d4d8;
+    --zinc-200: #e4e4e7;
+
+    --bg-base: var(--zinc-950);
+    --bg-surface: var(--zinc-900);
+    --bg-elevated: var(--zinc-800);
+    --border-subtle: var(--zinc-800);
+    --border-dim:   rgba(63, 63, 70, 0.5);   /* zinc-700/50 */
+    --border-dim-2: rgba(39, 39, 42, 0.5);   /* zinc-800/50 */
+    --text-primary: var(--zinc-200);
+    --text-muted:   var(--zinc-400);
+    --text-dim:     var(--zinc-600);
+    --accent: #60a5fa;
+    --accent-soft: rgba(96, 165, 250, 0.18);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: -apple-system, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    height: 100vh;
+  }
+  .panel {
+    border-right: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    padding: 20px;
+    overflow-y: auto;
+    height: 100vh;
+  }
+  .panel h1 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.01em;
+  }
+  .panel .subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .control-group {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(63,63,70,0.3);
+  }
+  .control-group:last-child { border-bottom: none; }
+  .control-group .label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+
+  /* Segmented control */
+  .segmented {
+    display: flex;
+    background: var(--bg-elevated);
+    border-radius: 6px;
+    padding: 3px;
+    border: 1px solid var(--border-subtle);
+  }
+  .segmented.segmented-wrap { flex-wrap: wrap; gap: 2px; }
+  .segmented.segmented-wrap label { flex: 1 1 calc(33% - 4px); min-width: 0; }
+  .segmented label {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 120ms, color 120ms;
+  }
+  .segmented label:hover { color: var(--text-primary); }
+  .segmented label input { display: none; }
+  .segmented label.active {
+    background: var(--accent-soft);
+    color: #93c5fd;
+    font-weight: 500;
+  }
+  .hint-text {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--zinc-500);
+    line-height: 1.45;
+  }
+
+  /* Slider */
+  .slider-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .slider-row .val {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--bg-elevated);
+    border-radius: 2px;
+    outline: none;
+    margin: 6px 0 0 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg-surface);
+  }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 10px;
+  }
+  .toggle-row:last-child { margin-bottom: 0; }
+  .toggle-label { font-size: 12px; color: var(--text-primary); }
+  .toggle-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .switch {
+    position: relative;
+    width: 34px; height: 20px;
+    background: var(--bg-elevated);
+    border-radius: 10px;
+    transition: background 120ms;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: "";
+    position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #71717a;
+    transition: transform 120ms, background 120ms;
+  }
+  input[type="checkbox"].switch-input { display: none; }
+  input[type="checkbox"].switch-input:checked + .switch { background: var(--accent); }
+  input[type="checkbox"].switch-input:checked + .switch::after {
+    transform: translateX(14px);
+    background: white;
+  }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .stat {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+  .stat-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  .stat-val {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Prompt output */
+  .prompt-area { margin-top: 4px; }
+  .prompt-text {
+    background: var(--bg-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--zinc-300);
+    white-space: pre-wrap;
+    max-height: 280px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+  }
+  .copy-btn {
+    width: 100%;
+    padding: 8px;
+    background: var(--accent);
+    border: 0;
+    color: #0c0c0f;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .copy-btn:hover { background: #3b82f6; }
+  .copy-btn.copied { background: #22c55e; color: #0c0c0f; }
+
+  .btn-secondary {
+    width: 100%;
+    padding: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { border-color: var(--zinc-600); }
+
+  /* ── Timeline view ──────────────────────────────────────────── */
+  .view {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+  .view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .view-title { font-weight: 500; color: var(--text-primary); }
+  .view-hint  { font-size: 11px; }
+
+  .scroll {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background: var(--zinc-950);
+  }
+
+  .grid {
+    display: grid;
+    position: relative;
+    grid-template-columns: 68px 48px 1fr;
+    min-height: 100%;
+  }
+
+  .col-date, .col-time {
+    position: relative;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--zinc-950);
+  }
+  .col-stations {
+    display: grid;
+    position: relative;
+  }
+  .station {
+    position: relative;
+    border-right: 1px solid var(--border-subtle);
+    min-width: 180px;
+    background: var(--zinc-950);
+  }
+
+  /* Sticky header row */
+  .grid-header {
+    display: grid;
+    grid-template-columns: 68px 48px 1fr;
+    position: sticky; top: 0; z-index: 30;
+    background: var(--zinc-900);
+    border-bottom: 1px solid var(--border-subtle);
+    height: 40px;
+  }
+  .grid-header .h-cell {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-muted);
+    border-right: 1px solid var(--border-subtle);
+  }
+  .grid-header .h-stations {
+    display: grid;
+    height: 40px;
+  }
+  .grid-header .station-head {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 500;
+    color: var(--zinc-300);
+    padding: 0 12px;
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  /* Date / time labels */
+  .date-label {
+    position: absolute;
+    left: 4px; right: 4px;
+    padding-top: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--zinc-300);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+  }
+  .date-label .date-sub {
+    display: block;
+    font-weight: 400;
+    color: var(--zinc-500);
+    font-size: 9px;
+    margin-top: 1px;
+  }
+
+  /* Hour label — HourMarker.tsx: right-2, font-mono text-sm text-zinc-600, "Nh" */
+  .hour-label {
+    position: absolute;
+    right: 8px;
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+    font-size: 11.375px;
+    color: var(--zinc-600);
+    transform: translateY(1px);
+    line-height: 1;
+  }
+  .hour-tick {
+    position: absolute;
+    right: 0;
+    height: 1px;
+  }
+  .hour-tick.t15 { width: 8px;  background: var(--border-dim-2); }
+  .hour-tick.t30 { width: 12px; background: var(--border-dim);   }
+  .hour-tick.t45 { width: 8px;  background: var(--border-dim-2); }
+
+  .hour-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 1px;
+    background: var(--border-dim);
+  }
+
+  /* Unavailability stripes — matches /stripes.svg */
+  .unavail {
+    position: absolute;
+    left: 0; right: 0;
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.17) 0 5px,
+      transparent 5px 16px
+    );
+    pointer-events: none;
+  }
+
+  /* ── Tiles — matches Tile.tsx ──────────────────────────────── */
+  .tile {
+    position: absolute;
+    left: 0; right: 0;
+    border-radius: 2px;
+    border-left-width: 4px;
+    border-left-style: solid;
+    font-size: 11.375px;
+    padding: 3px 6px 3px 6px;
+    overflow: hidden;
+    line-height: 1.25;
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.04);
+  }
+  .tile .tile-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+  }
+  .tile .tile-ops {
+    color: var(--zinc-400);
+    font-size: 9px;
+    margin-top: 2px;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tile .tile-setup {
+    border-bottom: 1px dotted rgba(0, 0, 0, 0.6);
+    padding: 2px 0;
+    margin-bottom: 2px;
+    font-size: 9px;
+    opacity: 0.75;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+   *  COLLAPSE BAND — GRAPHIC STYLE ONLY
+   *  5 variantes × 4 catégories = 20 apparences.
+   *  Intensity via --intensity CSS variable (0.6 / 1 / 1.5).
+   * ─────────────────────────────────────────────────────────────── */
+  .band {
+    position: absolute;
+    left: 0; right: 0;
+    cursor: pointer;
+    user-select: none;
+    z-index: 5;
+    overflow: hidden;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    --intensity: 1;
+  }
+  .band::before,
+  .band::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* Date/time column "side decoration" — mirrors the band but without chip */
+  .band-side {
+    position: absolute;
+    left: 0; right: 0;
+    z-index: 6;
+    pointer-events: none;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: var(--zinc-950);
+  }
+  .date-jump {
+    position: absolute;
+    left: 4px; right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    font-family: ui-monospace, monospace;
+    color: var(--zinc-500);
+    text-align: center;
+    line-height: 1.2;
+    pointer-events: none;
+  }
+  .date-jump .arrow { color: var(--zinc-700); }
+
+  /* ────────  V1 — TEXTURE (pure pattern, no figure)  ──────── */
+  .band.variant-texture.cat-night {
+    background: linear-gradient(180deg, #0b0f1a 0%, #080a12 100%);
+  }
+  .band.variant-texture.cat-night::before {
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 7% 22%, rgba(196,217,255,0.55) 0%, transparent 70%),
+      radial-gradient(1.2px 1.2px at 14% 70%, rgba(255,255,255,0.6) 0%, transparent 70%),
+      radial-gradient(1px 1px at 22% 42%, rgba(196,217,255,0.5) 0%, transparent 70%),
+      radial-gradient(1.4px 1.4px at 31% 85%, rgba(255,255,255,0.65) 0%, transparent 70%),
+      radial-gradient(1.1px 1.1px at 39% 28%, rgba(196,217,255,0.45) 0%, transparent 70%),
+      radial-gradient(1px 1px at 48% 60%, rgba(255,255,255,0.5) 0%, transparent 70%),
+      radial-gradient(1.3px 1.3px at 57% 20%, rgba(196,217,255,0.6) 0%, transparent 70%),
+      radial-gradient(1px 1px at 64% 78%, rgba(255,255,255,0.45) 0%, transparent 70%),
+      radial-gradient(1.5px 1.5px at 72% 45%, rgba(196,217,255,0.55) 0%, transparent 70%),
+      radial-gradient(1px 1px at 80% 25%, rgba(255,255,255,0.5) 0%, transparent 70%),
+      radial-gradient(1.2px 1.2px at 88% 68%, rgba(196,217,255,0.5) 0%, transparent 70%),
+      radial-gradient(1px 1px at 94% 38%, rgba(255,255,255,0.55) 0%, transparent 70%);
+    opacity: calc(var(--intensity) * 0.9);
+  }
+  .band.variant-texture.cat-weekend {
+    background: linear-gradient(180deg, #14121f 0%, #0e0c14 100%);
+  }
+  .band.variant-texture.cat-weekend::before {
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(196,181,253,0.09) 0 30px,
+      transparent 30px 70px
+    );
+    opacity: calc(var(--intensity) * 1);
+  }
+  .band.variant-texture.cat-closure {
+    background: linear-gradient(180deg, #17120a 0%, #0e0b06 100%);
+  }
+  .band.variant-texture.cat-closure::before {
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(252,211,77,0.14) 0 10px,
+      rgba(252,211,77,0.04) 10px 26px
+    );
+    opacity: calc(var(--intensity) * 0.75);
+  }
+  .band.variant-texture.cat-pause {
+    background: var(--zinc-900);
+  }
+  .band.variant-texture.cat-pause::before {
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(161,161,170,0.1) 0 2px,
+      transparent 2px 8px
+    );
+    opacity: calc(var(--intensity) * 1);
+  }
+
+  /* ────────  V2 — CORNER (flat bg + tiny glyph top-right)  ──────── */
+  .band.variant-corner.cat-night   { background: #0b0f1a; }
+  .band.variant-corner.cat-weekend { background: #14121f; }
+  .band.variant-corner.cat-closure { background: #17120a; }
+  .band.variant-corner.cat-pause   { background: var(--zinc-900); }
+
+  .band.variant-corner::after {
+    right: 14px; top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 16px;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: right center;
+    opacity: calc(var(--intensity) * 0.75);
+  }
+  .band.variant-corner.cat-night::after {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M11 2a7 7 0 1 0 3 11A5 5 0 0 1 11 2z' fill='%2393c5fd'/></svg>");
+  }
+  .band.variant-corner.cat-weekend::after {
+    width: 34px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 16'><text x='0' y='11' fill='%23c4b5fd' font-family='ui-monospace,monospace' font-size='9' font-weight='700' letter-spacing='0.5'>SA/DI</text></svg>");
+  }
+  .band.variant-corner.cat-closure::after {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M4.5 8V6a3.5 3.5 0 0 1 7 0v2' fill='none' stroke='%23fcd34d' stroke-width='1.4'/><rect x='2.5' y='7.5' width='11' height='7' rx='1' fill='%23fcd34d' fill-opacity='0.6'/></svg>");
+  }
+  .band.variant-corner.cat-pause::after {
+    width: 12px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'><rect x='2' y='3' width='2.8' height='10' rx='0.5' fill='%23a1a1aa'/><rect x='7.2' y='3' width='2.8' height='10' rx='0.5' fill='%23a1a1aa'/></svg>");
+  }
+
+  /* ────────  V3 — CENTERED (medium glyph on soft wash)  ──────── */
+  .band.variant-centered.cat-night {
+    background: linear-gradient(180deg, #0b0f1a 0%, #0a0d16 50%, #090b12 100%);
+  }
+  .band.variant-centered.cat-night::before {
+    inset: 0;
+    background-image:
+      radial-gradient(1.2px 1.2px at 14% 30%, rgba(255,255,255,0.4), transparent 70%),
+      radial-gradient(1px 1px at 28% 68%, rgba(255,255,255,0.3), transparent 70%),
+      radial-gradient(1.4px 1.4px at 44% 25%, rgba(255,255,255,0.5), transparent 70%),
+      radial-gradient(1px 1px at 58% 75%, rgba(255,255,255,0.3), transparent 70%),
+      radial-gradient(1.1px 1.1px at 78% 35%, rgba(255,255,255,0.35), transparent 70%);
+    opacity: calc(var(--intensity) * 0.8);
+  }
+  .band.variant-centered.cat-night::after {
+    right: 26px; top: 50%;
+    transform: translateY(-50%);
+    width: 32px; height: 32px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M21 4a12 12 0 1 0 4 15A9 9 0 0 1 21 4z' fill='%23c4d9ff' fill-opacity='0.35'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 0.85);
+  }
+  .band.variant-centered.cat-weekend {
+    background: linear-gradient(180deg, #15121f 0%, #0e0c14 100%);
+  }
+  .band.variant-centered.cat-weekend::after {
+    right: 24px; top: 50%;
+    transform: translateY(-50%);
+    width: 68px; height: 34px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 68 34'><rect x='2' y='5' width='28' height='24' rx='3' fill='rgba(196,181,253,0.08)' stroke='%23c4b5fd' stroke-opacity='0.5' stroke-width='1.2'/><rect x='38' y='5' width='28' height='24' rx='3' fill='rgba(196,181,253,0.08)' stroke='%23c4b5fd' stroke-opacity='0.5' stroke-width='1.2'/><line x1='5' y1='11' x2='27' y2='11' stroke='%23c4b5fd' stroke-opacity='0.3' stroke-width='0.7'/><line x1='41' y1='11' x2='63' y2='11' stroke='%23c4b5fd' stroke-opacity='0.3' stroke-width='0.7'/><text x='16' y='22' text-anchor='middle' fill='%23c4b5fd' fill-opacity='0.75' font-family='ui-monospace, monospace' font-size='7.5' font-weight='600'>SAM</text><text x='52' y='22' text-anchor='middle' fill='%23c4b5fd' fill-opacity='0.75' font-family='ui-monospace, monospace' font-size='7.5' font-weight='600'>DIM</text></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 0.95);
+  }
+  .band.variant-centered.cat-closure {
+    background: linear-gradient(180deg, #17120a 0%, #0e0b06 100%);
+  }
+  .band.variant-centered.cat-closure::after {
+    right: 28px; top: 50%;
+    transform: translateY(-50%);
+    width: 28px; height: 34px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 34'><path d='M7 16V11a7 7 0 0 1 14 0v5' fill='none' stroke='%23fcd34d' stroke-opacity='0.65' stroke-width='1.6' stroke-linecap='round'/><rect x='3.5' y='15' width='21' height='15' rx='2' fill='%23fcd34d' fill-opacity='0.22' stroke='%23fcd34d' stroke-opacity='0.55' stroke-width='1'/><circle cx='14' cy='22.5' r='1.5' fill='%23fcd34d' fill-opacity='0.85'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 0.85);
+  }
+  .band.variant-centered.cat-pause {
+    background: linear-gradient(180deg, #18181b 0%, #0e0e11 100%);
+  }
+  .band.variant-centered.cat-pause::after {
+    right: 30px; top: 50%;
+    transform: translateY(-50%);
+    width: 22px; height: 24px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 24'><rect x='4' y='3' width='4.5' height='18' rx='1' fill='%23a1a1aa' fill-opacity='0.5'/><rect x='13.5' y='3' width='4.5' height='18' rx='1' fill='%23a1a1aa' fill-opacity='0.5'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 0.9);
+  }
+
+  /* ────────  V4 — SCENE (fuller illustrative)  ──────── */
+  .band.variant-scene.cat-night {
+    background: linear-gradient(180deg, #0a0e1a 0%, #0f1628 45%, #0a0d16 100%);
+  }
+  .band.variant-scene.cat-night::before {
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 5% 20%, rgba(255,255,255,0.65) 0%, transparent 70%),
+      radial-gradient(1.4px 1.4px at 12% 55%, rgba(196,217,255,0.6) 0%, transparent 70%),
+      radial-gradient(1px 1px at 20% 32%, rgba(255,255,255,0.5) 0%, transparent 70%),
+      radial-gradient(1.7px 1.7px at 27% 72%, rgba(255,255,255,0.75) 0%, transparent 70%),
+      radial-gradient(1.1px 1.1px at 36% 22%, rgba(196,217,255,0.55) 0%, transparent 70%),
+      radial-gradient(1px 1px at 42% 58%, rgba(255,255,255,0.5) 0%, transparent 70%),
+      radial-gradient(1.6px 1.6px at 50% 18%, rgba(196,217,255,0.7) 0%, transparent 70%),
+      radial-gradient(1px 1px at 56% 80%, rgba(255,255,255,0.5) 0%, transparent 70%),
+      radial-gradient(1.3px 1.3px at 63% 42%, rgba(196,217,255,0.55) 0%, transparent 70%);
+    opacity: calc(var(--intensity) * 1);
+  }
+  .band.variant-scene.cat-night::after {
+    right: 28px; top: 50%;
+    transform: translateY(-50%);
+    width: 52px; height: 52px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 52'><defs><radialGradient id='m' cx='38%25' cy='42%25' r='60%25'><stop offset='0%25' stop-color='%23e9f0ff' stop-opacity='0.55'/><stop offset='100%25' stop-color='%2393c5fd' stop-opacity='0.25'/></radialGradient></defs><path d='M35 6a20 20 0 1 0 7 25A16 16 0 0 1 35 6z' fill='url(%23m)'/><circle cx='30' cy='16' r='1.6' fill='%23ffffff' fill-opacity='0.22'/><circle cx='22' cy='26' r='2.2' fill='%23ffffff' fill-opacity='0.16'/><circle cx='28' cy='35' r='1.1' fill='%23ffffff' fill-opacity='0.18'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 0.95);
+  }
+  .band.variant-scene.cat-weekend {
+    background: linear-gradient(180deg, #16132a 0%, #0f0d1e 100%);
+  }
+  .band.variant-scene.cat-weekend::before {
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(196,181,253,0.045) 0 30px,
+      transparent 30px 60px
+    );
+    opacity: calc(var(--intensity) * 1);
+  }
+  .band.variant-scene.cat-weekend::after {
+    right: 18px; top: 50%;
+    transform: translateY(-50%);
+    width: 100px; height: 44px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 44'><rect x='2' y='4' width='44' height='36' rx='4' fill='rgba(196,181,253,0.1)' stroke='%23c4b5fd' stroke-opacity='0.6' stroke-width='1.3'/><rect x='54' y='4' width='44' height='36' rx='4' fill='rgba(196,181,253,0.1)' stroke='%23c4b5fd' stroke-opacity='0.6' stroke-width='1.3'/><line x1='6' y1='12' x2='42' y2='12' stroke='%23c4b5fd' stroke-opacity='0.35' stroke-width='0.9'/><line x1='58' y1='12' x2='94' y2='12' stroke='%23c4b5fd' stroke-opacity='0.35' stroke-width='0.9'/><text x='24' y='30' text-anchor='middle' fill='%23c4b5fd' fill-opacity='0.9' font-family='ui-monospace, monospace' font-size='12' font-weight='700'>SAM</text><text x='76' y='30' text-anchor='middle' fill='%23c4b5fd' fill-opacity='0.9' font-family='ui-monospace, monospace' font-size='12' font-weight='700'>DIM</text></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 1);
+  }
+  .band.variant-scene.cat-closure {
+    background: linear-gradient(180deg, #1e160a 0%, #110c05 100%);
+  }
+  .band.variant-scene.cat-closure::before {
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(252,211,77,0.11) 0 16px,
+      rgba(252,211,77,0.03) 16px 32px
+    );
+    opacity: calc(var(--intensity) * 0.8);
+  }
+  .band.variant-scene.cat-closure::after {
+    right: 20px; top: 50%;
+    transform: translateY(-50%);
+    width: 50px; height: 50px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 50 50'><path d='M13 24V17a11 11 0 0 1 22 0v7' fill='none' stroke='%23fcd34d' stroke-opacity='0.75' stroke-width='2.4' stroke-linecap='round'/><rect x='7' y='23' width='34' height='22' rx='3' fill='%23fcd34d' fill-opacity='0.28' stroke='%23fcd34d' stroke-opacity='0.7' stroke-width='1.5'/><circle cx='24' cy='33' r='2.5' fill='%23fcd34d' fill-opacity='0.92'/><rect x='22.8' y='33' width='2.4' height='6' rx='1' fill='%23fcd34d' fill-opacity='0.92'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 1);
+  }
+  .band.variant-scene.cat-pause {
+    background: linear-gradient(180deg, #1a1a1d 0%, #101013 100%);
+  }
+  .band.variant-scene.cat-pause::before {
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(161,161,170,0.08) 0 2px,
+      transparent 2px 10px
+    );
+    opacity: calc(var(--intensity) * 0.9);
+  }
+  .band.variant-scene.cat-pause::after {
+    right: 24px; top: 50%;
+    transform: translateY(-50%);
+    width: 40px; height: 40px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='16' fill='none' stroke='%23a1a1aa' stroke-opacity='0.4' stroke-width='1.4'/><rect x='13' y='11' width='4' height='18' rx='1' fill='%23a1a1aa' fill-opacity='0.7'/><rect x='23' y='11' width='4' height='18' rx='1' fill='%23a1a1aa' fill-opacity='0.7'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: calc(var(--intensity) * 0.9);
+  }
+
+  /* ────────  V5 — WASH (pure saturated color, no figure)  ──────── */
+  .band.variant-wash.cat-night,
+  .band.variant-wash.cat-weekend,
+  .band.variant-wash.cat-closure,
+  .band.variant-wash.cat-pause {
+    background: var(--zinc-950);
+  }
+  .band.variant-wash::before {
+    inset: 0;
+    opacity: calc(var(--intensity) * 0.85);
+  }
+  .band.variant-wash.cat-night::before    { background: #1a2442; }
+  .band.variant-wash.cat-weekend::before  { background: #1e1836; }
+  .band.variant-wash.cat-closure::before  { background: #2b1f0a; }
+  .band.variant-wash.cat-pause::before    { background: #232326; }
+
+  /* ── Monochrome override — when state.colorMode = "mono" ── */
+  .scroll.color-mono .band::before,
+  .scroll.color-mono .band::after {
+    filter: grayscale(1) brightness(0.95);
+  }
+  .scroll.color-mono .band.cat-night,
+  .scroll.color-mono .band.cat-weekend,
+  .scroll.color-mono .band.cat-closure,
+  .scroll.color-mono .band.cat-pause {
+    background: var(--zinc-900);
+  }
+  .scroll.color-mono .band.variant-wash::before {
+    background: #242428;
+  }
+  .scroll.color-mono .band-chip { --cat-color: var(--zinc-400) !important; }
+
+  /* ── Chip (locked: center, size M per spec) ── */
+  .band-chip {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    background: var(--bg-elevated);
+    color: var(--zinc-200);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 5px 12px 5px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    z-index: 2;
+  }
+  .band-chip .chip-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    color: var(--cat-color, var(--zinc-400));
+  }
+  .band-chip .chip-label {
+    font-weight: 600;
+    color: var(--cat-color, var(--zinc-200));
+    font-family: -apple-system, "SF Pro Text", "Inter", sans-serif;
+    letter-spacing: 0.01em;
+  }
+  .band-chip .chip-amount {
+    font-family: ui-monospace, "SF Mono", monospace;
+    color: var(--zinc-300);
+    font-weight: 500;
+    padding-left: 8px;
+    border-left: 1px solid var(--border-subtle);
+    font-size: 12px;
+  }
+  .band-chip .chip-range {
+    font-family: ui-monospace, "SF Mono", monospace;
+    color: var(--zinc-500);
+    font-size: 10px;
+    padding-left: 4px;
+  }
+  .band-chip.cat-night   { --cat-color: #93c5fd; }
+  .band-chip.cat-weekend { --cat-color: #c4b5fd; }
+  .band-chip.cat-closure { --cat-color: #fcd34d; }
+  .band-chip.cat-pause   { --cat-color: #a1a1aa; }
+
+  .band:hover .band-chip {
+    border-color: var(--cat-color, var(--accent));
+    box-shadow: 0 0 0 1px var(--cat-color, var(--accent)), 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  .band-hint {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--zinc-500);
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 120ms;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .band:hover .band-hint { opacity: 1; }
+
+  .footer-note {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .footer-note kbd {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--text-primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ── CONTROL PANEL ───────────────────────────────────────── -->
+  <aside class="panel">
+    <h1>Repli — variantes graphiques</h1>
+    <p class="subtitle">
+      Style « Graphic » verrouillé (spec 2026-04-19). Explore 5 variantes
+      par catégorie — de la texture pure à la scène figurative — puis règle
+      intensité et palette.
+    </p>
+
+    <!-- Variant -->
+    <div class="control-group">
+      <span class="label">Variante graphique</span>
+      <div class="segmented segmented-wrap" id="variant-group">
+        <label data-val="texture"><input type="radio" name="variant" value="texture">Texture</label>
+        <label data-val="corner"><input type="radio" name="variant" value="corner">Coin</label>
+        <label data-val="centered" class="active"><input type="radio" name="variant" value="centered" checked>Centré</label>
+        <label data-val="scene"><input type="radio" name="variant" value="scene">Scène</label>
+        <label data-val="wash"><input type="radio" name="variant" value="wash">Aplat</label>
+      </div>
+      <div class="hint-text" id="variant-hint"></div>
+    </div>
+
+    <!-- Intensity -->
+    <div class="control-group">
+      <span class="label">Intensité visuelle</span>
+      <div class="segmented" id="intensity-group">
+        <label data-val="subtle"><input type="radio" name="intensity" value="subtle">Discret</label>
+        <label data-val="default" class="active"><input type="radio" name="intensity" value="default" checked>Standard</label>
+        <label data-val="strong"><input type="radio" name="intensity" value="strong">Affirmé</label>
+      </div>
+      <div class="hint-text">Multiplicateur appliqué à l'opacité de l'imagerie (×0.6 / ×1 / ×1.5).</div>
+    </div>
+
+    <!-- Color mode -->
+    <div class="control-group">
+      <span class="label">Palette</span>
+      <div class="segmented" id="color-group">
+        <label data-val="category" class="active"><input type="radio" name="color" value="category" checked>Par catégorie</label>
+        <label data-val="mono"><input type="radio" name="color" value="mono">Monochrome</label>
+      </div>
+      <div class="hint-text">Test A/B : bascule en monochrome pour voir si la forme/texture suffit, hors couleur.</div>
+    </div>
+
+    <!-- Threshold -->
+    <div class="control-group">
+      <span class="label">Seuil de repli</span>
+      <div class="slider-row"><span>Min écart</span><span class="val" id="val-threshold">8h</span></div>
+      <input type="range" id="threshold" min="1" max="12" step="1" value="8" />
+    </div>
+
+    <!-- Band height -->
+    <div class="control-group">
+      <span class="label">Hauteur du ruban</span>
+      <div class="slider-row"><span>Fixe</span><span class="val" id="val-band">76 px</span></div>
+      <input type="range" id="band-px" min="32" max="120" step="4" value="76" />
+    </div>
+
+    <!-- Zoom -->
+    <div class="control-group">
+      <span class="label">Densité (px/h)</span>
+      <div class="slider-row"><span>Zoom</span><span class="val" id="val-zoom">50 px/h</span></div>
+      <input type="range" id="zoom" min="20" max="80" step="5" value="50" />
+    </div>
+
+    <!-- Toggles -->
+    <div class="control-group">
+      <label class="toggle-row">
+        <div><div class="toggle-label">Repli activé</div></div>
+        <input type="checkbox" class="switch-input" id="toggle-enabled" checked />
+        <div class="switch"></div>
+      </label>
+      <label class="toggle-row">
+        <div><div class="toggle-label">Afficher le chip</div></div>
+        <input type="checkbox" class="switch-input" id="toggle-chip" checked />
+        <div class="switch"></div>
+      </label>
+      <label class="toggle-row">
+        <div><div class="toggle-label">Chip verbeux (from → to)</div></div>
+        <input type="checkbox" class="switch-input" id="toggle-verbose" checked />
+        <div class="switch"></div>
+      </label>
+    </div>
+
+    <!-- Stats -->
+    <div class="control-group">
+      <span class="label">Compression</span>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Brut</div>
+          <div class="stat-val" id="stat-raw">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Rendu</div>
+          <div class="stat-val" id="stat-rendered">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Bandes</div>
+          <div class="stat-val" id="stat-bands">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Ratio</div>
+          <div class="stat-val" id="stat-ratio">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <button id="reset-expanded" class="btn-secondary">Replier toutes les bandes</button>
+    </div>
+
+    <!-- Prompt -->
+    <div class="control-group prompt-area">
+      <span class="label">Prompt d'implémentation</span>
+      <div class="prompt-text" id="prompt-text"></div>
+      <button class="copy-btn" id="copy-prompt">Copier le prompt</button>
+    </div>
+  </aside>
+
+  <!-- ── TIMELINE VIEW ───────────────────────────────────────── -->
+  <main class="view">
+    <div class="view-header">
+      <div class="view-title">Operator planning · Thu Apr 16 — Thu Apr 23, 2026</div>
+      <div class="view-hint">Clic sur un ruban → expansion locale</div>
+    </div>
+
+    <div class="scroll" id="scroll">
+      <div class="grid-header">
+        <div class="h-cell">Jour</div>
+        <div class="h-cell">H</div>
+        <div class="h-stations" id="station-heads"></div>
+      </div>
+
+      <div class="grid" id="grid">
+        <div class="col-date" id="col-date"></div>
+        <div class="col-time" id="col-time"></div>
+        <div class="col-stations" id="col-stations"></div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      5 variantes × 4 catégories · Variante actuelle : <span id="footer-variant">Centré</span>.
+      La pause (1h) apparaît uniquement si seuil ≤ 1h.
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/* ─────────────────────────────────────────────────────────────
+ * CONFIG
+ * ───────────────────────────────────────────────────────────── */
+const DAYS = [
+  { idx: 0, label: "Thu",  sub: "Apr 16", working: true  },
+  { idx: 1, label: "Fri",  sub: "Apr 17", working: true  },
+  { idx: 2, label: "Sat",  sub: "Apr 18", working: false },
+  { idx: 3, label: "Sun",  sub: "Apr 19", working: false },
+  { idx: 4, label: "Mon",  sub: "Apr 20", working: true  },
+  { idx: 5, label: "Tue",  sub: "Apr 21", working: false }, // jour férié
+  { idx: 6, label: "Wed",  sub: "Apr 22", working: true  },
+  { idx: 7, label: "Thu",  sub: "Apr 23", working: true  },
+];
+const TOTAL_H = DAYS.length * 24;
+
+const OPERATORS = [
+  { id: "A", name: "Alice"  },
+  { id: "B", name: "Bob"    },
+  { id: "C", name: "Chloé"  },
+  { id: "D", name: "Dan"    },
+];
+
+const STATE_PALETTE = {
+  default:   { rgb: "59,130,246",  border: "#3b82f6", text: "#93c5fd", opacity: 0.12 },
+  completed: { rgb: "34,197,94",   border: "#22c55e", text: "#86efac", opacity: 0.09 },
+  conflict:  { rgb: "245,158,11",  border: "#f59e0b", text: "#fcd34d", opacity: 0.09 },
+  late:      { rgb: "239,68,68",   border: "#ef4444", text: "#fca5a5", opacity: 0.09 },
+  shipped:   { rgb: "16,185,129",  border: "#10b981", text: "#6ee7b7", opacity: 0.09 },
+  blocked:   { rgb: "113,113,122", border: "#71717a", text: "#a1a1aa", opacity: 0.06 },
+};
+
+const WORK_WINDOWS = [[8, 12], [13, 17]];
+
+const JOBS = [
+  { ref: "J-2047", client: "Éditions Laval",   product: "Brochure 32p" },
+  { ref: "J-2048", client: "Maison Durand",    product: "Flyer A5"     },
+  { ref: "J-2051", client: "Café Vertigo",     product: "Menu cartonné"},
+  { ref: "J-2053", client: "Clinique Saint-L.",product: "Affiche A3"   },
+  { ref: "J-2055", client: "Groupe Bernier",   product: "Catalogue"    },
+  { ref: "J-2060", client: "Atelier Nord",     product: "Calendrier"   },
+  { ref: "J-2061", client: "Les Halles Mtl",   product: "Étiquettes"   },
+  { ref: "J-2064", client: "Sport & Co.",      product: "Dépliant 6v"  },
+  { ref: "J-2070", client: "École Brébeuf",    product: "Agenda"       },
+  { ref: "J-2074", client: "Librairie Ciel",   product: "Jaquette"     },
+  { ref: "J-2077", client: "Studio Cinq",      product: "Carte postale"},
+  { ref: "J-2082", client: "Fromagerie B.",    product: "Étiquettes"   },
+];
+
+const TASK_DEFS = [
+  // Thu
+  { op: "A", d: 0, s: 8,    dur: 2,   state: "default",   setup: 0.25, job: 0 },
+  { op: "A", d: 0, s: 10.5, dur: 1.5, state: "completed", setup: 0,    job: 1 },
+  { op: "A", d: 0, s: 13,   dur: 3,   state: "default",   setup: 0.5,  job: 2 },
+  { op: "B", d: 0, s: 9,    dur: 2,   state: "default",   setup: 0.25, job: 3 },
+  { op: "B", d: 0, s: 14,   dur: 2.5, state: "conflict",  setup: 0,    job: 4 },
+  { op: "C", d: 0, s: 8.5,  dur: 3,   state: "default",   setup: 0.25, job: 5 },
+  { op: "C", d: 0, s: 13,   dur: 1.5, state: "completed", setup: 0,    job: 6 },
+  { op: "C", d: 0, s: 15,   dur: 2,   state: "default",   setup: 0.25, job: 7 },
+  { op: "D", d: 0, s: 8,    dur: 3.5, state: "default",   setup: 0.5,  job: 8 },
+  { op: "D", d: 0, s: 14,   dur: 2.5, state: "default",   setup: 0.25, job: 9 },
+  // Fri
+  { op: "A", d: 1, s: 8,    dur: 3,   state: "default",   setup: 0.5,  job: 10 },
+  { op: "A", d: 1, s: 13,   dur: 4,   state: "late",      setup: 0,    job: 11 },
+  { op: "B", d: 1, s: 9,    dur: 2.5, state: "default",   setup: 0.25, job: 0 },
+  { op: "B", d: 1, s: 13.5, dur: 3,   state: "default",   setup: 0.25, job: 1 },
+  { op: "C", d: 1, s: 8,    dur: 2,   state: "default",   setup: 0.25, job: 2 },
+  { op: "C", d: 1, s: 10.5, dur: 1.5, state: "shipped",   setup: 0,    job: 3 },
+  { op: "C", d: 1, s: 14,   dur: 2.5, state: "default",   setup: 0.25, job: 4 },
+  { op: "D", d: 1, s: 8.5,  dur: 3,   state: "default",   setup: 0.5,  job: 5 },
+  { op: "D", d: 1, s: 13,   dur: 2,   state: "blocked",   setup: 0,    job: 6 },
+  { op: "D", d: 1, s: 15.5, dur: 1.5, state: "default",   setup: 0.25, job: 7 },
+  // Mon
+  { op: "A", d: 4, s: 8,    dur: 2.5, state: "default",   setup: 0.5,  job: 8 },
+  { op: "A", d: 4, s: 13,   dur: 3,   state: "default",   setup: 0.25, job: 9 },
+  { op: "B", d: 4, s: 8,    dur: 3,   state: "default",   setup: 0.5,  job: 10 },
+  { op: "B", d: 4, s: 14,   dur: 2.5, state: "conflict",  setup: 0,    job: 11 },
+  { op: "C", d: 4, s: 9,    dur: 2,   state: "default",   setup: 0.25, job: 0 },
+  { op: "C", d: 4, s: 13.5, dur: 3,   state: "default",   setup: 0.5,  job: 1 },
+  { op: "D", d: 4, s: 8,    dur: 3.5, state: "default",   setup: 0.5,  job: 2 },
+  { op: "D", d: 4, s: 13,   dur: 1.5, state: "default",   setup: 0.25, job: 3 },
+  { op: "D", d: 4, s: 15,   dur: 2,   state: "default",   setup: 0.25, job: 4 },
+  // (Tue férié — pas de tâches)
+  // Wed
+  { op: "A", d: 6, s: 8,    dur: 3,   state: "default",   setup: 0.5,  job: 5 },
+  { op: "A", d: 6, s: 13,   dur: 2.5, state: "default",   setup: 0.25, job: 6 },
+  { op: "B", d: 6, s: 9,    dur: 2.5, state: "default",   setup: 0.25, job: 7 },
+  { op: "B", d: 6, s: 14,   dur: 2.5, state: "late",      setup: 0.25, job: 8 },
+  { op: "C", d: 6, s: 10,   dur: 2,   state: "default",   setup: 0.25, job: 9 },
+  { op: "C", d: 6, s: 13,   dur: 3,   state: "default",   setup: 0.25, job: 10 },
+  { op: "D", d: 6, s: 8,    dur: 3,   state: "default",   setup: 0.5,  job: 11 },
+  { op: "D", d: 6, s: 14,   dur: 2,   state: "default",   setup: 0.25, job: 0 },
+  // Thu
+  { op: "A", d: 7, s: 8,    dur: 2.5, state: "default",   setup: 0.5,  job: 1 },
+  { op: "B", d: 7, s: 9,    dur: 2,   state: "default",   setup: 0.25, job: 2 },
+  { op: "C", d: 7, s: 8.5,  dur: 2.5, state: "conflict",  setup: 0.25, job: 3 },
+  { op: "D", d: 7, s: 13,   dur: 2,   state: "default",   setup: 0.25, job: 4 },
+];
+
+const TASKS = TASK_DEFS.map((t, i) => {
+  const j = JOBS[t.job % JOBS.length];
+  return {
+    id: "T" + i,
+    op: t.op,
+    start: t.d * 24 + t.s,
+    end:   t.d * 24 + t.s + t.dur,
+    state: t.state,
+    setupH: t.setup || 0,
+    jobRef: j.ref,
+    client: j.client,
+    product: j.product,
+  };
+});
+
+/* ─────────────────────────────────────────────────────────────
+ * STATE — defaults locked to 2026-04-19 spec
+ * ───────────────────────────────────────────────────────────── */
+const state = {
+  variant:   "centered",   // texture | corner | centered | scene | wash
+  intensity: "default",    // subtle | default | strong
+  colorMode: "category",   // category | mono
+  threshold: 8,            // MIN_COLLAPSE_HOURS
+  bandPx:    76,           // COLLAPSED_BAND_PX
+  pxPerHour: 50,
+  enabled:   true,
+  showChip:  true,
+  verbose:   true,
+  expanded:  new Set(),
+};
+
+const INTENSITY_MAP = { subtle: 0.6, default: 1, strong: 1.5 };
+
+const VARIANT_HINTS = {
+  texture:  "Pattern pur (étoiles, rayures). Zéro figuration — la matière seule signale la catégorie.",
+  corner:   "Fond plat + petit glyphe en coin droit. Lecture rapide, empreinte minimale.",
+  centered: "Fond gradué + glyphe moyen centré-droit. Équilibre figuration/abstraction (défaut spec).",
+  scene:    "Composition plus figurative : lune XL + étoiles denses, cartes SAM/DIM grandes, cadenas XL.",
+  wash:     "Aplat de couleur saturée, zéro figure. Le chip porte toute l'information.",
+};
+
+const VARIANT_LABELS = {
+  texture:  "Texture",
+  corner:   "Coin",
+  centered: "Centré",
+  scene:    "Scène",
+  wash:     "Aplat",
+};
+
+/* ─────────────────────────────────────────────────────────────
+ * CATEGORIES
+ * ───────────────────────────────────────────────────────────── */
+function classifyCollapse(range) {
+  const fromDay = Math.floor(range.from / 24);
+  const toDay   = Math.floor((range.to - 1e-6) / 24);
+
+  for (let d = fromDay; d <= toDay; d++) {
+    const label = DAYS[d]?.label;
+    if (label === "Sat" || label === "Sun") return "weekend";
+  }
+  if (fromDay === toDay) return "pause";
+  if (toDay - fromDay === 1 && DAYS[fromDay]?.working && DAYS[toDay]?.working) return "night";
+  return "closure";
+}
+
+const CATEGORY_LABELS = { night: "Nuit", weekend: "Weekend", closure: "Fermeture", pause: "Pause" };
+const CATEGORY_GLYPHS = {
+  night:   '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M10.5 2.2a6 6 0 1 0 3.3 10.6A4.8 4.8 0 0 1 10.5 2.2z" fill="currentColor"/></svg>',
+  weekend:
+    '<svg viewBox="0 0 16 16" width="14" height="13" aria-hidden="true">' +
+    '<rect x="1.5" y="3" width="5.5" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+    '<rect x="9" y="3" width="5.5" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+    '<line x1="1.5" y1="6" x2="7" y2="6" stroke="currentColor" stroke-width="1.2"/>' +
+    '<line x1="9" y1="6" x2="14.5" y2="6" stroke="currentColor" stroke-width="1.2"/></svg>',
+  closure:
+    '<svg viewBox="0 0 16 16" width="12" height="13" aria-hidden="true">' +
+    '<path d="M4 7V5a4 4 0 0 1 8 0v2" fill="none" stroke="currentColor" stroke-width="1.3"/>' +
+    '<rect x="2.5" y="7" width="11" height="7" rx="1" fill="currentColor"/></svg>',
+  pause:
+    '<svg viewBox="0 0 16 16" width="11" height="13" aria-hidden="true">' +
+    '<rect x="4" y="3" width="2.4" height="10" rx="0.5" fill="currentColor"/>' +
+    '<rect x="9.6" y="3" width="2.4" height="10" rx="0.5" fill="currentColor"/></svg>',
+};
+
+/* ─────────────────────────────────────────────────────────────
+ * ENGINE — collapse detection, piecewise time→Y mapping
+ * ───────────────────────────────────────────────────────────── */
+function isOperatorInWork(opId, tAbs) {
+  const dayIdx = Math.floor(tAbs / 24);
+  const day = DAYS[dayIdx];
+  if (!day || !day.working) return false;
+  const h = tAbs - dayIdx * 24;
+  return WORK_WINDOWS.some(([s, e]) => h >= s && h < e);
+}
+function anyoneInWork(tAbs) {
+  return OPERATORS.some(op => isOperatorInWork(op.id, tAbs));
+}
+
+function computeCollapses() {
+  if (!state.enabled) return [];
+  const step = 0.25; // 15-min snap resolution per spec
+  const ranges = [];
+  let start = null;
+  for (let t = 0; t < TOTAL_H; t += step) {
+    const collapsible = !anyoneInWork(t);
+    if (collapsible && start === null) start = t;
+    else if (!collapsible && start !== null) {
+      ranges.push({ from: start, to: t });
+      start = null;
+    }
+  }
+  if (start !== null) ranges.push({ from: start, to: TOTAL_H });
+
+  return ranges
+    .map(r => {
+      const rng = { ...r, id: `${r.from}-${r.to}`, duration: r.to - r.from };
+      rng.category = classifyCollapse(rng);
+      return rng;
+    })
+    .filter(r => r.duration >= state.threshold)
+    .filter(r => !state.expanded.has(r.id));
+}
+
+function timeToY(tAbs, collapses) {
+  let y = 0;
+  let cursor = 0;
+  for (const c of collapses) {
+    if (tAbs <= c.from) {
+      y += (tAbs - cursor) * state.pxPerHour;
+      return y;
+    }
+    y += (c.from - cursor) * state.pxPerHour;
+    if (tAbs <= c.to) {
+      y += state.bandPx * ((tAbs - c.from) / (c.to - c.from));
+      return y;
+    }
+    y += state.bandPx;
+    cursor = c.to;
+  }
+  y += (tAbs - cursor) * state.pxPerHour;
+  return y;
+}
+
+function totalHeight(collapses) {
+  const collapsedH = collapses.reduce((s, c) => s + c.duration, 0);
+  const visibleH = TOTAL_H - collapsedH;
+  return visibleH * state.pxPerHour + collapses.length * state.bandPx;
+}
+
+function isInsideCollapse(tAbs, collapses, eps) {
+  return collapses.some(c => tAbs > c.from + eps && tAbs < c.to - eps);
+}
+
+function computeGapsForOperator(opId) {
+  const gaps = [];
+  const step = 0.5;
+  let start = null;
+  for (let t = 0; t < TOTAL_H; t += step) {
+    const inWork = isOperatorInWork(opId, t);
+    if (!inWork && start === null) start = t;
+    else if (inWork && start !== null) {
+      gaps.push({ from: start, to: t });
+      start = null;
+    }
+  }
+  if (start !== null) gaps.push({ from: start, to: TOTAL_H });
+  return gaps;
+}
+
+function subtractCollapses(ranges, collapses) {
+  let result = ranges.slice();
+  for (const c of collapses) {
+    const next = [];
+    for (const r of result) {
+      if (c.to <= r.from || c.from >= r.to) { next.push(r); continue; }
+      if (c.from > r.from) next.push({ from: r.from, to: c.from });
+      if (c.to < r.to)     next.push({ from: c.to,   to: r.to   });
+    }
+    result = next;
+  }
+  return result;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * FORMATTING
+ * ───────────────────────────────────────────────────────────── */
+function fmtAbs(tAbs) {
+  const day = Math.floor(tAbs / 24);
+  const h = Math.floor(tAbs - day * 24);
+  const m = Math.round((tAbs - day * 24 - h) * 60);
+  const dd = DAYS[Math.max(0, Math.min(DAYS.length - 1, day))];
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  return { dayLabel: dd?.label ?? "", hhmm: `${hh}:${mm}` };
+}
+function fmtDuration(h) {
+  if (h < 24) return `${Math.round(h)}h`;
+  const d = Math.floor(h / 24);
+  const r = Math.round(h - d * 24);
+  return r === 0 ? `${d}d` : `${d}d ${r}h`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * RENDER
+ * ───────────────────────────────────────────────────────────── */
+function render() {
+  const collapses = computeCollapses();
+  const totalPx   = totalHeight(collapses);
+
+  // Stats
+  const rawPx = TOTAL_H * state.pxPerHour;
+  document.getElementById("stat-raw").textContent      = rawPx + " px";
+  document.getElementById("stat-rendered").textContent = Math.round(totalPx) + " px";
+  document.getElementById("stat-bands").textContent    = collapses.length.toString();
+  const ratio = rawPx > 0 ? (totalPx / rawPx) : 1;
+  document.getElementById("stat-ratio").textContent    = `${(ratio * 100).toFixed(0)}%`;
+
+  // Apply color mode to scroll container
+  document.getElementById("scroll").classList.toggle("color-mono", state.colorMode === "mono");
+
+  // Grid
+  const grid = document.getElementById("grid");
+  grid.style.height = totalPx + "px";
+
+  // Station heads + columns grid
+  const heads = document.getElementById("station-heads");
+  heads.style.gridTemplateColumns = `repeat(${OPERATORS.length}, minmax(180px, 1fr))`;
+  heads.innerHTML = OPERATORS.map(op => `<div class="station-head"><span>${op.name}</span></div>`).join("");
+
+  const colStations = document.getElementById("col-stations");
+  colStations.style.gridTemplateColumns = `repeat(${OPERATORS.length}, minmax(180px, 1fr))`;
+
+  // Date column
+  const colDate = document.getElementById("col-date");
+  colDate.innerHTML = "";
+  for (const day of DAYS) {
+    const t = day.idx * 24;
+    if (isInsideCollapse(t, collapses, 0.01)) continue;
+    const y = timeToY(t, collapses);
+    const el = document.createElement("div");
+    el.className = "date-label";
+    el.style.top = y + "px";
+    el.innerHTML = `${day.label}<span class="date-sub">${day.sub}</span>`;
+    colDate.appendChild(el);
+  }
+  // Date band decoration with "day-jump" label
+  for (const c of collapses) {
+    const y = timeToY(c.from, collapses);
+    const dayFrom = DAYS[Math.floor(c.from / 24)];
+    const dayTo   = DAYS[Math.floor((c.to - 0.001) / 24)];
+    const el = document.createElement("div");
+    el.className = "band-side";
+    el.style.top    = y + "px";
+    el.style.height = state.bandPx + "px";
+    if (dayFrom && dayTo && dayFrom.idx !== dayTo.idx) {
+      const jmp = document.createElement("div");
+      jmp.className = "date-jump";
+      jmp.innerHTML = `${dayFrom.label}<br><span class="arrow">↓</span><br>${dayTo.label}`;
+      el.appendChild(jmp);
+    }
+    colDate.appendChild(el);
+  }
+
+  // Time column
+  const colTime = document.getElementById("col-time");
+  colTime.innerHTML = "";
+  for (let h = 0; h <= TOTAL_H; h++) {
+    if (isInsideCollapse(h, collapses, 0.01)) continue;
+    const y = timeToY(h, collapses);
+    const dh = h % 24;
+    const showLabel = state.pxPerHour >= 35 || dh % 2 === 0;
+    if (showLabel) {
+      const label = document.createElement("div");
+      label.className = "hour-label";
+      label.style.top = y + "px";
+      label.textContent = `${dh}h`;
+      colTime.appendChild(label);
+    }
+    if (state.pxPerHour >= 30 && h < TOTAL_H) {
+      const step = state.pxPerHour / 4;
+      [["t15", y + step], ["t30", y + step * 2], ["t45", y + step * 3]].forEach(([cls, ty]) => {
+        const tick = document.createElement("div");
+        tick.className = "hour-tick " + cls;
+        tick.style.top = ty + "px";
+        colTime.appendChild(tick);
+      });
+    }
+  }
+  for (const c of collapses) {
+    const y = timeToY(c.from, collapses);
+    const el = document.createElement("div");
+    el.className = "band-side";
+    el.style.top    = y + "px";
+    el.style.height = state.bandPx + "px";
+    colTime.appendChild(el);
+  }
+
+  // Station columns
+  colStations.innerHTML = "";
+  for (const op of OPERATORS) {
+    const col = document.createElement("div");
+    col.className = "station";
+
+    // Hour lines
+    for (let h = 0; h <= TOTAL_H; h++) {
+      if (isInsideCollapse(h, collapses, 0.01)) continue;
+      const y = timeToY(h, collapses);
+      const line = document.createElement("div");
+      line.className = "hour-line";
+      line.style.top = y + "px";
+      col.appendChild(line);
+    }
+
+    // Unavailability stripes (short gaps not collapsed)
+    const gaps = computeGapsForOperator(op.id);
+    for (const g of gaps) {
+      const visibleSlices = subtractCollapses([g], collapses);
+      for (const s of visibleSlices) {
+        const y1 = timeToY(s.from, collapses);
+        const y2 = timeToY(s.to,   collapses);
+        if (y2 - y1 < 1) continue;
+        const el = document.createElement("div");
+        el.className = "unavail";
+        el.style.top    = y1 + "px";
+        el.style.height = (y2 - y1) + "px";
+        col.appendChild(el);
+      }
+    }
+
+    // Tiles
+    for (const t of TASKS.filter(x => x.op === op.id)) {
+      const y1 = timeToY(t.start, collapses);
+      const y2 = timeToY(t.end,   collapses);
+      const p  = STATE_PALETTE[t.state] || STATE_PALETTE.default;
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.style.top             = (y1 + 1) + "px";
+      tile.style.height          = Math.max(0, (y2 - y1) - 2) + "px";
+      tile.style.background      = `rgba(${p.rgb}, ${p.opacity})`;
+      tile.style.borderLeftColor = p.border;
+      tile.style.color           = p.text;
+      const setupPx  = t.setupH > 0 ? (t.setupH * state.pxPerHour) : 0;
+      const setupBlk = setupPx >= 10 ? `<div class="tile-setup" style="height:${setupPx - 4}px">cal.</div>` : "";
+      tile.innerHTML = `${setupBlk}
+        <div class="tile-title">${t.jobRef} · ${t.client}</div>
+        <div class="tile-ops">${t.product}</div>`;
+      col.appendChild(tile);
+    }
+
+    colStations.appendChild(col);
+  }
+
+  // Collapse bands
+  for (const c of collapses) {
+    const y = timeToY(c.from, collapses);
+    const band = document.createElement("div");
+    band.className = `band variant-${state.variant} cat-${c.category}`;
+    band.style.top    = y + "px";
+    band.style.height = state.bandPx + "px";
+    band.style.setProperty("--intensity", INTENSITY_MAP[state.intensity]);
+    band.dataset.id   = c.id;
+
+    if (state.showChip) {
+      const chip = document.createElement("div");
+      chip.className = "band-chip cat-" + c.category;
+      const from = fmtAbs(c.from);
+      const to   = fmtAbs(c.to);
+      const glyph = `<span class="chip-glyph">${CATEGORY_GLYPHS[c.category] || ""}</span>`;
+      const label = `<span class="chip-label">${CATEGORY_LABELS[c.category] || "—"}</span>`;
+      const amt   = `<span class="chip-amount">${fmtDuration(c.duration)}</span>`;
+      const rng   = state.verbose
+        ? `<span class="chip-range">${from.dayLabel} ${from.hhmm} → ${to.dayLabel} ${to.hhmm}</span>`
+        : "";
+      chip.innerHTML = glyph + label + amt + rng;
+      band.appendChild(chip);
+    }
+
+    const hint = document.createElement("div");
+    hint.className = "band-hint";
+    hint.textContent = "clic pour déplier";
+    band.appendChild(hint);
+
+    band.addEventListener("click", () => {
+      state.expanded.add(c.id);
+      renderAll();
+    });
+
+    colStations.appendChild(band);
+  }
+
+  // footer variant name
+  document.getElementById("footer-variant").textContent = VARIANT_LABELS[state.variant];
+  const vHint = document.getElementById("variant-hint");
+  if (vHint) vHint.textContent = VARIANT_HINTS[state.variant];
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * PROMPT GENERATOR
+ * ───────────────────────────────────────────────────────────── */
+function updatePrompt() {
+  const variantDesc = {
+    texture:  "Texture pure — pattern géométrique (starfield, pillar-stripes, caution-tape, pinstripes) couvrant toute la bande, sans figure reconnaissable.",
+    corner:   "Glyphe de coin — fond plat + icône minuscule (14-16px) alignée à droite. Empreinte visuelle minimale.",
+    centered: "Icône centrée — fond gradué + SVG moyen (28-32px) positionné centré-droit. Équilibre figuration/abstraction.",
+    scene:    "Scène figurative — composition plus dense : lune XL + étoiles (nuit), 2 cartes SAM/DIM grand format (weekend), cadenas XL (fermeture), cercle + barres pause (pause).",
+    wash:     "Aplat de couleur saturée sur fond zinc-950. Aucune imagerie — le chip porte toute l'information.",
+  }[state.variant];
+
+  const intensityDesc = {
+    subtle:  "Discrète (--intensity = 0.6, imagerie à 60% d'opacité)",
+    default: "Standard (--intensity = 1)",
+    strong:  "Affirmée (--intensity = 1.5, imagerie poussée)",
+  }[state.intensity];
+
+  const paletteDesc = state.colorMode === "mono"
+    ? "Monochrome (toutes catégories neutralisées en zinc-900 + filtre grayscale sur l'imagerie)"
+    : "Par catégorie : Nuit bleu cool (#93c5fd/#0b0f1a) · Weekend violet (#c4b5fd/#14121f) · Fermeture ambre (#fcd34d/#17120a) · Pause neutre (#a1a1aa/zinc-900)";
+
+  const lines = [
+    `Implémente le repli des périodes vides sur la timeline de planification (SchedulingGrid).`,
+    ``,
+    `Paramètres :`,
+    `— MIN_COLLAPSE_HOURS = ${state.threshold}   (seuil : replier tout écart ≥ ${state.threshold}h)`,
+    `— COLLAPSED_BAND_PX  = ${state.bandPx}   (hauteur fixe du ruban, quelle que soit la durée repliée)`,
+    ``,
+    `Détection :`,
+    `— Un créneau est repliable ssi aucun opérateur n'est dans une fenêtre de travail à ce moment.`,
+    `— Tâches placées hors fenêtre = invariant impossible → pas de contrôle de recouvrement nécessaire.`,
+    `— Arrondir les bornes au pas de 15min pour éviter des rubans "17:02 → 08:01".`,
+    ``,
+    `Catégorisation (priorité : weekend > fermeture > nuit > pause) :`,
+    `— NUIT      : franchit exactement un minuit entre deux jours ouvrés`,
+    `— WEEKEND   : contient un samedi ou un dimanche`,
+    `— FERMETURE : multi-jours, pas de weekend (jour férié / vacances)`,
+    `— PAUSE     : entièrement dans une seule journée (si seuil ≤ durée pause)`,
+    ``,
+    `Rendu visuel retenu :`,
+    `— Style : Graphic (imagerie par catégorie)`,
+    `— Variante : ${VARIANT_LABELS[state.variant]} — ${variantDesc}`,
+    `— Intensité : ${intensityDesc}`,
+    `— Palette : ${paletteDesc}`,
+    `— Chip centré, taille M (12px)${state.showChip ? " — affiché" : " — masqué"}${state.verbose ? ", verbeux (catégorie + durée + plage)" : ", compact (catégorie + durée)"}`,
+    `— Glyphe par catégorie : 🌙 Nuit · 📅 Weekend · 🔒 Fermeture · ⏸ Pause`,
+    `— Le ruban traverse toutes les colonnes (date + heure + toutes les stations) d'un coup.`,
+    `— Colonne date : afficher le libellé de jour des deux côtés du ruban quand il franchit minuit.`,
+    `— Colonne heure : étiquettes "Nh" au-dessus et en-dessous du ruban ; pas d'étiquette à l'intérieur.`,
+    ``,
+    `Mapping temps → Y :`,
+    `— timeToY(t) devient linéaire par morceaux. Chaque repli contribue exactement COLLAPSED_BAND_PX,`,
+    `  quelle que soit sa durée réelle.`,
+    `— yToTime(y) : miroir de timeToY. Un y à l'intérieur d'une bande renvoie une valeur proportionnelle`,
+    `  entre from et to (utile pour la loupe TimelineLens).`,
+    ``,
+    `Interactions :`,
+    `— Clic sur un ruban → expansion locale (état éphémère, Set<CollapseId>).`,
+    `— Pas de drop : le drag/drop n'est pas câblé dans SchedulingGrid.`,
+    `— TimelineLens : doit utiliser le nouveau timeToY ; ignorer l'ouverture de la loupe à l'intérieur d'un ruban.`,
+    `— Scroll anchor : mémoriser comme valeur temporelle, pas comme pixel, pour éviter les sauts quand on bascule l'option.`,
+    ``,
+    `Fichiers impactés :`,
+    `— apps/web/src/components/SchedulingGrid/utils.ts        (timeToY, yToTime, computeCollapses)`,
+    `— apps/web/src/components/SchedulingGrid/SchedulingGrid.tsx (rendu du ruban, hauteur totale)`,
+    `— apps/web/src/components/TimelineColumn/TimelineColumn.tsx (skip labels inside bands)`,
+    `— apps/web/src/components/StationColumns/StationColumn.tsx (skip stripes inside bands)`,
+    `— apps/web/src/components/TimelineLens/TimelineLens.tsx  (use new timeToY)`,
+  ];
+
+  const el = document.getElementById("prompt-text");
+  if (el) el.textContent = lines.join("\n");
+}
+
+function renderAll() { render(); updatePrompt(); }
+
+/* ─────────────────────────────────────────────────────────────
+ * CONTROLS
+ * ───────────────────────────────────────────────────────────── */
+function bindSegmented(groupId, onChange) {
+  const group = document.getElementById(groupId);
+  group.addEventListener("click", (e) => {
+    const label = e.target.closest("label[data-val]");
+    if (!label) return;
+    group.querySelectorAll("label").forEach(l => l.classList.toggle("active", l === label));
+    const input = label.querySelector("input");
+    if (input) input.checked = true;
+    onChange(label.dataset.val);
+  });
+}
+
+function bindControls() {
+  bindSegmented("variant-group",   (v) => { state.variant   = v; renderAll(); });
+  bindSegmented("intensity-group", (v) => { state.intensity = v; renderAll(); });
+  bindSegmented("color-group",     (v) => { state.colorMode = v; renderAll(); });
+
+  const threshold = document.getElementById("threshold");
+  threshold.addEventListener("input", (e) => {
+    state.threshold = +e.target.value;
+    state.expanded.clear();
+    document.getElementById("val-threshold").textContent = `${state.threshold}h`;
+    renderAll();
+  });
+
+  const bandPx = document.getElementById("band-px");
+  bandPx.addEventListener("input", (e) => {
+    state.bandPx = +e.target.value;
+    document.getElementById("val-band").textContent = `${state.bandPx} px`;
+    renderAll();
+  });
+
+  const zoom = document.getElementById("zoom");
+  zoom.addEventListener("input", (e) => {
+    state.pxPerHour = +e.target.value;
+    document.getElementById("val-zoom").textContent = `${state.pxPerHour} px/h`;
+    renderAll();
+  });
+
+  document.getElementById("toggle-enabled").addEventListener("change", (e) => { state.enabled = e.target.checked; renderAll(); });
+  document.getElementById("toggle-chip").addEventListener("change",    (e) => { state.showChip = e.target.checked; renderAll(); });
+  document.getElementById("toggle-verbose").addEventListener("change", (e) => { state.verbose = e.target.checked; renderAll(); });
+
+  document.getElementById("reset-expanded").addEventListener("click", () => {
+    state.expanded.clear();
+    renderAll();
+  });
+
+  document.getElementById("copy-prompt").addEventListener("click", () => {
+    const text = document.getElementById("prompt-text").textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById("copy-prompt");
+      btn.classList.add("copied");
+      btn.textContent = "Copié !";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.textContent = "Copier le prompt";
+      }, 1500);
+    });
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * INIT
+ * ───────────────────────────────────────────────────────────── */
+bindControls();
+renderAll();
+
+</script>
+</body>
+</html>

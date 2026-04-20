@@ -26,6 +26,7 @@ dist-ssr
 # Playwright
 playwright-report/
 test-results/
+scripts/.auth.json
 .scannerwork/
 sonar-report.json
 sonar-issues.json

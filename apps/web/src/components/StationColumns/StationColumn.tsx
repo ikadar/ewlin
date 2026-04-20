@@ -1,9 +1,11 @@
 import { type ReactNode, type MouseEvent, useRef, useMemo, memo } from 'react';
 import type { Station, DaySchedule, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
+import { timeToYPosition } from '../TimelineColumn/utils';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
+import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface StationColumnProps {
   /** Station to display */
@@ -30,6 +32,8 @@ export interface StationColumnProps {
   category?: StationCategory;
   /** Callback when clicking the column background (deselect) */
   onDeselect?: () => void;
+  /** Optional collapse bands — grid lines inside bands are skipped, totalHeight collapses. */
+  collapses?: readonly Collapse[];
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -77,9 +81,12 @@ export const StationColumn = memo(function StationColumn({
   displayMode: _displayMode,
   category,
   onDeselect,
+  collapses,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
+
+  const effectiveCollapses = collapses ?? [];
 
   // REQ-04: Calculate number of days for multi-day grid
   // When gridStartDate is provided, render overlays for each day
@@ -91,27 +98,42 @@ export const StationColumn = memo(function StationColumn({
   const effectiveDayOfWeek = dayOfWeek ?? today.getDay();
   const daySchedule = getDaySchedule(station, effectiveDayOfWeek, today);
 
-  // Calculate total height
-  const totalHeight = hoursToDisplay * pixelsPerHour;
+  // Calculate total height — collapse-aware: each band trades real height for its heightPx
+  const totalHeight = useMemo(() => {
+    let h = hoursToDisplay * pixelsPerHour;
+    for (const c of effectiveCollapses) {
+      h -= (c.durationHours * pixelsPerHour - c.heightPx);
+    }
+    return h;
+  }, [hoursToDisplay, pixelsPerHour, effectiveCollapses]);
 
-  // v0.3.46: Generate hour grid lines only for visible day range (memoized for performance)
+  // v0.3.46: Generate hour grid lines only for visible day range (memoized for performance).
+  // Collapse-aware: lines whose Y resolves inside a band are skipped (the band cover hides them).
   const gridLines = useMemo(() => {
     const lines: number[] = [];
+    const useCollapse = effectiveCollapses.length > 0 && gridStartDate !== undefined;
+
+    const pushLine = (i: number) => {
+      if (!useCollapse) {
+        lines.push(i * pixelsPerHour);
+        return;
+      }
+      const hourDate = new Date(gridStartDate!.getTime() + i * 3_600_000);
+      const ms = hourDate.getTime();
+      const inside = effectiveCollapses.some(c => ms > c.from.getTime() && ms < c.to.getTime());
+      if (inside) return;
+      lines.push(timeToYPosition(hourDate, startHour, pixelsPerHour, gridStartDate, effectiveCollapses));
+    };
+
     if (visibleDayRange) {
-      // Virtual scroll mode: only render grid lines for visible days
       const startHourIndex = visibleDayRange.start * 24;
       const endHourIndex = (visibleDayRange.end + 1) * 24;
-      for (let i = startHourIndex; i <= endHourIndex; i++) {
-        lines.push(i * pixelsPerHour);
-      }
+      for (let i = startHourIndex; i <= endHourIndex; i++) pushLine(i);
     } else {
-      // Legacy mode: render all grid lines
-      for (let i = 0; i <= hoursToDisplay; i++) {
-        lines.push(i * pixelsPerHour);
-      }
+      for (let i = 0; i <= hoursToDisplay; i++) pushLine(i);
     }
     return lines;
-  }, [visibleDayRange, pixelsPerHour, hoursToDisplay]);
+  }, [visibleDayRange, pixelsPerHour, hoursToDisplay, effectiveCollapses, gridStartDate, startHour]);
 
   // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
   const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
@@ -154,7 +176,9 @@ export const StationColumn = memo(function StationColumn({
             const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
             const dayOfWeekForDay = currentDate.getDay();
             const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay, currentDate);
-            const dayYOffset = dayIndex * 24 * pixelsPerHour;
+            const dayYOffset = effectiveCollapses.length === 0
+              ? dayIndex * 24 * pixelsPerHour
+              : timeToYPosition(currentDate, startHour, pixelsPerHour, gridStartDate, effectiveCollapses);
 
             visibleDays.push(
               <UnavailabilityOverlay
@@ -164,6 +188,9 @@ export const StationColumn = memo(function StationColumn({
                 hoursToDisplay={24}
                 pixelsPerHour={pixelsPerHour}
                 yOffset={dayYOffset}
+                collapses={effectiveCollapses}
+                dayDate={currentDate}
+                gridStartDate={gridStartDate}
               />
             );
           }
