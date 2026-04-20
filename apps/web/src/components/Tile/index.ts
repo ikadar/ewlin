@@ -10,6 +10,8 @@ export type { SwapButtonsProps } from './SwapButtons';
 export { SimilarityIndicators } from './SimilarityIndicators';
 export type { SimilarityIndicatorsProps } from './SimilarityIndicators';
 
+export { SimilarityBadge } from './SimilarityBadge';
+
 export { getStateColorClasses, computeTileState } from './colorUtils';
 export type { TileState, ColorClasses } from './colorUtils';
 

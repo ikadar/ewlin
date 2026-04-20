@@ -302,6 +302,7 @@ export function FocusStationColumn({
             top={cached.top}
             height={cached.height}
             similarityResults={cached.similarityResults}
+            similarityScore={cached.similarityScore}
             hasConflict={cached.hasConflict}
             tileState={cached.tileState}
             pixelsPerHour={cached.pixelsPerHour}

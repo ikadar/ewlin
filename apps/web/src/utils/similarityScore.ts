@@ -17,6 +17,7 @@
  */
 
 import type {
+  ElementSpec,
   SimilarityCriterion,
   SimilarityScore,
   SimilarityScoreRule,
@@ -24,12 +25,12 @@ import type {
 } from '@flux/types';
 import { parsePapierDSL } from './papierDSL';
 
-type ElementSpec = Record<string, unknown> | null | undefined;
+type SpecInput = ElementSpec | Record<string, unknown> | null | undefined;
 type MatchState = true | false; // true = MATCHED, false = UNMATCHED. Absent key = NEUTRALIZED.
 
 export function computeSimilarityScore(
-  prevSpec: ElementSpec,
-  currSpec: ElementSpec,
+  prevSpec: SpecInput,
+  currSpec: SpecInput,
   category: StationCategory,
 ): SimilarityScore {
   const rules = category.similarityScoreRules ?? [];
@@ -55,11 +56,17 @@ export function computeSimilarityScore(
     };
   }
 
+  // Widen to Record for dynamic fieldPath lookup — ElementSpec has specific
+  // typed keys but no index signature, which blocks `spec[fieldPath]` access.
+  // At runtime this is always an object (validated by the null-check above).
+  const prev = prevSpec as Record<string, unknown>;
+  const curr = currSpec as Record<string, unknown>;
+
   const matchByCode = new Map<string, MatchState>();
   const neutralizedCodes: string[] = [];
 
   for (const criterion of criteria) {
-    const state = resolveCriterionMatch(criterion, prevSpec, currSpec);
+    const state = resolveCriterionMatch(criterion, prev, curr);
     if (state === null) {
       neutralizedCodes.push(criterion.code);
     } else {
@@ -89,8 +96,8 @@ export function computeSimilarityScore(
  */
 function resolveCriterionMatch(
   criterion: SimilarityCriterion,
-  prevSpec: Record<string, unknown>,
-  currSpec: Record<string, unknown>,
+  prevSpec: Record<string, unknown>,  // validated non-null upstream
+  currSpec: Record<string, unknown>,  // validated non-null upstream
 ): boolean | null {
   let prev: string | null;
   let curr: string | null;

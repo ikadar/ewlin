@@ -1,11 +1,12 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
-import type { TaskAssignment, Job, InternalTask, Element } from '@flux/types';
+import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { TileTooltip } from './TileTooltip';
 import { getStateColorClasses, getStateRgb } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
+import { SimilarityBadge } from './SimilarityBadge';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useTooltipDelay } from '../../hooks';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -29,6 +30,8 @@ export interface TileProps {
   isSelected?: boolean;
   /** Similarity comparison results with previous tile (if any) */
   similarityResults?: SimilarityResult[];
+  /** Practicity score vs previous tile on this station (Phase 2). */
+  similarityScore?: SimilarityScore;
   /** Whether this tile has a conflict (precedence violation - REQ-12) */
   hasConflict?: boolean;
   /** Callback when pin icon is clicked (inline state indicator when pinned) */
@@ -97,6 +100,7 @@ export const Tile = memo(function Tile({
   overrideOpacity,
   sawtoothTop = false,
   sawtoothBottom = false,
+  similarityScore,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -205,6 +209,7 @@ export const Tile = memo(function Tile({
         if (e.key === 'Enter') handleClick();
       }}
     >
+      {similarityScore && <SimilarityBadge score={similarityScore} />}
       {/* Clipped body wrapper. The clip-path is applied here (not on the root)
           so that the folder-tab and other overflow-outside children (label
           overlay, tooltip) are not clipped away on tiles with teeth. The

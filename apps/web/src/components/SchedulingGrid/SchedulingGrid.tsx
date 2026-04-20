@@ -513,6 +513,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           height={lensHeight}
           isSelected={false}
           similarityResults={cached.similarityResults}
+          similarityScore={cached.similarityScore}
           onSelect={noop}
           onTogglePin={noop}
           hasConflict={cached.hasConflict}
@@ -782,6 +783,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         height={cached.height}
                         isSelected={selectedJobId === cached.jobId}
                         similarityResults={cached.similarityResults}
+                        similarityScore={cached.similarityScore}
                         onSelect={onSelectJob}
                         onTogglePin={onTogglePin}
                         hasConflict={cached.hasConflict}

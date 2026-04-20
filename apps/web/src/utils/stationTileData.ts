@@ -5,6 +5,7 @@ import type {
   Job,
   Element,
   TaskAssignment,
+  SimilarityScore,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { compareSimilarity, computeTileState } from '../components/Tile';
@@ -12,6 +13,7 @@ import { timeToYPosition } from '../components/TimelineColumn';
 import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { getPrerequisiteBlockingInfo } from './prerequisites';
 import { getTirageLabel } from './tileLabelResolver';
+import { computeSimilarityScore } from './similarityScore';
 
 export interface CachedTileData {
   jobId: string;
@@ -22,6 +24,8 @@ export interface CachedTileData {
   /** Collapse-aware pixel height — bottomY - topY through `timeToYPosition`. */
   height: number;
   similarityResults: ReturnType<typeof compareSimilarity> | undefined;
+  /** Practicity score vs the previous tile on this station (Phase 2). */
+  similarityScore: SimilarityScore | undefined;
   hasConflict: boolean;
   tileState: ReturnType<typeof computeTileState>;
   blocked: boolean;
@@ -97,11 +101,15 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       const height = Math.max(bottom - top, 1);
 
       let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
-      if (index > 0 && criteria.length > 0 && element?.spec) {
+      let similarityScore: SimilarityScore | undefined = undefined;
+      if (index > 0 && element?.spec) {
         const prevTask = taskMap.get(stationAssignments[index - 1].taskId);
         const prevElement = prevTask ? elementMap.get(prevTask.elementId) : undefined;
-        if (prevElement?.spec) {
+        if (prevElement?.spec && criteria.length > 0) {
           similarityResults = compareSimilarity(prevElement.spec, element.spec, criteria);
+        }
+        if (prevElement?.spec && category) {
+          similarityScore = computeSimilarityScore(prevElement.spec, element.spec, category);
         }
       }
 
@@ -128,6 +136,7 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       cache.set(assignment.id, {
         jobId: job.id, element, task, job, top, height,
         similarityResults,
+        similarityScore,
         hasConflict, tileState,
         blocked: blocking?.blocked ?? false,
         blockingInfo: blocking?.blockingInfo,
