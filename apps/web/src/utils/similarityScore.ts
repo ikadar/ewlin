@@ -24,6 +24,7 @@ import type {
   StationCategory,
 } from '@flux/types';
 import { parsePapierDSL } from './papierDSL';
+import { longSide } from './formatDSL';
 
 type SpecInput = ElementSpec | Record<string, unknown> | null | undefined;
 type MatchState = true | false; // true = MATCHED, false = UNMATCHED. Absent key = NEUTRALIZED.
@@ -74,7 +75,7 @@ export function computeSimilarityScore(
     }
   }
 
-  const firedRules = rules.filter((r) => ruleFires(r, matchByCode));
+  const firedRules = rules.filter((r) => ruleFires(r, matchByCode, prev, curr));
   const keptRules = resolveGroups(firedRules);
   const points = keptRules.reduce((sum, r) => sum + r.points, 0);
 
@@ -155,13 +156,38 @@ function extractParsedPapier(
   return value === '' ? null : value;
 }
 
-function ruleFires(rule: SimilarityScoreRule, matchByCode: Map<string, MatchState>): boolean {
+function ruleFires(
+  rule: SimilarityScoreRule,
+  matchByCode: Map<string, MatchState>,
+  prevSpec: Record<string, unknown>,
+  currSpec: Record<string, unknown>,
+): boolean {
+  if (rule.kind === 'format-descending') {
+    return isFormatDescending(prevSpec, currSpec);
+  }
   for (const code of rule.criteriaCodes) {
     if (matchByCode.get(code) !== true) {
       return false;
     }
   }
   return true;
+}
+
+/**
+ * Decide whether prev → curr is a strictly descending paper-format transition
+ * (prev long side > curr long side). Returns false when either side is
+ * unparseable — a directional rule should only fire with known dimensions.
+ */
+function isFormatDescending(
+  prevSpec: Record<string, unknown>,
+  currSpec: Record<string, unknown>,
+): boolean {
+  const prevFmt = typeof prevSpec['format'] === 'string' ? (prevSpec['format'] as string) : null;
+  const currFmt = typeof currSpec['format'] === 'string' ? (currSpec['format'] as string) : null;
+  const prevLong = longSide(prevFmt);
+  const currLong = longSide(currFmt);
+  if (prevLong === null || currLong === null) return false;
+  return prevLong > currLong;
 }
 
 /**

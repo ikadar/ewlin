@@ -24,6 +24,7 @@ function makeOffsetCategory(): StationCategory {
       { criteriaCodes: ['inking'], points: 4, group: null },
       { criteriaCodes: ['paper_type', 'paper_format'], points: 3, group: 'paper' },
       { criteriaCodes: ['paper_format'], points: 2, group: 'paper' },
+      { criteriaCodes: ['paper_format'], points: 1, group: 'paper', kind: 'format-descending' },
     ],
   };
 }
@@ -74,19 +75,56 @@ function makeFinitionCategory(): StationCategory {
 
 describe('computeSimilarityScore — Offset truth table (max = 7)', () => {
   const cat = makeOffsetCategory();
-  const base = { papier: 'Couché mat:135', format: 'A3', impression: 'CMYK' };
+  // Base uses A4 (smaller) so different-format cases default to ASCENDING
+  // (A4 → A3) and never trigger R4 — directional rule covered separately below.
+  const base = { papier: 'Couché mat:135', format: 'A4', impression: 'CMYK' };
 
   it.each([
-    ['all different',             { papier: 'Offset:120', format: 'A4', impression: 'NB' },   0],
-    ['pf only',                   { papier: 'Offset:120', format: 'A3', impression: 'NB' },   2],
-    ['pt only',                   { papier: 'Couché mat:200', format: 'A4', impression: 'NB' }, 0],
-    ['pt+pf (R2 wins over R3)',   { papier: 'Couché mat:200', format: 'A3', impression: 'NB' }, 3],
-    ['ink only',                  { papier: 'Offset:120', format: 'A4', impression: 'CMYK' }, 4],
-    ['ink + pf',                  { papier: 'Offset:120', format: 'A3', impression: 'CMYK' }, 6],
-    ['ink + pt',                  { papier: 'Couché mat:200', format: 'A4', impression: 'CMYK' }, 4],
-    ['all match',                 { papier: 'Couché mat:135', format: 'A3', impression: 'CMYK' }, 7],
+    ['all different (ascending)',   { papier: 'Offset:120',    format: 'A3', impression: 'NB'   }, 0],
+    ['pf only',                     { papier: 'Offset:120',    format: 'A4', impression: 'NB'   }, 2],
+    ['pt only (ascending)',         { papier: 'Couché mat:200', format: 'A3', impression: 'NB'   }, 0],
+    ['pt+pf (R2 wins over R3)',     { papier: 'Couché mat:200', format: 'A4', impression: 'NB'   }, 3],
+    ['ink only (ascending)',        { papier: 'Offset:120',    format: 'A3', impression: 'CMYK' }, 4],
+    ['ink + pf',                    { papier: 'Offset:120',    format: 'A4', impression: 'CMYK' }, 6],
+    ['ink + pt (ascending)',        { papier: 'Couché mat:200', format: 'A3', impression: 'CMYK' }, 4],
+    ['all match',                   { papier: 'Couché mat:135', format: 'A4', impression: 'CMYK' }, 7],
   ])('%s', (_label, curr, expected) => {
     const score = computeSimilarityScore(base, curr, cat);
+    expect(score.points).toBe(expected);
+    expect(score.maxPoints).toBe(7);
+  });
+});
+
+describe('computeSimilarityScore — Offset directional rule R4 (format-descending)', () => {
+  const cat = makeOffsetCategory();
+
+  it.each([
+    ['desc only, no ink',
+     { papier: 'Couché mat:135', format: 'A3', impression: 'CMYK' },
+     { papier: 'Offset:120',    format: 'A4', impression: 'NB' }, 1],
+    ['desc + ink',
+     { papier: 'Couché mat:135', format: 'A3', impression: 'CMYK' },
+     { papier: 'Offset:120',    format: 'A4', impression: 'CMYK' }, 5],
+    ['desc + pt match, no ink',
+     { papier: 'Couché mat:135', format: 'A3', impression: 'CMYK' },
+     { papier: 'Couché mat:200', format: 'A4', impression: 'NB' }, 1],
+    ['desc + pt + ink',
+     { papier: 'Couché mat:135', format: 'A3', impression: 'CMYK' },
+     { papier: 'Couché mat:200', format: 'A4', impression: 'CMYK' }, 5],
+    ['numeric desc 64x90 → 50x70',
+     { papier: 'Offset:90',  format: '64x90', impression: 'NB' },
+     { papier: 'Couché:80',  format: '50x70', impression: 'Q/Q' }, 1],
+    ['SRA3 → A3',
+     { papier: 'Couché:135', format: 'SRA3', impression: 'CMYK' },
+     { papier: 'Offset:80',  format: 'A3',   impression: 'NB' }, 1],
+    ['same format A4, different rest',
+     { papier: 'Couché:135', format: 'A4', impression: 'CMYK' },
+     { papier: 'Offset:80',  format: 'A4', impression: 'NB' }, 2],
+    ['desc with garbage curr format',
+     { papier: 'Couché:135', format: 'A3',    impression: 'CMYK' },
+     { papier: 'Offset:80',  format: 'pouet', impression: 'NB' }, 0],
+  ])('%s', (_label, prev, curr, expected) => {
+    const score = computeSimilarityScore(prev, curr, cat);
     expect(score.points).toBe(expected);
     expect(score.maxPoints).toBe(7);
   });
