@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Similarity Badge — Links / N indicators per category</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-muted: rgb(128, 128, 128);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base); color: var(--flux-text-primary);
+    min-height: 100vh; display: grid; grid-template-columns: 320px 1fr;
+  }
+
+  aside.controls {
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    padding: 20px 18px; overflow-y: auto;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .controls h1 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .controls .subtitle { font-size: 11px; color: var(--flux-text-muted); margin-bottom: 16px; line-height: 1.5; }
+
+  fieldset {
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    padding: 10px 12px 12px; margin-bottom: 12px;
+    background: var(--flux-elevated);
+  }
+  legend {
+    padding: 0 6px; font-size: 11px; font-weight: 600;
+    color: var(--flux-text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .radio-group { display: flex; flex-direction: column; gap: 4px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 4px;
+    font-size: 12px; color: var(--flux-text-secondary); cursor: pointer;
+  }
+  .radio-group label:hover { background: rgba(255,255,255,0.04); }
+  .radio-group label.checked { background: rgba(59, 130, 246, 0.1); color: var(--flux-text-primary); }
+  .radio-group input[type="radio"] { accent-color: rgb(59, 130, 246); }
+
+  .slider-row { display: grid; grid-template-columns: 80px 1fr 42px; align-items: center; gap: 6px; font-size: 11px; color: var(--flux-text-muted); }
+  .slider-row input[type="range"] { accent-color: rgb(59, 130, 246); }
+
+  .export-btn {
+    width: 100%; margin-top: 6px;
+    padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    border: 1px solid rgb(59, 130, 246);
+    background: rgb(37, 99, 235); color: white; cursor: pointer;
+  }
+  .export-btn.prompt { background: rgb(22, 101, 52); border-color: rgb(34, 134, 74); }
+  .export-btn:hover { filter: brightness(1.1); }
+  .export-output {
+    margin-top: 10px; padding: 8px; background: var(--flux-base);
+    border: 1px solid var(--flux-border); border-radius: 4px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 10px;
+    color: var(--flux-text-secondary);
+    white-space: pre-wrap; max-height: 280px; overflow-y: auto;
+    display: none;
+  }
+  .export-output.visible { display: block; }
+
+  /* ─── STAGE ───────────────────────────────────────────────── */
+  main.stage { padding: 24px 28px 60px; overflow-x: auto; }
+  .stage h2 {
+    font-size: 13px; font-weight: 600; margin: 22px 0 8px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--flux-border);
+  }
+  .stage h2:first-child { margin-top: 0; }
+  .stage .scen-note {
+    font-size: 11px; color: var(--flux-text-muted); margin-bottom: 12px; line-height: 1.5;
+  }
+
+  .zoom-zone {
+    padding: 28px 24px; background: var(--flux-surface);
+    border: 1px solid var(--flux-border); border-radius: 8px;
+    display: flex; gap: 28px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 18px;
+  }
+  .zoom-zone > .zoomed { transform: scale(4); transform-origin: center; }
+  .zoom-zone .cat-label {
+    font-size: 10px; color: var(--flux-text-muted);
+    margin-top: 14px; text-align: center;
+  }
+
+  .cat-block {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 16px;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .cat-name { font-size: 12px; font-weight: 600; color: var(--flux-text-secondary); min-width: 110px; }
+  .score-cell { font-size: 10px; color: var(--flux-text-muted); display: inline-flex; align-items: center; gap: 8px; }
+  .score-cell .lbl { min-width: 60px; text-align: right; }
+
+  .indicator-row {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  }
+
+  /* ─── INDICATOR SHAPES ─── */
+  .indicator {
+    display: inline-flex;
+    gap: var(--ind-gap, 2px);
+    align-items: center;
+    line-height: 1;
+  }
+
+  /* V1 — Chain links (SVG via background) */
+  .indicator.v-links svg {
+    width: var(--ind-sz, 10px); height: var(--ind-sz, 10px);
+    flex-shrink: 0;
+    color: var(--empty-col, rgb(82, 82, 91));
+  }
+  .indicator.v-links svg.filled { color: var(--fill-col, rgb(52, 211, 153)); }
+
+  /* V2 — Dots */
+  .indicator.v-dots > .dot {
+    width: var(--ind-sz, 8px); height: var(--ind-sz, 8px); border-radius: 50%;
+    background: var(--empty-col, rgb(82, 82, 91));
+    flex-shrink: 0;
+  }
+  .indicator.v-dots > .dot.filled { background: var(--fill-col, rgb(52, 211, 153)); }
+  .indicator.v-dots > .dot.empty-ghost { background: transparent; border: 1px solid var(--empty-col, rgb(82, 82, 91)); }
+  .indicator.v-dots > .dot.empty-dashed { background: transparent; border: 1px dashed var(--empty-col, rgb(82, 82, 91)); }
+
+  /* V3 — Squares */
+  .indicator.v-squares > .sq {
+    width: var(--ind-sz, 8px); height: var(--ind-sz, 8px);
+    background: var(--empty-col, rgb(82, 82, 91));
+    border-radius: 1px; flex-shrink: 0;
+  }
+  .indicator.v-squares > .sq.filled { background: var(--fill-col, rgb(52, 211, 153)); }
+  .indicator.v-squares > .sq.empty-ghost { background: transparent; border: 1px solid var(--empty-col, rgb(82, 82, 91)); }
+
+  /* V4 — Stars (SVG-based) */
+  .indicator.v-stars svg {
+    width: var(--ind-sz, 11px); height: var(--ind-sz, 11px);
+    flex-shrink: 0;
+    fill: var(--empty-col, rgb(82, 82, 91));
+  }
+  .indicator.v-stars svg.filled { fill: var(--fill-col, rgb(52, 211, 153)); }
+
+  /* V5 — Chevrons */
+  .indicator.v-chevrons { gap: 0; }
+  .indicator.v-chevrons > .chv {
+    font-size: var(--ind-sz, 11px);
+    color: var(--empty-col, rgb(82, 82, 91));
+    line-height: 1;
+    font-weight: 700;
+  }
+  .indicator.v-chevrons > .chv.filled { color: var(--fill-col, rgb(52, 211, 153)); }
+
+  /* V6 — Battery-bars (vertical thin bars) */
+  .indicator.v-bars {
+    align-items: flex-end;
+    height: calc(var(--ind-sz, 10px) * 1.2);
+  }
+  .indicator.v-bars > .bar {
+    width: calc(var(--ind-sz, 10px) / 3);
+    background: var(--empty-col, rgb(82, 82, 91));
+    border-radius: 1px; flex-shrink: 0;
+  }
+  .indicator.v-bars > .bar.filled { background: var(--fill-col, rgb(52, 211, 153)); }
+
+  /* Size-by-rank option (V2 dots variant) */
+  .indicator.v-dots.rank-size > .dot:nth-child(1) { width: calc(var(--ind-sz, 8px) * 0.65); height: calc(var(--ind-sz, 8px) * 0.65); }
+  .indicator.v-dots.rank-size > .dot:nth-child(2) { width: calc(var(--ind-sz, 8px) * 0.8); height: calc(var(--ind-sz, 8px) * 0.8); }
+  .indicator.v-dots.rank-size > .dot:nth-child(3) { width: var(--ind-sz, 8px); height: var(--ind-sz, 8px); }
+  .indicator.v-dots.rank-size > .dot:nth-child(4) { width: calc(var(--ind-sz, 8px) * 1.15); height: calc(var(--ind-sz, 8px) * 1.15); }
+  .indicator.v-dots.rank-size > .dot:nth-child(5) { width: calc(var(--ind-sz, 8px) * 1.3); height: calc(var(--ind-sz, 8px) * 1.3); }
+
+  .legend {
+    margin-top: 32px; padding: 16px; background: var(--flux-surface);
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    font-size: 11px; color: var(--flux-text-muted); line-height: 1.6;
+  }
+  .legend strong { color: var(--flux-text-secondary); }
+  .legend code { background: var(--flux-elevated); padding: 1px 4px; border-radius: 3px; font-family: "SF Mono", Menlo, monospace; font-size: 10px; }
+</style>
+</head>
+<body>
+  <!-- ─── CONTROLS ───────────────────────────────────────────── -->
+  <aside class="controls">
+    <h1>Links / N-indicators</h1>
+    <div class="subtitle">N indicateurs par catégorie : Offset=5, Pelliculeuses=3, Finition=2, Massicots=1, Typo=0. Remplissage ordinal selon le niveau atteint. Focus sur l'<strong>aspect visuel</strong> — aucun contrôle de position.</div>
+
+    <fieldset>
+      <legend>Famille visuelle</legend>
+      <div class="radio-group" data-axis="shape">
+        <label><input type="radio" name="shape" value="links" checked> Chaîne de maillons 🔗</label>
+        <label><input type="radio" name="shape" value="dots"> Points ronds ●○</label>
+        <label><input type="radio" name="shape" value="squares"> Cellules carrées ▰▱</label>
+        <label><input type="radio" name="shape" value="stars"> Étoiles ★☆</label>
+        <label><input type="radio" name="shape" value="chevrons"> Chevrons ›</label>
+        <label><input type="radio" name="shape" value="bars"> Barres verticales ▍</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Dimensions</legend>
+      <div class="slider-row">
+        <span>Taille</span>
+        <input type="range" id="size" min="6" max="16" step="1" value="10">
+        <span id="size-val">10 px</span>
+      </div>
+      <div class="slider-row">
+        <span>Gap</span>
+        <input type="range" id="gap" min="0" max="6" step="1" value="2">
+        <span id="gap-val">2 px</span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Couleur "plein" (niveau atteint)</legend>
+      <div class="radio-group" data-axis="fillCol">
+        <label><input type="radio" name="fillCol" value="emerald" checked> Emerald-400 (vert)</label>
+        <label><input type="radio" name="fillCol" value="blue"> Blue-400</label>
+        <label><input type="radio" name="fillCol" value="amber"> Amber-400</label>
+        <label><input type="radio" name="fillCol" value="stepped"> Stepped (rouge/ambre/vert par position)</label>
+        <label><input type="radio" name="fillCol" value="mono-intensity"> Mono par intensité (vert clair → vert foncé selon rang)</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Couleur "vide" (niveau non atteint)</legend>
+      <div class="radio-group" data-axis="emptyCol">
+        <label><input type="radio" name="emptyCol" value="zinc-dark" checked> Gris sombre (zinc-600)</label>
+        <label><input type="radio" name="emptyCol" value="zinc-light"> Gris clair (zinc-500)</label>
+        <label><input type="radio" name="emptyCol" value="transparent"> Transparent + bordure</label>
+        <label><input type="radio" name="emptyCol" value="dashed"> Pointillé (dots/squares)</label>
+        <label><input type="radio" name="emptyCol" value="tinted-fade"> Teinte du plein à 15 %</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Modulation</legend>
+      <div class="radio-group" data-axis="mod">
+        <label><input type="radio" name="mod" value="none" checked> Tous identiques</label>
+        <label><input type="radio" name="mod" value="rank-size"> Taille croissante par rang (dots uniquement)</label>
+      </div>
+    </fieldset>
+
+    <button class="export-btn" id="export-btn">Exporter la config</button>
+    <button class="export-btn prompt" id="prompt-btn">Générer le prompt Claude</button>
+    <pre class="export-output" id="export-output"></pre>
+  </aside>
+
+  <!-- ─── STAGE ──────────────────────────────────────────────── -->
+  <main class="stage">
+    <h2>Aperçu zoomé ×4 — échantillons à score max</h2>
+    <div class="scen-note">Chaque catégorie affiche l'indicateur au score maximum (tous maillons atteints).</div>
+    <div class="zoom-zone" id="zoom-zone"></div>
+
+    <h2>Toutes les combinaisons — par catégorie</h2>
+    <div class="scen-note">Pour chaque catégorie, un indicateur par niveau de score atteignable. Les scores possibles sont listés devant.</div>
+    <div id="all-combos"></div>
+
+    <div class="legend">
+      <strong>Récap N maillons par catégorie (hors score 0)</strong><br>
+      • <code>Offset</code> → 5 : scores possibles 2, 3, 4, 6, 7<br>
+      • <code>Pelliculeuses</code> → 3 : 0.5, 1, 3<br>
+      • <code>Finition</code> (Plieuses / Encarteuses-Piqueuses / Assembleuses / Assembleuses-Piqueuses / Conditionnement) → 2 : 1, 3<br>
+      • <code>Massicots</code> → 1 : 1<br>
+      • <code>Typographie</code> → 0 (rien à afficher)<br><br>
+      <strong>Remplissage ordinal</strong> : le <em>n</em>ème indicateur est allumé si <code>score ≥ niveau[n]</code>. Ex. Offset score 4 → 3 maillons pleins (niveaux 2, 3, 4 tous ≤ 4), 2 maillons vides (niveaux 6 et 7 non atteints).<br><br>
+      <strong>Option "mono par intensité"</strong> : le maillon rempli a une couleur d'autant plus foncée qu'il est loin dans la séquence. Utile pour que l'œil distingue un maillon à gauche (palier bas) d'un maillon à droite (palier haut) sans lire la position.
+    </div>
+  </main>
+
+<script>
+  // ─── SVG assets (Lucide-style) ─────────────────────────────
+  const SVG_LINK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+  const SVG_UNLINK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"/><path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"/><line x1="8" x2="8" y1="2" y2="5"/><line x1="2" x2="5" y1="8" y2="8"/><line x1="16" x2="16" y1="19" y2="22"/><line x1="19" x2="22" y1="16" y2="16"/></svg>`;
+  const SVG_STAR = `<svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+
+  // ─── DATA ──────────────────────────────────────────────────
+  const CATEGORIES = {
+    Offset:     { N: 5, levels: [2, 3, 4, 6, 7] },
+    Pelliculeuses: { N: 3, levels: [0.5, 1, 3] },
+    Finition:   { N: 2, levels: [1, 3] },
+    Massicots:  { N: 1, levels: [1] },
+  };
+
+  const FILL_COLORS = {
+    emerald: 'rgb(52, 211, 153)',
+    blue:    'rgb(96, 165, 250)',
+    amber:   'rgb(251, 191, 36)',
+  };
+
+  const EMPTY_COLORS = {
+    'zinc-dark': 'rgb(82, 82, 91)',
+    'zinc-light': 'rgb(113, 113, 122)',
+    'transparent': 'transparent',
+    'dashed': 'transparent',
+  };
+
+  const state = {
+    shape: 'links',
+    size: 10,
+    gap: 2,
+    fillCol: 'emerald',
+    emptyCol: 'zinc-dark',
+    mod: 'none',
+  };
+
+  // ─── COLOR RESOLVERS ───────────────────────────────────────
+  function fillColor(rank, total) {
+    if (state.fillCol === 'stepped') {
+      const r = total > 1 ? rank / (total - 1) : 1;
+      if (r < 1 / 3) return 'rgb(248, 113, 113)';      // red-400
+      if (r < 2 / 3) return 'rgb(251, 191, 36)';       // amber-400
+      return 'rgb(52, 211, 153)';                       // emerald-400
+    }
+    if (state.fillCol === 'mono-intensity') {
+      const r = total > 1 ? rank / (total - 1) : 1;
+      // from emerald-300 (lighter) to emerald-600 (darker)
+      const from = [110, 231, 183]; // emerald-300
+      const to = [5, 150, 105];     // emerald-600
+      const rr = Math.round(from[0] + (to[0] - from[0]) * r);
+      const gg = Math.round(from[1] + (to[1] - from[1]) * r);
+      const bb = Math.round(from[2] + (to[2] - from[2]) * r);
+      return `rgb(${rr},${gg},${bb})`;
+    }
+    return FILL_COLORS[state.fillCol] ?? FILL_COLORS.emerald;
+  }
+
+  function emptyColor() {
+    if (state.emptyCol === 'tinted-fade') {
+      // derive from default fill — use emerald fallback at 15% if stepped/mono
+      const c = state.fillCol in FILL_COLORS ? FILL_COLORS[state.fillCol] : FILL_COLORS.emerald;
+      const m = /rgb\(([^,]+),([^,]+),([^,]+)\)/.exec(c);
+      if (m) return `rgba(${m[1].trim()},${m[2].trim()},${m[3].trim()},0.15)`;
+    }
+    return EMPTY_COLORS[state.emptyCol] ?? EMPTY_COLORS['zinc-dark'];
+  }
+
+  function applyEmptyDecoration(node) {
+    if (state.emptyCol === 'transparent') node.classList.add('empty-ghost');
+    if (state.emptyCol === 'dashed') node.classList.add('empty-dashed');
+  }
+
+  // ─── INDICATOR BUILDERS ────────────────────────────────────
+  function buildIndicator(catName, score) {
+    const cat = CATEGORIES[catName];
+    if (!cat || cat.N === 0) {
+      const ph = document.createElement('span');
+      ph.style.fontSize = '9px'; ph.style.color = 'var(--flux-text-muted)';
+      ph.textContent = '— (aucun maillon)';
+      return ph;
+    }
+
+    const ind = document.createElement('span');
+    ind.className = `indicator v-${state.shape}`;
+    if (state.mod === 'rank-size' && state.shape === 'dots') {
+      ind.classList.add('rank-size');
+    }
+    ind.style.setProperty('--ind-sz', `${state.size}px`);
+    ind.style.setProperty('--ind-gap', `${state.gap}px`);
+    ind.style.setProperty('--empty-col', emptyColor());
+
+    for (let i = 0; i < cat.N; i++) {
+      const lvl = cat.levels[i];
+      const filled = score >= lvl;
+      const fillC = fillColor(i, cat.N);
+
+      if (state.shape === 'links') {
+        const span = document.createElement('span');
+        span.innerHTML = filled ? SVG_LINK : SVG_UNLINK;
+        const svg = span.firstChild;
+        if (filled) svg.classList.add('filled');
+        svg.style.color = filled ? fillC : emptyColor();
+        ind.appendChild(svg);
+      } else if (state.shape === 'dots') {
+        const d = document.createElement('span');
+        d.className = 'dot' + (filled ? ' filled' : '');
+        if (filled) d.style.background = fillC;
+        else applyEmptyDecoration(d);
+        ind.appendChild(d);
+      } else if (state.shape === 'squares') {
+        const sq = document.createElement('span');
+        sq.className = 'sq' + (filled ? ' filled' : '');
+        if (filled) sq.style.background = fillC;
+        else applyEmptyDecoration(sq);
+        ind.appendChild(sq);
+      } else if (state.shape === 'stars') {
+        const wrap = document.createElement('span');
+        wrap.innerHTML = SVG_STAR;
+        const svg = wrap.firstChild;
+        if (filled) { svg.classList.add('filled'); svg.style.fill = fillC; }
+        else svg.style.fill = emptyColor();
+        ind.appendChild(svg);
+      } else if (state.shape === 'chevrons') {
+        const c = document.createElement('span');
+        c.className = 'chv' + (filled ? ' filled' : '');
+        c.textContent = '›';
+        if (filled) c.style.color = fillC;
+        ind.appendChild(c);
+      } else if (state.shape === 'bars') {
+        const b = document.createElement('span');
+        b.className = 'bar' + (filled ? ' filled' : '');
+        // Bar height grows by rank for a "battery rising" look
+        const h = state.size * (0.45 + (i / Math.max(1, cat.N - 1)) * 0.55);
+        b.style.height = `${h}px`;
+        if (filled) b.style.background = fillC;
+        ind.appendChild(b);
+      }
+    }
+    return ind;
+  }
+
+  // ─── RENDER ────────────────────────────────────────────────
+  function render() {
+    // Zoom zone — one sample at score MAX per non-empty category
+    const zoom = document.getElementById('zoom-zone');
+    zoom.innerHTML = '';
+    for (const [name, cat] of Object.entries(CATEGORIES)) {
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex'; wrap.style.flexDirection = 'column'; wrap.style.alignItems = 'center';
+      const scaler = document.createElement('div');
+      scaler.className = 'zoomed';
+      scaler.appendChild(buildIndicator(name, cat.levels[cat.levels.length - 1]));
+      wrap.appendChild(scaler);
+      const lbl = document.createElement('div');
+      lbl.className = 'cat-label';
+      lbl.innerHTML = `<strong>${name}</strong><br>${cat.N} maillons · max = ${cat.levels[cat.levels.length - 1]}`;
+      wrap.appendChild(lbl);
+      zoom.appendChild(wrap);
+    }
+
+    // All combos — one row per category with every reachable score
+    const all = document.getElementById('all-combos');
+    all.innerHTML = '';
+    for (const [name, cat] of Object.entries(CATEGORIES)) {
+      const block = document.createElement('div');
+      block.className = 'cat-block';
+
+      const catName = document.createElement('div');
+      catName.className = 'cat-name';
+      catName.innerHTML = `${name}<br><span style="font-weight:400;font-size:10px;color:var(--flux-text-muted)">N = ${cat.N}</span>`;
+      block.appendChild(catName);
+
+      const row = document.createElement('div');
+      row.className = 'indicator-row';
+      for (const lvl of cat.levels) {
+        const cell = document.createElement('span');
+        cell.className = 'score-cell';
+        const lbl = document.createElement('span');
+        lbl.className = 'lbl';
+        lbl.textContent = `score ${lvl}`;
+        cell.appendChild(lbl);
+        cell.appendChild(buildIndicator(name, lvl));
+        row.appendChild(cell);
+      }
+      // Also show score = 0 (all empty) for reference
+      const zeroCell = document.createElement('span');
+      zeroCell.className = 'score-cell';
+      zeroCell.style.opacity = '0.55';
+      zeroCell.innerHTML = `<span class="lbl">score 0</span>`;
+      zeroCell.appendChild(buildIndicator(name, 0));
+      row.appendChild(zeroCell);
+      block.appendChild(row);
+      all.appendChild(block);
+    }
+
+    updateRadioStyle();
+  }
+
+  function updateRadioStyle() {
+    document.querySelectorAll('.radio-group label').forEach(l => {
+      const i = l.querySelector('input');
+      l.classList.toggle('checked', i && i.checked);
+    });
+  }
+
+  // ─── WIRING ────────────────────────────────────────────────
+  document.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.addEventListener('change', (e) => {
+      state[e.target.name] = e.target.value;
+      render();
+    });
+  });
+  for (const [id, unit] of [['size', 'px'], ['gap', 'px']]) {
+    const input = document.getElementById(id);
+    const out = document.getElementById(`${id}-val`);
+    input.addEventListener('input', e => {
+      state[id] = parseInt(e.target.value, 10);
+      out.textContent = `${e.target.value} ${unit}`;
+      render();
+    });
+  }
+
+  // ─── EXPORT / PROMPT ──────────────────────────────────────
+  function currentRefinement() {
+    return {
+      base: {
+        indicatorModel: 'n-per-category',
+        ordinalFill: true,
+        visibility: 'positive-only',
+      },
+      refine: {
+        shape: state.shape,
+        sizePx: state.size,
+        gapPx: state.gap,
+        fillColor: state.fillCol,
+        emptyColor: state.emptyCol,
+        modulation: state.mod,
+      },
+      categories: CATEGORIES,
+    };
+  }
+
+  function buildPrompt(cfg) {
+    const json = JSON.stringify(cfg, null, 2);
+    return `# Tâche — réimplémenter \`SimilarityBadge\` en mode "N maillons par catégorie" (Phase 2, B5 révisé)
+
+## Contexte
+
+Le rendu "jauge horizontale" a été abandonné. On revient à des **indicateurs
+discrets** par niveau atteignable, comme l'ancien \`SimilarityIndicators\`
+mais avec un remplissage **ordinal** (le Nème indicateur est allumé si le
+score courant ≥ au Nème niveau trié de la catégorie).
+
+Nombre de maillons par catégorie (hors score 0) :
+- Offset : 5 (niveaux 2, 3, 4, 6, 7)
+- Pelliculeuses : 3 (0.5, 1, 3)
+- Finition (5 catégories) : 2 (1, 3)
+- Massicots : 1 (1)
+- Typographie : 0 (rien à afficher)
+
+Le composant doit **dériver ces niveaux dynamiquement** depuis
+\`category.similarityScoreRules\` via énumération des sous-ensembles + résolution
+des groupes exclusifs, pas les hardcoder.
+
+## Config retenue
+
+\`\`\`json
+${json}
+\`\`\`
+
+## Fichiers à créer / modifier
+
+- **Remplacer** \`apps/web/src/components/Tile/SimilarityBadge.tsx\`
+  - Props : \`{ score: SimilarityScore; category: StationCategory }\`
+  - Cite littéralement la config JSON ci-dessus en header.
+  - Retourne \`null\` si \`score.points <= 0\` ou si la catégorie n'a pas de règles.
+  - Calcule la liste des niveaux atteignables depuis \`category.similarityScoreRules\`
+    (helper \`reachableLevels(rules: SimilarityScoreRule[]): number[]\`), triée asc.
+  - Rend N indicateurs (N = levels.length). Le Nème est allumé ssi
+    \`score.points >= levels[n]\`.
+  - Shape selon \`refine.shape\` : \`links\` (SVG Lucide link/unlink), \`dots\`
+    (cercles), \`squares\` (carrés), \`stars\` (étoile SVG), \`chevrons\`
+    (caractère ›), \`bars\` (barres verticales croissantes).
+  - Couleurs selon \`refine.fillColor\` / \`refine.emptyColor\`.
+  - Taille et gap inline depuis \`refine.sizePx\` / \`refine.gapPx\`.
+
+- **Modifier** \`apps/web/src/utils/stationTileData.ts\`
+  - Passer \`category\` à \`<Tile>\` en plus du score (nouveau prop ou inclu
+    dans \`CachedTileData\`).
+
+- **Modifier** \`apps/web/src/components/Tile/Tile.tsx\`
+  - Accepter la prop \`category?: StationCategory\` et la transmettre à
+    \`<SimilarityBadge>\`.
+
+## Invariants
+
+- Pas de badge sur la première tuile d'une station.
+- Pas de badge pour Typographie (aucune règle).
+- Pas de badge pour score 0 (option \`visibility: positive-only\`).
+- Parité visuelle avec le playground
+  \`apps/web/playgrounds/similarity-badge-links.html\`.
+
+## Vérification
+
+- \`cd apps/web && npx tsc -b --force\` — 0 nouvelle erreur
+- \`cd apps/web && npx vitest run src/components/Tile\` — vert
+- Dev server : deux jobs offset tout-match → 5/5 maillons allumés
+`;
+  }
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    out.textContent = JSON.stringify(currentRefinement(), null, 2);
+    out.classList.add('visible');
+    if (navigator.clipboard) navigator.clipboard.writeText(out.textContent).catch(() => {});
+  });
+  document.getElementById('prompt-btn').addEventListener('click', () => {
+    const out = document.getElementById('export-output');
+    out.textContent = buildPrompt(currentRefinement());
+    out.classList.add('visible');
+    if (navigator.clipboard) navigator.clipboard.writeText(out.textContent).catch(() => {});
+  });
+
+  render();
+</script>
+</body>
+</html>
