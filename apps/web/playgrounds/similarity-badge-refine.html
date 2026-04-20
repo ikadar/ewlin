@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Similarity Badge Refinement — Pill / Micro / Stepped / Junction</title>
+<title>Similarity Badge — Gauge refinement</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,8 +37,8 @@
     border-radius: 6px; padding: 10px 12px; margin-bottom: 14px;
     font-size: 10px; line-height: 1.6; color: var(--flux-text-muted);
   }
-  .locked code { color: var(--flux-text-secondary); background: transparent; }
   .locked strong { color: var(--flux-text-secondary); }
+  .locked code { color: var(--flux-text-secondary); }
 
   fieldset {
     border: 1px solid var(--flux-border); border-radius: 6px;
@@ -49,7 +49,7 @@
     padding: 0 6px; font-size: 11px; font-weight: 600;
     color: var(--flux-text-secondary); text-transform: uppercase; letter-spacing: 0.03em;
   }
-  .radio-group, .slider-group { display: flex; flex-direction: column; gap: 4px; }
+  .radio-group { display: flex; flex-direction: column; gap: 4px; }
   .radio-group label {
     display: flex; align-items: center; gap: 8px;
     padding: 4px 6px; border-radius: 4px;
@@ -58,18 +58,18 @@
   .radio-group label:hover { background: rgba(255,255,255,0.04); }
   .radio-group label.checked { background: rgba(59, 130, 246, 0.1); color: var(--flux-text-primary); }
   .radio-group input[type="radio"] { accent-color: rgb(59, 130, 246); }
-  .slider-row { display: grid; grid-template-columns: 72px 1fr 34px; align-items: center; gap: 6px; font-size: 11px; color: var(--flux-text-muted); }
+  .slider-row { display: grid; grid-template-columns: 90px 1fr 42px; align-items: center; gap: 6px; font-size: 11px; color: var(--flux-text-muted); }
   .slider-row input[type="range"] { accent-color: rgb(59, 130, 246); }
   .swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
   .swatch {
     border: 1px solid var(--flux-border); border-radius: 4px;
     padding: 6px; cursor: pointer; background: var(--flux-elevated);
-    display: flex; flex-direction: column; gap: 2px; align-items: center;
+    display: flex; flex-direction: column; gap: 4px; align-items: center;
   }
   .swatch.checked { border-color: rgb(59, 130, 246); background: rgba(59, 130, 246, 0.08); }
-  .swatch .swatch-label { font-size: 9px; color: var(--flux-text-muted); }
-  .swatch .swatch-chips { display: flex; gap: 1px; }
-  .swatch .swatch-chips > span { width: 10px; height: 10px; border-radius: 50%; }
+  .swatch-label { font-size: 9px; color: var(--flux-text-muted); text-align: center; }
+  .swatch-chips { display: flex; gap: 1px; }
+  .swatch-chips > span { width: 10px; height: 10px; border-radius: 50%; }
 
   .export-btn {
     width: 100%; margin-top: 6px;
@@ -92,7 +92,7 @@
   /* ─── STAGE ───────────────────────────────────────────────── */
   main.stage { padding: 24px 28px 60px; overflow-x: auto; }
   .stage h2 {
-    font-size: 13px; font-weight: 600; margin: 18px 0 8px;
+    font-size: 13px; font-weight: 600; margin: 22px 0 8px;
     padding-bottom: 4px; border-bottom: 1px solid var(--flux-border);
   }
   .stage h2:first-child { margin-top: 0; }
@@ -100,25 +100,26 @@
     font-size: 11px; color: var(--flux-text-muted); margin-bottom: 12px; line-height: 1.5;
   }
 
-  .zoom-wrap {
-    background: var(--flux-surface); border: 1px solid var(--flux-border);
-    border-radius: 8px; padding: 24px;
-    display: flex; gap: 20px; align-items: center; justify-content: center;
-    margin-bottom: 10px;
+  .zoom-header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 10px;
+    font-size: 11px; color: var(--flux-text-muted);
   }
-  .zoom-scale { transform: scale(5); transform-origin: center; display: inline-block; }
-  .zoom-scale-x3 { transform: scale(3); }
-  .zoom-scale-x2 { transform: scale(2); }
-  .scale-controls { font-size: 10px; color: var(--flux-text-muted); margin-left: auto; }
-  .scale-controls label { display: inline-flex; gap: 4px; margin-right: 6px; cursor: pointer; }
+  .zoom-header label { display: inline-flex; gap: 4px; cursor: pointer; }
 
   .scenario-row {
     display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start;
     margin-bottom: 14px;
   }
-  .pair-wrap { display: flex; flex-direction: column; align-items: center; min-width: 88px; }
-  .pair-label { font-size: 10px; color: var(--flux-text-muted); margin-bottom: 4px; text-align: center; }
-  .pair-label strong { color: var(--flux-text-secondary); }
+  .scenario-row.zoomed { padding: 40px 20px; background: var(--flux-surface); border: 1px solid var(--flux-border); border-radius: 8px; }
+
+  .pair-wrap { display: flex; flex-direction: column; align-items: center; min-width: 92px; }
+  .pair-label { font-size: 10px; color: var(--flux-text-muted); margin-bottom: 6px; text-align: center; line-height: 1.3; }
+  .pair-label strong { color: var(--flux-text-secondary); font-weight: 600; }
+
+  .zoom-x2 { transform: scale(2); transform-origin: top center; margin-bottom: 60px; }
+  .zoom-x3 { transform: scale(3); transform-origin: top center; margin-bottom: 120px; }
+  .zoom-x5 { transform: scale(5); transform-origin: top center; margin-bottom: 240px; }
+
   .station-col {
     position: relative; width: 88px;
     background: var(--flux-elevated); border: 1px solid var(--flux-border);
@@ -133,32 +134,42 @@
   .tile-mock:last-child { margin-bottom: 0; }
   .tile-mock .sub { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.7); margin-top: 1px; }
 
-  /* ─── BADGE — focused pill/micro/numeric/stepped/junction variant ─── */
-  .badge {
+  /* ─── GAUGE BADGE ─── */
+  .gauge {
     position: absolute;
-    left: 50%;
-    top: 0;
-    transform: translate(-50%, -50%);
-    transform-origin: center;
+    left: 50%; top: 0;
+    transform: translate(-50%, calc(-50% + var(--offset-y, 0px)));
+    display: inline-block;
+    overflow: hidden;
+    background: var(--track-bg, transparent);
+    border-radius: var(--radius, 4px);
+    border: var(--gauge-border, none);
+    box-shadow: var(--gauge-shadow, none);
+    width: var(--gauge-w, 24px);
+    height: var(--gauge-h, 6px);
     z-index: 2;
-    display: inline-flex; align-items: center; justify-content: center;
-    background: var(--badge-bg);
-    color: var(--badge-fg, white);
-    font-weight: var(--fw, 600);
-    font-size: var(--fs, 9px);
-    min-width: var(--h, 12px);
-    height: var(--h, 12px);
-    padding: 0 var(--px, 3px);
-    border-radius: var(--radius, 7px);
-    border: var(--border, none);
-    box-shadow: var(--shadow, none);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    user-select: none;
-    white-space: nowrap;
   }
-  .badge.align-left { left: 6px; transform: translateY(-50%); }
-  .badge.align-right { left: auto; right: 6px; transform: translateY(-50%); }
+  .gauge.align-left { left: 6px; transform: translateY(calc(-50% + var(--offset-y, 0px))); }
+  .gauge.align-right { left: auto; right: 6px; transform: translateY(calc(-50% + var(--offset-y, 0px))); }
+
+  .gauge > .fill {
+    display: block;
+    height: 100%;
+    width: var(--fill-w, 0);
+    background: var(--fill-bg, transparent);
+    border-radius: inherit;
+    transition: width 0.15s, background 0.15s;
+  }
+  .gauge > .fill.striped {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--fill-bg, transparent) 0 3px,
+      rgba(255,255,255,0.08) 3px 6px
+    );
+  }
+  .gauge > .fill.gradient {
+    background: linear-gradient(to right, var(--fill-bg-from, var(--fill-bg)), var(--fill-bg-to, var(--fill-bg)));
+  }
 
   .legend {
     margin-top: 32px; padding: 16px; background: var(--flux-surface);
@@ -172,49 +183,62 @@
 <body>
   <!-- ─── CONTROLS ───────────────────────────────────────────── -->
   <aside class="controls">
-    <h1>Badge Refinement</h1>
-    <div class="subtitle">Focus sur la config déjà retenue (pill / micro / numeric / stepped / junction-overlay). Les axes verrouillés apparaissent ci-dessous ; seuls les ajustements fins restent tunables.</div>
+    <h1>Gauge Refinement</h1>
+    <div class="subtitle">Jauge horizontale à hauteur de microdot, remplissage proportionnel au score. Pas de chiffre — l'info passe par la largeur remplie et la couleur.</div>
 
     <div class="locked">
       <strong>Config verrouillée :</strong><br>
-      • <code>shape = pill</code><br>
-      • <code>infoDensity = numeric</code><br>
+      • <code>shape = gauge</code> (barre de progression)<br>
+      • <code>infoDensity = visual-only</code><br>
+      • <code>position = junction-overlay</code><br>
+      • <code>color = stepped</code><br>
       • <code>visibility = positive-only</code><br>
-      • <code>normalization = absolute</code><br>
       • <code>interaction = static</code>
     </div>
 
     <fieldset>
-      <legend>Position (autour de junction-overlay)</legend>
-      <div class="radio-group" data-axis="align">
-        <label><input type="radio" name="align" value="center" checked> Centré sur la ligne de jonction</label>
-        <label><input type="radio" name="align" value="left"> Ancré à gauche (bord-de-ligne)</label>
-        <label><input type="radio" name="align" value="right"> Ancré à droite (bord-de-ligne)</label>
+      <legend>Dimensions</legend>
+      <div class="slider-row">
+        <span>Hauteur</span>
+        <input type="range" id="gaugeH" min="3" max="14" step="1" value="6">
+        <span id="gaugeH-val">6 px</span>
+      </div>
+      <div class="radio-group" data-axis="widthMode" style="margin-top:8px;">
+        <label><input type="radio" name="widthMode" value="per-point" checked> Largeur = maxPoints × unit</label>
+        <label><input type="radio" name="widthMode" value="fixed"> Largeur fixe (ratio du fill)</label>
       </div>
       <div class="slider-row" style="margin-top:8px;">
-        <span>Offset Y</span>
-        <input type="range" id="offsetY" min="-4" max="4" step="1" value="0">
-        <span id="offsetY-val">0 px</span>
+        <span>Unit (per-pt)</span>
+        <input type="range" id="unitW" min="2" max="8" step="1" value="4">
+        <span id="unitW-val">4 px</span>
+      </div>
+      <div class="slider-row">
+        <span>Largeur fixe</span>
+        <input type="range" id="fixedW" min="14" max="48" step="2" value="28">
+        <span id="fixedW-val">28 px</span>
+      </div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span>Border-rad.</span>
+        <input type="range" id="radius" min="0" max="8" step="1" value="3">
+        <span id="radius-val">3 px</span>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>Typographie (autour de numeric)</legend>
-      <div class="radio-group" data-axis="weight">
-        <label><input type="radio" name="weight" value="500"> Medium (500)</label>
-        <label><input type="radio" name="weight" value="600" checked> Semibold (600)</label>
-        <label><input type="radio" name="weight" value="700"> Bold (700)</label>
+      <legend>Track (arrière-plan)</legend>
+      <div class="radio-group" data-axis="track">
+        <label><input type="radio" name="track" value="visible" checked> Visible, gris neutre</label>
+        <label><input type="radio" name="track" value="visible-tinted"> Visible, teinté par la palette</label>
+        <label><input type="radio" name="track" value="hidden"> Masqué (fill seul)</label>
       </div>
-      <div class="slider-row" style="margin-top:8px;">
-        <span>Font-size</span>
-        <input type="range" id="fs" min="7" max="11" step="1" value="9">
-        <span id="fs-val">9 px</span>
-      </div>
-      <div class="radio-group" data-axis="numFmt" style="margin-top:8px;">
-        <label><input type="radio" name="numFmt" value="plain" checked> Entier brut ("3")</label>
-        <label><input type="radio" name="numFmt" value="plus"> Préfixe plus ("+3")</label>
-        <label><input type="radio" name="numFmt" value="dot"> Style pip ("•3")</label>
-        <label><input type="radio" name="numFmt" value="decimal"> Toujours 1 décimale ("3.0")</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Style du fill</legend>
+      <div class="radio-group" data-axis="fillStyle">
+        <label><input type="radio" name="fillStyle" value="solid" checked> Plein (couleur unie)</label>
+        <label><input type="radio" name="fillStyle" value="gradient"> Gradient (interpolation dans le fill)</label>
+        <label><input type="radio" name="fillStyle" value="striped"> Rayé diagonal (texture)</label>
       </div>
     </fieldset>
 
@@ -226,39 +250,38 @@
     <fieldset>
       <legend>Seuils stepped</legend>
       <div class="radio-group" data-axis="thresholds">
-        <label><input type="radio" name="thresholds" value="33-66" checked> Classique (33 % / 66 %) — 3 paliers</label>
-        <label><input type="radio" name="thresholds" value="50"> Binaire (50 %) — pass/fail</label>
-        <label><input type="radio" name="thresholds" value="25-50-75"> Fin (25 / 50 / 75 %) — 4 paliers</label>
-        <label><input type="radio" name="thresholds" value="abs-2-4"> Absolu 2 / 4 pts (≥ 4 = "excellent")</label>
+        <label><input type="radio" name="thresholds" value="33-66" checked> Classique (33 / 66 %)</label>
+        <label><input type="radio" name="thresholds" value="50"> Binaire (50 %)</label>
+        <label><input type="radio" name="thresholds" value="25-50-75"> Fin (25 / 50 / 75 %)</label>
+        <label><input type="radio" name="thresholds" value="abs-2-4"> Absolu 2 / 4 pts</label>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>Taille micro — ajustements</legend>
-      <div class="slider-row">
-        <span>Hauteur</span>
-        <input type="range" id="h" min="10" max="18" step="1" value="12">
-        <span id="h-val">12 px</span>
+      <legend>Position</legend>
+      <div class="radio-group" data-axis="align">
+        <label><input type="radio" name="align" value="center" checked> Centré sur la jonction</label>
+        <label><input type="radio" name="align" value="left"> Ancré à gauche</label>
+        <label><input type="radio" name="align" value="right"> Ancré à droite</label>
       </div>
-      <div class="slider-row">
-        <span>Padding H</span>
-        <input type="range" id="px" min="2" max="8" step="1" value="3">
-        <span id="px-val">3 px</span>
+      <div class="slider-row" style="margin-top:8px;">
+        <span>Offset Y</span>
+        <input type="range" id="offsetY" min="-4" max="4" step="1" value="0">
+        <span id="offsetY-val">0 px</span>
       </div>
-      <div class="slider-row">
-        <span>Border-rad.</span>
-        <input type="range" id="radius" min="0" max="10" step="1" value="7">
-        <span id="radius-val">7 px</span>
-      </div>
-      <div class="radio-group" data-axis="border" style="margin-top:8px;">
+    </fieldset>
+
+    <fieldset>
+      <legend>Bordure / Ombre</legend>
+      <div class="radio-group" data-axis="border">
         <label><input type="radio" name="border" value="none" checked> Sans bordure</label>
-        <label><input type="radio" name="border" value="tonal"> Bordure tonale (mêmes couleurs, plus sombre)</label>
-        <label><input type="radio" name="border" value="contrast"> Bordure contrastée (fond tuile)</label>
+        <label><input type="radio" name="border" value="tonal"> Tonale (palette assombrie)</label>
+        <label><input type="radio" name="border" value="contrast"> Contrastée (fond tuile)</label>
       </div>
       <div class="radio-group" data-axis="shadow" style="margin-top:8px;">
-        <label><input type="radio" name="shadow" value="none"> Sans ombre</label>
-        <label><input type="radio" name="shadow" value="subtle" checked> Ombre discrète</label>
-        <label><input type="radio" name="shadow" value="medium"> Ombre franche</label>
+        <label><input type="radio" name="shadow" value="none" checked> Sans ombre</label>
+        <label><input type="radio" name="shadow" value="subtle"> Discrète</label>
+        <label><input type="radio" name="shadow" value="medium"> Franche</label>
       </div>
     </fieldset>
 
@@ -269,33 +292,31 @@
 
   <!-- ─── STAGE ──────────────────────────────────────────────── -->
   <main class="stage">
-    <h2>Aperçu zoomé ×5 — un échantillon sur chaque palier</h2>
-    <div class="scen-note">Pour inspecter au pixel près. La tuile et le badge sont à leur taille réelle ensuite en dessous. Le score est indiqué au-dessus.</div>
-    <div class="zoom-wrap">
-      <div class="scale-controls">
-        <label><input type="radio" name="zoom" value="2"> ×2</label>
-        <label><input type="radio" name="zoom" value="3"> ×3</label>
-        <label><input type="radio" name="zoom" value="5" checked> ×5</label>
-      </div>
+    <h2>Aperçu zoomé — palette complète des scores Offset</h2>
+    <div class="scen-note">Pour inspecter la hauteur et la lisibilité au pixel près. Le zoom s'applique à toutes les tuiles simultanément.</div>
+    <div class="zoom-header">
+      Zoom :
+      <label><input type="radio" name="zoom" value="2"> ×2</label>
+      <label><input type="radio" name="zoom" value="3"> ×3</label>
+      <label><input type="radio" name="zoom" value="5" checked> ×5</label>
     </div>
-    <div class="scenario-row" id="scen-zoom"></div>
+    <div class="scenario-row zoomed" id="scen-zoom"></div>
 
-    <h2>Taille réelle — balayage complet des scores</h2>
-    <div class="scen-note">Comme ça se présentera dans la grille de planning.</div>
+    <h2>Taille réelle — toutes les catégories</h2>
+    <div class="scen-note">Comme ça se présentera dans la grille de planning. Offset va jusqu'à max=7, Pelliculeuses / Finition jusqu'à 3, Massicots = 1.</div>
     <div class="scenario-row" id="scen-real"></div>
 
-    <h2>Cas bords et minimums</h2>
-    <div class="scen-note">Pelliculeuses 0.5 (fractionnaire), Massicots 1/1 (seuls 100 %), Offset 2 (bas de la fourchette).</div>
+    <h2>Cas bords</h2>
+    <div class="scen-note">Score fractionnaire (Pelliculeuses 0.5), maxPoints minimal (Massicots 1), bas de fourchette (Offset 2).</div>
     <div class="scenario-row" id="scen-edges"></div>
 
     <div class="legend">
-      <strong>Lecture.</strong><br>
-      • Seuils <code>stepped</code> : par ratio (<code>score / maxPoints</code>) ou absolu (palier en points bruts).<br>
-      • La palette <em>Classique</em> suit la convention feu tricolore (red-400 / amber-400 / emerald-400).<br>
-      • Palette <em>Sobre</em> reste en tons verts (zinc-500 → emerald-400) pour une lecture moins alarmiste.<br>
-      • Palette <em>Chaud-froid</em> passe du bleu (rare) au vert (fréquent) — évite le rouge qui porte une connotation "erreur".<br>
-      • Palette <em>Mono</em> joue uniquement sur l'opacité.<br>
-      • Le bouton <strong>Prompt Claude</strong> produit un prompt prêt-à-coller reprenant exactement la config affichée.
+      <strong>Notes de lecture.</strong><br>
+      • Mode <code>per-point</code> : largeur totale = maxPoints × unit. Offset (max=7) à unit=4 → track de 28 px. Massicots (max=1) à unit=4 → track de 4 px. Les catégories plus "riches" ont une jauge plus large.<br>
+      • Mode <code>fixed</code> : largeur totale constante pour toutes les catégories ; le remplissage est un pourcentage du total.<br>
+      • Les seuils stepped s'appliquent au fill. Un score 4/7 (ratio 0.57) en seuils 33-66 tombe dans "mid" (ambre) ; en seuils abs 2/4 → "high" (emerald) puisque le score ≥ 4.<br>
+      • <code>track=visible-tinted</code> teinte la track avec la couleur de palette à faible opacité — ambiance cohérente.<br>
+      • Le bouton <strong>Prompt Claude</strong> produit un prompt prêt-à-coller avec la config complète et les instructions pour B5.
     </div>
   </main>
 
@@ -304,10 +325,10 @@
   const PAIRS = {
     zoom: [
       { cat: 'Offset', max: 7, score: 2 },
+      { cat: 'Offset', max: 7, score: 3 },
       { cat: 'Offset', max: 7, score: 4 },
+      { cat: 'Offset', max: 7, score: 6 },
       { cat: 'Offset', max: 7, score: 7 },
-      { cat: 'Pellic.', max: 3, score: 0.5 },
-      { cat: 'Finition', max: 3, score: 3 },
     ],
     real: [
       { cat: 'Offset', max: 7, score: 2 },
@@ -331,31 +352,27 @@
   const PALETTES = {
     classic: {
       label: 'Classique',
-      description: 'Feu tricolore',
       low:  'rgb(248, 113, 113)',   // red-400
       mid:  'rgb(251, 191, 36)',    // amber-400
       high: 'rgb(52, 211, 153)',    // emerald-400
-      extraHigh: 'rgb(16, 185, 129)', // emerald-500 (for 4-palier)
+      extraHigh: 'rgb(16, 185, 129)',
     },
     sober: {
       label: 'Sobre',
-      description: 'Tons verts',
       low:  'rgb(113, 113, 122)',   // zinc-500
       mid:  'rgb(132, 204, 22)',    // lime-500
-      high: 'rgb(52, 211, 153)',    // emerald-400
+      high: 'rgb(52, 211, 153)',
       extraHigh: 'rgb(16, 185, 129)',
     },
     warmcold: {
       label: 'Chaud-froid',
-      description: 'Bleu → vert',
       low:  'rgb(96, 165, 250)',    // blue-400
       mid:  'rgb(45, 212, 191)',    // teal-400
-      high: 'rgb(52, 211, 153)',    // emerald-400
+      high: 'rgb(52, 211, 153)',
       extraHigh: 'rgb(16, 185, 129)',
     },
     mono: {
       label: 'Mono',
-      description: 'Opacité seule',
       low:  'rgba(52, 211, 153, 0.35)',
       mid:  'rgba(52, 211, 153, 0.65)',
       high: 'rgba(52, 211, 153, 1.0)',
@@ -363,25 +380,20 @@
     },
   };
 
-  // ─── STATE ─────────────────────────────────────────────────
   const state = {
-    // Position
-    align: 'center',
-    offsetY: 0,
-    // Typography
-    weight: 600,
-    fs: 9,
-    numFmt: 'plain',
-    // Palette + thresholds
+    gaugeH: 6,
+    widthMode: 'per-point',
+    unitW: 4,
+    fixedW: 28,
+    radius: 3,
+    track: 'visible',
+    fillStyle: 'solid',
     palette: 'classic',
     thresholds: '33-66',
-    // Size
-    h: 12,
-    px: 3,
-    radius: 7,
+    align: 'center',
+    offsetY: 0,
     border: 'none',
-    shadow: 'subtle',
-    // Zoom
+    shadow: 'none',
     zoom: 5,
   };
 
@@ -408,95 +420,119 @@
     return 'mid';
   }
 
-  function bgColorFor(pair) {
+  function fillColor(pair) {
+    return PALETTES[state.palette][classify(pair.score, pair.max)] ?? PALETTES[state.palette].mid;
+  }
+
+  function fillColorForRatio(pair, ratio) {
     const p = PALETTES[state.palette];
-    const k = classify(pair.score, pair.max);
-    return p[k] ?? p.mid;
+    if (state.thresholds === '25-50-75') {
+      if (ratio < 0.25) return p.low;
+      if (ratio < 0.5) return p.mid;
+      if (ratio < 0.75) return p.high;
+      return p.extraHigh;
+    }
+    if (state.thresholds === '50') return ratio < 0.5 ? p.low : p.high;
+    if (state.thresholds === 'abs-2-4') {
+      // translate the end-of-fill ratio back to an absolute score via pair.max on caller; fall back to high
+      return p.high;
+    }
+    if (ratio < 1 / 3) return p.low;
+    if (ratio < 2 / 3) return p.mid;
+    return p.high;
   }
 
-  function fgColorFor(pair) {
-    if (state.palette === 'mono') return 'white';
-    return 'white';
+  function trackColor(pair) {
+    if (state.track === 'hidden') return 'transparent';
+    if (state.track === 'visible') return 'var(--flux-border)';
+    // visible-tinted: palette low-opacity variant
+    const c = PALETTES[state.palette][classify(pair.score, pair.max)];
+    if (!c) return 'var(--flux-border)';
+    // extract rgb and add low alpha
+    const m = /rgba?\(([^,]+),([^,]+),([^,]+)/.exec(c);
+    if (!m) return c;
+    return `rgba(${m[1].trim()},${m[2].trim()},${m[3].trim()},0.18)`;
   }
 
-  function darkerForBorder(rgbStr) {
-    // crude: reduce each channel by 25% for tonal border
-    const m = /rgba?\(([^,]+),([^,]+),([^,]+)(?:,([^)]+))?\)/.exec(rgbStr);
-    if (!m) return rgbStr;
-    const [r, g, b] = [+m[1], +m[2], +m[3]].map(n => Math.max(0, Math.round(n * 0.65)));
+  function darker(rgb) {
+    const m = /rgba?\(([^,]+),([^,]+),([^,]+)(?:,([^)]+))?\)/.exec(rgb);
+    if (!m) return rgb;
+    const [r, g, b] = [+m[1], +m[2], +m[3]].map(n => Math.max(0, Math.round(n * 0.6)));
     const a = m[4] ? parseFloat(m[4]) : 1;
     return `rgba(${r},${g},${b},${a})`;
   }
 
-  function formatNumber(score) {
-    const i = Math.floor(score);
-    const frac = score - i;
-    const isFrac = frac >= 0.05;
-    switch (state.numFmt) {
-      case 'plain':
-        return isFrac ? score.toFixed(1) : String(i);
-      case 'plus':
-        return '+' + (isFrac ? score.toFixed(1) : String(i));
-      case 'dot':
-        return '•' + (isFrac ? score.toFixed(1) : String(i));
-      case 'decimal':
-        return score.toFixed(1);
-    }
-    return String(i);
-  }
-
-  function shadowFor() {
-    switch (state.shadow) {
-      case 'none': return 'none';
-      case 'subtle': return '0 1px 2px rgba(0,0,0,0.3)';
-      case 'medium': return '0 2px 6px rgba(0,0,0,0.5)';
-    }
-    return 'none';
-  }
-
   function borderFor(bg) {
     if (state.border === 'none') return 'none';
-    if (state.border === 'tonal') return `1px solid ${darkerForBorder(bg)}`;
+    if (state.border === 'tonal') return `1px solid ${darker(bg)}`;
     if (state.border === 'contrast') return `1px solid var(--flux-elevated)`;
     return 'none';
   }
 
-  // ─── BADGE BUILDER ────────────────────────────────────────
-  function buildBadge(pair) {
-    if (pair.score <= 0) return null;  // visibility = positive-only (locked)
-
-    const b = document.createElement('span');
-    b.className = 'badge' + (state.align === 'left' ? ' align-left' : state.align === 'right' ? ' align-right' : '');
-    const bg = bgColorFor(pair);
-    b.style.setProperty('--badge-bg', bg);
-    b.style.setProperty('--badge-fg', fgColorFor(pair));
-    b.style.setProperty('--fw', state.weight);
-    b.style.setProperty('--fs', `${state.fs}px`);
-    b.style.setProperty('--h', `${state.h}px`);
-    b.style.setProperty('--px', `${state.px}px`);
-    b.style.setProperty('--radius', `${state.radius}px`);
-    b.style.setProperty('--shadow', shadowFor());
-    b.style.setProperty('--border', borderFor(bg));
-    if (state.align === 'center') {
-      b.style.top = `${state.offsetY}px`;
-    } else {
-      b.style.top = `${state.offsetY}px`;
-    }
-    b.textContent = formatNumber(pair.score);
-    return b;
+  function shadowFor() {
+    if (state.shadow === 'none') return 'none';
+    if (state.shadow === 'subtle') return '0 1px 2px rgba(0,0,0,0.3)';
+    return '0 2px 6px rgba(0,0,0,0.5)';
   }
 
-  // ─── RENDER ───────────────────────────────────────────────
+  function gaugeDimsFor(pair) {
+    const fillC = fillColor(pair);
+    let totalW, fillW;
+    if (state.widthMode === 'per-point') {
+      totalW = Math.max(state.unitW, pair.max * state.unitW);
+      fillW = Math.max(0, pair.score) * state.unitW;
+    } else {
+      totalW = state.fixedW;
+      const ratio = pair.max > 0 ? pair.score / pair.max : 0;
+      fillW = Math.round(ratio * totalW);
+    }
+    return { totalW, fillW, fillC };
+  }
+
+  // ─── BUILD ─────────────────────────────────────────────────
+  function buildGauge(pair) {
+    if (pair.score <= 0) return null;  // visibility = positive-only
+
+    const { totalW, fillW, fillC } = gaugeDimsFor(pair);
+
+    const g = document.createElement('span');
+    g.className = 'gauge' + (state.align === 'left' ? ' align-left' : state.align === 'right' ? ' align-right' : '');
+    g.style.setProperty('--gauge-w', `${totalW}px`);
+    g.style.setProperty('--gauge-h', `${state.gaugeH}px`);
+    g.style.setProperty('--radius', `${Math.min(state.radius, state.gaugeH / 2)}px`);
+    g.style.setProperty('--track-bg', trackColor(pair));
+    g.style.setProperty('--offset-y', `${state.offsetY}px`);
+    g.style.setProperty('--gauge-border', borderFor(fillC));
+    g.style.setProperty('--gauge-shadow', shadowFor());
+
+    const fill = document.createElement('span');
+    fill.className = 'fill' + (state.fillStyle === 'striped' ? ' striped' : state.fillStyle === 'gradient' ? ' gradient' : '');
+    fill.style.setProperty('--fill-w', `${fillW}px`);
+    fill.style.setProperty('--fill-bg', fillC);
+
+    if (state.fillStyle === 'gradient') {
+      const from = PALETTES[state.palette].low;
+      const to = fillC;
+      fill.style.setProperty('--fill-bg-from', from);
+      fill.style.setProperty('--fill-bg-to', to);
+    }
+
+    g.appendChild(fill);
+    return g;
+  }
+
+  // ─── RENDER ────────────────────────────────────────────────
   function renderPair(pair, zoomClass = '') {
     const wrap = document.createElement('div');
     wrap.className = 'pair-wrap';
+
     const label = document.createElement('div');
     label.className = 'pair-label';
     label.innerHTML = `<strong>${pair.cat}</strong><br>score ${pair.score} / ${pair.max}`;
     wrap.appendChild(label);
 
     const scaler = zoomClass ? document.createElement('div') : null;
-    if (scaler) scaler.className = `zoom-scale ${zoomClass}`;
+    if (scaler) scaler.className = zoomClass;
 
     const col = document.createElement('div');
     col.className = 'station-col';
@@ -505,8 +541,8 @@
       <div class="tile-mock" style="position: relative;">J2<div class="sub">—</div></div>
     `;
     const currTile = col.children[1];
-    const b = buildBadge(pair);
-    if (b) currTile.appendChild(b);
+    const g = buildGauge(pair);
+    if (g) currTile.appendChild(g);
 
     if (scaler) {
       scaler.appendChild(col);
@@ -518,25 +554,25 @@
   }
 
   function renderAll() {
-    const zoomClass = state.zoom === 5 ? 'zoom-scale' : state.zoom === 3 ? 'zoom-scale zoom-scale-x3' : 'zoom-scale zoom-scale-x2';
+    const zoomClass = state.zoom === 5 ? 'zoom-x5' : state.zoom === 3 ? 'zoom-x3' : 'zoom-x2';
 
     const rz = document.getElementById('scen-zoom');
     rz.innerHTML = '';
-    PAIRS.zoom.forEach((p) => rz.appendChild(renderPair(p, zoomClass)));
+    PAIRS.zoom.forEach(p => rz.appendChild(renderPair(p, zoomClass)));
 
     const rr = document.getElementById('scen-real');
     rr.innerHTML = '';
-    PAIRS.real.forEach((p) => rr.appendChild(renderPair(p)));
+    PAIRS.real.forEach(p => rr.appendChild(renderPair(p)));
 
     const re = document.getElementById('scen-edges');
     re.innerHTML = '';
-    PAIRS.edges.forEach((p) => re.appendChild(renderPair(p)));
+    PAIRS.edges.forEach(p => re.appendChild(renderPair(p)));
 
     updateRadioStyle();
     updatePaletteStyle();
   }
 
-  // ─── WIRING ───────────────────────────────────────────────
+  // ─── WIRING ────────────────────────────────────────────────
   function updateRadioStyle() {
     document.querySelectorAll('.radio-group label').forEach(l => {
       const i = l.querySelector('input');
@@ -577,27 +613,21 @@
     r.addEventListener('change', (e) => {
       const name = e.target.name;
       const val = e.target.value;
-      if (name === 'weight' || name === 'offsetY') {
-        state[name] = parseInt(val, 10);
-      } else if (name === 'zoom') {
-        state.zoom = parseInt(val, 10);
-      } else {
-        state[name] = val;
-      }
+      if (name === 'zoom') state.zoom = parseInt(val, 10);
+      else state[name] = val;
       renderAll();
     });
   });
 
   const sliders = [
-    ['offsetY', 'px'], ['fs', 'px'], ['h', 'px'], ['px', 'px'], ['radius', 'px'],
+    ['gaugeH', 'px'], ['unitW', 'px'], ['fixedW', 'px'], ['radius', 'px'], ['offsetY', 'px'],
   ];
   sliders.forEach(([id, unit]) => {
     const input = document.getElementById(id);
     const out = document.getElementById(`${id}-val`);
-    input.addEventListener('input', (e) => {
-      const v = parseInt(e.target.value, 10);
-      state[id] = v;
-      out.textContent = `${v} ${unit}`;
+    input.addEventListener('input', e => {
+      state[id] = parseInt(e.target.value, 10);
+      out.textContent = `${e.target.value} ${unit}`;
       renderAll();
     });
   });
@@ -605,29 +635,26 @@
   // ─── EXPORT / PROMPT ──────────────────────────────────────
   function currentRefinement() {
     return {
-      // Base locked config (carried verbatim for the downstream prompt)
       base: {
-        shape: 'pill',
+        shape: 'gauge',
+        infoDensity: 'visual-only',
         position: 'junction-overlay',
-        infoDensity: 'numeric',
         color: 'stepped',
-        size: 'micro',
         visibility: 'positive-only',
-        normalization: 'absolute',
         interaction: 'static',
       },
-      // Fine-tuning on top of that base
       refine: {
-        align: state.align,
-        offsetY: state.offsetY,
-        fontWeight: state.weight,
-        fontSizePx: state.fs,
-        numberFormat: state.numFmt,
+        gaugeHeightPx: state.gaugeH,
+        widthMode: state.widthMode,
+        unitWidthPx: state.unitW,
+        fixedWidthPx: state.fixedW,
+        borderRadiusPx: state.radius,
+        track: state.track,
+        fillStyle: state.fillStyle,
         palette: state.palette,
         thresholds: state.thresholds,
-        heightPx: state.h,
-        paddingHPx: state.px,
-        borderRadiusPx: state.radius,
+        align: state.align,
+        offsetYPx: state.offsetY,
         border: state.border,
         shadow: state.shadow,
       },
@@ -643,13 +670,12 @@
 
 ## Contexte
 
-Je viens de valider la config UX du badge de practicité via le playground
-\`apps/web/playgrounds/similarity-badge-refine.html\`. Implémente maintenant
-le composant React qui rend cette config sur les tuiles du planning.
+Config UX validée via le playground \`apps/web/playgrounds/similarity-badge-refine.html\`.
 
-Config de base : **pill / numeric / stepped / micro / junction-overlay**.
-Les valeurs \`refine\` en-dessous sont les ajustements fins retenus —
-implémente-les telles quelles (pas d'autres interprétations).
+Le badge est une **jauge horizontale** de la hauteur d'un microdot. Pas de
+chiffre — l'information passe par la largeur remplie et la couleur (stepped).
+Placé à la jonction entre deux tuiles consécutives d'une même station sur la
+grille de planning.
 
 ## Config retenue
 
@@ -660,53 +686,60 @@ ${json}
 ## Fichiers à créer / modifier
 
 - **Créer** \`apps/web/src/components/Tile/SimilarityBadge.tsx\`
-  - Props : \`{ score: SimilarityScore }\` — le type vient de \`@flux/types\`.
-  - Header du fichier : cite littéralement la config JSON ci-dessus dans un
-    commentaire pour garantir la traçabilité playground → React.
-  - Rend un \`<span>\` positionné en absolu (position: 'absolute', top: 0,
-    left/right selon \`refine.align\`, transform: translate(-50%, -50%)
-    pour center, seul translateY pour left/right), avec :
-    - hauteur = \`refine.heightPx\`, min-width idem
-    - padding horizontal = \`refine.paddingHPx\`
-    - border-radius = \`refine.borderRadiusPx\`
-    - font-weight = \`refine.fontWeight\`, font-size = \`refine.fontSizePx\`
-    - fond = palette\`[classe du score]\` où classe = low/mid/high/extraHigh
-      selon \`refine.thresholds\` (33-66 | 50 | 25-50-75 | abs-2-4)
-    - bordure + ombre selon les axes correspondants
+  - Props : \`{ score: SimilarityScore }\` (type de \`@flux/types\`).
   - Retourne \`null\` si \`score.points <= 0\` (visibility = positive-only).
+  - Header du fichier : cite littéralement la config JSON ci-dessus en
+    commentaire pour la traçabilité playground → React.
+  - Rendu :
+    - \`<span>\` absolute : \`top: 0\`, \`left: 50%\` (ou left/right selon
+      \`refine.align\`), \`transform: translate(-50%, calc(-50% + \${offsetY}px))\`.
+    - Hauteur = \`refine.gaugeHeightPx\`, largeur selon \`refine.widthMode\` :
+      - \`per-point\` : \`score.maxPoints * refine.unitWidthPx\`
+      - \`fixed\` : \`refine.fixedWidthPx\`
+    - Border-radius = \`min(refine.borderRadiusPx, gaugeHeightPx / 2)\`.
+    - Enfant \`<span>\` fill : \`height: 100%\`, \`width\` = largeur proportionnelle
+      au score (per-point → \`score.points * unitWidthPx\` ; fixed → \`(score.points / score.maxPoints) * fixedWidthPx\`).
+    - Couleur du fill = \`paletteColors[classe]\` selon \`refine.thresholds\`.
+    - Couleur de la track selon \`refine.track\` (hidden / neutre / teintée palette).
+    - Bordure + ombre selon \`refine.border\` / \`refine.shadow\`.
+    - Style de fill (\`solid\` / \`gradient\` / \`striped\`) : CSS \`background\`
+      adapté (solid = couleur, gradient = \`linear-gradient\`, striped =
+      \`repeating-linear-gradient\` 45°).
+  - Tailwind uniquement + styles inline pour les valeurs numériques dynamiques.
 
 - **Modifier** \`apps/web/src/components/Tile/Tile.tsx\`
-  - Monter \`<SimilarityBadge score={similarityScore} />\` dans le wrapper
-    interne de la tuile (position: relative parent) quand \`similarityScore\`
-    existe dans les props.
+  - Wrapper interne de la tuile en \`position: relative\`.
+  - Monter \`<SimilarityBadge score={similarityScore} />\` quand la prop existe.
 
 - **Modifier** \`apps/web/src/utils/stationTileData.ts\`
   - Appeler \`computeSimilarityScore(prevElement?.spec, element.spec, category)\`
     depuis \`./similarityScore\` (livré en B3).
   - Stocker dans \`CachedTileData.similarityScore\`.
 
+## Classes de score (stepped)
+
+- Seuils \`33-66\` (ratio = score/max) : low si ratio < 1/3, mid si < 2/3, sinon high.
+- Seuils \`50\` : low si ratio < 0.5, sinon high.
+- Seuils \`25-50-75\` : low / mid / high / extraHigh (4 paliers).
+- Seuils \`abs-2-4\` (absolu) : low si score < 2, mid si < 4, sinon high.
+
 ## Invariants
 
-- Pas de badge sur la première tuile d'une station (pas de prédécesseur) —
-  \`prev\` null ⇒ \`score\` non fourni ⇒ \`null\`.
-- Pas de badge quand \`similarityScoreRules\` est vide sur la catégorie
-  (Typographie) — \`score.maxPoints === 0\` ⇒ le calculator rend \`points = 0\`
-  ⇒ \`null\` via positive-only.
-- Aucune régression sur \`Tile.test.tsx\`.
-
-## Parité playground
-
-Pour vérifier la bonne implémentation : un job offset avec score 4 doit
-donner un badge avec fond = palette.mid (palette \`classic\` → amber-400),
-hauteur 12 px (si non modifié), police ${state.weight} à ${state.fs} px,
-affichant "4" (si numberFormat = plain). Le playground reste l'oracle —
-pixel-pour-pixel identique attendu.
+- Pas de badge sur la première tuile d'une station.
+- Pas de badge quand la catégorie n'a aucune \`similarityScoreRules\` (Typographie).
+- Zéro régression sur \`Tile.test.tsx\`.
 
 ## Vérification
 
-- \`cd apps/web && npx tsc -b --force\` — aucune nouvelle erreur TS
-- \`cd apps/web && npx vitest run src/components/Tile\` — vert
-- Dev server + check visuel sur deux jobs similaires d'une presse offset
+- \`cd apps/web && npx tsc -b --force\` — 0 nouvelle erreur.
+- \`cd apps/web && npx vitest run src/components/Tile\` — vert.
+- Dev server : deux jobs offset avec \`papier\` + \`format\` + \`impression\`
+  identiques → jauge Offset à 7/7 (fill = track en mode per-point, couleur "high").
+
+## Parité playground
+
+Le playground est l'oracle visuel. Sous la même config, le composant React
+doit rendre une jauge pixel-pour-pixel identique pour chaque paire test.
 `;
   }
 
