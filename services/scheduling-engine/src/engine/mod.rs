@@ -198,7 +198,9 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
     // Skip for single-job payloads — nothing to destroy/repair across jobs.
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
     if stats.late_job_count > 0 && elapsed_ms < 55_000 && request.jobs.len() > 1 {
-        let lns_budget = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
+        // TEMP: shortened improvement search budget (normally 60_000 - elapsed, min 5_000).
+        let _lns_budget_normal = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
+        let lns_budget = 3_000u64;
         if let Some((lns_a, lns_act, lns_s, lns_i)) = lns::lns_improve(
             &request.jobs,
             &request.stations,
