@@ -22,3 +22,6 @@ export { useMassUnschedule } from './useMassUnschedule';
 export type { MassUnscheduleState } from './useMassUnschedule';
 
 export { useAutoRecompute } from './useAutoRecompute';
+
+export { useComputeToaster } from './useComputeToaster';
+export type { ComputeToast, ComputeToastType, ComputeToastAction, ComputeToastMetric } from './useComputeToaster';

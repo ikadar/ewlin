@@ -156,6 +156,12 @@ body {
   white-space: nowrap;
 }
 
+/* ── Compute toaster indeterminate progress ── */
+@keyframes progress-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(420%); }
+}
+
 /* ── Flux Dashboard animations (v0.5.17) ── */
 
 @keyframes flux-subrow-in {

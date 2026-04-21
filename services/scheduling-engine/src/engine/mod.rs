@@ -8,7 +8,8 @@ pub mod pre_split;
 pub mod similarity;
 
 use std::collections::HashMap;
-use std::sync::mpsc;
+use std::sync::atomic::AtomicBool;
+use std::sync::{mpsc, Arc};
 use std::time::Instant;
 
 use crate::model::progress::ProgressEvent;
@@ -45,14 +46,29 @@ pub fn format_minutes(minutes: u64, start_date: chrono::NaiveDate) -> String {
 }
 
 pub fn compute(request: &ComputeRequest) -> ScheduleResult {
-    compute_inner(request, &None)
+    compute_inner(request, &None, None)
 }
 
 pub fn compute_with_progress(request: &ComputeRequest, tx: mpsc::Sender<ProgressEvent>) -> ScheduleResult {
-    compute_inner(request, &Some(tx))
+    compute_inner(request, &Some(tx), None)
 }
 
-fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> ScheduleResult {
+/// Compute with a cancellation token plumbed into the LNS loop. Used by
+/// the streaming endpoint so a superseding request can cleanly stop
+/// the LNS in flight.
+pub fn compute_with_cancel(
+    request: &ComputeRequest,
+    tx: mpsc::Sender<ProgressEvent>,
+    cancel: Arc<AtomicBool>,
+) -> ScheduleResult {
+    compute_inner(request, &Some(tx), Some(cancel))
+}
+
+fn compute_inner(
+    request: &ComputeRequest,
+    progress: &ProgressSender,
+    cancel: Option<Arc<AtomicBool>>,
+) -> ScheduleResult {
     let start_time = Instant::now();
     let now = Local::now();
     let start_date = now.date_naive();
@@ -221,7 +237,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             now_tick,
             lns_budget,
             progress,
-            None, // Synchronous path: no external cancellation.
+            cancel.clone(),
         ) {
             assignments = lns_a;
             actions = lns_act;

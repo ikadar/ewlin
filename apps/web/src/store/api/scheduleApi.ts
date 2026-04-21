@@ -978,6 +978,9 @@ export interface ComputeScheduleResult {
     lateJobCount: number;
     weightedLatenessMinutes: number;
     lateJobIds: string[];
+    calageBonusSum?: number;
+    calageBonusMean?: number;
+    calageBonusMedian?: number;
   };
   warnings: Array<{ taskId: string | null; message: string }>;
   fbiIterations: number;
