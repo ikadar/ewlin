@@ -5,6 +5,7 @@ mod grid;
 pub mod lns;
 pub mod moore;
 pub mod pre_split;
+pub mod similarity;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -633,6 +634,12 @@ pub fn build_actions(
 
             let mut prev_task_id: Option<String> = None;
 
+            // Extract similarity-relevant spec fields once per element — all
+            // its tasks share the same underlying ElementSpec.
+            let spec_snapshot = similarity::SpecSnapshot::from_spec_json(
+                element.spec.as_ref(),
+            );
+
             for task in &sorted_tasks {
                 let station_idx = match station_id_to_idx.get(&task.station_id) {
                     Some(&idx) => idx,
@@ -698,6 +705,7 @@ pub fn build_actions(
                     pending_recalage: false,
                     current_recalage_start: None,
                     recalage_segments: Vec::new(),
+                    spec_snapshot: spec_snapshot.clone(),
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
@@ -1120,6 +1128,7 @@ mod integration_tests {
             max_chunk_minutes: None,
             category_id: None,
             similarity_criteria: None,
+            similarity_score_rules: None,
             is_press: false,
             drying_time_minutes: 0,
             max_operators: Some(1),

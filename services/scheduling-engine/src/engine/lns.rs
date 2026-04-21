@@ -48,7 +48,7 @@ pub fn lns_improve(
 
     let start = Instant::now();
     let mut rng = StdRng::seed_from_u64(42);
-    let default_weights: [f64; 6] = [1.0; 6];
+    let default_weights: [f64; 7] = [1.0; 7];
 
     // Collect late jobs sorted by lateness descending
     let job_deadlines: HashMap<&str, u64> = jobs

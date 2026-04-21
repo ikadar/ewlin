@@ -138,6 +138,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 pending_recalage: false,
                 current_recalage_start: None,
                 recalage_segments: Vec::new(),
+                spec_snapshot: action.spec_snapshot.clone(),
             });
 
             prev_chunk_idx = Some(idx);
@@ -195,5 +196,6 @@ pub fn clone_action(a: &Action) -> Action {
         pending_recalage: a.pending_recalage,
         current_recalage_start: a.current_recalage_start,
         recalage_segments: a.recalage_segments.clone(),
+        spec_snapshot: a.spec_snapshot.clone(),
     }
 }

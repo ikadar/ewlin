@@ -42,7 +42,7 @@ pub fn run_with_fbi(
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
-    score_weights: &[f64; 6],
+    score_weights: &[f64; 7],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -66,6 +66,8 @@ pub fn run_with_fbi(
                 0
             },
             max_operators: s.effective_max_operators(),
+            similarity_criteria: s.similarity_criteria.clone().unwrap_or_default(),
+            similarity_score_rules: s.similarity_score_rules.clone().unwrap_or_default(),
         })
         .collect();
 
@@ -438,7 +440,7 @@ pub fn run_with_fbi_ordering(
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
-    score_weights: &[f64; 6],
+    score_weights: &[f64; 7],
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights)
 }
@@ -475,7 +477,7 @@ pub fn run_with_multi_start_fbi(
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
-    let default_weights: [f64; 6] = [1.0; 6];
+    let default_weights: [f64; 7] = [1.0; 7];
     let mut total_iters: u32 = 0;
 
     // Pass 1: Baseline (TierFirst, default weights)
@@ -518,8 +520,8 @@ pub fn run_with_multi_start_fbi(
         let mut rng = StdRng::seed_from_u64(42);
 
         for pass in 0..perturbed_starts {
-            // Generate perturbed weights in [0.5, 1.5] for each of the 6 scoring components
-            let mut weights = [0.0f64; 6];
+            // Generate perturbed weights in [0.5, 1.5] for each of the 7 scoring components
+            let mut weights = [0.0f64; 7];
             for w in &mut weights {
                 *w = 0.5 + rng.gen_range(0.0..1.0); // [0.5, 1.5)
             }

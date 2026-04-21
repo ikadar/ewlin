@@ -32,6 +32,12 @@ pub struct StationInput {
     pub category_id: Option<String>,
     #[serde(default)]
     pub similarity_criteria: Option<Vec<SimilarityCriterion>>,
+    /// Scoring rules producing practicity points (Phase 3). Empty / None =
+    /// no compatibility bonus is ever emitted for pairs on this station's
+    /// category. Rules with a non-null `group` are mutually exclusive at
+    /// best-in-group resolution; rules with `group = None` accumulate.
+    #[serde(default)]
+    pub similarity_score_rules: Option<Vec<SimilarityScoreRule>>,
     /// Whether this station is a press (requires drying time after printing)
     #[serde(default)]
     pub is_press: bool,
@@ -48,6 +54,33 @@ pub struct SimilarityCriterion {
     pub code: Option<String>,
     pub name: Option<String>,
     pub field_path: Option<String>,
+}
+
+/// A scoring rule for practicity computation between two consecutive jobs
+/// on a station. Mirrors the PHP `App\ValueObject\SimilarityScoreRule` and
+/// the TS `SimilarityScoreRule` from `@flux/types`. The evaluation logic
+/// lives in {@link crate::engine::similarity}.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimilarityScoreRule {
+    pub criteria_codes: Vec<String>,
+    pub points: f64,
+    #[serde(default)]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub kind: RuleKind,
+}
+
+/// Rule evaluation kind. `AllMatch` (default) fires when every referenced
+/// criterion is MATCHED between prev and curr specs. `FormatDescending`
+/// fires when prev's paper format has a strictly greater long side than
+/// curr's — used on Presses Offset (R4) to reward large→small transitions.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum RuleKind {
+    #[default]
+    AllMatch,
+    FormatDescending,
 }
 
 fn default_drying_time() -> u32 { 240 }

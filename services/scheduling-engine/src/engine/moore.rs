@@ -185,7 +185,7 @@ pub fn moore_escape(
             .collect();
 
         attempts += 1;
-        let default_weights: [f64; 6] = [1.0; 6];
+        let default_weights: [f64; 7] = [1.0; 7];
         let (new_assignments, new_actions, new_stats, new_iters) = run_with_fbi_ordering(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, fbi_max_iterations, start_date,

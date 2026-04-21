@@ -27,6 +27,12 @@ pub struct StationAttrs {
     /// ticks during setup, setup expires and must be redone.
     pub peremption_ticks: u32,
     pub max_operators: u32,
+    /// Similarity criteria — empty when the station's category has none.
+    /// Used by the scoring loop to compute a compatibility_bonus against the
+    /// previous action on this station.
+    pub similarity_criteria: Vec<crate::model::station::SimilarityCriterion>,
+    /// Scoring rules — empty when the category has none (Typographie).
+    pub similarity_score_rules: Vec<crate::model::station::SimilarityScoreRule>,
 }
 
 /// A pair of stations an operator can supervise simultaneously, prepared
@@ -175,6 +181,11 @@ pub struct Action {
     /// completion. Surfaced in ComputedAssignment so the UI can render a
     /// calage-phase section per event.
     pub recalage_segments: Vec<(u32, u32)>,
+    /// Subset of the owning element's spec consulted by similarity rules
+    /// (papier / format / impression). Populated once at Action build time
+    /// so the scoring hot path doesn't re-parse JSON per tick. See
+    /// `crate::engine::similarity::SpecSnapshot`.
+    pub spec_snapshot: super::similarity::SpecSnapshot,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -561,7 +572,7 @@ pub fn run_forward_pass(
     station_to_group: &[Option<(usize, u32)>],
     now_tick: usize,
     station_urgency_boost: &HashMap<usize, f64>,
-    score_weights: &[f64; 6],
+    score_weights: &[f64; 7],
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
@@ -765,6 +776,35 @@ pub fn run_forward_pass(
 
             let calage_bonus = compute_calage_bonus(&last_action_per_station, &actions, i);
 
+            // Compatibility bonus: reward transitions to a candidate whose
+            // spec is compatible with the previous action on the same
+            // station. Only fires when the predecessor exists AND is a
+            // different job (same-job continuity is already captured by
+            // calage_bonus). Score derived from the per-category rules.
+            let compatibility_bonus: i64 = {
+                let station_idx = action.station_idx;
+                match last_action_per_station.get(station_idx).and_then(|o| *o) {
+                    Some(prev_idx)
+                        if prev_idx < actions.len()
+                            && actions[prev_idx].job_id != action.job_id =>
+                    {
+                        let attrs = &station_attrs[station_idx];
+                        if attrs.similarity_score_rules.is_empty() {
+                            0
+                        } else {
+                            let pts = super::similarity::compute_similarity_score(
+                                &actions[prev_idx].spec_snapshot,
+                                &action.spec_snapshot,
+                                &attrs.similarity_criteria,
+                                &attrs.similarity_score_rules,
+                            );
+                            (pts * super::similarity::BONUS_SCALE) as i64
+                        }
+                    }
+                    _ => 0,
+                }
+            };
+
             // Chain pressure: tasks at the head of long successor chains get a
             // bonus because any delay cascades to all downstream tasks.
             // Normalized to [0, 500] range based on chain_remaining_art vs own art.
@@ -798,12 +838,13 @@ pub fn run_forward_pass(
                 && score_weights[2] == 1.0
                 && score_weights[3] == 1.0
                 && score_weights[4] == 1.0
-                && score_weights[5] == 1.0;
+                && score_weights[5] == 1.0
+                && score_weights[6] == 1.0;
 
             let score = if is_default_weights {
                 weighted_urgency + job_boost + proximity_bonus
                     + calage_bonus + chain_pressure + contention_bonus
-                    + station_boost
+                    + station_boost + compatibility_bonus
             } else {
                 (weighted_urgency as f64 * score_weights[0]) as i64
                     + (job_boost as f64 * score_weights[1]) as i64
@@ -811,6 +852,7 @@ pub fn run_forward_pass(
                     + (calage_bonus as f64 * score_weights[3]) as i64
                     + (chain_pressure as f64 * score_weights[4]) as i64
                     + (contention_bonus as f64 * score_weights[5]) as i64
+                    + (compatibility_bonus as f64 * score_weights[6]) as i64
                     + station_boost
             };
 
@@ -2051,6 +2093,7 @@ mod peremption_tests {
             pending_recalage: false,
             current_recalage_start: None,
             recalage_segments: Vec::new(),
+            spec_snapshot: crate::engine::similarity::SpecSnapshot::default(),
         }
     }
 
