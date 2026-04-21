@@ -29,8 +29,8 @@ import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { Toast } from './components/Toast';
-import { useToast, useMassUnschedule, useAutoRecompute, useComputeToaster } from './hooks';
-import { ComputeToastStack } from './components/ComputeToastStack';
+import { useToast, useMassUnschedule } from './hooks';
+import { useAutoRecomputeCtx } from './contexts/AutoRecomputeContext';
 import { computeCollapses } from './utils/computeCollapses';
 import type { Collapse } from './components/SchedulingGrid/collapseConfig';
 import { yPositionToTime } from './components/DragPreview/snapUtils';
@@ -308,73 +308,12 @@ function AppContent() {
   const { toast, showToast, hideToast } = useToast();
   const { theme } = useTheme();
 
-  // v0.6.x: Unified compute toaster (validated in playground-compute-
-  // toaster.html). Single channel for all compute-related feedback.
-  const computeToaster = useComputeToaster();
-
-  // v0.6.x: Auto-recompute orchestration. Every impactful edit (job
-  // create/update/delete) triggers a debounced Phase-1 compute, which
-  // itself kicks off the 60 s background LNS. The safety zone protects
-  // cards already in preparation so auto-applied improvements are
-  // visually safe.
-  const autoRecompute = useAutoRecompute((event, reason, extra) => {
-    const toastId = 'auto-recompute';
-    if (event === 'started') {
-      computeToaster.show({
-        id: toastId,
-        type: 'progress',
-        title: 'Recalcul du planning',
-        detail: reason,
-        progress: -1,
-        pinned: true,
-      });
-    } else if (event === 'succeeded') {
-      computeToaster.show({
-        id: toastId,
-        type: 'success',
-        title: 'Planning à jour',
-        detail: 'Optimisation en arrière-plan en cours…',
-      });
-    } else if (event === 'failed') {
-      computeToaster.show({
-        id: toastId,
-        type: 'error',
-        title: 'Recalcul échoué',
-        detail: extra?.error ?? 'Erreur inconnue',
-      });
-    } else if (event === 'optimized' && extra?.optimized) {
-      const o = extra.optimized;
-      const metrics: { label: string; value: string; bad?: boolean }[] = [];
-      if (o.lateJobCountDelta !== 0) {
-        metrics.push({
-          label: 'Retards',
-          value: `${o.lateJobCountDelta > 0 ? '+' : ''}${o.lateJobCountDelta}`,
-          bad: o.lateJobCountDelta > 0,
-        });
-      }
-      if (o.calageBonusSumDelta !== 0) {
-        metrics.push({
-          label: 'Calage Σ',
-          value: `${o.calageBonusSumDelta > 0 ? '+' : ''}${o.calageBonusSumDelta}`,
-          bad: o.calageBonusSumDelta < 0,
-        });
-      }
-      if (o.calageBonusMeanDelta !== 0) {
-        metrics.push({
-          label: 'Calage x̄',
-          value: `${o.calageBonusMeanDelta > 0 ? '+' : ''}${o.calageBonusMeanDelta.toFixed(1)}`,
-          bad: o.calageBonusMeanDelta < 0,
-        });
-      }
-      computeToaster.show({
-        type: 'waze',
-        title: 'Optimisation auto appliquée',
-        detail: 'Le LNS a trouvé une meilleure organisation.',
-        metrics,
-      });
-    }
-    // lns-no-change / lns-started / lns-failed are intentionally silent.
-  });
+  // v0.6.x: Auto-recompute orchestration lives at RootLayout level (see
+  // AutoRecomputeContext) so it survives route changes — otherwise the
+  // debounce / LNS stream in flight would be killed when JCF save
+  // navigates away (e.g. from /flux). App.tsx just consumes the ready
+  // `trigger` + status bits.
+  const autoRecompute = useAutoRecomputeCtx();
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -2243,12 +2182,6 @@ function AppContent() {
 
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
-
-      {/* v0.6.x: Unified compute toaster stack (progress / waze / etc.) */}
-      <ComputeToastStack
-        toasts={computeToaster.toasts}
-        onDismiss={computeToaster.dismiss}
-      />
 
       {/* Compute Schedule FAB */}
       <button

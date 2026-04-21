@@ -8,6 +8,7 @@ import { CommandCenterProvider, useCommandCenter } from './CommandPalette/Comman
 import { useCommands } from './CommandPalette/useCommands';
 import { ConsolePanel } from './ConsolePanel/ConsolePanel';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { AutoRecomputeProvider } from '../contexts/AutoRecomputeContext';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
 import type { CompactHorizon } from '../utils';
@@ -184,7 +185,9 @@ export function RootLayout() {
   return (
     <ThemeProvider>
       <CommandCenterProvider>
-        <RootLayoutInner />
+        <AutoRecomputeProvider>
+          <RootLayoutInner />
+        </AutoRecomputeProvider>
       </CommandCenterProvider>
     </ThemeProvider>
   );
