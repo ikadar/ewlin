@@ -30,7 +30,7 @@ DOMAINE MÉTIER
 - Une imprimerie planifie des jobs (dossiers) chacun composé d'éléments, eux-mêmes composés de tâches (tasks) à exécuter sur des stations (machines).
 - Chaque tâche a une durée setup (préparation) et une durée run (production), exprimées en minutes. Le format usuel "30+150" signifie setup=30, run=150.
 - Les opérateurs ont des compétences (skills) sur certaines stations et un horaire de travail hebdomadaire avec des exceptions ponctuelles (absences, heures sup).
-- Les contraintes de planning (SchedulingConstraint) sont la façon canonique d'exprimer une absence opérateur ou une maintenance machine.
+- Les absences opérateur se gèrent via Operator.absences (tool add_operator_absence). Les maintenances machine se gèrent via Station.scheduleExceptions (tool add_station_maintenance). Ce sont les modèles domain canoniques — ne pas chercher une API SchedulingConstraint séparée.
 - Les tâches peuvent être épinglées (pinned) pour empêcher leur déplacement automatique.
 
 VOCABULAIRE JOB / DEADLINES (ATTENTION, deux dates différentes !)

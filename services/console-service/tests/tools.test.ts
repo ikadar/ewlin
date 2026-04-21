@@ -143,60 +143,80 @@ describe('add_operator_absence', () => {
     expect(result.preview).toContain('Frédéric');
   });
 
-  it('wet mode posts a SchedulingConstraint of type OperatorAbsent', async () => {
-    const { php, calls } = makeFakePhp();
+  it('wet mode reads then PUTs Operator.absences', async () => {
+    const { php, calls } = makeFakePhp({
+      'GET /api/v1/operators/op-1': {
+        id: 'op-1',
+        firstName: 'Frédéric',
+        lastName: 'Dupont',
+        absences: [{ startAt: '2026-03-01T00:00:00', endAt: '2026-03-03T23:59:00', reason: 'passé' }],
+      },
+    });
     const result = await addOperatorAbsenceTool.handler(
       { operatorId: 'op-1', operatorLabel: 'Frédéric', fromDate: '2026-04-13', toDate: '2026-04-15', reason: 'congés' },
       makeCtx(php),
     );
     expect(result.ok).toBe(true);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.method).toBe('POST');
-    expect(calls[0]?.path).toBe('/api/v1/scheduling-constraints');
-    const body = calls[0]?.body as Record<string, unknown>;
-    expect(body.constraintType).toBe('OperatorAbsent');
-    expect(body.targetId).toBe('op-1');
-    expect(body.timeStart).toBe('2026-04-13T00:00:00');
-    expect(body.timeEnd).toBe('2026-04-15T23:59:00');
-    expect(body.description).toContain('congés');
+    // First call = GET to read current absences; second = PUT with the full array.
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.path).toBe('/api/v1/operators/op-1');
+    const body = put?.body as { absences: { startAt: string; endAt: string; reason: string | null }[] };
+    expect(body.absences).toHaveLength(2);
+    expect(body.absences[1].startAt).toMatch(/^2026-04-13T00:00:00/);
+    expect(body.absences[1].endAt).toMatch(/^2026-04-15T23:59:00/);
+    expect(body.absences[1].reason).toBe('congés');
   });
 });
 
 describe('add_station_maintenance', () => {
-  it('rejects timeEnd <= timeStart', async () => {
+  it('rejects malformed date', async () => {
     const { php } = makeFakePhp();
     const result = await addStationMaintenanceTool.handler(
-      {
-        stationId: 's-1',
-        stationLabel: 'MBO XL',
-        fromDate: '2026-04-14',
-        fromTime: '13:00',
-        toDate: '2026-04-14',
-        toTime: '10:00',
-      },
+      { stationId: 's-1', stationLabel: 'MBO XL', date: '14/04/2026' },
       makeCtx(php),
     );
     expect(result.ok).toBe(false);
   });
 
-  it('wet mode posts MachineUnavailable with combined ISO datetimes', async () => {
-    const { php, calls } = makeFakePhp();
+  it('without operating slots writes a closed-day exception', async () => {
+    const { php, calls } = makeFakePhp({
+      'GET /api/v1/stations/s-1': { id: 's-1', name: 'MBO XL', scheduleExceptions: [] },
+    });
+    const result = await addStationMaintenanceTool.handler(
+      { stationId: 's-1', stationLabel: 'MBO XL', date: '2026-04-14', reason: 'vidange' },
+      makeCtx(php),
+    );
+    expect(result.ok).toBe(true);
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.path).toBe('/api/v1/stations/s-1');
+    const body = put?.body as { scheduleExceptions: { date: string; type: string; schedule: unknown; reason: string | null }[] };
+    expect(body.scheduleExceptions).toHaveLength(1);
+    expect(body.scheduleExceptions[0].date).toBe('2026-04-14');
+    expect(body.scheduleExceptions[0].type).toBe('closed');
+    expect(body.scheduleExceptions[0].schedule).toBeNull();
+    expect(body.scheduleExceptions[0].reason).toBe('vidange');
+  });
+
+  it('with operating slots writes a custom exception', async () => {
+    const { php, calls } = makeFakePhp({
+      'GET /api/v1/stations/s-1': { id: 's-1', name: 'MBO XL', scheduleExceptions: [] },
+    });
     const result = await addStationMaintenanceTool.handler(
       {
         stationId: 's-1',
         stationLabel: 'MBO XL',
-        fromDate: '2026-04-14',
-        fromTime: '10:00',
-        toDate: '2026-04-14',
-        toTime: '13:00',
+        date: '2026-04-14',
+        operatingSlots: [{ start: '08:00', end: '12:00' }],
       },
       makeCtx(php),
     );
     expect(result.ok).toBe(true);
-    const body = calls[0]?.body as Record<string, unknown>;
-    expect(body.constraintType).toBe('MachineUnavailable');
-    expect(body.timeStart).toBe('2026-04-14T10:00:00');
-    expect(body.timeEnd).toBe('2026-04-14T13:00:00');
+    const put = calls.find((c) => c.method === 'PUT');
+    const body = put?.body as { scheduleExceptions: { type: string; schedule: { isOperating: boolean; slots: { start: string; end: string }[] } | null }[] };
+    expect(body.scheduleExceptions[0].type).toBe('custom');
+    expect(body.scheduleExceptions[0].schedule?.isOperating).toBe(true);
+    expect(body.scheduleExceptions[0].schedule?.slots).toEqual([{ start: '08:00', end: '12:00' }]);
   });
 });
 
@@ -228,20 +248,39 @@ describe('update_job_deadline', () => {
 });
 
 describe('list_active_constraints', () => {
-  it('filters out constraints whose timeEnd is before todayIso', async () => {
+  it('aggregates operator absences and station exceptions, filtering past ones', async () => {
     const { php } = makeFakePhp({
-      'GET /api/v1/scheduling-constraints': [
-        { id: 'c-1', constraintType: 'OperatorAbsent', timeStart: '2026-04-01T00:00:00', timeEnd: '2026-04-02T23:59:00', targetId: 'op-1', description: 'past' },
-        { id: 'c-2', constraintType: 'OperatorAbsent', timeStart: '2026-04-13T00:00:00', timeEnd: '2026-04-15T23:59:00', targetId: 'op-1', description: 'future' },
-        { id: 'c-3', constraintType: 'MachineUnavailable', timeStart: '2026-04-08T08:00:00', timeEnd: null, targetId: 's-1', description: 'open-ended' },
+      'GET /api/v1/operators': [
+        {
+          id: 'op-1',
+          firstName: 'Frédéric',
+          lastName: 'Dupont',
+          absences: [
+            { startAt: '2026-04-01T00:00:00', endAt: '2026-04-02T23:59:00', reason: 'past' },
+            { startAt: '2026-04-13T00:00:00', endAt: '2026-04-15T23:59:00', reason: 'future' },
+          ],
+        },
+      ],
+      'GET /api/v1/stations': [
+        {
+          id: 's-1',
+          name: 'MBO XL',
+          scheduleExceptions: [
+            { date: '2026-04-08', type: 'closed', schedule: null, reason: 'vidange' },
+            { date: '2026-04-01', type: 'closed', schedule: null, reason: 'past' },
+          ],
+        },
       ],
     });
     const result = await listActiveConstraintsTool.handler({}, makeCtx(php));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const data = result.data as { count: number; constraints: { id: string }[] };
+    const data = result.data as { count: number; constraints: { id: string; kind: string }[] };
+    // todayIso in makeCtx is expected to be 2026-04-10 (see fixture); future
+    // absence + future station exception kept; past ones filtered.
     expect(data.count).toBe(2);
-    expect(data.constraints.map((c) => c.id).sort()).toEqual(['c-2', 'c-3']);
+    const kinds = data.constraints.map((c) => c.kind).sort();
+    expect(kinds).toEqual(['operator-absence', 'station-exception']);
   });
 });
 
