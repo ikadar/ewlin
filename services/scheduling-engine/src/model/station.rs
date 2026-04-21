@@ -1,39 +1,33 @@
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::model::operator::DaySchedule;
-
-/// Per-date override of a station's operating schedule.
+/// A period of unavailability on a station (maintenance window, cleaning,
+/// ad-hoc breakdown). Endpoints are inclusive — a moment `t` is covered iff
+/// `start_at <= t <= end_at`. Same shape as [`crate::model::operator::Absence`]
+/// so the two concepts unify structurally.
 ///
-/// Encodes explicit exceptions such as maintenance windows, public holidays
-/// or custom operating hours. Semantics:
-///   - `type = "closed"` OR `schedule = null` OR `schedule.is_operating = false`
-///     → the station is completely unavailable on `date`.
-///   - `type = "custom"` with `schedule.slots` → the station is available ONLY
-///     during those slots on `date`. Gaps between slots are blocked.
-///
-/// Base operating_schedule wiring is deferred to a later change; until then
-/// a station with no exception on a date is considered always-available,
-/// and effective availability is driven by operator availability.
+/// Base `operating_schedule` wiring is deferred; a station with no exception
+/// covering a given moment is considered always-available at this layer,
+/// and actual availability is gated via the operators the task needs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScheduleException {
-    /// ISO date, e.g. "2026-04-25"
-    pub date: String,
-    #[serde(default)]
-    pub r#type: Option<String>,
-    #[serde(default)]
-    pub schedule: Option<ExceptionSchedule>,
+    #[serde(deserialize_with = "deserialize_naive_datetime")]
+    pub start_at: NaiveDateTime,
+    #[serde(deserialize_with = "deserialize_naive_datetime")]
+    pub end_at: NaiveDateTime,
     #[serde(default)]
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExceptionSchedule {
-    #[serde(default)]
-    pub is_operating: bool,
-    #[serde(default)]
-    pub slots: Vec<crate::model::operator::TimeSlot>,
+fn deserialize_naive_datetime<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S")
+        .or_else(|_| NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M"))
+        .map_err(serde::de::Error::custom)
 }
 
 /// Deserializer tolerating both missing field and explicit null.
@@ -101,72 +95,47 @@ impl StationInput {
     /// horizon starting at `start_date`. Used by fbi.rs to pre-block
     /// grid ticks the station cannot occupy.
     ///
-    /// Only consumes `schedule_exceptions`. Base weekly schedule wiring
-    /// is deferred — stations without an exception on a date are
-    /// considered always-available at this layer (actual availability
-    /// is gated via the operators the task needs).
+    /// Each exception `[start_at, end_at]` (endpoints inclusive) maps to
+    /// a half-open tick range `[start_tick, end_tick)`. The tick
+    /// containing `end_at` is itself blocked (the rightmost tick whose
+    /// start ≤ end_at). Ranges outside the `[start_date, start_date +
+    /// horizon_days)` horizon are clipped or dropped.
     pub fn blocked_ranges(
         &self,
         start_date: chrono::NaiveDate,
         horizon_days: u32,
         tick_minutes: u32,
     ) -> Vec<(usize, usize)> {
-        use crate::model::operator::TimeSlot;
+        let horizon_start = start_date.and_hms_opt(0, 0, 0).unwrap();
+        let horizon_end = (start_date + chrono::Duration::days(horizon_days as i64))
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let tick = tick_minutes as usize;
+        let total_ticks = (horizon_days as usize * 24 * 60) / tick;
+
         let mut ranges = Vec::new();
-
         for exc in &self.schedule_exceptions {
-            let date = match chrono::NaiveDate::parse_from_str(&exc.date, "%Y-%m-%d") {
-                Ok(d) => d,
-                Err(_) => continue,
-            };
-            let days_from_start = match (date - start_date).num_days() {
-                d if d >= 0 && (d as u32) < horizon_days => d as u32,
-                _ => continue,
-            };
-
-            let day_start_tick =
-                (days_from_start as usize * 24 * 60) / tick_minutes as usize;
-            let day_end_tick =
-                ((days_from_start + 1) as usize * 24 * 60) / tick_minutes as usize;
-
-            let fully_closed = exc.r#type.as_deref() == Some("closed")
-                || match &exc.schedule {
-                    None => true,
-                    Some(sch) => !sch.is_operating || sch.slots.is_empty(),
-                };
-
-            if fully_closed {
-                ranges.push((day_start_tick, day_end_tick));
+            // Clip to horizon. End is inclusive so the last representable
+            // moment within the horizon is `horizon_end - 1 minute`.
+            let effective_start = exc.start_at.max(horizon_start);
+            let horizon_last_moment = horizon_end - chrono::Duration::minutes(1);
+            let effective_end = exc.end_at.min(horizon_last_moment);
+            if effective_end < effective_start {
                 continue;
             }
 
-            // Custom slots: block the gaps between slots.
-            let slots: &Vec<TimeSlot> = &exc.schedule.as_ref().unwrap().slots;
-            let mut cursor_minutes = 0u32;
-            let mut sorted_slots = slots.clone();
-            sorted_slots.sort_by_key(|s| s.start_minutes());
-            for slot in &sorted_slots {
-                let slot_start = slot.start_minutes();
-                let slot_end = slot.end_minutes();
-                if slot_start > cursor_minutes {
-                    let gap_start_tick = day_start_tick
-                        + (cursor_minutes as usize) / tick_minutes as usize;
-                    let gap_end_tick = day_start_tick
-                        + (slot_start as usize) / tick_minutes as usize;
-                    if gap_end_tick > gap_start_tick {
-                        ranges.push((gap_start_tick, gap_end_tick));
-                    }
-                }
-                cursor_minutes = cursor_minutes.max(slot_end);
+            let start_minutes = (effective_start - horizon_start).num_minutes();
+            let end_minutes = (effective_end - horizon_start).num_minutes();
+            if start_minutes < 0 {
+                continue;
             }
-            // Tail: from last slot end to midnight.
-            let day_end_minutes: u32 = 24 * 60;
-            if cursor_minutes < day_end_minutes {
-                let tail_start_tick = day_start_tick
-                    + (cursor_minutes as usize) / tick_minutes as usize;
-                if day_end_tick > tail_start_tick {
-                    ranges.push((tail_start_tick, day_end_tick));
-                }
+
+            let start_tick = (start_minutes as usize) / tick;
+            // Tick containing end_at (inclusive) is blocked, hence +1.
+            let end_tick = ((end_minutes as usize) / tick + 1).min(total_ticks);
+
+            if end_tick > start_tick {
+                ranges.push((start_tick, end_tick));
             }
         }
 
@@ -174,14 +143,9 @@ impl StationInput {
     }
 }
 
-/// Silence unused import warning when not in use inside this module.
-#[allow(dead_code)]
-type _DayScheduleAlias = DaySchedule;
-
 #[cfg(test)]
 mod schedule_exception_tests {
     use super::*;
-    use crate::model::operator::TimeSlot;
 
     fn make_station(exceptions: Vec<ScheduleException>) -> StationInput {
         StationInput {
@@ -207,6 +171,10 @@ mod schedule_exception_tests {
         }
     }
 
+    fn dt(s: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").unwrap()
+    }
+
     fn start_date() -> chrono::NaiveDate {
         chrono::NaiveDate::from_ymd_opt(2026, 4, 20).unwrap()
     }
@@ -218,87 +186,96 @@ mod schedule_exception_tests {
     }
 
     #[test]
-    fn closed_exception_blocks_full_day() {
+    fn full_day_period_blocks_full_day() {
+        // 2026-04-21 entirely unavailable → ticks 24..48 with tick_minutes=60.
         let s = make_station(vec![ScheduleException {
-            date: "2026-04-21".into(),
-            r#type: Some("closed".into()),
-            schedule: None,
+            start_at: dt("2026-04-21T00:00:00"),
+            end_at: dt("2026-04-21T23:59:00"),
             reason: None,
         }]);
-        let ranges = s.blocked_ranges(start_date(), 7, 60);
-        // Day 1 (2026-04-21) = ticks 24..48 with tick_minutes=60.
-        assert_eq!(ranges, vec![(24, 48)]);
+        assert_eq!(s.blocked_ranges(start_date(), 7, 60), vec![(24, 48)]);
     }
 
     #[test]
-    fn null_schedule_blocks_full_day() {
+    fn intraday_partial_period_blocks_expected_ticks() {
+        // Unavailable 08:00 to 11:59 (just before noon) on 2026-04-21.
+        // Ticks 32..36 (08:00-12:00).
         let s = make_station(vec![ScheduleException {
-            date: "2026-04-21".into(),
-            r#type: Some("custom".into()),
-            schedule: None,
+            start_at: dt("2026-04-21T08:00:00"),
+            end_at: dt("2026-04-21T11:59:00"),
             reason: None,
         }]);
-        let ranges = s.blocked_ranges(start_date(), 7, 60);
-        assert_eq!(ranges, vec![(24, 48)]);
+        assert_eq!(s.blocked_ranges(start_date(), 7, 60), vec![(32, 36)]);
     }
 
     #[test]
-    fn non_operating_schedule_blocks_full_day() {
-        let s = make_station(vec![ScheduleException {
-            date: "2026-04-21".into(),
-            r#type: Some("custom".into()),
-            schedule: Some(ExceptionSchedule {
-                is_operating: false,
-                slots: vec![],
-            }),
-            reason: None,
-        }]);
-        let ranges = s.blocked_ranges(start_date(), 7, 60);
-        assert_eq!(ranges, vec![(24, 48)]);
+    fn multiple_periods_same_day_block_the_gaps() {
+        // Mirrors the pre-refactor "custom slots" test but expressed
+        // as three unavailable periods directly.
+        let s = make_station(vec![
+            ScheduleException { start_at: dt("2026-04-21T00:00:00"), end_at: dt("2026-04-21T07:59:00"), reason: None },
+            ScheduleException { start_at: dt("2026-04-21T12:00:00"), end_at: dt("2026-04-21T13:59:00"), reason: None },
+            ScheduleException { start_at: dt("2026-04-21T18:00:00"), end_at: dt("2026-04-21T23:59:00"), reason: None },
+        ]);
+        assert_eq!(
+            s.blocked_ranges(start_date(), 7, 60),
+            vec![(24, 32), (36, 38), (42, 48)]
+        );
     }
 
     #[test]
-    fn custom_slots_block_the_gaps() {
-        // 2026-04-21: station operates 08:00-12:00 and 14:00-18:00 only.
-        // Blocked: 00:00-08:00, 12:00-14:00, 18:00-24:00.
+    fn period_crossing_midnight_produces_single_range() {
+        // 22:00 on day 0 → 02:00 on day 1 (inclusive).
+        // Ticks 22..27 (22:00 day 0 through 03:00 day 1 exclusive).
         let s = make_station(vec![ScheduleException {
-            date: "2026-04-21".into(),
-            r#type: Some("custom".into()),
-            schedule: Some(ExceptionSchedule {
-                is_operating: true,
-                slots: vec![
-                    TimeSlot { start: "08:00".into(), end: "12:00".into() },
-                    TimeSlot { start: "14:00".into(), end: "18:00".into() },
-                ],
-            }),
+            start_at: dt("2026-04-20T22:00:00"),
+            end_at: dt("2026-04-21T02:00:00"),
             reason: None,
         }]);
-        let ranges = s.blocked_ranges(start_date(), 7, 60);
-        assert_eq!(ranges, vec![(24, 32), (36, 38), (42, 48)]);
+        assert_eq!(s.blocked_ranges(start_date(), 7, 60), vec![(22, 27)]);
     }
 
     #[test]
-    fn exception_outside_horizon_ignored() {
+    fn period_starting_before_horizon_is_clipped() {
         let s = make_station(vec![ScheduleException {
-            date: "2026-05-01".into(),
-            r#type: Some("closed".into()),
-            schedule: None,
+            start_at: dt("2026-04-19T12:00:00"),
+            end_at: dt("2026-04-20T12:00:00"),
             reason: None,
         }]);
-        let ranges = s.blocked_ranges(start_date(), 7, 60);
-        assert!(ranges.is_empty());
+        // Clipped start = horizon start (tick 0), end 12:00 day 0 → tick 13 exclusive.
+        assert_eq!(s.blocked_ranges(start_date(), 7, 60), vec![(0, 13)]);
     }
 
     #[test]
-    fn exception_before_horizon_ignored() {
+    fn period_ending_after_horizon_is_clipped() {
         let s = make_station(vec![ScheduleException {
-            date: "2026-04-01".into(),
-            r#type: Some("closed".into()),
-            schedule: None,
+            start_at: dt("2026-04-26T12:00:00"),
+            end_at: dt("2026-05-01T12:00:00"),
             reason: None,
         }]);
-        let ranges = s.blocked_ranges(start_date(), 7, 60);
-        assert!(ranges.is_empty());
+        // Horizon spans 7 days (168 ticks). Clipped end = 2026-04-26T23:59
+        // (tick 167 inclusive, upper bound 168 exclusive).
+        assert_eq!(s.blocked_ranges(start_date(), 7, 60), vec![(156, 168)]);
+    }
+
+    #[test]
+    fn period_fully_outside_horizon_is_dropped() {
+        let s = make_station(vec![ScheduleException {
+            start_at: dt("2026-05-01T00:00:00"),
+            end_at: dt("2026-05-01T23:59:00"),
+            reason: None,
+        }]);
+        assert!(s.blocked_ranges(start_date(), 7, 60).is_empty());
+    }
+
+    #[test]
+    fn period_before_horizon_is_dropped() {
+        let s = make_station(vec![ScheduleException {
+            start_at: dt("2026-04-01T00:00:00"),
+            end_at: dt("2026-04-01T23:59:00"),
+            reason: None,
+        }]);
+        assert!(s.blocked_ranges(start_date(), 7, 60).is_empty());
     }
 }
 

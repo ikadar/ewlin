@@ -1,25 +1,22 @@
 /**
  * Scheduling directive tools — operator absences + station maintenance.
  *
- * These tools write to the domain entities directly (not through the
- * deprecated `SchedulingConstraint` table):
+ * Both concepts have the same shape now (ADR-017): a period
+ * `{startAt, endAt, reason}` written directly on the domain entity.
  *
- *   - Operator absence  →  PATCH /api/v1/operators/{id}  (absences array)
- *   - Station maintenance →  PATCH /api/v1/stations/{id} (scheduleExceptions array)
+ *   - Operator absence    →  PUT /api/v1/operators/{id} (absences array)
+ *   - Station maintenance →  PUT /api/v1/stations/{id}  (scheduleExceptions array)
  *
  * Both endpoints replace the full array on write, so we read first,
  * append or remove, then write the new full list. Matches how the
  * admin Settings UI already operates (OperatorsPage, StationsPage).
- *
- * Tool names stay stable for backward-compat with LLM callers + MCP
- * clients that may have memorised the `add_operator_absence` handle.
  */
 import { z } from 'zod';
 import type { ToolDefinition } from './types.js';
 import { isIsoDate, toIsoWithLocalOffset } from './dates.js';
 import { uuidField } from './ids.js';
 
-interface OperatorAbsence {
+interface AbsenceLike {
   startAt: string;
   endAt: string;
   reason?: string | null;
@@ -29,41 +26,31 @@ interface OperatorResponse {
   id: string;
   firstName: string;
   lastName: string;
-  absences?: OperatorAbsence[] | null;
+  absences?: AbsenceLike[] | null;
   [key: string]: unknown;
-}
-
-interface ScheduleException {
-  date: string;
-  type?: string | null;
-  schedule?: {
-    isOperating: boolean;
-    slots: { start: string; end: string }[];
-  } | null;
-  reason?: string | null;
 }
 
 interface StationResponse {
   id: string;
   name: string;
-  scheduleExceptions?: ScheduleException[] | null;
+  scheduleExceptions?: AbsenceLike[] | null;
   [key: string]: unknown;
 }
 
-// Stable id for an entry so list_active_constraints / cancel_constraint
+// Stable composite ids so list_active_constraints / cancel_constraint
 // can round-trip between listing and deletion without a real DB id.
-function operatorAbsenceKey(operatorId: string, absence: OperatorAbsence): string {
+function operatorAbsenceKey(operatorId: string, absence: AbsenceLike): string {
   return `op:${operatorId}:${absence.startAt}:${absence.endAt}`;
 }
 
-function stationExceptionKey(stationId: string, exception: ScheduleException): string {
-  return `st:${stationId}:${exception.date}`;
+function stationExceptionKey(stationId: string, exception: AbsenceLike): string {
+  return `st:${stationId}:${exception.startAt}:${exception.endAt}`;
 }
 
 export const addOperatorAbsenceTool: ToolDefinition = {
   name: 'add_operator_absence',
   description:
-    "Marque un opérateur comme absent sur un intervalle de dates (jours inclus). Utiliser resolve_operator d'abord pour obtenir l'ID. La voie canonique : Operator.absences (pas SchedulingConstraint).",
+    "Marque un opérateur comme absent sur un intervalle de dates (jours inclus). Utiliser resolve_operator d'abord pour obtenir l'ID. Voie canonique: Operator.absences.",
   inputSchema: z.object({
     operatorId: uuidField('resolve_operator').describe(
       "UUID de l'opérateur, OBTENU EN APPELANT resolve_operator(name=...) D'ABORD.",
@@ -87,11 +74,7 @@ export const addOperatorAbsenceTool: ToolDefinition = {
     const endAt = toIsoWithLocalOffset(input.toDate, '23:59');
     const reasonText = input.reason ?? null;
 
-    const newAbsence: OperatorAbsence = {
-      startAt,
-      endAt,
-      reason: reasonText,
-    };
+    const newAbsence: AbsenceLike = { startAt, endAt, reason: reasonText };
 
     const preview = `${input.operatorLabel} absent du ${input.fromDate} au ${input.toDate}${
       reasonText ? ` (${reasonText})` : ''
@@ -101,15 +84,10 @@ export const addOperatorAbsenceTool: ToolDefinition = {
       return {
         ok: true,
         preview,
-        data: {
-          dryRun: true,
-          operatorId: input.operatorId,
-          absence: newAbsence,
-        },
+        data: { dryRun: true, operatorId: input.operatorId, absence: newAbsence },
       };
     }
 
-    // Read current operator, append the absence, PATCH back.
     const current = await ctx.php.get<OperatorResponse>(
       `/api/v1/operators/${input.operatorId}`,
     );
@@ -138,52 +116,44 @@ export const addOperatorAbsenceTool: ToolDefinition = {
 export const addStationMaintenanceTool: ToolDefinition = {
   name: 'add_station_maintenance',
   description:
-    "Déclare une station en maintenance sur une journée (schedule exception). Pour un créneau intra-jour, passer operatingSlots = liste des plages pendant lesquelles la station OPÈRE ce jour-là (les autres plages seront bloquées). Pour toute la journée, laisser operatingSlots vide → journée fermée.",
+    "Déclare une indisponibilité de station sur une période (maintenance, panne, nettoyage). Pour une journée entière, passer fromDate = toDate et laisser startTime/endTime vides.",
   inputSchema: z.object({
     stationId: uuidField('resolve_station').describe(
       "UUID de la station, OBTENU EN APPELANT resolve_station(name=...) D'ABORD.",
     ),
     stationLabel: z.string().min(1).describe("Nom lisible de la station, ex 'MBO XL'."),
-    date: z.string().describe('Date de la maintenance, YYYY-MM-DD.'),
-    operatingSlots: z
-      .array(
-        z.object({
-          start: z.string().describe('HH:MM'),
-          end: z.string().describe('HH:MM'),
-        }),
-      )
+    fromDate: z.string().describe("Premier jour indisponible inclus, YYYY-MM-DD."),
+    toDate: z.string().describe("Dernier jour indisponible inclus, YYYY-MM-DD."),
+    startTime: z
+      .string()
       .optional()
-      .describe(
-        "Plages pendant lesquelles la station OPÈRE ce jour-là. Omis = journée entièrement fermée.",
-      ),
+      .describe("Heure HH:MM à laquelle commence l'indispo le premier jour. Défaut: 00:00."),
+    endTime: z
+      .string()
+      .optional()
+      .describe("Heure HH:MM à laquelle finit l'indispo le dernier jour. Défaut: 23:59."),
     reason: z.string().optional().describe('Motif optionnel.'),
   }),
   handler: async (input, ctx) => {
-    if (!isIsoDate(input.date)) {
-      return { ok: false, error: 'date must be YYYY-MM-DD' };
+    if (!isIsoDate(input.fromDate) || !isIsoDate(input.toDate)) {
+      return { ok: false, error: 'fromDate and toDate must be YYYY-MM-DD' };
     }
+    if (input.toDate < input.fromDate) {
+      return { ok: false, error: 'toDate must be >= fromDate' };
+    }
+    const startTime = input.startTime ?? '00:00';
+    const endTime = input.endTime ?? '23:59';
+    const startAt = toIsoWithLocalOffset(input.fromDate, startTime);
+    const endAt = toIsoWithLocalOffset(input.toDate, endTime);
     const reasonText = input.reason ?? null;
-    const slots = input.operatingSlots ?? [];
-    const exception: ScheduleException =
-      slots.length === 0
-        ? {
-            date: input.date,
-            type: 'closed',
-            schedule: null,
-            reason: reasonText,
-          }
-        : {
-            date: input.date,
-            type: 'custom',
-            schedule: { isOperating: true, slots },
-            reason: reasonText,
-          };
 
-    const previewSlots =
-      slots.length === 0
-        ? 'journée entière'
-        : slots.map((s: { start: string; end: string }) => `${s.start}-${s.end}`).join(', ');
-    const preview = `${input.stationLabel} maintenance le ${input.date} (${previewSlots})${
+    const exception: AbsenceLike = { startAt, endAt, reason: reasonText };
+
+    const rangeLabel =
+      input.fromDate === input.toDate
+        ? `le ${input.fromDate} ${startTime}–${endTime}`
+        : `du ${input.fromDate} ${startTime} au ${input.toDate} ${endTime}`;
+    const preview = `${input.stationLabel} indispo ${rangeLabel}${
       reasonText ? ` — ${reasonText}` : ''
     }`;
 
@@ -191,21 +161,14 @@ export const addStationMaintenanceTool: ToolDefinition = {
       return {
         ok: true,
         preview,
-        data: {
-          dryRun: true,
-          stationId: input.stationId,
-          exception,
-        },
+        data: { dryRun: true, stationId: input.stationId, exception },
       };
     }
 
     const current = await ctx.php.get<StationResponse>(
       `/api/v1/stations/${input.stationId}`,
     );
-    const filtered = (current.scheduleExceptions ?? []).filter(
-      (e) => e.date !== input.date,
-    );
-    const scheduleExceptions = [...filtered, exception];
+    const scheduleExceptions = [...(current.scheduleExceptions ?? []), exception];
     const updated = await ctx.php.put<StationResponse>(
       `/api/v1/stations/${input.stationId}`,
       { scheduleExceptions },
@@ -228,7 +191,7 @@ export const addStationMaintenanceTool: ToolDefinition = {
 export const cancelConstraintTool: ToolDefinition = {
   name: 'cancel_constraint',
   description:
-    "Supprime une absence d'opérateur ou une maintenance de station. L'ID est fourni par list_active_constraints (format `op:{operatorId}:{startAt}:{endAt}` ou `st:{stationId}:{date}`).",
+    "Supprime une absence d'opérateur ou une indispo de station. L'ID est fourni par list_active_constraints (`op:{operatorId}:{startAt}:{endAt}` ou `st:{stationId}:{startAt}:{endAt}`).",
   inputSchema: z.object({
     constraintId: z
       .string()
@@ -264,13 +227,13 @@ export const cancelConstraintTool: ToolDefinition = {
         data: { deleted: input.constraintId, kind: 'operator-absence' },
       };
     }
-    if (parts[0] === 'st' && parts.length === 3) {
-      const [, stationId, date] = parts;
+    if (parts[0] === 'st' && parts.length === 4) {
+      const [, stationId, startAt, endAt] = parts;
       const current = await ctx.php.get<StationResponse>(
         `/api/v1/stations/${stationId}`,
       );
       const scheduleExceptions = (current.scheduleExceptions ?? []).filter(
-        (e) => e.date !== date,
+        (e) => e.startAt !== startAt || e.endAt !== endAt,
       );
       await ctx.php.put(`/api/v1/stations/${stationId}`, { scheduleExceptions });
       return {
@@ -289,7 +252,7 @@ export const cancelConstraintTool: ToolDefinition = {
 export const listActiveConstraintsTool: ToolDefinition = {
   name: 'list_active_constraints',
   description:
-    "Liste les absences opérateur et maintenances station actives ou à venir. Filtrer par date optionnelle. Agrège Operator.absences + Station.scheduleExceptions.",
+    "Liste les absences opérateur et indispos station actives ou à venir. Filtrer par date optionnelle. Agrège Operator.absences + Station.scheduleExceptions (même shape).",
   readOnly: true,
   inputSchema: z.object({
     fromDate: z
@@ -335,14 +298,15 @@ export const listActiveConstraintsTool: ToolDefinition = {
 
     for (const st of stations) {
       for (const exc of st.scheduleExceptions ?? []) {
-        if (exc.date < cutoff) continue;
+        const endDate = exc.endAt.slice(0, 10);
+        if (endDate < cutoff) continue;
         entries.push({
           id: stationExceptionKey(st.id, exc),
           kind: 'station-exception',
           targetId: st.id,
           targetLabel: st.name,
-          startDate: exc.date,
-          endDate: exc.date,
+          startDate: exc.startAt.slice(0, 10),
+          endDate,
           description: exc.reason ?? null,
         });
       }

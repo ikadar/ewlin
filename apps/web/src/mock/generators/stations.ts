@@ -207,24 +207,19 @@ export function generateOperatingSchedule(type: 'standard' | 'extended' | '24h' 
   };
 }
 
-export function generateScheduleExceptions(stationId: string): ScheduleException[] {
-  // Generate a few schedule exceptions for testing
+export function generateScheduleExceptions(_stationId: string): ScheduleException[] {
   const today = new Date();
-  const nextMonth = new Date(today);
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-
+  const year = today.getFullYear();
   return [
     {
-      id: `exc-${stationId}-christmas`,
-      date: `${today.getFullYear()}-12-25`,
-      schedule: createClosedDay(),
+      startAt: `${year}-12-25T00:00:00`,
+      endAt: `${year}-12-25T23:59:00`,
       reason: 'Noël',
     },
     {
-      id: `exc-${stationId}-newyear`,
-      date: `${today.getFullYear() + 1}-01-01`,
-      schedule: createClosedDay(),
-      reason: 'Jour de l\'an',
+      startAt: `${year + 1}-01-01T00:00:00`,
+      endAt: `${year + 1}-01-01T23:59:00`,
+      reason: "Jour de l'an",
     },
   ];
 }

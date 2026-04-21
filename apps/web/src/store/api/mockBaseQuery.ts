@@ -2521,12 +2521,14 @@ let mockStationStore: StationResponse[] = getSnapshot().stations.map((s, i) => (
   capacity: s.capacity,
   displayOrder: i,
   operatingSchedule: (s.operatingSchedule as unknown as Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>) ?? null,
-  scheduleExceptions: (s.exceptions ?? []).map((e) => ({
-    date: (e as { date: string }).date,
-    type: 'CLOSED',
-    schedule: (e as { schedule?: unknown }).schedule ?? null,
-    reason: (e as { reason?: string }).reason ?? null,
-  })),
+  scheduleExceptions: (s.exceptions ?? []).map((e) => {
+    const ex = e as { startAt?: string; endAt?: string; reason?: string | null };
+    return {
+      startAt: ex.startAt ?? '',
+      endAt: ex.endAt ?? '',
+      reason: ex.reason ?? null,
+    };
+  }),
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 }));
@@ -2597,11 +2599,10 @@ const handleCreateStation = async (
         groupId: newStation.groupId,
         capacity: newStation.capacity,
         operatingSchedule: (newStation.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
-        exceptions: (newStation.scheduleExceptions ?? []).map((e, i) => ({
-          id: `exc-${newStation.id}-${i}`,
-          date: (e as { date: string }).date,
-          schedule: ((e as { schedule?: unknown }).schedule ?? { isOperating: false, slots: [] }) as import('@flux/types').DaySchedule,
-          reason: (e as { reason?: string | null }).reason ?? undefined,
+        exceptions: (newStation.scheduleExceptions ?? []).map((e) => ({
+          startAt: e.startAt,
+          endAt: e.endAt,
+          reason: e.reason ?? null,
         })),
       },
     ],
@@ -2676,11 +2677,10 @@ const handleUpdateStation = async (
             groupId: updated.groupId,
             capacity: updated.capacity,
             operatingSchedule: (updated.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
-            exceptions: (updated.scheduleExceptions ?? []).map((e, i) => ({
-              id: `exc-${updated.id}-${i}`,
-              date: (e as { date: string }).date,
-              schedule: ((e as { schedule?: unknown }).schedule ?? { isOperating: false, slots: [] }) as import('@flux/types').DaySchedule,
-              reason: (e as { reason?: string | null }).reason ?? undefined,
+            exceptions: (updated.scheduleExceptions ?? []).map((e) => ({
+              startAt: e.startAt,
+              endAt: e.endAt,
+              reason: e.reason ?? null,
             })),
           }
         : s

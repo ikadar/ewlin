@@ -173,32 +173,13 @@ describe('add_station_maintenance', () => {
   it('rejects malformed date', async () => {
     const { php } = makeFakePhp();
     const result = await addStationMaintenanceTool.handler(
-      { stationId: 's-1', stationLabel: 'MBO XL', date: '14/04/2026' },
+      { stationId: 's-1', stationLabel: 'MBO XL', fromDate: '14/04/2026', toDate: '14/04/2026' },
       makeCtx(php),
     );
     expect(result.ok).toBe(false);
   });
 
-  it('without operating slots writes a closed-day exception', async () => {
-    const { php, calls } = makeFakePhp({
-      'GET /api/v1/stations/s-1': { id: 's-1', name: 'MBO XL', scheduleExceptions: [] },
-    });
-    const result = await addStationMaintenanceTool.handler(
-      { stationId: 's-1', stationLabel: 'MBO XL', date: '2026-04-14', reason: 'vidange' },
-      makeCtx(php),
-    );
-    expect(result.ok).toBe(true);
-    const put = calls.find((c) => c.method === 'PUT');
-    expect(put?.path).toBe('/api/v1/stations/s-1');
-    const body = put?.body as { scheduleExceptions: { date: string; type: string; schedule: unknown; reason: string | null }[] };
-    expect(body.scheduleExceptions).toHaveLength(1);
-    expect(body.scheduleExceptions[0].date).toBe('2026-04-14');
-    expect(body.scheduleExceptions[0].type).toBe('closed');
-    expect(body.scheduleExceptions[0].schedule).toBeNull();
-    expect(body.scheduleExceptions[0].reason).toBe('vidange');
-  });
-
-  it('with operating slots writes a custom exception', async () => {
+  it('without explicit times writes a full-day period', async () => {
     const { php, calls } = makeFakePhp({
       'GET /api/v1/stations/s-1': { id: 's-1', name: 'MBO XL', scheduleExceptions: [] },
     });
@@ -206,17 +187,42 @@ describe('add_station_maintenance', () => {
       {
         stationId: 's-1',
         stationLabel: 'MBO XL',
-        date: '2026-04-14',
-        operatingSlots: [{ start: '08:00', end: '12:00' }],
+        fromDate: '2026-04-14',
+        toDate: '2026-04-14',
+        reason: 'vidange',
       },
       makeCtx(php),
     );
     expect(result.ok).toBe(true);
     const put = calls.find((c) => c.method === 'PUT');
-    const body = put?.body as { scheduleExceptions: { type: string; schedule: { isOperating: boolean; slots: { start: string; end: string }[] } | null }[] };
-    expect(body.scheduleExceptions[0].type).toBe('custom');
-    expect(body.scheduleExceptions[0].schedule?.isOperating).toBe(true);
-    expect(body.scheduleExceptions[0].schedule?.slots).toEqual([{ start: '08:00', end: '12:00' }]);
+    expect(put?.path).toBe('/api/v1/stations/s-1');
+    const body = put?.body as { scheduleExceptions: { startAt: string; endAt: string; reason: string | null }[] };
+    expect(body.scheduleExceptions).toHaveLength(1);
+    expect(body.scheduleExceptions[0].startAt).toMatch(/^2026-04-14T00:00:00/);
+    expect(body.scheduleExceptions[0].endAt).toMatch(/^2026-04-14T23:59:00/);
+    expect(body.scheduleExceptions[0].reason).toBe('vidange');
+  });
+
+  it('with explicit times writes the supplied sub-day period', async () => {
+    const { php, calls } = makeFakePhp({
+      'GET /api/v1/stations/s-1': { id: 's-1', name: 'MBO XL', scheduleExceptions: [] },
+    });
+    const result = await addStationMaintenanceTool.handler(
+      {
+        stationId: 's-1',
+        stationLabel: 'MBO XL',
+        fromDate: '2026-04-14',
+        toDate: '2026-04-14',
+        startTime: '12:00',
+        endTime: '18:00',
+      },
+      makeCtx(php),
+    );
+    expect(result.ok).toBe(true);
+    const put = calls.find((c) => c.method === 'PUT');
+    const body = put?.body as { scheduleExceptions: { startAt: string; endAt: string }[] };
+    expect(body.scheduleExceptions[0].startAt).toMatch(/^2026-04-14T12:00:00/);
+    expect(body.scheduleExceptions[0].endAt).toMatch(/^2026-04-14T18:00:00/);
   });
 });
 
@@ -266,8 +272,8 @@ describe('list_active_constraints', () => {
           id: 's-1',
           name: 'MBO XL',
           scheduleExceptions: [
-            { date: '2026-04-08', type: 'closed', schedule: null, reason: 'vidange' },
-            { date: '2026-04-01', type: 'closed', schedule: null, reason: 'past' },
+            { startAt: '2026-04-08T00:00:00', endAt: '2026-04-08T23:59:00', reason: 'vidange' },
+            { startAt: '2026-04-01T00:00:00', endAt: '2026-04-01T23:59:00', reason: 'past' },
           ],
         },
       ],

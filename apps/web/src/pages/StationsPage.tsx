@@ -53,6 +53,12 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function todayFullDayRange(): { startAt: string; endAt: string } {
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return { startAt: `${date}T00:00`, endAt: `${date}T23:59` };
+}
+
 // ============================================================================
 // Station Form Modal
 // ============================================================================
@@ -83,78 +89,34 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
   const [maxChunkHours, setMaxChunkHours] = useState(String(initial?.maxChunkMinutes != null ? initial.maxChunkMinutes / 60 : 7));
   const [maxOperators, setMaxOperators] = useState(String(initial?.maxOperators ?? 1));
 
-  /** One editor row per schedule exception. Two modes:
-   *   - 'closed'  → full-day block
-   *   - 'custom'  → open only between openFrom and openTo (gaps blocked)
-   * Local `id` is a synthetic ref for React key stability — doesn't go on the wire.
-   */
-  interface ExceptionRow {
+  interface ExceptionPeriod {
     id: string;
-    date: string;
-    mode: 'closed' | 'custom';
-    openFrom: string;
-    openTo: string;
+    startAt: string;
+    endAt: string;
     reason: string;
   }
 
-  const [scheduleExceptions, setScheduleExceptions] = useState<ExceptionRow[]>(() => {
+  const [scheduleExceptions, setScheduleExceptions] = useState<ExceptionPeriod[]>(() => {
     const raw = (initial?.scheduleExceptions as Array<{
-      date: string;
-      type?: string | null;
-      schedule?: { isOperating?: boolean; slots?: { start: string; end: string }[] } | null;
+      startAt: string;
+      endAt: string;
       reason?: string | null;
     }> | null | undefined) ?? [];
-    return raw.map((ex, i) => {
-      const hasSlots = ex.schedule?.slots && ex.schedule.slots.length > 0;
-      const firstSlot = hasSlots ? ex.schedule!.slots![0] : { start: '08:00', end: '12:00' };
-      return {
-        id: `ex-${i}`,
-        date: ex.date,
-        mode: (ex.type === 'custom' && hasSlots) ? 'custom' : 'closed',
-        openFrom: firstSlot.start,
-        openTo: firstSlot.end,
-        reason: ex.reason ?? '',
-      };
-    });
+    return raw.map((ex, idx) => ({
+      id: `ex-${idx}`,
+      startAt: ex.startAt.slice(0, 16),
+      endAt: ex.endAt.slice(0, 16),
+      reason: ex.reason ?? '',
+    }));
   });
 
   const exceptionsValid = useMemo(() => {
     for (const ex of scheduleExceptions) {
-      if (!ex.date) return false;
-      if (ex.mode === 'custom') {
-        if (!ex.openFrom || !ex.openTo) return false;
-        if (ex.openFrom >= ex.openTo) return false;
-      }
+      if (!ex.startAt || !ex.endAt) return false;
+      if (ex.startAt > ex.endAt) return false;
     }
-    // Also reject duplicate dates (backend unique constraint).
-    const dates = scheduleExceptions.map((e) => e.date);
-    if (new Set(dates).size !== dates.length) return false;
     return true;
   }, [scheduleExceptions]);
-
-  const addException = () => {
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    setScheduleExceptions((rows) => [
-      ...rows,
-      {
-        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        date: todayStr,
-        mode: 'closed',
-        openFrom: '08:00',
-        openTo: '12:00',
-        reason: '',
-      },
-    ]);
-  };
-
-  const updateException = (id: string, patch: Partial<ExceptionRow>) => {
-    setScheduleExceptions((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  };
-
-  const removeException = (id: string) => {
-    setScheduleExceptions((rows) => rows.filter((r) => r.id !== id));
-  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -170,27 +132,13 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
     e.preventDefault();
     if (!canSave) return;
 
-    // Serialise exception rows into the PHP shape
-    // { date, type, schedule: { isOperating, slots } | null, reason }
-    const serialisedExceptions = scheduleExceptions.map((ex) => {
-      if (ex.mode === 'closed') {
-        return {
-          date: ex.date,
-          type: 'closed',
-          schedule: null,
-          reason: ex.reason.trim() || null,
-        };
-      }
-      return {
-        date: ex.date,
-        type: 'custom',
-        schedule: {
-          isOperating: true,
-          slots: [{ start: ex.openFrom, end: ex.openTo }],
-        },
+    const serialisedExceptions = scheduleExceptions
+      .map((ex) => ({
+        startAt: ex.startAt.length === 16 ? `${ex.startAt}:00` : ex.startAt,
+        endAt: ex.endAt.length === 16 ? `${ex.endAt}:00` : ex.endAt,
         reason: ex.reason.trim() || null,
-      };
-    });
+      }))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
 
     await onSave({
       name: name.trim(),
@@ -374,114 +322,80 @@ function StationFormModal({ initial, categories, groups, onSave, onCancel, isSav
             </div>
           </div>
 
-          {/* Schedule exceptions editor */}
-          <div className="border-t border-flux-border pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm text-flux-text-secondary">
-                Exceptions de planning
-              </label>
-              <button
-                type="button"
-                onClick={addException}
-                disabled={isSaving}
-                className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
-              >
-                + Ajouter une exception
-              </button>
-            </div>
-            <p className="text-[11px] text-flux-text-muted mb-3 leading-snug">
-              Jour particulier pendant lequel la station est fermée ou opère sur des horaires différents.
-              Mode « fermée » = journée entière bloquée. Mode « horaires custom » = la station n'opère que sur la plage indiquée.
+          {/* Schedule exceptions editor — same UX as operator absences */}
+          <div className="pt-2 border-t border-flux-border">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">
+              Exceptions de planning
             </p>
-            {scheduleExceptions.length === 0 ? (
-              <div className="text-xs text-flux-text-muted italic pb-2">
-                Aucune exception.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {scheduleExceptions.map((ex) => (
-                  <div
-                    key={ex.id}
-                    className="bg-flux-base border border-flux-border-light rounded p-2.5 flex flex-col gap-2"
-                  >
-                    <div className="grid grid-cols-[160px_1fr_32px] gap-2 items-center">
-                      <input
-                        type="date"
-                        value={ex.date}
-                        onChange={(e) => updateException(ex.id, { date: e.target.value })}
-                        className="px-2 py-1 text-xs bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-                        disabled={isSaving}
-                        required
-                      />
-                      <div className="flex gap-2 items-center text-xs text-flux-text-secondary">
-                        <label className="inline-flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name={`mode-${ex.id}`}
-                            checked={ex.mode === 'closed'}
-                            onChange={() => updateException(ex.id, { mode: 'closed' })}
-                            disabled={isSaving}
-                          />
-                          <span>Fermée toute la journée</span>
-                        </label>
-                        <label className="inline-flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name={`mode-${ex.id}`}
-                            checked={ex.mode === 'custom'}
-                            onChange={() => updateException(ex.id, { mode: 'custom' })}
-                            disabled={isSaving}
-                          />
-                          <span>Horaires custom</span>
-                        </label>
+            {scheduleExceptions.length > 0 && (
+              <div className="flex flex-col gap-3 mb-3">
+                {scheduleExceptions.map((ex, idx) => {
+                  const isInvalid = !!ex.startAt && !!ex.endAt && ex.startAt > ex.endAt;
+                  return (
+                    <div key={ex.id} className="flex flex-col gap-1.5 p-3 bg-flux-base rounded border border-flux-border">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-flux-text-muted w-8">Du</label>
+                        <input
+                          type="datetime-local"
+                          value={ex.startAt}
+                          onChange={(e) => {
+                            const next = [...scheduleExceptions];
+                            next[idx] = { ...next[idx], startAt: e.target.value };
+                            setScheduleExceptions(next);
+                          }}
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        />
+                        <label className="text-xs text-flux-text-muted w-8 text-center">au</label>
+                        <input
+                          type="datetime-local"
+                          value={ex.endAt}
+                          onChange={(e) => {
+                            const next = [...scheduleExceptions];
+                            next[idx] = { ...next[idx], endAt: e.target.value };
+                            setScheduleExceptions(next);
+                          }}
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setScheduleExceptions(scheduleExceptions.filter((_, i) => i !== idx))}
+                          className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none px-1"
+                        >
+                          ×
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeException(ex.id)}
-                        disabled={isSaving}
-                        aria-label="Supprimer l'exception"
-                        className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none -mt-0.5"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-flux-text-muted w-8">Motif</label>
+                        <input
+                          type="text"
+                          value={ex.reason}
+                          onChange={(e) => {
+                            const next = [...scheduleExceptions];
+                            next[idx] = { ...next[idx], reason: e.target.value };
+                            setScheduleExceptions(next);
+                          }}
+                          placeholder="Optionnel"
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                        />
+                      </div>
+                      {isInvalid && (
+                        <p className="text-[11px] text-red-400 pl-10">La date de début doit être antérieure ou égale à la date de fin.</p>
+                      )}
                     </div>
-                    {ex.mode === 'custom' && (
-                      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center text-xs">
-                        <input
-                          type="time"
-                          value={ex.openFrom}
-                          onChange={(e) => updateException(ex.id, { openFrom: e.target.value })}
-                          disabled={isSaving}
-                          className="px-2 py-1 bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-                        />
-                        <span className="text-flux-text-muted">→</span>
-                        <input
-                          type="time"
-                          value={ex.openTo}
-                          onChange={(e) => updateException(ex.id, { openTo: e.target.value })}
-                          disabled={isSaving}
-                          className="px-2 py-1 bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
-                        />
-                      </div>
-                    )}
-                    <input
-                      type="text"
-                      placeholder="Raison (optionnel)"
-                      value={ex.reason}
-                      maxLength={200}
-                      onChange={(e) => updateException(ex.id, { reason: e.target.value })}
-                      disabled={isSaving}
-                      className="px-2 py-1 text-xs bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                    />
-                  </div>
-                ))}
-                {!exceptionsValid && (
-                  <p className="text-[11px] text-red-400">
-                    Chaque exception doit avoir une date unique, et les horaires custom doivent avoir début &lt; fin.
-                  </p>
-                )}
+                  );
+                })}
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                const range = todayFullDayRange();
+                setScheduleExceptions([...scheduleExceptions, { id: String(Date.now()), startAt: range.startAt, endAt: range.endAt, reason: '' }]);
+              }}
+              className="w-full py-2 text-xs text-flux-text-muted border border-dashed border-flux-border-light rounded hover:border-blue-500 hover:text-blue-500 transition-colors"
+            >
+              + Ajouter une exception
+            </button>
           </div>
 
           </div>{/* end scrollable body */}

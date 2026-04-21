@@ -18,7 +18,7 @@ export interface StationResponse {
   capacity: number;
   displayOrder: number;
   operatingSchedule: Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }> | null;
-  scheduleExceptions: Array<{ date: string; type: string; schedule: unknown; reason: string | null }> | null;
+  scheduleExceptions: Array<{ startAt: string; endAt: string; reason: string | null }> | null;
   attentionFull: number | null;
   attentionRun: number | null;
   maskedTimeEnabled: boolean;
