@@ -35,6 +35,10 @@ import type {
   BatStatus,
   PlateStatus,
   FormeStatus,
+  SafetyZoneConfig,
+  JobSafetyOverride,
+  UpdateSafetyZoneRequest,
+  SetSafetyOverrideRequest,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
@@ -834,6 +838,76 @@ export const scheduleApi = createApi({
     }),
 
     // ========================================================================
+    // Safety Zone
+    // ========================================================================
+
+    /**
+     * Get the global safety zone configuration.
+     */
+    getSafetyZone: builder.query<SafetyZoneConfig, void>({
+      query: () => '/safety-zone',
+    }),
+
+    /**
+     * Update the global safety zone duration (admin).
+     * Invalidates Snapshot so the planning re-renders with the new boundary.
+     */
+    updateSafetyZone: builder.mutation<SafetyZoneConfig, UpdateSafetyZoneRequest>({
+      query: (body) => ({ url: '/safety-zone', method: 'PUT', body }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Set (or clear) a safety override on a (jobId, sequenceIndex, stationId) tuple.
+     * Optimistically mirrors the override into the snapshot so the tile
+     * reflects the cyan-off state immediately.
+     */
+    setSafetyOverride: builder.mutation<
+      JobSafetyOverride,
+      { jobId: string; body: SetSafetyOverrideRequest }
+    >({
+      query: ({ jobId, body }) => ({
+        url: `/jobs/${jobId}/safety-override`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Snapshot'],
+      async onQueryStarted({ jobId, body }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const overrides = draft.safetyOverrides ?? [];
+            const idx = overrides.findIndex(
+              (o) =>
+                o.jobId === jobId &&
+                o.sequenceIndex === body.sequenceIndex &&
+                o.stationId === body.stationId
+            );
+            const now = new Date().toISOString();
+            if (idx >= 0) {
+              overrides[idx].isOverridden = body.isOverridden;
+              overrides[idx].updatedAt = now;
+            } else if (body.isOverridden) {
+              overrides.push({
+                id: `optimistic-${now}`,
+                jobId,
+                sequenceIndex: body.sequenceIndex,
+                stationId: body.stationId,
+                isOverridden: true,
+                updatedAt: now,
+              });
+            }
+            draft.safetyOverrides = overrides;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    // ========================================================================
     // Saved Schedules
     // ========================================================================
 
@@ -943,4 +1017,7 @@ export const {
   useLoadScheduleMutation,
   useDeleteSavedScheduleMutation,
   useComputeScheduleMutation,
+  useGetSafetyZoneQuery,
+  useUpdateSafetyZoneMutation,
+  useSetSafetyOverrideMutation,
 } = scheduleApi;

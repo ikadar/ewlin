@@ -16,6 +16,8 @@ import { computeStationUnavailabilitySegments } from '../TimelineLens/unavailabi
 import { COLLAPSED_BAND_PX, type Collapse } from './collapseConfig';
 import { CollapseBand } from './CollapseBand';
 import { yPositionToTime } from '../DragPreview/snapUtils';
+import { SafetyBand } from '../SafetyBand';
+import { makeSafetyKey, isInSafetyZone } from '../../utils/safetyZone';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -92,6 +94,19 @@ export interface SchedulingGridProps {
   operators?: Operator[];
   /** Collapse bands to render across all columns. Computed by parent from operator schedules. */
   collapses?: readonly Collapse[];
+  /** Safety zone duration in hours. 0 disables the feature (no band, no flocon). */
+  safetyZoneHours?: number;
+  /** Active safety overrides from the current snapshot. */
+  safetyOverrides?: ReadonlyArray<{
+    jobId: string;
+    sequenceIndex: number;
+    stationId: string;
+    isOverridden: boolean;
+  }>;
+  /** Pre-computed (taskId → flat sequenceIndex) map. Provided by parent to stay in sync with backend. */
+  sequenceIndexByTaskId?: ReadonlyMap<string, number>;
+  /** Callback when user clicks the Sky snowflake on a tile in the safety zone. */
+  onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
 }
 
 /**
@@ -127,6 +142,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       shippedJobIds,
       operators,
       collapses,
+      safetyZoneHours = 0,
+      safetyOverrides,
+      sequenceIndexByTaskId,
+      onToggleFrozenOverride,
     },
     ref
   ) {
@@ -250,6 +269,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
   // Calculate now line position (multi-day aware, collapse-aware)
   const nowPosition = timeToYPosition(now, startHour, pixelsPerHour, startDate, effectiveCollapses);
+
+  // Safety zone: lookup structure for O(1) per-tile override check.
+  const overrideLookup = useMemo(() => {
+    const m = new Map<string, boolean>();
+    (safetyOverrides ?? []).forEach((o) => {
+      if (o.isOverridden) m.set(makeSafetyKey(o.jobId, o.sequenceIndex, o.stationId), true);
+    });
+    return m;
+  }, [safetyOverrides]);
+
+  // Safety zone band: height computed collapse-agnostically (zone is a
+  // calendar-hours concept, not a working-hours one — user's V1 decision).
+  const safetyZonePx = safetyZoneHours > 0 ? safetyZoneHours * pixelsPerHour : 0;
 
   // Create lookup maps for jobs and tasks
   const jobMap = useMemo(() => {
@@ -721,6 +753,15 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
             onMouseMove={handleColumnsMouseMove}
             onMouseLeave={handleColumnsMouseLeave}
           >
+            {/* Safety Zone band (Sky tint-horizontal), rendered below the now line */}
+            {safetyZonePx > 0 && (
+              <SafetyBand
+                nowPx={nowPosition}
+                zoneHeightPx={safetyZonePx}
+                boundaryLabel={`+${safetyZoneHours} h`}
+              />
+            )}
+
             {/* Now line spanning all station columns */}
             <div
               className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"
@@ -775,6 +816,13 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     const cached = tileDataCache.get(assignment.id);
                     if (!cached) return null;
                     const interrupt = taskInterruption.get(assignment.id);
+                    const sequenceIndex = sequenceIndexByTaskId?.get(cached.task.id);
+                    const inZone = safetyZoneHours > 0
+                      && isInSafetyZone(assignment.scheduledStart, safetyZoneHours, now);
+                    const isOverridden = inZone && sequenceIndex !== undefined
+                      && overrideLookup.get(
+                        makeSafetyKey(cached.job.id, sequenceIndex, cached.task.stationId),
+                      ) === true;
                     return (
                       <Tile
                         key={assignment.id}
@@ -802,6 +850,10 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         operatorNames={cached.operatorNames}
                         sawtoothTop={interrupt?.top}
                         sawtoothBottom={interrupt?.bottom}
+                        inSafetyZone={inZone}
+                        isFrozenOverridden={isOverridden}
+                        sequenceIndex={sequenceIndex}
+                        onToggleFrozenOverride={onToggleFrozenOverride}
                       />
                     );
                   })}

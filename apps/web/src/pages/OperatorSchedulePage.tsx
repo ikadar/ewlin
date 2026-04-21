@@ -66,6 +66,7 @@ import {
 import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
+import { SafetyBand } from '../components/SafetyBand';
 import { OperatorHeader } from '../components/OperatorHeaders';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
@@ -1136,6 +1137,15 @@ export default function OperatorSchedulePage() {
                   onMouseMove={handleOperatorsMouseMove}
                   onMouseLeave={handleOperatorsMouseLeave}
                 >
+                  {/* Safety zone band (Sky tint-horizontal) */}
+                  {(snapshot.safetyZoneHours ?? 0) > 0 && (
+                    <SafetyBand
+                      nowPx={nowPosition}
+                      zoneHeightPx={(snapshot.safetyZoneHours ?? 0) * pixelsPerHour}
+                      boundaryLabel={`+${snapshot.safetyZoneHours ?? 0} h`}
+                    />
+                  )}
+
                   {/* Now line spanning all columns */}
                   <div
                     className="absolute left-0 right-0 h-0.5 bg-red-500 z-10 pointer-events-none"

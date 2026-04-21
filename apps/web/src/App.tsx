@@ -21,8 +21,9 @@ import type { TemplateEditorData } from './components/JcfTemplateEditorModal';
 import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { updateSnapshot } from './mock';
+import { buildSequenceIndexLookup } from './utils/safetyZone';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -282,6 +283,7 @@ function AppContent() {
   const [toggleCompletion] = useToggleCompletionMutation();
   const [togglePin] = useTogglePinMutation();
   const [batchSetPin] = useBatchSetPinMutation();
+  const [setSafetyOverride] = useSetSafetyOverrideMutation();
   const [updateOutsourcingDates] = useUpdateOutsourcingDatesMutation();
   const [updateSTStatus] = useUpdateSTStatusMutation();
 
@@ -1633,6 +1635,30 @@ function AppContent() {
   }, [contextMenu, handleToggleComplete]);
 
   // Handle toggle pin (mirrors handleToggleComplete)
+  const sequenceIndexByTaskId = useMemo(
+    () => buildSequenceIndexLookup(snapshot),
+    [snapshot.jobs, snapshot.elements, snapshot.tasks],
+  );
+
+  const handleToggleFrozenOverride = useCallback(
+    async (jobId: string, sequenceIndex: number, stationId: string) => {
+      const existing = (snapshot.safetyOverrides ?? []).find(
+        (o) =>
+          o.jobId === jobId && o.sequenceIndex === sequenceIndex && o.stationId === stationId,
+      );
+      const next = existing ? !existing.isOverridden : true;
+      try {
+        await setSafetyOverride({
+          jobId,
+          body: { sequenceIndex, stationId, isOverridden: next },
+        }).unwrap();
+      } catch (e) {
+        console.error('Failed to toggle safety override', e);
+      }
+    },
+    [snapshot.safetyOverrides, setSafetyOverride],
+  );
+
   const handleTogglePin = useCallback(async (assignmentId: string) => {
     const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
     if (!assignment) {
@@ -1975,6 +2001,10 @@ function AppContent() {
           shippedJobIds={shippedJobIds}
           operators={snapshot.operators}
           collapses={effectiveCollapses}
+          safetyZoneHours={snapshot.safetyZoneHours ?? 0}
+          safetyOverrides={snapshot.safetyOverrides}
+          sequenceIndexByTaskId={sequenceIndexByTaskId}
+          onToggleFrozenOverride={handleToggleFrozenOverride}
         />
         {isMinimapVisible && (
           <Minimap

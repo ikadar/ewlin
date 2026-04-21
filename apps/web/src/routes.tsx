@@ -41,6 +41,7 @@ import { ImpressionPresetsPage } from './pages/ImpressionPresetsPage';
 import { SurfacagePresetsPage } from './pages/SurfacagePresetsPage';
 import { FeuilleFormatsPage } from './pages/FeuilleFormatsPage';
 import { StationsPage } from './pages/StationsPage';
+import { SafetyZonePage } from './pages/SafetyZonePage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { ShippersPage } from './pages/ShippersPage';
@@ -105,6 +106,7 @@ export function AppRoutes() {
           <Route path="surfacage-presets" element={<SurfacagePresetsPage />} />
           <Route path="feuille-formats" element={<FeuilleFormatsPage />} />
           <Route path="templates" element={<TemplatesPage />} />
+          <Route path="safety-zone" element={<SafetyZonePage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
           <Route path="shippers" element={<ShippersPage />} />
           <Route path="users" element={<RequirePermission permission="admin.users"><UsersPage /></RequirePermission>} />

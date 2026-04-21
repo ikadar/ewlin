@@ -148,6 +148,9 @@ export {
   useLoadScheduleMutation,
   useDeleteSavedScheduleMutation,
   useComputeScheduleMutation,
+  useGetSafetyZoneQuery,
+  useUpdateSafetyZoneMutation,
+  useSetSafetyOverrideMutation,
   scheduleApi,
 } from './api/scheduleApi';
 export type { SavedScheduleItem, ComputeScheduleResult } from './api/scheduleApi';

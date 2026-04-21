@@ -50,6 +50,13 @@ html {
 
   --flux-frozen-shadow: rgba(0,0,0,0.3);
 
+  /* Safety Zone (Sky hue, validated in playground-safety-zone.html) */
+  --flux-frost:           #38bdf8;
+  --flux-frost-dim:       #0284c7;
+  --flux-frost-rgb:       56, 189, 248;
+  --flux-frost-glow:      rgba(56, 189, 248, 0.45);
+  --flux-frost-intensity: 0.5;
+
   /* Late/conflict row tints (dark mode) */
   --flux-late-row-bg: rgba(248,113,113,0.06);
   --flux-late-sticky-bg: rgb(49,39,39);
@@ -92,6 +99,62 @@ body {
 .tt-value { color: var(--color-flux-text-primary); font-variant-numeric: tabular-nums; }
 .tt-late { color: #ef4444; font-weight: 600; }
 .tt-ontime { color: #22c55e; font-weight: 600; }
+
+/* ── Safety Zone (v0.6.x) ── */
+
+/* Tile in safety zone, frozen by system → Sky halo around the tile.
+ * Applied on the absolute-positioned Tile root. Stacks with the existing
+ * inset shadow that provides separation; the halo is additive. */
+.safety-zone-frozen {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.04),
+    0 0 calc(18px * var(--flux-frost-intensity)) var(--flux-frost-glow);
+}
+
+/* Tile in safety zone but user-overridden → no halo, subtle dashed hint. */
+.safety-zone-overridden::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px dashed rgba(var(--flux-frost-rgb), 0.25);
+  border-radius: 2px;
+}
+
+/* Safety Zone background band (tint-horizontal variant from playground). */
+.safety-zone-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(var(--flux-frost-rgb), 0.06) 0,
+    rgba(var(--flux-frost-rgb), 0.06) 1px,
+    transparent 1px,
+    transparent 12px
+  );
+  border-bottom: 1px dashed rgba(var(--flux-frost-rgb), 0.4);
+  transition: height 0.25s ease-out;
+}
+
+.safety-zone-band-label {
+  position: absolute;
+  left: 8px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--flux-frost);
+  background: var(--color-flux-base);
+  padding: 1px 6px;
+  border: 1px solid rgba(var(--flux-frost-rgb), 0.3);
+  border-radius: 3px;
+  z-index: 5;
+  white-space: nowrap;
+}
 
 /* ── Flux Dashboard animations (v0.5.17) ── */
 

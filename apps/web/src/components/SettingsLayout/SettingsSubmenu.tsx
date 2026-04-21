@@ -19,6 +19,7 @@ const SETTINGS_ITEMS = [
   { label: 'Surfacages',                  path: '/settings/surfacage-presets' },
   { label: 'Formats feuille (Impositions)', path: '/settings/feuille-formats' },
   { label: 'Templates',                   path: '/settings/templates' },
+  { label: 'Safety Zone',                 path: '/settings/safety-zone' },
 ];
 
 /**

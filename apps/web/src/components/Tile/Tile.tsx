@@ -73,6 +73,14 @@ export interface TileProps {
    * (focus view, tests).
    */
   calageGeometries?: readonly CalageGeometry[];
+  /** Whether this tile falls inside the safety zone boundary (derived). */
+  inSafetyZone?: boolean;
+  /** Whether the user has explicitly released this tile from the freeze. */
+  isFrozenOverridden?: boolean;
+  /** Callback when the Sky snowflake is clicked. Receives (jobId, sequenceIndex, stationId). */
+  onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
+  /** Flat index of this task within its job (0-based, stable across JCF rebuilds). */
+  sequenceIndex?: number;
 }
 
 /**
@@ -114,6 +122,10 @@ export const Tile = memo(function Tile({
   similarityScore,
   category,
   calageGeometries,
+  inSafetyZone = false,
+  isFrozenOverridden = false,
+  onToggleFrozenOverride,
+  sequenceIndex,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
@@ -173,6 +185,17 @@ export const Tile = memo(function Tile({
     onTogglePin?.(assignment.id);
   };
 
+  // Safety zone: frozen = in zone AND user hasn't overridden. Manual pin
+  // takes precedence neither visually nor in logic — the engine treats both
+  // uniformly (Option A: pin implicite). We keep both widgets displayed side
+  // by side so override intent stays addressable independently of the pin.
+  const isSafetyFrozen = inSafetyZone && !isFrozenOverridden;
+  const handleToggleFrozen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (sequenceIndex === undefined) return;
+    onToggleFrozenOverride?.(job.id, sequenceIndex, task.stationId);
+  };
+
   // Handle right-click context menu (v0.3.58)
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -188,10 +211,16 @@ export const Tile = memo(function Tile({
   const borderStyleClass = isBlocked ? 'border-dashed' : '';
 
   // Cursor: grab for selected pickable tiles, pointer for all others
+  const safetyZoneClass = isSafetyFrozen
+    ? 'safety-zone-frozen'
+    : inSafetyZone && isFrozenOverridden
+      ? 'safety-zone-overridden'
+      : '';
+
   return (
     <div
       ref={rootRef}
-      className={`absolute text-sm group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out`}
+      className={`absolute text-sm group cursor-pointer touch-none select-none transition-[filter,opacity,box-shadow] duration-150 ease-out ${safetyZoneClass}`}
       style={{
         // 1px inset top + bottom (when no sawtooth) to expose the separation
         // between consecutive tiles — matches the operator view's TileSegment.
@@ -215,6 +244,8 @@ export const Tile = memo(function Tile({
       data-has-conflict={hasConflict ? 'true' : undefined}
       data-is-blocked={isBlocked ? 'true' : undefined}
       data-pinned={assignment.isPinned ? 'true' : 'false'}
+      data-safety-frozen={isSafetyFrozen ? 'true' : undefined}
+      data-safety-overridden={inSafetyZone && isFrozenOverridden ? 'true' : undefined}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -315,6 +346,27 @@ export const Tile = memo(function Tile({
               onClick={handleTogglePin}
             />
           </span>
+          {inSafetyZone && (
+            <span className="inline-flex align-middle mr-1">
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
+                  isFrozenOverridden
+                    ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
+                    : 'text-sky-400 hover:text-sky-300'
+                }`}
+                onClick={handleToggleFrozen}
+                aria-label={
+                  isFrozenOverridden
+                    ? 'Override actif — clic pour restaurer le freeze auto'
+                    : 'Frozen par safety zone — clic pour libérer'
+                }
+              >
+                <path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z" />
+              </svg>
+            </span>
+          )}
           {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
         </div>
         {operatorNames && (
@@ -369,7 +421,10 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.tileState !== next.tileState ||
     prev.operatorNames !== next.operatorNames ||
     prev.sawtoothTop !== next.sawtoothTop ||
-    prev.sawtoothBottom !== next.sawtoothBottom
+    prev.sawtoothBottom !== next.sawtoothBottom ||
+    prev.inSafetyZone !== next.inSafetyZone ||
+    prev.isFrozenOverridden !== next.isFrozenOverridden ||
+    prev.sequenceIndex !== next.sequenceIndex
   );
 }
 
@@ -381,7 +436,8 @@ function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
   return (
     prev.onSelect !== next.onSelect ||
     prev.onTogglePin !== next.onTogglePin ||
-    prev.onContextMenu !== next.onContextMenu
+    prev.onContextMenu !== next.onContextMenu ||
+    prev.onToggleFrozenOverride !== next.onToggleFrozenOverride
   );
 }
 
