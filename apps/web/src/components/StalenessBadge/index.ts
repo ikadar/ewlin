@@ -1,0 +1,1 @@
+export { StalenessBadge } from './StalenessBadge';

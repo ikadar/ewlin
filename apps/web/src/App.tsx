@@ -22,13 +22,14 @@ import type { JcfTemplate } from '@flux/types';
 import type { SchedulingGridHandle, TaskMarker } from './components';
 import { updateSnapshot } from './mock';
 import { buildSequenceIndexLookup } from './utils/safetyZone';
+import { StalenessBadge } from './components/StalenessBadge';
 import { shouldUseFixture } from './mock/testFixtures';
 import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { Toast } from './components/Toast';
-import { useToast, useMassUnschedule } from './hooks';
+import { useToast, useMassUnschedule, useAutoRecompute } from './hooks';
 import { computeCollapses } from './utils/computeCollapses';
 import type { Collapse } from './components/SchedulingGrid/collapseConfig';
 import { yPositionToTime } from './components/DragPreview/snapUtils';
@@ -306,6 +307,20 @@ function AppContent() {
   const { toast, showToast, hideToast } = useToast();
   const { theme } = useTheme();
 
+  // v0.6.x: Auto-recompute orchestration. Every impactful edit (job
+  // create/update/delete) triggers a debounced full compute so the
+  // planning stays fresh. The safety zone protects cards already in
+  // preparation so full recompute is visually safe.
+  const autoRecompute = useAutoRecompute((event, reason, error) => {
+    if (event === 'started') {
+      showToast('Recalcul du planning…', 'info');
+    } else if (event === 'succeeded') {
+      showToast('Planning à jour', 'success');
+    } else if (event === 'failed') {
+      showToast(`Recalcul échoué (${reason ?? '—'}): ${error ?? 'erreur inconnue'}`, 'error');
+    }
+  });
+
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
   const { jobId: urlJobId } = useParams<{ jobId?: string }>();
@@ -484,6 +499,8 @@ function AppContent() {
       // Cache invalidation: Snapshot is automatic via invalidatesTags, Flux needs explicit invalidation
       setIsJcfSaving(false);
       dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+      // Auto-recompute: keep the planning fresh after the save.
+      autoRecompute.trigger(isEditMode ? `edit job ${editingJobId}` : 'create job');
       // Navigate back: Flux route if opened from Flux, otherwise scheduler root
       const fromRoute = (location.state as { from?: string } | null)?.from;
       navigate(fromRoute?.startsWith('/flux') ? fromRoute : '/', { replace: true });
@@ -508,7 +525,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch]);
+  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch, autoRecompute]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -775,10 +792,11 @@ function AppContent() {
       await deleteJob(selectedJobId).unwrap();
       setSelectedJobId(null);
       dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+      autoRecompute.trigger(`delete job ${selectedJobId}`);
     } catch (err) {
       showToast(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error');
     }
-  }, [selectedJobId, deleteJob, setSelectedJobId, showToast, dispatch]);
+  }, [selectedJobId, deleteJob, setSelectedJobId, showToast, dispatch, autoRecompute]);
 
   // REQ-14: Calculate grid/DateStrip start date (lookbackDays before today)
   const lookbackDays = snapshotData?.lookbackDays ?? 6;
@@ -1964,6 +1982,12 @@ function AppContent() {
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 flex overflow-hidden">
+        <StalenessBadge
+          hasFailed={autoRecompute.hasFailed}
+          isRetrying={autoRecompute.isComputing}
+          lastError={autoRecompute.lastError}
+          onRetry={autoRecompute.retry}
+        />
         <DateStrip
           startDate={gridStartDate}
           onDateClick={handleDateClick}

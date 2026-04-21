@@ -20,3 +20,5 @@ export { useHasPermission } from './useHasPermission';
 
 export { useMassUnschedule } from './useMassUnschedule';
 export type { MassUnscheduleState } from './useMassUnschedule';
+
+export { useAutoRecompute } from './useAutoRecompute';
