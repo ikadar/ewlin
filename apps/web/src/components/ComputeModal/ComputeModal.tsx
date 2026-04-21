@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { ScheduleSnapshot, Job } from '@flux/types';
 import type { ComputeScheduleResult } from '../../store';
+import { useAutoRecomputeCtx } from '../../contexts/AutoRecomputeContext';
 
 // ─── Types ───
 
@@ -89,6 +90,7 @@ function useComputeStream(
   mode: ComputeMode | null,
   jobId: string | undefined,
   onResult: (result: ComputeScheduleResult) => void,
+  showToast: ReturnType<typeof useAutoRecomputeCtx>['showToast'],
 ) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [result, setResult] = useState<ComputeScheduleResult | null>(null);
@@ -97,6 +99,11 @@ function useComputeStream(
 
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+  // Track the snapshot's lateJobCount at compute-start so the Waze
+  // toast can report the delta once lnsDone arrives.
+  const baselineLateRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!mode) {
@@ -223,6 +230,12 @@ function useComputeStream(
                   currentSteps[activeIdx].detail = late > 0
                     ? `${placed} tâches placées, ${late} job${late > 1 ? 's' : ''} en retard`
                     : `${placed} tâches placées, aucun retard`;
+                  // Capture the late count FBI reached before LNS runs,
+                  // so lnsDone can compute a meaningful delta for the
+                  // Waze toast.
+                  baselineLateRef.current = typeof parsed.lateJobCount === 'number'
+                    ? parsed.lateJobCount
+                    : baselineLateRef.current;
                 }
                 finishCurrent();
               } else if (type === 'fbiConverged') {
@@ -244,6 +257,27 @@ function useComputeStream(
                     : `${parsed.iterations} tentatives, pas d'amélioration possible`;
                 }
                 finishCurrent();
+                // Unify with auto-recompute: surface a Waze-style toast
+                // so the user sees the improvement even after the modal
+                // closes. Only when LNS actually moved the late count
+                // (baseline was captured at fbiIterationDone).
+                if (
+                  parsed.improved === true
+                  && baselineLateRef.current !== null
+                  && typeof parsed.bestLateJobCount === 'number'
+                ) {
+                  const delta = parsed.bestLateJobCount - baselineLateRef.current;
+                  if (delta < 0) {
+                    showToastRef.current({
+                      type: 'waze',
+                      title: 'Optimisation LNS trouvée',
+                      detail: 'Le moteur a réduit le nombre de retards pendant ce compute manuel.',
+                      metrics: [
+                        { label: 'Retards', value: `${delta}`, bad: false },
+                      ],
+                    });
+                  }
+                }
               }
             } else if (eventType === 'result') {
               if (!cancelled) {
@@ -342,7 +376,8 @@ export const ComputeModal = memo(function ComputeModal({
   onComputeIncremental,
   onComputeFull,
 }: ComputeModalProps) {
-  const { steps, result, elapsed, error } = useComputeStream(mode, jobId, onDone);
+  const { showToast } = useAutoRecomputeCtx();
+  const { steps, result, elapsed, error } = useComputeStream(mode, jobId, onDone, showToast);
 
   const snapshotReady = !result || snapshot.assignments.length > 0;
   const isDone = result !== null && snapshotReady;

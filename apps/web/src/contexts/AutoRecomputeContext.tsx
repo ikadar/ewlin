@@ -34,6 +34,21 @@ interface ContextValue {
   hasFailed: boolean;
   lastError: string | null;
   lastRanAt: Date | null;
+  /**
+   * Emit (or in-place update) a toast through the shared compute
+   * toaster stack. Available to pages that want to pipe compute
+   * feedback through the same channel (e.g. ComputeModal for the
+   * Waze-style improvement notification at lnsDone).
+   */
+  showToast: (toast: {
+    id?: string;
+    type: 'info' | 'success' | 'error' | 'progress' | 'waze';
+    title: string;
+    detail?: string;
+    metrics?: Array<{ label: string; value: string; bad?: boolean }>;
+    pinned?: boolean;
+    progress?: number;
+  }) => string;
 }
 
 const AutoRecomputeContext = createContext<ContextValue | null>(null);
@@ -115,6 +130,7 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
     hasFailed: autoRecompute.hasFailed,
     lastError: autoRecompute.lastError,
     lastRanAt: autoRecompute.lastRanAt,
+    showToast: computeToaster.show,
   };
 
   return (
