@@ -556,9 +556,13 @@ function AppContent() {
       dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
       // Auto-recompute: keep the planning fresh after the save.
       autoRecompute.trigger(isEditMode ? `edit job ${editingJobId}` : 'create job');
-      // Navigate back: Flux route if opened from Flux, otherwise scheduler root
+      // Navigate back: preserve current surface so App.tsx (and its
+      // useAutoRecompute debounced trigger above) stays mounted long
+      // enough to fire the background compute. Falling back to '/' here
+      // unmounts App and cancels the pending timer, losing the recompute.
       const fromRoute = (location.state as { from?: string } | null)?.from;
-      navigate(fromRoute?.startsWith('/flux') ? fromRoute : '/', { replace: true });
+      const defaultDest = location.pathname.startsWith('/stations') ? '/stations' : '/';
+      navigate(fromRoute?.startsWith('/flux') ? fromRoute : defaultDest, { replace: true });
       setJcfClient('');
       setJcfReferent('');
       setJcfTemplate('');
