@@ -392,6 +392,18 @@ The system uses a **hybrid PHP + Node.js architecture**:
   - Package: `@flux/schedule-validator`
   - Stateless, horizontally scalable
 
+### Rust Service
+- **Scheduling Engine** — FBI multi-start + Moore escape + LNS optimisation
+  - Binary: `services/scheduling-engine/flux-scheduler`
+  - **Two-phase HTTP API** (see [ADR-015](adr-015-two-phase-compute-lns-objective.md)):
+    - `POST /compute-fast` — FBI + Moore only, returns in < 1 s (Phase 1)
+    - `POST /compute-lns/stream` — LNS for up to 60 s, SSE, seeded with Phase 1
+      result, cancellable via a global `AtomicBool` token
+    - Legacy `POST /compute` + `POST /compute-stream` retained for backward compat
+  - **Stateless except for the LNS cancel slot** — a single `OnceLock<Mutex<...>>`
+    holds the token of the in-flight LNS run. Installing a new token flips the
+    previous to `true`, giving correct supersession under the mono-user assumption.
+
 ### Shared Infrastructure
 - **Database:** MariaDB 10.11+ (one schema per service)
 - **Event Bus:** Symfony Messenger (async domain events)

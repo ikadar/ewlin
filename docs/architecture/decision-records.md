@@ -32,6 +32,7 @@ Each ADR is a **small, immutable document**. When a decision is changed, a *new*
 | [ADR-012](#adr-012--event-sourcing-for-schedule-aggregate-future) | Event Sourcing (Future) | Proposed | 2025-01-25 |
 | [ADR-013](#adr-013--element-layer-with-hybrid-sequencing) | Element Layer with Hybrid Sequencing | Accepted | 2025-12-20 |
 | [ADR-014](adr-014-compaction-service-extraction.md) | Extract Smart Compaction to Node.js | Proposed | 2026-03-24 |
+| [ADR-015](adr-015-two-phase-compute-lns-objective.md) | Two-phase compute + lexicographic LNS objective | Accepted | 2026-04-21 |
 
 ---
 
