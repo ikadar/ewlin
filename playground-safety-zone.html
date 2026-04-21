@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Scheduler — Safety Zone (pin manuel + flocon auto)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    font-size: 13px;
+    --base: rgb(15 15 15);
+    --surface: rgb(26 26 26);
+    --elevated: rgb(36 36 36);
+    --hover: rgb(44 44 44);
+    --border: rgb(42 42 42);
+    --border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+
+    /* Tile state colors (from Tile.tsx colorUtils) */
+    --tile-default-rgb: 59,130,246;
+    --tile-default-border: #3b82f6;
+    --tile-default-text: #93c5fd;
+
+    /* Pin color (manual) */
+    --pin-active: #f59e0b;      /* amber-500 */
+    --pin-active-hover: #fbbf24; /* amber-400 */
+    --pin-idle: #3f3f46;         /* zinc-700 */
+    --pin-idle-hover: #a1a1aa;   /* zinc-400 */
+
+    /* Flocon color (auto freeze) — overridden at runtime */
+    --frost: #22d3ee;            /* cyan-400 */
+    --frost-dim: #0891b2;        /* cyan-600 */
+    --frost-rgb: 34,211,238;
+    --frost-glow: rgba(34,211,238,0.45);
+
+    /* Widget icon size */
+    --widget-size: 12px;
+  }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: var(--base);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--text-tertiary); font-size: 12px; }
+
+  .content {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    padding: 24px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ── Controls panel ───────────────────────────── */
+  .controls {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    position: sticky;
+    top: 76px;
+    height: fit-content;
+  }
+
+  .controls h2 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    letter-spacing: -0.2px;
+  }
+
+  .control-group {
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .control-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .control-label .value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: var(--frost);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--frost);
+  }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 11px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .legend-text {
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .legend-text strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .legend-text em {
+    color: var(--text-muted);
+    font-style: normal;
+    font-size: 10px;
+    display: block;
+    margin-top: 1px;
+  }
+
+  .variant-row {
+    margin-bottom: 14px;
+  }
+  .variant-row:last-child { margin-bottom: 0; }
+  .variant-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+  .variant-value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: var(--frost);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+  }
+  .swatch-grid.label-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .swatch {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    background: var(--elevated);
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+    color: var(--frost);
+    padding: 4px;
+  }
+  .swatch:hover { border-color: var(--border-light); background: var(--hover); }
+  .swatch.selected {
+    border-color: var(--frost);
+    box-shadow: 0 0 0 1px var(--frost), 0 0 8px rgba(34,211,238,0.4);
+  }
+  .swatch svg { width: 100%; height: 100%; display: block; }
+  .swatch .hue-fill {
+    width: 80%;
+    height: 80%;
+    border-radius: 3px;
+  }
+  .swatch .label-mini {
+    font-size: 9px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .swatch.label-swatch { aspect-ratio: auto; padding: 8px 4px; }
+
+  .action-btn {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-light);
+    background: var(--elevated);
+    color: var(--text-secondary);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+    margin-bottom: 6px;
+  }
+  .action-btn:hover { background: var(--hover); color: var(--text-primary); }
+  .action-btn.primary {
+    background: rgba(34,211,238,0.15);
+    border-color: rgba(34,211,238,0.4);
+    color: var(--frost);
+  }
+  .action-btn.primary:hover {
+    background: rgba(34,211,238,0.22);
+    border-color: rgba(34,211,238,0.6);
+  }
+  .action-btn:last-child { margin-bottom: 0; }
+
+  .hint {
+    background: rgba(34,211,238,0.06);
+    border: 1px solid rgba(34,211,238,0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .hint strong { color: var(--frost); font-weight: 500; }
+
+  /* ── Planning view ───────────────────────────── */
+  .planning {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .planning-header {
+    display: grid;
+    grid-template-columns: 72px repeat(var(--stations), 1fr);
+    background: var(--elevated);
+    border-bottom: 1px solid var(--border);
+    height: 36px;
+  }
+  .planning-header > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-right: 1px solid var(--border);
+  }
+  .planning-header > div:last-child { border-right: none; }
+  .planning-header .time-col { font-size: 10px; color: var(--text-muted); }
+
+  .planning-grid {
+    display: grid;
+    grid-template-columns: 72px repeat(var(--stations), 1fr);
+    position: relative;
+    min-height: 720px;
+  }
+
+  .time-axis {
+    border-right: 1px solid var(--border);
+    position: relative;
+    background: var(--base);
+  }
+  .time-tick {
+    position: absolute;
+    left: 0;
+    right: 0;
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: 2px 6px 0 0;
+    text-align: right;
+    border-top: 1px solid var(--border);
+  }
+
+  .station-col {
+    border-right: 1px solid var(--border);
+    position: relative;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 79px,
+        rgba(255,255,255,0.03) 79px,
+        rgba(255,255,255,0.03) 80px
+      );
+  }
+  .station-col:last-child { border-right: none; }
+
+  /* ── Safety zone band (horizontal, from top = now) ── */
+  .safety-band {
+    position: absolute;
+    left: 72px;
+    right: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: height 0.25s ease-out;
+  }
+
+  /* Tint variants */
+  .safety-band.tint-fade {
+    background: linear-gradient(
+      to bottom,
+      rgba(var(--frost-rgb), 0.10) 0%,
+      rgba(var(--frost-rgb), 0.06) 60%,
+      rgba(var(--frost-rgb), 0.02) 95%,
+      transparent 100%
+    );
+    border-bottom: 1px dashed rgba(var(--frost-rgb), 0.4);
+  }
+  .safety-band.tint-solid {
+    background: rgba(var(--frost-rgb), 0.07);
+    border-bottom: 1px solid rgba(var(--frost-rgb), 0.5);
+  }
+  .safety-band.tint-stripes {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(var(--frost-rgb), 0.08),
+      rgba(var(--frost-rgb), 0.08) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+    border-bottom: 1px dashed rgba(var(--frost-rgb), 0.4);
+  }
+  .safety-band.tint-border {
+    background: transparent;
+    border-bottom: 2px solid rgba(var(--frost-rgb), 0.6);
+    border-left: 1px dashed rgba(var(--frost-rgb), 0.3);
+    border-right: 1px dashed rgba(var(--frost-rgb), 0.3);
+  }
+  .safety-band.tint-none {
+    background: transparent;
+    border-bottom: 1px dashed rgba(var(--frost-rgb), 0.4);
+  }
+  .safety-band.tint-horizontal {
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(var(--frost-rgb), 0.06) 0,
+      rgba(var(--frost-rgb), 0.06) 1px,
+      transparent 1px,
+      transparent 12px
+    );
+    border-bottom: 1px dashed rgba(var(--frost-rgb), 0.4);
+  }
+  .safety-band-label {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--frost);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0,0,0,0.4);
+    padding: 3px 8px;
+    border-radius: 4px;
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(var(--frost-rgb), 0.2);
+  }
+  .safety-band-boundary-label {
+    position: absolute;
+    left: 76px;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: var(--frost);
+    background: var(--base);
+    padding: 1px 6px;
+    border: 1px solid rgba(var(--frost-rgb), 0.3);
+    border-radius: 3px;
+    z-index: 5;
+  }
+
+  /* ── Tile (replica of apps/web/src/components/Tile/Tile.tsx) ───── */
+  .tile {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-left: 4px solid var(--tile-default-border);
+    border-radius: 2px;
+    background: rgba(var(--tile-default-rgb), 0.12);
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.04);
+    cursor: pointer;
+    transition:
+      top 0.5s cubic-bezier(0.2, 0.8, 0.3, 1),
+      height 0.5s cubic-bezier(0.2, 0.8, 0.3, 1),
+      box-shadow 0.2s ease-out,
+      transform 0.12s ease-out,
+      border-color 0.2s;
+    overflow: hidden;
+    z-index: 2;
+  }
+  .tile:hover { transform: translateX(1px); }
+
+  /* Selected state (optional) */
+  .tile.selected {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      0 0 0 2px rgb(var(--tile-default-rgb)),
+      0 0 16px rgba(var(--tile-default-rgb), 0.5);
+  }
+
+  /* In safety zone → cyan glow (base class, overridden by glow-* variants) */
+  .tile.in-zone {
+    --glow-intensity: 1;
+  }
+
+  /* Glow style variants */
+  .tile.in-zone.glow-ring-glow {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.04),
+      0 0 0 1px var(--frost-dim),
+      0 0 calc(12px * var(--glow-intensity)) var(--frost-glow);
+  }
+  .tile.in-zone.glow-ring-only {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.04),
+      0 0 0 calc(1px * var(--glow-intensity)) var(--frost);
+  }
+  .tile.in-zone.glow-halo {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.04),
+      0 0 calc(18px * var(--glow-intensity)) var(--frost-glow);
+  }
+  .tile.in-zone.glow-top-bar {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 calc(3px * var(--glow-intensity)) 0 var(--frost);
+  }
+  .tile.in-zone.glow-left-stripe {
+    border-left: 4px solid var(--frost);
+  }
+  .tile.in-zone.glow-left-stripe.pinned {
+    border-left: 4px solid var(--pin-active);
+  }
+  .tile.in-zone.glow-corner {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.04);
+  }
+  .tile.in-zone.glow-corner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: calc(16px * var(--glow-intensity));
+    height: calc(16px * var(--glow-intensity));
+    background: linear-gradient(225deg, var(--frost) 0%, transparent 70%);
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .tile.in-zone.selected {
+    outline: 2px solid rgb(var(--tile-default-rgb));
+    outline-offset: 1px;
+  }
+
+  /* In zone but override free (user clicked flocon off) */
+  .tile.in-zone.unfrozen {
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.04);
+  }
+  .tile.in-zone.unfrozen::after {
+    /* subtle dashed cyan to show it WAS frozen but user overrode */
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border: 1px dashed rgba(34,211,238,0.25);
+    border-radius: 2px;
+  }
+
+  .tile-label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 2px;
+    padding: 0 8px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .tile-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--tile-default-text);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .tile-widgets {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    pointer-events: auto;
+    flex-shrink: 0;
+  }
+
+  .widget-btn {
+    width: calc(var(--widget-size) + 2px);
+    height: calc(var(--widget-size) + 2px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--pin-idle);
+    transition: color 0.12s, transform 0.08s;
+  }
+  .widget-btn:hover { transform: scale(1.15); }
+  .widget-btn svg { width: var(--widget-size); height: var(--widget-size); display: block; }
+
+  .widget-btn.pin.on { color: var(--pin-active); }
+  .widget-btn.pin.on:hover { color: var(--pin-active-hover); }
+  .widget-btn.pin:not(.on):hover { color: var(--pin-idle-hover); }
+
+  .widget-btn.frost { color: var(--frost); }
+  .widget-btn.frost.off { color: var(--pin-idle); opacity: 0.55; }
+  .widget-btn.frost:hover { color: var(--frost); filter: brightness(1.2); }
+  .widget-btn.frost.off:hover { color: var(--frost-dim); opacity: 1; }
+
+  .tile-ref {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .tile-operator {
+    font-size: 9px;
+    color: #a1a1aa;
+    line-height: 1;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── State inspector (right panel under planning) ─── */
+  .inspector {
+    margin-top: 18px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-size: 11px;
+  }
+  .inspector h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+  }
+  .inspector-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+  }
+  .inspector-table th,
+  .inspector-table td {
+    text-align: left;
+    padding: 3px 8px 3px 0;
+    color: var(--text-tertiary);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .inspector-table th {
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 9.5px;
+    letter-spacing: 0.5px;
+  }
+  .inspector-table td.state-cyan { color: var(--frost); }
+  .inspector-table td.state-orange { color: var(--pin-active); }
+  .inspector-table td.state-off { color: var(--text-muted); }
+
+  .help-footer {
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+  }
+  .help-footer strong { color: var(--text-secondary); }
+  .help-footer kbd {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    background: var(--hover);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    color: var(--text-primary);
+  }
+
+  /* ── Prompt synthesis ─────────────────────── */
+  .prompt-panel {
+    margin-top: 18px;
+    background: var(--elevated);
+    border: 1px solid rgba(var(--frost-rgb), 0.3);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .prompt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(var(--frost-rgb), 0.06);
+    border-bottom: 1px solid var(--border);
+  }
+  .prompt-header h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
+  }
+  .copy-btn {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 4px;
+    background: rgba(var(--frost-rgb), 0.15);
+    border: 1px solid rgba(var(--frost-rgb), 0.4);
+    color: var(--frost);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.12s;
+  }
+  .copy-btn:hover {
+    background: rgba(var(--frost-rgb), 0.25);
+  }
+  .copy-btn.copied {
+    background: rgba(52,211,153,0.2);
+    border-color: rgba(52,211,153,0.5);
+    color: #34d399;
+  }
+  .prompt-body {
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .prompt-body .key { color: var(--frost); }
+  .prompt-body .section { color: var(--text-primary); font-weight: 600; margin-top: 6px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Safety Zone — Pin manuel + Flocon auto</h1>
+  <span class="subtitle">Playground · tiles fidèles au composant actuel</span>
+</header>
+
+<div class="content">
+
+  <!-- ── Controls ───────────────────────────────────────── -->
+  <aside class="controls">
+    <h2>Paramètres</h2>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Zone de sécurité</span>
+        <span class="value" id="zone-value">48 h</span>
+      </div>
+      <input type="range" id="zone-slider" min="0" max="96" step="4" value="48">
+      <div class="control-label" style="margin-top: 8px;">
+        <span>0 h</span>
+        <span>96 h</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label" style="margin-bottom: 10px;">Légende</div>
+      <div class="legend">
+        <div class="legend-row">
+          <span class="legend-swatch">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12" style="color: var(--pin-active);">
+              <path d="M12 2L9 5v5l-3 3 4 4-3 5h2l3-5 4 4 3-3-5-3V5l-2-3z"/>
+            </svg>
+          </span>
+          <div class="legend-text">
+            <strong>Pin manuel (orange)</strong>
+            <em>Décision explicite : carte immuable</em>
+          </div>
+        </div>
+        <div class="legend-row">
+          <span class="legend-swatch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="color: var(--frost);">
+              <path d="M2 12h20"/>
+              <path d="M12 2v20"/>
+              <path d="m4.93 4.93 14.14 14.14"/>
+              <path d="m19.07 4.93-14.14 14.14"/>
+            </svg>
+          </span>
+          <div class="legend-text">
+            <strong>Flocon auto (cyan)</strong>
+            <em>Frozen par safety zone — actif par défaut</em>
+          </div>
+        </div>
+        <div class="legend-row">
+          <span class="legend-swatch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="color: var(--pin-idle); opacity: 0.5;">
+              <path d="M2 12h20"/>
+              <path d="M12 2v20"/>
+              <path d="m4.93 4.93 14.14 14.14"/>
+              <path d="m19.07 4.93-14.14 14.14"/>
+            </svg>
+          </span>
+          <div class="legend-text">
+            <strong>Flocon éteint (override)</strong>
+            <em>User a déverrouillé malgré zone</em>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label" style="margin-bottom: 10px;">Variantes graphiques</div>
+
+      <div class="variant-row">
+        <label class="variant-label">Icône flocon</label>
+        <div class="swatch-grid" id="icon-swatches"></div>
+      </div>
+
+      <div class="variant-row">
+        <label class="variant-label">Teinte cyan</label>
+        <div class="swatch-grid" id="hue-swatches"></div>
+      </div>
+
+      <div class="variant-row">
+        <label class="variant-label">Taille icône
+          <span class="variant-value" id="size-value">12 px</span>
+        </label>
+        <input type="range" id="size-slider" min="10" max="18" step="1" value="12">
+      </div>
+
+      <div class="variant-row">
+        <label class="variant-label">Tint zone</label>
+        <div class="swatch-grid label-grid" id="tint-swatches"></div>
+      </div>
+
+      <div class="variant-row">
+        <label class="variant-label">Style glow</label>
+        <div class="swatch-grid label-grid" id="glow-swatches"></div>
+      </div>
+
+      <div class="variant-row">
+        <label class="variant-label">Intensité glow
+          <span class="variant-value" id="glow-value">100 %</span>
+        </label>
+        <input type="range" id="glow-slider" min="0" max="200" step="10" value="100">
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label" style="margin-bottom: 10px;">Simulation</div>
+      <button id="btn-recompute" class="action-btn primary">↻ Simuler recompute planning</button>
+      <button id="btn-reset" class="action-btn">Reset positions</button>
+    </div>
+
+    <div class="control-group">
+      <div class="hint">
+        <strong>Interactions.</strong><br>
+        Clique <strong>pin</strong> sur une tuile pour toggler le pin manuel.<br>
+        Clique <strong>flocon</strong> (visible uniquement dans la zone cyan) pour override le freeze auto.<br>
+        Slider = durée zone. <strong>Recompute</strong> = prouve que cartes frozen/pinned restent en place, les autres sont replanifiées.
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Planning ────────────────────────────────────────── -->
+  <div>
+    <div class="planning" style="--stations: 5;">
+      <div class="planning-header">
+        <div class="time-col">h</div>
+        <div>HP-01</div>
+        <div>HP-02</div>
+        <div>RO-01</div>
+        <div>FIN-01</div>
+        <div>FIN-02</div>
+      </div>
+      <div class="planning-grid" id="grid">
+        <div class="time-axis" id="time-axis"></div>
+        <div class="station-col" data-station="HP-01"></div>
+        <div class="station-col" data-station="HP-02"></div>
+        <div class="station-col" data-station="RO-01"></div>
+        <div class="station-col" data-station="FIN-01"></div>
+        <div class="station-col" data-station="FIN-02"></div>
+        <div class="safety-band tint-fade" id="safety-band">
+          <div class="safety-band-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10">
+              <path d="M2 12h20"/><path d="M12 2v20"/>
+              <path d="m4.93 4.93 14.14 14.14"/>
+              <path d="m19.07 4.93-14.14 14.14"/>
+            </svg>
+            SAFETY ZONE
+          </div>
+        </div>
+        <div class="safety-band-boundary-label" id="safety-boundary-label">+48 h</div>
+      </div>
+    </div>
+
+    <!-- State inspector -->
+    <div class="inspector">
+      <h3>Inspecteur d'état (live)</h3>
+      <table class="inspector-table">
+        <thead>
+          <tr>
+            <th>Tile</th>
+            <th>Station</th>
+            <th>Start (h)</th>
+            <th>In zone ?</th>
+            <th>Pin</th>
+            <th>Flocon</th>
+            <th>→ Engine</th>
+          </tr>
+        </thead>
+        <tbody id="inspector-body"></tbody>
+      </table>
+    </div>
+
+    <div class="help-footer">
+      <strong>Logique derrière l'UI</strong><br>
+      <kbd>pin = true</kbd> : engine reçoit <code>isPinned=true</code>, tuile immuable quel que soit la zone.<br>
+      <kbd>pin = false, flocon auto ON</kbd> : tuile dans zone, engine voit <code>isFrozen=true</code> (dérivé au compute-time, non stocké en DB).<br>
+      <kbd>pin = false, flocon OFF dans zone</kbd> : override user stocké en DB (<code>isFrozenOverride=true</code>, keyé par jobId+sequenceIndex+stationId pour survivre rebuild).<br>
+      <kbd>hors zone</kbd> : flocon jamais affiché, widget caché. Seul pin disponible.
+    </div>
+
+    <!-- ── Synthèse prompt ─────────────────────────────────── -->
+    <div class="prompt-panel">
+      <div class="prompt-header">
+        <h3>Synthèse des choix (prompt d'implémentation)</h3>
+        <button class="copy-btn" id="copy-prompt">Copier</button>
+      </div>
+      <pre class="prompt-body" id="prompt-body"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────
+   Data model
+   ───────────────────────────────────────────────────────── */
+const PX_PER_HOUR = 10;          // planning scale
+const HOURS_VISIBLE = 72;        // 72h visible planning
+const ZONE_MAX = 96;
+
+/**
+ * Each tile:
+ *   station: string
+ *   startHour: number (hours from now = top of grid)
+ *   duration: number (hours)
+ *   job: { ref, client }
+ *   isPinned: boolean (user manual pin)
+ *   isFrozenOverride: boolean (user has overridden freeze → free)
+ */
+const tiles = [
+  { id: 't1', station: 'HP-01', startHour: 2,  duration: 4, job: { ref: 'JOB-1021', client: 'Maison Dupont' }, isPinned: false, isFrozenOverride: false },
+  { id: 't2', station: 'HP-01', startHour: 8,  duration: 6, job: { ref: 'JOB-1025', client: 'Studio Ora' },    isPinned: true,  isFrozenOverride: false },
+  { id: 't3', station: 'HP-01', startHour: 18, duration: 5, job: { ref: 'JOB-1028', client: 'BlueRoom' },      isPinned: false, isFrozenOverride: false },
+  { id: 't4', station: 'HP-01', startHour: 34, duration: 7, job: { ref: 'JOB-1033', client: 'Atlas Édition' }, isPinned: false, isFrozenOverride: false },
+
+  { id: 't5', station: 'HP-02', startHour: 4,  duration: 5, job: { ref: 'JOB-1022', client: 'Nord Impression' }, isPinned: false, isFrozenOverride: false },
+  { id: 't6', station: 'HP-02', startHour: 14, duration: 8, job: { ref: 'JOB-1027', client: 'Clarté SA' },       isPinned: false, isFrozenOverride: false },
+  { id: 't7', station: 'HP-02', startHour: 26, duration: 6, job: { ref: 'JOB-1030', client: 'Polygone' },        isPinned: true,  isFrozenOverride: false },
+
+  { id: 't8',  station: 'RO-01', startHour: 1,  duration: 10, job: { ref: 'JOB-1020', client: 'Verdier & Fils' }, isPinned: false, isFrozenOverride: false },
+  { id: 't9',  station: 'RO-01', startHour: 14, duration: 12, job: { ref: 'JOB-1026', client: 'Horizon Mag' },    isPinned: false, isFrozenOverride: false },
+  { id: 't10', station: 'RO-01', startHour: 30, duration: 9,  job: { ref: 'JOB-1031', client: 'EcoPrint' },       isPinned: false, isFrozenOverride: false },
+
+  { id: 't11', station: 'FIN-01', startHour: 6,  duration: 4, job: { ref: 'JOB-1022', client: 'Nord Impression' }, isPinned: false, isFrozenOverride: false },
+  { id: 't12', station: 'FIN-01', startHour: 16, duration: 6, job: { ref: 'JOB-1025', client: 'Studio Ora' },      isPinned: false, isFrozenOverride: false },
+  { id: 't13', station: 'FIN-01', startHour: 28, duration: 7, job: { ref: 'JOB-1029', client: 'Atelier M' },       isPinned: false, isFrozenOverride: false },
+
+  { id: 't14', station: 'FIN-02', startHour: 3,  duration: 5, job: { ref: 'JOB-1021', client: 'Maison Dupont' }, isPinned: false, isFrozenOverride: false },
+  { id: 't15', station: 'FIN-02', startHour: 12, duration: 5, job: { ref: 'JOB-1027', client: 'Clarté SA' },     isPinned: false, isFrozenOverride: false },
+  { id: 't16', station: 'FIN-02', startHour: 22, duration: 8, job: { ref: 'JOB-1032', client: 'Papier+' },       isPinned: false, isFrozenOverride: false },
+];
+
+let safetyZoneHours = 48;
+let selectedTileId = null;
+
+/* ─────────────────────────────────────────────────────────
+   Rendering
+   ───────────────────────────────────────────────────────── */
+function h(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') el.className = v;
+    else if (k === 'dataset') Object.assign(el.dataset, v);
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'style') el.style.cssText = v;
+    else if (k === 'html') el.innerHTML = v;
+    else el.setAttribute(k, v);
+  }
+  for (const child of children) {
+    if (child == null) continue;
+    el.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+  }
+  return el;
+}
+
+const pinSvg = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <path d="M16 3l5 5-5 5 1 4-4-1-5 5-3-3 5-5-1-4 4 1 3-7z"/>
+</svg>`;
+
+/* ─────────────────────────────────────────────────────────
+   Variant options
+   ───────────────────────────────────────────────────────── */
+
+const ICON_VARIANTS = {
+  'snowflake-full': {
+    label: 'Flocon détaillé',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12h20"/><path d="M12 2v20"/>
+      <path d="m4.93 4.93 14.14 14.14"/><path d="m19.07 4.93-14.14 14.14"/>
+      <path d="M7 8l-3 1 1 3"/><path d="M17 8l3 1-1 3"/>
+      <path d="M7 16l-3-1 1-3"/><path d="M17 16l3-1-1-3"/>
+    </svg>`,
+  },
+  'snowflake-simple': {
+    label: 'Flocon simple',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12h20"/><path d="M12 2v20"/>
+      <path d="m4.93 4.93 14.14 14.14"/><path d="m19.07 4.93-14.14 14.14"/>
+    </svg>`,
+  },
+  'asterisk': {
+    label: 'Astérisque',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <path d="M12 4v16"/><path d="M5.64 7.05l12.72 9.9"/><path d="M18.36 7.05L5.64 16.95"/>
+    </svg>`,
+  },
+  'lock': {
+    label: 'Cadenas',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2"/>
+      <path d="M8 11V7a4 4 0 018 0v4"/>
+    </svg>`,
+  },
+  'shield': {
+    label: 'Bouclier',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>
+    </svg>`,
+  },
+  'flake-filled': {
+    label: 'Flocon plein',
+    svg: `<svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z"/>
+    </svg>`,
+  },
+};
+
+const HUE_VARIANTS = {
+  'cyan':    { label: 'Cyan',   main: '#22d3ee', dim: '#0891b2', rgb: '34,211,238' },
+  'sky':     { label: 'Sky',    main: '#38bdf8', dim: '#0284c7', rgb: '56,189,248' },
+  'teal':    { label: 'Teal',   main: '#2dd4bf', dim: '#0d9488', rgb: '45,212,191' },
+  'indigo':  { label: 'Indigo', main: '#818cf8', dim: '#4f46e5', rgb: '129,140,248' },
+  'violet':  { label: 'Violet', main: '#a78bfa', dim: '#7c3aed', rgb: '167,139,250' },
+  'slate':   { label: 'Slate',  main: '#94a3b8', dim: '#475569', rgb: '148,163,184' },
+};
+
+const TINT_VARIANTS = {
+  'tint-fade':       'Dégradé',
+  'tint-solid':      'Uni',
+  'tint-stripes':    'Rayures ╱',
+  'tint-horizontal': 'Lignes ═',
+  'tint-border':     'Bordure',
+  'tint-none':       'Invisible',
+};
+
+const GLOW_VARIANTS = {
+  'glow-ring-glow':    'Ring + halo',
+  'glow-ring-only':    'Ring seul',
+  'glow-halo':         'Halo seul',
+  'glow-top-bar':      'Barre haut',
+  'glow-left-stripe':  'Bord gauche',
+  'glow-corner':       'Coin accent',
+};
+
+let cfg = {
+  icon: 'snowflake-simple',
+  hue: 'cyan',
+  size: 12,
+  tint: 'tint-fade',
+  glow: 'glow-ring-glow',
+  glowIntensity: 1.0,
+};
+
+function applyConfig() {
+  const hue = HUE_VARIANTS[cfg.hue];
+  const root = document.documentElement;
+  root.style.setProperty('--frost', hue.main);
+  root.style.setProperty('--frost-dim', hue.dim);
+  root.style.setProperty('--frost-rgb', hue.rgb);
+  root.style.setProperty('--frost-glow', `rgba(${hue.rgb},0.45)`);
+  root.style.setProperty('--widget-size', cfg.size + 'px');
+
+  const band = document.getElementById('safety-band');
+  band.className = 'safety-band ' + cfg.tint;
+}
+
+function buildSwatchGrid(containerId, variants, currentKey, onPick, renderContent) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (const [key, def] of Object.entries(variants)) {
+    const swatch = document.createElement('button');
+    swatch.className = 'swatch' + (key === currentKey ? ' selected' : '');
+    swatch.type = 'button';
+    swatch.title = typeof def === 'string' ? def : def.label;
+    swatch.innerHTML = renderContent(key, def);
+    swatch.addEventListener('click', () => {
+      onPick(key);
+    });
+    container.appendChild(swatch);
+  }
+}
+
+function renderSwatches() {
+  buildSwatchGrid('icon-swatches', ICON_VARIANTS, cfg.icon, (k) => {
+    cfg.icon = k; renderSwatches(); renderTiles(); renderPrompt();
+  }, (k, def) => def.svg);
+
+  buildSwatchGrid('hue-swatches', HUE_VARIANTS, cfg.hue, (k) => {
+    cfg.hue = k; applyConfig(); renderSwatches(); renderTiles(); renderPrompt();
+  }, (k, def) => `<div class="hue-fill" style="background: linear-gradient(135deg, ${def.main}, ${def.dim});"></div>`);
+
+  const tintPanel = document.getElementById('tint-swatches');
+  tintPanel.classList.add('label-grid');
+  buildSwatchGrid('tint-swatches', TINT_VARIANTS, cfg.tint, (k) => {
+    cfg.tint = k; applyConfig(); renderSwatches(); renderPrompt();
+  }, (k, label) => `<div class="label-mini">${label}</div>`);
+  tintPanel.querySelectorAll('.swatch').forEach(s => s.classList.add('label-swatch'));
+
+  const glowPanel = document.getElementById('glow-swatches');
+  glowPanel.classList.add('label-grid');
+  buildSwatchGrid('glow-swatches', GLOW_VARIANTS, cfg.glow, (k) => {
+    cfg.glow = k; renderSwatches(); renderTiles(); renderPrompt();
+  }, (k, label) => `<div class="label-mini">${label}</div>`);
+  glowPanel.querySelectorAll('.swatch').forEach(s => s.classList.add('label-swatch'));
+}
+
+function renderTimeAxis() {
+  const axis = document.getElementById('time-axis');
+  axis.innerHTML = '';
+  for (let h = 0; h <= HOURS_VISIBLE; h += 8) {
+    const tick = document.createElement('div');
+    tick.className = 'time-tick';
+    tick.style.top = (h * PX_PER_HOUR) + 'px';
+    tick.textContent = '+' + h + 'h';
+    axis.appendChild(tick);
+  }
+}
+
+function renderSafetyBand() {
+  const band = document.getElementById('safety-band');
+  band.style.height = (safetyZoneHours * PX_PER_HOUR) + 'px';
+  const label = document.getElementById('safety-boundary-label');
+  label.textContent = '+' + safetyZoneHours + ' h';
+  label.style.top = (safetyZoneHours * PX_PER_HOUR) + 'px';
+  label.style.display = safetyZoneHours > 0 ? 'block' : 'none';
+  if (safetyZoneHours === 0) band.style.display = 'none';
+  else band.style.display = 'block';
+}
+
+function tileInZone(tile) {
+  return tile.startHour < safetyZoneHours;
+}
+
+function tileFrozen(tile) {
+  // Frozen = in zone AND not overridden AND not already manually pinned
+  // (manual pin takes precedence visually)
+  return tileInZone(tile) && !tile.isFrozenOverride;
+}
+
+function renderTiles() {
+  document.querySelectorAll('.tile').forEach(n => n.remove());
+
+  const stationCols = {};
+  document.querySelectorAll('.station-col').forEach(col => {
+    stationCols[col.dataset.station] = col;
+  });
+
+  for (const tile of tiles) {
+    const col = stationCols[tile.station];
+    if (!col) continue;
+
+    const inZone = tileInZone(tile);
+    const frozen = tileFrozen(tile);
+    const overridden = inZone && tile.isFrozenOverride;
+
+    const classes = ['tile'];
+    if (inZone) classes.push('in-zone');
+    if (inZone && !overridden) classes.push(cfg.glow);
+    if (overridden) classes.push('unfrozen');
+    if (selectedTileId === tile.id) classes.push('selected');
+    if (tile.isPinned) classes.push('pinned');
+
+    const tileEl = h('div', {
+      class: classes.join(' '),
+      dataset: { tileId: tile.id },
+      style: `top: ${tile.startHour * PX_PER_HOUR}px; height: ${tile.duration * PX_PER_HOUR - 2}px; --glow-intensity: ${cfg.glowIntensity};`,
+      onClick: (e) => {
+        selectedTileId = selectedTileId === tile.id ? null : tile.id;
+        renderAll();
+      },
+    });
+
+    // Widgets (pin + flocon if in zone)
+    const widgets = h('span', { class: 'tile-widgets' });
+    widgets.addEventListener('click', e => e.stopPropagation());
+
+    // Pin widget
+    const pinBtn = h('button', {
+      class: 'widget-btn pin' + (tile.isPinned ? ' on' : ''),
+      title: tile.isPinned ? 'Pin manuel actif — clic pour retirer' : 'Pin manuel inactif — clic pour épingler',
+      onClick: () => {
+        tile.isPinned = !tile.isPinned;
+        renderAll();
+      },
+      html: pinSvg,
+    });
+    widgets.appendChild(pinBtn);
+
+    // Flocon widget (only if in zone)
+    if (inZone) {
+      const frostBtn = h('button', {
+        class: 'widget-btn frost' + (tile.isFrozenOverride ? ' off' : ''),
+        title: tile.isFrozenOverride
+          ? 'Override actif — carte libre dans zone. Clic pour restaurer le freeze auto.'
+          : 'Frozen auto par safety zone. Clic pour override (libère la carte).',
+        onClick: () => {
+          tile.isFrozenOverride = !tile.isFrozenOverride;
+          renderAll();
+        },
+        html: ICON_VARIANTS[cfg.icon].svg,
+      });
+      widgets.appendChild(frostBtn);
+    }
+
+    // Label block
+    const label = h('div', { class: 'tile-label' },
+      h('div', { class: 'tile-header' },
+        widgets,
+        h('span', { class: 'tile-ref' }, `${tile.job.ref} · ${tile.job.client}`),
+      ),
+    );
+    tileEl.appendChild(label);
+
+    col.appendChild(tileEl);
+  }
+}
+
+function renderInspector() {
+  const body = document.getElementById('inspector-body');
+  body.innerHTML = '';
+  for (const tile of tiles) {
+    const inZone = tileInZone(tile);
+    const overridden = inZone && tile.isFrozenOverride;
+    const frozen = tileFrozen(tile) && !tile.isPinned;
+
+    let pinCell = 'off';
+    let pinClass = 'state-off';
+    if (tile.isPinned) { pinCell = 'MANUAL'; pinClass = 'state-orange'; }
+
+    let frostCell = '—';
+    let frostClass = 'state-off';
+    if (inZone && !overridden) { frostCell = 'AUTO'; frostClass = 'state-cyan'; }
+    else if (inZone && overridden) { frostCell = 'OVERRIDE'; frostClass = 'state-off'; }
+
+    let engineCell = 'free';
+    if (tile.isPinned) engineCell = 'isPinned=true';
+    else if (inZone && !overridden) engineCell = 'isFrozen=true (derived)';
+
+    const row = h('tr', {},
+      h('td', {}, tile.job.ref),
+      h('td', {}, tile.station),
+      h('td', {}, '+' + tile.startHour + 'h'),
+      h('td', {}, inZone ? 'oui' : 'non'),
+      h('td', { class: pinClass }, pinCell),
+      h('td', { class: frostClass }, frostCell),
+      h('td', {}, engineCell),
+    );
+    body.appendChild(row);
+  }
+}
+
+function renderPrompt() {
+  const iconDef = ICON_VARIANTS[cfg.icon];
+  const hueDef = HUE_VARIANTS[cfg.hue];
+  const tintLabel = TINT_VARIANTS[cfg.tint];
+  const glowLabel = GLOW_VARIANTS[cfg.glow];
+
+  const tileSummary = tiles.map(t => {
+    const inZone = tileInZone(t);
+    const state = t.isPinned ? 'pinned' : (inZone && !t.isFrozenOverride ? 'frozen-auto' : (inZone && t.isFrozenOverride ? 'overridden-free' : 'free'));
+    return `  - ${t.job.ref} @ ${t.station} +${t.startHour}h → ${state}`;
+  }).join('\n');
+
+  const text = `Implémenter la "Safety Zone" pour le planning Flux selon le design validé dans playground-safety-zone.html.
+
+═══════════════════════════════════════════════════════
+CONCEPT
+═══════════════════════════════════════════════════════
+Zone glissante depuis now() pendant laquelle les cartes assignées ne peuvent pas être déplacées par le recompute planning. Objectif: protéger le travail déjà en préparation/production atelier.
+
+═══════════════════════════════════════════════════════
+PARAMÈTRES CHOISIS
+═══════════════════════════════════════════════════════
+- Durée zone           : ${safetyZoneHours} h (calendaires, glissante depuis now)
+- Granularité          : globale V1 (param admin unique, pas per-machine)
+- Icône widget         : ${iconDef.label} (clé: "${cfg.icon}")
+- Couleur thème        : ${hueDef.label} — main ${hueDef.main} / dim ${hueDef.dim} / rgb ${hueDef.rgb}
+- Taille icône         : ${cfg.size} px (pin + flocon)
+- Tint bande zone      : ${tintLabel} (classe CSS: ${cfg.tint})
+- Style glow tuile     : ${glowLabel} (classe CSS: ${cfg.glow})
+- Intensité glow       : ${Math.round(cfg.glowIntensity * 100)} %
+
+═══════════════════════════════════════════════════════
+MODÈLE D'ÉTATS (3 par tuile)
+═══════════════════════════════════════════════════════
+1. MANUAL_PIN — user a épinglé explicite. isPinned=true en DB. Engine: immuable.
+2. FROZEN_AUTO — in zone, pas de pin, pas d'override. Dérivé au compute-time, pas stocké. Engine: immuable.
+3. FREE — hors zone OU in zone avec override user. isFrozenOverride=true en DB si cas override.
+
+Le pin manuel (orange) et le flocon auto (${hueDef.label.toLowerCase()}) sont DEUX widgets séparés côte à côte, pas une feature unique tri-state. Le flocon est affiché seulement si la tuile est dans la zone.
+
+═══════════════════════════════════════════════════════
+INTERACTIONS
+═══════════════════════════════════════════════════════
+- Click pin  : toggle isPinned (cycle vide ↔ orange). Toujours disponible.
+- Click flocon (dans zone seulement) : toggle isFrozenOverride. Action immédiate, pas de confirmation.
+- Change durée zone admin : recalcul auto des states dérivés, pas d'invalidation DB.
+- Override survit rebuild JCF si (jobId, sequenceIndex, stationId) identique.
+
+═══════════════════════════════════════════════════════
+IMPACTS ENGINE (Rust scheduling-engine)
+═══════════════════════════════════════════════════════
+- Payload builder (ScheduleComputeController::buildJobs) doit ajouter pour chaque task:
+  * isPinned=true si user pin OU frozen (pin explicite et frozen équivalents côté engine).
+  * pinnedStartTick=current startTick quand isPinned.
+  * NOT pin si override user actif.
+- Aucune modif Rust nécessaire si pin implicite (Option A). Option C (flag explicite) = seulement si besoin de séparer raisons côté engine.
+
+═══════════════════════════════════════════════════════
+IMPACT SCHÉMA DB (PHP API)
+═══════════════════════════════════════════════════════
+- Settings: ajouter clé safetyZoneHours (int, default 48).
+- Nouvelle table (ou colonne Sequence): JobSafetyOverride keyé par (jobId, sequenceIndex, stationId), boolean value.
+- Pas de colonne isFrozen sur Assignment (dérivé).
+
+═══════════════════════════════════════════════════════
+UI COMPONENTS À TOUCHER
+═══════════════════════════════════════════════════════
+- apps/web/src/components/Tile/Tile.tsx
+  * Ajouter widget flocon à côté du pin (rendu conditionnel sur inSafetyZone).
+  * Ajouter classe "in-zone" + "${cfg.glow}" quand applicable.
+  * Props à propager: inSafetyZone, isFrozenOverride, onToggleFrozenOverride.
+- apps/web/src/components/Planning/SchedulingGrid.tsx (ou équivalent)
+  * Afficher bande safety-band avec classe "${cfg.tint}" et label boundary.
+  * Calcul inSafetyZone par tuile basé sur assignment.startTick < now() + safetyZoneHours.
+- Admin settings panel: slider safetyZoneHours + preview (facultatif).
+
+═══════════════════════════════════════════════════════
+TOKENS CSS (à injecter dans le design system)
+═══════════════════════════════════════════════════════
+--frost:          ${hueDef.main};
+--frost-dim:      ${hueDef.dim};
+--frost-rgb:      ${hueDef.rgb};
+--frost-glow:     rgba(${hueDef.rgb},0.45);
+--widget-size:    ${cfg.size}px;
+--glow-intensity: ${cfg.glowIntensity};
+
+═══════════════════════════════════════════════════════
+EDGE CASES TRANCHÉS
+═══════════════════════════════════════════════════════
+- Task straddle boundary → frozen entier (cohérent avec "déjà en prod").
+- Override persistence → garde l'override si tuile reste in-zone après recompute.
+- Pas de confirmation UI lors du toggle override (action immédiate).
+- Unités: heures calendaires (non ouvrées), simple et prévisible.
+
+═══════════════════════════════════════════════════════
+EDGE CASES À TRANCHER AVANT IMPLEM
+═══════════════════════════════════════════════════════
+- Conflit safety zone vs deadline édité (deadline tirée plus tôt, tuile frozen bloque respect)  → affichage warning ou prioriser freeze ?
+- Element rebuild via JCF: mapping override via (jobId, sequenceIndex, stationId) → invalidation si la tâche n'existe plus après rebuild ?
+- Visualisation multi-opérateur : flocon par station ou global au job ?
+
+═══════════════════════════════════════════════════════
+ÉTAT ACTUEL DES TUILES DU PLAYGROUND (pour référence)
+═══════════════════════════════════════════════════════
+${tileSummary}
+`;
+
+  const body = document.getElementById('prompt-body');
+  body.textContent = text;
+  body.dataset.raw = text;
+}
+
+function renderAll() {
+  renderTimeAxis();
+  renderSafetyBand();
+  renderTiles();
+  renderInspector();
+  renderPrompt();
+}
+
+/* ─────────────────────────────────────────────────────────
+   Recompute simulation
+   - Frozen (in zone, not overridden) + pinned tiles stay in place
+   - Other tiles get new random startHour on same station
+   ───────────────────────────────────────────────────────── */
+const initialPositions = tiles.map(t => ({ id: t.id, startHour: t.startHour, duration: t.duration }));
+
+function simulateRecompute() {
+  const byStation = {};
+  const movables = [];
+
+  // Freeze immovables (pinned OR frozen-auto)
+  for (const tile of tiles) {
+    const immovable = tile.isPinned || tileFrozen(tile);
+    if (immovable) {
+      byStation[tile.station] = byStation[tile.station] || [];
+      byStation[tile.station].push({ start: tile.startHour, end: tile.startHour + tile.duration });
+    } else {
+      movables.push(tile);
+    }
+  }
+
+  // Re-place movables greedily avoiding immovable slots
+  for (const tile of movables) {
+    byStation[tile.station] = byStation[tile.station] || [];
+    const occupied = byStation[tile.station];
+
+    // Find a new random start that doesn't collide, within HOURS_VISIBLE
+    const attempts = 50;
+    for (let i = 0; i < attempts; i++) {
+      const candidate = Math.floor(Math.random() * (HOURS_VISIBLE - tile.duration));
+      const collides = occupied.some(s => !(candidate + tile.duration <= s.start || candidate >= s.end));
+      if (!collides) {
+        tile.startHour = candidate;
+        occupied.push({ start: candidate, end: candidate + tile.duration });
+        break;
+      }
+    }
+  }
+
+  renderAll();
+}
+
+function resetPositions() {
+  for (const tile of tiles) {
+    const init = initialPositions.find(p => p.id === tile.id);
+    if (init) tile.startHour = init.startHour;
+  }
+  renderAll();
+}
+
+/* ─────────────────────────────────────────────────────────
+   Wiring
+   ───────────────────────────────────────────────────────── */
+document.getElementById('zone-slider').addEventListener('input', (e) => {
+  safetyZoneHours = parseInt(e.target.value, 10);
+  document.getElementById('zone-value').textContent = safetyZoneHours + ' h';
+  renderAll();
+});
+
+document.getElementById('btn-recompute').addEventListener('click', simulateRecompute);
+document.getElementById('btn-reset').addEventListener('click', resetPositions);
+
+document.getElementById('size-slider').addEventListener('input', (e) => {
+  cfg.size = parseInt(e.target.value, 10);
+  document.getElementById('size-value').textContent = cfg.size + ' px';
+  applyConfig();
+  renderPrompt();
+});
+
+document.getElementById('glow-slider').addEventListener('input', (e) => {
+  cfg.glowIntensity = parseInt(e.target.value, 10) / 100;
+  document.getElementById('glow-value').textContent = e.target.value + ' %';
+  renderTiles();
+  renderPrompt();
+});
+
+document.getElementById('copy-prompt').addEventListener('click', async () => {
+  const btn = document.getElementById('copy-prompt');
+  const text = document.getElementById('prompt-body').dataset.raw || '';
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '✓ Copié';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copier';
+      btn.classList.remove('copied');
+    }, 1800);
+  } catch (err) {
+    btn.textContent = 'Erreur';
+    setTimeout(() => { btn.textContent = 'Copier'; }, 1800);
+  }
+});
+
+applyConfig();
+renderSwatches();
+renderAll();
+</script>
+
+</body>
+</html>
