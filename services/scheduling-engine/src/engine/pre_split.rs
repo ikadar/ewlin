@@ -21,8 +21,9 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             // Keep action as-is
             let mut cloned = clone_action(action);
             cloned.idx = new_actions.len();
-            // Remap predecessor
+            // Remap predecessor + additional predecessors
             cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
+            cloned.additional_predecessors = remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk);
             original_to_last_chunk.insert(action.idx, cloned.idx);
             new_actions.push(cloned);
             continue;
@@ -35,6 +36,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             let mut cloned = clone_action(action);
             cloned.idx = new_actions.len();
             cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
+            cloned.additional_predecessors = remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk);
             original_to_last_chunk.insert(action.idx, cloned.idx);
             new_actions.push(cloned);
             continue;
@@ -48,6 +50,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             let mut cloned = clone_action(action);
             cloned.idx = new_actions.len();
             cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
+            cloned.additional_predecessors = remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk);
             original_to_last_chunk.insert(action.idx, cloned.idx);
             new_actions.push(cloned);
             continue;
@@ -101,6 +104,14 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 0
             };
 
+            // Cross-element / cross-job extra predecessors apply to the
+            // first chunk only (subsequent chunks chain through prev_chunk_idx).
+            let additional_predecessors = if is_first {
+                remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk)
+            } else {
+                Vec::new()
+            };
+
             let idx = new_actions.len();
             new_actions.push(Action {
                 idx,
@@ -122,7 +133,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 deadline_priority: action.deadline_priority,
                 job_deadline_tick: action.job_deadline_tick,
                 earliest_retry_tick: None,
-                additional_predecessors: Vec::new(),
+                additional_predecessors,
                 work_accumulator: 0.0,
                 idle_ticks: 0,
                 tick_operator_log: Vec::new(),
@@ -159,6 +170,174 @@ fn remap_predecessor(
     original_to_last_chunk: &std::collections::HashMap<usize, usize>,
 ) -> Option<usize> {
     pred_idx.and_then(|idx| original_to_last_chunk.get(&idx).copied())
+}
+
+/// Remap the `additional_predecessors` vec (cross-element / cross-job extra
+/// predecessors) from the original action vec to the new action vec. Entries
+/// whose original index can't be resolved are dropped — that matches
+/// [`remap_predecessor`]'s contract.
+fn remap_additional_predecessors(
+    extra: &[(usize, u32)],
+    original_to_last_chunk: &std::collections::HashMap<usize, usize>,
+) -> Vec<(usize, u32)> {
+    extra
+        .iter()
+        .filter_map(|&(idx, gap)| {
+            original_to_last_chunk
+                .get(&idx)
+                .copied()
+                .map(|new_idx| (new_idx, gap))
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::similarity::SpecSnapshot;
+
+    fn make_action(idx: usize, station_idx: usize, setup_ticks: u32, run_ticks: u32) -> Action {
+        Action {
+            idx,
+            task_id: format!("t{}", idx),
+            job_id: "j".into(),
+            station_idx,
+            setup_ticks,
+            run_ticks,
+            art: setup_ticks + run_ticks,
+            eat: 0,
+            last: u64::MAX,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: Vec::new(),
+            start_tick: None,
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks: 0,
+            tick_operator_log: Vec::new(),
+            original_art: setup_ticks + run_ticks,
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            is_pinned: false,
+            chain_remaining_art: setup_ticks + run_ticks,
+            pinned_start_tick: None,
+            peremption_count: 0,
+            pending_recalage: false,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
+            spec_snapshot: SpecSnapshot::default(),
+        }
+    }
+
+    fn make_station(max_chunk_minutes: u32) -> StationInput {
+        StationInput {
+            id: format!("s{}", max_chunk_minutes),
+            name: "Station".into(),
+            attention_full: None,
+            attention_run: None,
+            max_run_attention: None,
+            masked_time_enabled: false,
+            attention_masked: None,
+            masked_productivity: None,
+            tick_minutes: Some(15),
+            peremption_threshold_minutes: None,
+            max_chunk_minutes: Some(max_chunk_minutes),
+            category_id: None,
+            similarity_criteria: None,
+            similarity_score_rules: None,
+            is_press: false,
+            drying_time_minutes: 240,
+            max_operators: None,
+            capacity: None,
+            schedule_exceptions: Vec::new(),
+        }
+    }
+
+    /// Regression guard: when pre_split chunks an early action, later actions
+    /// whose `additional_predecessors` referenced indices beyond the chunk must
+    /// see those indices REMAPPED to the new action vec layout. Previously
+    /// (before the fix) the field was cloned verbatim and ended up pointing
+    /// at unrelated actions, silently defeating cross-element precedence for
+    /// any downstream element with 2+ prerequisites.
+    #[test]
+    fn additional_predecessors_are_remapped_across_chunks() {
+        // Station 0 has a tight max_chunk; station 1 is generous.
+        // Action 0: runs on station 0 with 8 * 15 = 120 min of work and
+        // max_chunk=60 → splits into 2 chunks (so indices shift by +1).
+        // Action 1: prereq on station 1, no split.
+        // Action 2: sibling prereq on station 1, no split.
+        // Action 3: downstream on station 1, depends on action 1 (primary)
+        // and action 2 (additional).
+        let stations = vec![make_station(60), make_station(480)];
+
+        let mut act0 = make_action(0, 0, 0, 8); // will split → 2 chunks
+        // Pretend action 0 has some run-only payload (setup=0, run=8 ticks = 120min).
+
+        let act1 = make_action(1, 1, 1, 2);
+        let act2 = make_action(2, 1, 1, 2);
+        let mut act3 = make_action(3, 1, 1, 2);
+        act3.predecessor_idx = Some(1); // primary prereq = action 1
+        act3.additional_predecessors = vec![(2, 0)]; // additional = action 2
+
+        // Touch act0 so the unused warning doesn't fire; no payload change needed.
+        act0.run_ticks = 8;
+
+        let mut actions = vec![act0, act1, act2, act3];
+        pre_split(&mut actions, &stations, 15);
+
+        // After split: action 0 becomes 2 chunks at indices 0, 1.
+        // Original idx 1 → new idx 2. Original idx 2 → new idx 3. Original idx 3 → new idx 4.
+        assert_eq!(actions.len(), 5, "2 chunks + 3 originals = 5 actions");
+
+        // Find the downstream action (originally idx 3).
+        let downstream = actions.iter().find(|a| a.task_id == "t3").expect("t3 present");
+
+        assert_eq!(downstream.predecessor_idx, Some(2), "predecessor_idx remapped to t1's new idx");
+        assert_eq!(
+            downstream.additional_predecessors,
+            vec![(3, 0)],
+            "additional_predecessors remapped to t2's new idx — this is the regression guard",
+        );
+    }
+
+    /// Corollary: when the downstream action ITSELF is the one being chunked,
+    /// its additional_predecessors must land on the first chunk (and be empty
+    /// on subsequent chunks, which chain via the intra-task predecessor).
+    #[test]
+    fn additional_predecessors_land_on_first_chunk_of_split_action() {
+        let stations = vec![make_station(480), make_station(60)];
+
+        let act0 = make_action(0, 0, 1, 2);
+        let act1 = make_action(1, 0, 1, 2);
+        let mut act2 = make_action(2, 1, 0, 8); // will split → 2 chunks on station 1
+        act2.predecessor_idx = Some(0);
+        act2.additional_predecessors = vec![(1, 3)];
+
+        let mut actions = vec![act0, act1, act2];
+        pre_split(&mut actions, &stations, 15);
+
+        // After split: originals 0, 1 → idx 0, 1. Original 2 → chunks at 2, 3.
+        assert_eq!(actions.len(), 4);
+
+        let first_chunk = &actions[2];
+        let second_chunk = &actions[3];
+        assert_eq!(first_chunk.task_id, "t2");
+        assert_eq!(first_chunk.predecessor_idx, Some(0));
+        assert_eq!(
+            first_chunk.additional_predecessors,
+            vec![(1, 3)],
+            "first chunk carries the (remapped) additional predecessors",
+        );
+        assert!(
+            second_chunk.additional_predecessors.is_empty(),
+            "subsequent chunks chain via intra-task predecessor only",
+        );
+    }
 }
 
 /// Clone an Action (Action does not derive Clone, so we do it manually).
