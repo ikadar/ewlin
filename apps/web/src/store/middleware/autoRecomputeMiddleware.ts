@@ -21,6 +21,12 @@
  */
 
 import type { Middleware } from '@reduxjs/toolkit';
+import { operatorApi } from '../api/operatorApi';
+import { stationApi } from '../api/stationApi';
+import { stationCategoryApi } from '../api/stationCategoryApi';
+import { providerApi } from '../api/providerApi';
+import { fluxApi } from '../api/fluxApi';
+import { constraintApi } from '../api/constraintApi';
 
 type TriggerFn = (reason: string) => void;
 
@@ -30,6 +36,33 @@ let registeredTrigger: TriggerFn | null = null;
 export function registerAutoRecomputeTrigger(fn: TriggerFn | null): void {
   registeredTrigger = fn;
 }
+
+/**
+ * Union of every RTK Query endpoint name whose fulfillment should
+ * trigger an auto-recompute. Each entry is constrained to the actual
+ * endpoint set of its API slice via `Extract<keyof typeof api.endpoints, ...>`
+ * so renaming an endpoint surface fails at compile time rather than
+ * silently dropping the trigger.
+ */
+type AutoRecomputeEndpointName =
+  // Operator lifecycle — absences, schedules, skills propagate through.
+  | Extract<keyof typeof operatorApi.endpoints,
+      'createOperator' | 'updateOperator' | 'deleteOperator'
+      | 'replaceSkills' | 'replaceConcurrentGroups'>
+  // Station availability, tick granularity, schedule exceptions, etc.
+  | Extract<keyof typeof stationApi.endpoints,
+      'createStation' | 'updateStation' | 'deleteStation'>
+  // Station category rules (similarityScoreRules etc.) feed the scoring.
+  | Extract<keyof typeof stationCategoryApi.endpoints,
+      'createStationCategory' | 'updateStationCategory' | 'deleteStationCategory'>
+  // OutsourcedProvider — transitDays + action type support drive outsourcing gaps.
+  | Extract<keyof typeof providerApi.endpoints,
+      'createProvider' | 'updateProvider' | 'deleteProvider'>
+  // Element prerequisite status — flipping to Ready unblocks held tasks.
+  | Extract<keyof typeof fluxApi.endpoints, 'updateElementPrerequisite'>
+  // Scheduling constraints — direct engine directives.
+  | Extract<keyof typeof constraintApi.endpoints,
+      'createSchedulingConstraint' | 'deleteSchedulingConstraint'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -42,32 +75,22 @@ export function registerAutoRecomputeTrigger(fn: TriggerFn | null): void {
  * engine's view of the problem, either because the safety zone already
  * protects them or because they're localised to a single task.
  */
-const AUTO_RECOMPUTE_ENDPOINTS = new Set<string>([
-  // Operator lifecycle — absences, schedules, skills propagate through
-  // createOperator / updateOperator / deleteOperator / replaceSkills /
-  // replaceConcurrentGroups.
+const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set<AutoRecomputeEndpointName>([
   'createOperator',
   'updateOperator',
   'deleteOperator',
   'replaceSkills',
   'replaceConcurrentGroups',
-  // Station availability, tick granularity, schedule exceptions, etc.
   'createStation',
   'updateStation',
   'deleteStation',
-  // Station category rules (similarityScoreRules etc.) feed the scoring.
   'createStationCategory',
   'updateStationCategory',
   'deleteStationCategory',
-  // OutsourcedProvider — transitDays + action type support drive outsourcing gaps.
   'createProvider',
   'updateProvider',
   'deleteProvider',
-  // Element prerequisite status — flipping to Ready unblocks previously
-  // held tasks, changing what the engine can schedule.
   'updateElementPrerequisite',
-  // Scheduling constraints — direct engine directives (machine down,
-  // operator absent, pinned start, duration override).
   'createSchedulingConstraint',
   'deleteSchedulingConstraint',
 ]);
@@ -87,7 +110,9 @@ export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {
   ) {
     const meta = (action as { meta: { arg?: { endpointName?: string } } }).meta;
     const endpointName = meta.arg?.endpointName;
-    if (endpointName && AUTO_RECOMPUTE_ENDPOINTS.has(endpointName)) {
+    // Runtime membership check; the cast narrows the value to the
+    // union type once the Set confirms it.
+    if (endpointName && AUTO_RECOMPUTE_ENDPOINTS.has(endpointName as AutoRecomputeEndpointName)) {
       registeredTrigger?.(`mutation: ${endpointName}`);
     }
   }
