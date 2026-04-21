@@ -99,36 +99,17 @@ fn compute_inner(
         .map(|(i, s)| (s.id.clone(), i))
         .collect();
 
-    // Build per-station blocked tick ranges. Two sources feed this list:
-    //   1. Station.schedule_exceptions (new canonical source) — per-date
-    //      overrides declared on the domain entity itself.
-    //   2. SchedulingConstraint(MachineUnavailable) (legacy) — external
-    //      directives. Kept for backward-compat during the migration; will
-    //      be removed once all callers switch to Station.scheduleExceptions.
+    // Build per-station blocked tick ranges from the station's domain-level
+    // schedule exceptions. Legacy SchedulingConstraint(MachineUnavailable)
+    // source was removed in the architecture cleanup — the only canonical
+    // channel now is Station.scheduleExceptions.
     let mut station_blocked_ranges: Vec<Vec<(usize, usize)>> = vec![Vec::new(); request.stations.len()];
     for (station_idx, station) in request.stations.iter().enumerate() {
         for range in station.blocked_ranges(start_date, options.horizon_days, tick_minutes) {
             station_blocked_ranges[station_idx].push(range);
         }
     }
-    for constraint in &request.constraints {
-        if constraint.constraint_type != "MachineUnavailable" {
-            continue;
-        }
-        let station_idx = match station_id_to_idx.get(&constraint.target_id) {
-            Some(&idx) => idx,
-            None => continue,
-        };
-        let start_tick = constraint.time_start.as_ref()
-            .and_then(|s| parse_deadline_minutes(s, start_date))
-            .map(|mins| mins as usize / tick_minutes as usize)
-            .unwrap_or(0);
-        let end_tick = constraint.time_end.as_ref()
-            .and_then(|s| parse_deadline_minutes(s, start_date))
-            .map(|mins| mins as usize / tick_minutes as usize)
-            .unwrap_or(usize::MAX);
-        station_blocked_ranges[station_idx].push((start_tick, end_tick));
-    }
+    let _ = &station_id_to_idx;
 
     // Parse occupied slots (existing assignments to preserve) into grid-ready form.
     // Each entry: (station_idx, Vec<operator_idx>, start_tick, end_tick)
@@ -1444,7 +1425,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1479,7 +1460,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1539,14 +1520,14 @@ mod integration_tests {
             operators: vec![paired_op],
             jobs: jobs.clone(),
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         });
         let unpaired_result = compute(&ComputeRequest {
             stations,
             operators: vec![unpaired_op],
             jobs,
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         });
 
         let paired_makespan = paired_result
@@ -1606,7 +1587,7 @@ mod integration_tests {
             operators: vec![op],
             jobs: vec![make_job("job-a", "sbg", 60)],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1646,7 +1627,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1724,7 +1705,7 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![job],
             options: options(),
-            station_groups: Vec::new(), constraints: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1912,7 +1893,6 @@ mod integration_tests {
             jobs,
             options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None }),
             station_groups: Vec::new(),
-            constraints: Vec::new(),
             occupied_slots: Vec::new(),
         };
 
@@ -1972,7 +1952,6 @@ mod integration_tests {
             ],
             options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None }),
             station_groups: Vec::new(),
-            constraints: Vec::new(),
             occupied_slots: Vec::new(),
         };
 

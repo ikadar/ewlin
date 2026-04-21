@@ -28,8 +28,6 @@ pub struct ComputeRequest {
     pub options: Option<ComputeOptions>,
     #[serde(default)]
     pub station_groups: Vec<StationGroupInput>,
-    #[serde(default)]
-    pub constraints: Vec<ConstraintInput>,
     /// Pre-occupied slots from existing assignments. The engine blocks these
     /// station+operator ticks in the grid before the forward pass, so new
     /// tasks are placed in the remaining gaps only.
@@ -47,18 +45,6 @@ pub struct OccupiedSlot {
     pub operator_ids: Vec<String>,
     pub start: String,
     pub end: String,
-}
-
-/// A scheduling constraint (e.g. machine unavailability window).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConstraintInput {
-    pub constraint_type: String,
-    pub target_id: String,
-    #[serde(default)]
-    pub time_start: Option<String>,
-    #[serde(default)]
-    pub time_end: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
