@@ -545,11 +545,18 @@ export default function OperatorSchedulePage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // ---- Escape: close selected job ----
+      // Skip when the Escape is being consumed by a modal (compute modal,
+      // JCF, etc.) — otherwise the selection clears behind the modal and
+      // the next Alt+P becomes a silent no-op.
       if (e.key === 'Escape' && selectedJobId) {
-        e.preventDefault();
-        setSelectedJobId(null);
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
+        const target = e.target as HTMLElement | null;
+        const insideModal = !!target?.closest?.('[role="dialog"], .fixed.inset-0.z-50');
+        if (!insideModal) {
+          e.preventDefault();
+          setSelectedJobId(null);
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
         }
         return;
       }
