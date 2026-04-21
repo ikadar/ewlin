@@ -110,6 +110,9 @@ pub fn run_with_fbi(
         weighted_lateness_minutes: u64::MAX,
         weighted_late_job_count: u64::MAX,
         late_job_ids: Vec::new(),
+        calage_bonus_sum: 0,
+        calage_bonus_mean: 0.0,
+        calage_bonus_median: 0.0,
     };
     let mut prev_makespan: u64 = u64::MAX;
     let mut prev_weighted_late_count: u64 = u64::MAX;

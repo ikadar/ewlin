@@ -77,6 +77,16 @@ pub struct ComputeOptions {
     /// 0 = disabled (default: 4 additional passes).
     #[serde(default = "default_perturbed_starts")]
     pub perturbed_starts: u32,
+    /// Skip the LNS post-placement improvement phase entirely.
+    /// Used by the two-phase /compute-fast endpoint so the base result
+    /// returns immediately; LNS is then driven separately via
+    /// /compute-lns/stream with its own 60s budget.
+    #[serde(default)]
+    pub skip_lns: Option<bool>,
+    /// Override the LNS time budget in milliseconds. When None the
+    /// engine derives it from the remaining 60s compute wall clock.
+    #[serde(default)]
+    pub lns_budget_ms: Option<u64>,
 }
 
 impl Default for ComputeOptions {
@@ -87,6 +97,8 @@ impl Default for ComputeOptions {
             fbi_max_iterations: default_fbi_max_iterations(),
             multi_start: true,
             perturbed_starts: default_perturbed_starts(),
+            skip_lns: None,
+            lns_budget_ms: None,
         }
     }
 }
@@ -189,6 +201,19 @@ pub struct ScheduleStats {
     /// IDs of jobs that miss their deadline (one entry per job, deduplicated)
     #[serde(default)]
     pub late_job_ids: Vec<String>,
+    /// Sum of calage bonus points across all placed internal actions.
+    /// Calage bonus = 100 if the previous action on the same station
+    /// belongs to the same job (job-continuity reward), else 0.
+    /// Drives the LNS secondary objective at equal late_job_count.
+    #[serde(default)]
+    pub calage_bonus_sum: u64,
+    /// Mean calage bonus across placed internal actions (0.0..=100.0).
+    #[serde(default)]
+    pub calage_bonus_mean: f64,
+    /// Median calage bonus across placed internal actions (0.0 or 100.0
+    /// in practice since bonus is binary).
+    #[serde(default)]
+    pub calage_bonus_median: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

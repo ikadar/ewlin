@@ -16,6 +16,22 @@ async fn compute_schedule(Json(request): Json<ComputeRequest>) -> Json<ScheduleR
     Json(result)
 }
 
+/// Two-phase compute — Phase 1 "fast" endpoint.
+///
+/// Runs base placement (FBI + Moore) but deliberately skips LNS so the
+/// response comes back as soon as possible. The caller is expected to
+/// kick off /compute-lns/stream separately for the 60 s background
+/// improvement pass, seeded with the same request payload.
+async fn compute_schedule_fast(
+    Json(mut request): Json<ComputeRequest>,
+) -> Json<ScheduleResult> {
+    let mut options = request.options.clone().unwrap_or_default();
+    options.skip_lns = Some(true);
+    request.options = Some(options);
+    let result = engine::compute(&request);
+    Json(result)
+}
+
 async fn compute_schedule_stream(
     Json(request): Json<ComputeRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
@@ -72,6 +88,7 @@ async fn main() {
     let cors = CorsLayer::permissive();
     let app = Router::new()
         .route("/compute", post(compute_schedule))
+        .route("/compute-fast", post(compute_schedule_fast))
         .route("/compute-stream", post(compute_schedule_stream))
         .layer(cors);
     let port = std::env::var("PORT").unwrap_or_else(|_| "3003".to_string());

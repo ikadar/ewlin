@@ -197,11 +197,15 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
     // LNS: if late jobs remain after Moore, explore alternative priority
     // configurations by destroying/repairing batches of late jobs.
     // Skip for single-job payloads — nothing to destroy/repair across jobs.
+    // Also skip when the caller asked to skip LNS (two-phase /compute-fast).
     let elapsed_ms = start_time.elapsed().as_millis() as u64;
-    if stats.late_job_count > 0 && elapsed_ms < 55_000 && request.jobs.len() > 1 {
-        // TEMP: shortened improvement search budget (normally 60_000 - elapsed, min 5_000).
-        let _lns_budget_normal = 60_000u64.saturating_sub(elapsed_ms).max(5_000);
-        let lns_budget = 3_000u64;
+    let skip_lns = options.skip_lns.unwrap_or(false);
+    if !skip_lns && stats.late_job_count > 0 && elapsed_ms < 55_000 && request.jobs.len() > 1 {
+        // Default in-request LNS budget: remainder of the 60s wall clock
+        // floor-clamped to 5s, but overridable via options.lns_budget_ms.
+        let lns_budget = options
+            .lns_budget_ms
+            .unwrap_or_else(|| 60_000u64.saturating_sub(elapsed_ms).max(5_000));
         if let Some((lns_a, lns_act, lns_s, lns_i)) = lns::lns_improve(
             &request.jobs,
             &request.stations,
@@ -217,6 +221,7 @@ fn compute_inner(request: &ComputeRequest, progress: &ProgressSender) -> Schedul
             now_tick,
             lns_budget,
             progress,
+            None, // Synchronous path: no external cancellation.
         ) {
             assignments = lns_a;
             actions = lns_act;
@@ -927,6 +932,9 @@ pub fn compute_stats(
     let mut late_job_ids: Vec<String> = late_jobs.into_iter().collect();
     late_job_ids.sort();
 
+    let (calage_bonus_sum, calage_bonus_mean, calage_bonus_median) =
+        compute_calage_stats_from_actions(actions);
+
     ScheduleStats {
         makespan_minutes,
         total_tasks,
@@ -938,7 +946,72 @@ pub fn compute_stats(
         weighted_lateness_minutes,
         weighted_late_job_count,
         late_job_ids,
+        calage_bonus_sum,
+        calage_bonus_mean,
+        calage_bonus_median,
     }
+}
+
+/// Compute calage bonus aggregates (sum, mean, median) across all placed
+/// internal actions. Bonus per action is 100 if the previous action on
+/// the same station belongs to the same job, else 0 (binary).
+///
+/// Drives the LNS secondary objective at equal late_job_count. Since the
+/// bonus is binary, the median collapses to 0 or 100 depending on
+/// whether more than half of placements benefit from continuity.
+pub(crate) fn compute_calage_stats_from_actions(actions: &[Action]) -> (u64, f64, f64) {
+    // Group placed actions by station, sorted by start_tick, and compute
+    // bonus 100 when consecutive actions share the same job.
+    use std::collections::HashMap;
+
+    #[derive(Clone)]
+    struct Placed<'a> {
+        job_id: &'a str,
+        start_tick: usize,
+    }
+    let mut by_station: HashMap<usize, Vec<Placed>> = HashMap::new();
+    for action in actions {
+        let start_tick = match action.start_tick {
+            Some(t) => t,
+            None => continue,
+        };
+        by_station.entry(action.station_idx).or_default().push(Placed {
+            job_id: action.job_id.as_str(),
+            start_tick,
+        });
+    }
+
+    let mut bonuses: Vec<u32> = Vec::new();
+    for placements in by_station.values_mut() {
+        placements.sort_by_key(|p| p.start_tick);
+        let mut prev_job: Option<&str> = None;
+        for p in placements.iter() {
+            let bonus = match prev_job {
+                Some(prev) if prev == p.job_id => 100u32,
+                _ => 0u32,
+            };
+            bonuses.push(bonus);
+            prev_job = Some(p.job_id);
+        }
+    }
+
+    if bonuses.is_empty() {
+        return (0, 0.0, 0.0);
+    }
+
+    let sum: u64 = bonuses.iter().map(|&b| b as u64).sum();
+    let mean: f64 = sum as f64 / bonuses.len() as f64;
+
+    let mut sorted = bonuses.clone();
+    sorted.sort_unstable();
+    let median = if sorted.len() % 2 == 1 {
+        sorted[sorted.len() / 2] as f64
+    } else {
+        let mid = sorted.len() / 2;
+        (sorted[mid - 1] as f64 + sorted[mid] as f64) / 2.0
+    };
+
+    (sum, mean, median)
 }
 
 /// Recompute stats from the FINAL assignments (after merge + post-processing).
@@ -1036,6 +1109,9 @@ fn recompute_stats_from_assignments(
     let mut late_job_ids: Vec<String> = late_jobs.into_iter().collect();
     late_job_ids.sort();
 
+    let (calage_bonus_sum, calage_bonus_mean, calage_bonus_median) =
+        compute_calage_stats_from_assignments(assignments, &task_to_job);
+
     ScheduleStats {
         makespan_minutes,
         total_tasks: assignments.len() as u32,
@@ -1047,7 +1123,66 @@ fn recompute_stats_from_assignments(
         weighted_lateness_minutes,
         weighted_late_job_count,
         late_job_ids,
+        calage_bonus_sum,
+        calage_bonus_mean,
+        calage_bonus_median,
     }
+}
+
+/// Assignment-based counterpart to compute_calage_stats_from_actions,
+/// used after merge when we only have ComputedAssignment data.
+pub(crate) fn compute_calage_stats_from_assignments(
+    assignments: &[ComputedAssignment],
+    task_to_job: &HashMap<String, String>,
+) -> (u64, f64, f64) {
+    #[derive(Clone)]
+    struct Placed<'a> {
+        job_id: &'a str,
+        start: &'a str,
+    }
+    let mut by_station: HashMap<&str, Vec<Placed>> = HashMap::new();
+    for a in assignments {
+        let job_id = match task_to_job.get(&a.task_id) {
+            Some(j) => j.as_str(),
+            None => continue,
+        };
+        by_station.entry(a.station_id.as_str()).or_default().push(Placed {
+            job_id,
+            start: a.scheduled_start.as_str(),
+        });
+    }
+
+    let mut bonuses: Vec<u32> = Vec::new();
+    for placements in by_station.values_mut() {
+        placements.sort_by(|a, b| a.start.cmp(b.start));
+        let mut prev_job: Option<&str> = None;
+        for p in placements.iter() {
+            let bonus = match prev_job {
+                Some(prev) if prev == p.job_id => 100u32,
+                _ => 0u32,
+            };
+            bonuses.push(bonus);
+            prev_job = Some(p.job_id);
+        }
+    }
+
+    if bonuses.is_empty() {
+        return (0, 0.0, 0.0);
+    }
+
+    let sum: u64 = bonuses.iter().map(|&b| b as u64).sum();
+    let mean: f64 = sum as f64 / bonuses.len() as f64;
+
+    let mut sorted = bonuses.clone();
+    sorted.sort_unstable();
+    let median = if sorted.len() % 2 == 1 {
+        sorted[sorted.len() / 2] as f64
+    } else {
+        let mid = sorted.len() / 2;
+        (sorted[mid - 1] as f64 + sorted[mid] as f64) / 2.0
+    };
+
+    (sum, mean, median)
 }
 
 /// Parse a datetime string (ISO/ATOM format) to minutes from start_date.

@@ -1,4 +1,6 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
 use chrono::NaiveDate;
@@ -41,10 +43,20 @@ pub fn lns_improve(
     now_tick: usize,
     time_budget_ms: u64,
     progress: &super::ProgressSender,
+    cancel: Option<Arc<AtomicBool>>,
 ) -> Option<(Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32)> {
+    // Kept the original "no late jobs" guard because destroy/repair has
+    // nothing to destroy. However the caller may now want LNS to run even
+    // with 0 late jobs purely to improve calage bonus — see also the
+    // secondary objective. For V1 we preserve the skip for performance;
+    // revisit if users ask for calage-only LNS cycles.
     if stats.late_job_count == 0 || time_budget_ms < 2000 {
         return None;
     }
+
+    let is_cancelled = |token: &Option<Arc<AtomicBool>>| -> bool {
+        token.as_ref().map(|t| t.load(Ordering::Relaxed)).unwrap_or(false)
+    };
 
     let start = Instant::now();
     let mut rng = StdRng::seed_from_u64(42);
@@ -85,7 +97,12 @@ pub fn lns_improve(
     }
 
     let mut best_result: Option<(Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32)> = None;
-    let mut best_score = (stats.late_job_count, stats.weighted_lateness_minutes);
+    // Lexicographic objective:
+    //   primary = late_job_count (minimise)
+    //   secondary (at tied primary) = any-of strict improvement on
+    //     (calage_bonus_sum, calage_bonus_mean, calage_bonus_median),
+    //     i.e. at least one strictly higher and none lower.
+    let mut best_stats_ref: ScheduleStats = stats.clone();
     let mut total_iters: u32 = 0;
     let mut iteration = 0;
 
@@ -96,6 +113,13 @@ pub fn lns_improve(
         late_jobs.len(), jobs.len(), time_budget_ms);
 
     while (start.elapsed().as_millis() as u64) < time_budget_ms {
+        // Early exit if the caller (e.g. a newer compute superseded us)
+        // flips the cancel token. We bail out without committing the
+        // current iteration; the best so far is still returned.
+        if is_cancelled(&cancel) {
+            eprintln!("[LNS] cancelled by caller at iter {}", iteration);
+            break;
+        }
         let destroy_count = destroy_sizes[iteration % destroy_sizes.len()];
         let n_destroy = destroy_count.min(late_jobs.len());
 
@@ -166,22 +190,22 @@ pub fn lns_improve(
         );
         total_iters += new_i;
 
-        let new_score = (new_s.late_job_count, new_s.weighted_lateness_minutes);
-        let improved = new_score < best_score;
+        let improved = is_strictly_better(&new_s, &best_stats_ref);
 
-        eprintln!("[LNS] iter {}: destroy={} sacrifice={} → {} late (best={})",
+        eprintln!("[LNS] iter {}: destroy={} sacrifice={} → {} late (best={}) calage(sum {}, mean {:.1}, med {:.1})",
             iteration, n_destroy, n_sacrifice,
-            new_s.late_job_count, best_score.0);
+            new_s.late_job_count, best_stats_ref.late_job_count,
+            new_s.calage_bonus_sum, new_s.calage_bonus_mean, new_s.calage_bonus_median);
 
         super::emit(progress, ProgressEvent::LnsIteration {
             iteration: iteration as u32 + 1,
             late_job_count: new_s.late_job_count,
-            best_late_job_count: if improved { new_s.late_job_count } else { best_score.0 },
+            best_late_job_count: if improved { new_s.late_job_count } else { best_stats_ref.late_job_count },
             improved,
         });
 
-        if new_score < best_score {
-            best_score = new_score;
+        if improved {
+            best_stats_ref = new_s.clone();
 
             // Update late_jobs list from new result BEFORE moving into best_result
             late_jobs.clear();
@@ -216,9 +240,102 @@ pub fn lns_improve(
 
     super::emit(progress, ProgressEvent::LnsDone {
         iterations: iteration as u32,
-        best_late_job_count: best_score.0,
+        best_late_job_count: best_stats_ref.late_job_count,
         improved: lns_improved,
     });
 
     best_result
+}
+
+/// Lexicographic "strictly better" check for the LNS objective.
+///
+/// Primary: late_job_count. A strict decrease is always better.
+/// A strict increase is always worse. When tied, fall through to
+/// the secondary check.
+///
+/// Secondary (at equal late_job_count): any-of strict improvement on
+/// calage bonus metrics (sum, mean, median). At least one of the three
+/// must be strictly greater than the reference AND none of the three
+/// may be strictly smaller.
+pub(crate) fn is_strictly_better(candidate: &ScheduleStats, reference: &ScheduleStats) -> bool {
+    if candidate.late_job_count < reference.late_job_count {
+        return true;
+    }
+    if candidate.late_job_count > reference.late_job_count {
+        return false;
+    }
+    // Equal late_job_count — any-of strict on calage bonus triple.
+    let sum_cmp = candidate.calage_bonus_sum.cmp(&reference.calage_bonus_sum);
+    let mean_cmp = candidate.calage_bonus_mean.partial_cmp(&reference.calage_bonus_mean);
+    let median_cmp = candidate.calage_bonus_median.partial_cmp(&reference.calage_bonus_median);
+
+    // If any metric is worse (Less), reject.
+    if sum_cmp == std::cmp::Ordering::Less { return false; }
+    if matches!(mean_cmp, Some(std::cmp::Ordering::Less)) { return false; }
+    if matches!(median_cmp, Some(std::cmp::Ordering::Less)) { return false; }
+
+    // At least one must be strictly better (Greater).
+    let any_strict = sum_cmp == std::cmp::Ordering::Greater
+        || matches!(mean_cmp, Some(std::cmp::Ordering::Greater))
+        || matches!(median_cmp, Some(std::cmp::Ordering::Greater));
+    any_strict
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_stats(late: u32, sum: u64, mean: f64, median: f64) -> ScheduleStats {
+        ScheduleStats {
+            makespan_minutes: 0,
+            total_tasks: 0,
+            scheduled_tasks: 0,
+            deadline_violations: 0,
+            late_task_count: 0,
+            total_lateness_minutes: 0,
+            late_job_count: late,
+            weighted_lateness_minutes: 0,
+            weighted_late_job_count: 0,
+            late_job_ids: Vec::new(),
+            calage_bonus_sum: sum,
+            calage_bonus_mean: mean,
+            calage_bonus_median: median,
+        }
+    }
+
+    #[test]
+    fn primary_lateness_decrease_wins() {
+        let cand = make_stats(3, 100, 50.0, 0.0);
+        let refr = make_stats(5, 500, 80.0, 100.0);
+        assert!(is_strictly_better(&cand, &refr));
+    }
+
+    #[test]
+    fn primary_lateness_increase_loses() {
+        let cand = make_stats(5, 10_000, 99.9, 100.0);
+        let refr = make_stats(3, 100, 50.0, 0.0);
+        assert!(!is_strictly_better(&cand, &refr));
+    }
+
+    #[test]
+    fn any_of_strict_accepts_single_gain() {
+        let cand = make_stats(3, 200, 50.0, 50.0); // sum ↑
+        let refr = make_stats(3, 100, 50.0, 50.0);
+        assert!(is_strictly_better(&cand, &refr));
+    }
+
+    #[test]
+    fn any_of_strict_rejects_any_regression() {
+        // Mean drops even though sum and median rise — regression.
+        let cand = make_stats(3, 200, 40.0, 100.0);
+        let refr = make_stats(3, 100, 50.0, 50.0);
+        assert!(!is_strictly_better(&cand, &refr));
+    }
+
+    #[test]
+    fn equal_everything_not_better() {
+        let cand = make_stats(3, 100, 50.0, 50.0);
+        let refr = make_stats(3, 100, 50.0, 50.0);
+        assert!(!is_strictly_better(&cand, &refr));
+    }
 }
