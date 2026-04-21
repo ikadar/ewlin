@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Scheduler — Compute Toaster unifié</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    font-size: 13px;
+    --base: rgb(15 15 15);
+    --surface: rgb(26 26 26);
+    --elevated: rgb(36 36 36);
+    --hover: rgb(44 44 44);
+    --border: rgb(42 42 42);
+    --border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+
+    --toast-info: #3b82f6;
+    --toast-success: #10b981;
+    --toast-error: #ef4444;
+    --toast-progress: #8b5cf6;
+    --toast-waze: #f59e0b;
+  }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: var(--base);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--text-tertiary); font-size: 12px; }
+
+  .content {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    padding: 24px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ── Controls panel ───────────────────────────── */
+  .controls {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    position: sticky;
+    top: 76px;
+    height: fit-content;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+  }
+
+  .controls h2 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    letter-spacing: -0.2px;
+  }
+
+  .control-group {
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .control-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .control-label .value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .action-btn {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-light);
+    background: var(--elevated);
+    color: var(--text-secondary);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: inherit;
+    margin-bottom: 5px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .action-btn:hover { background: var(--hover); color: var(--text-primary); }
+  .action-btn .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .action-btn .dot.info { background: var(--toast-info); }
+  .action-btn .dot.success { background: var(--toast-success); }
+  .action-btn .dot.error { background: var(--toast-error); }
+  .action-btn .dot.progress { background: var(--toast-progress); }
+  .action-btn .dot.waze { background: var(--toast-waze); }
+
+  .swatch-grid {
+    display: grid;
+    gap: 4px;
+  }
+  .swatch-grid.positions { grid-template-columns: repeat(3, 1fr); }
+  .swatch-grid.sizes { grid-template-columns: repeat(3, 1fr); }
+
+  .swatch {
+    padding: 8px 6px;
+    border: 1px solid var(--border);
+    background: var(--elevated);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+    transition: all 0.12s;
+  }
+  .swatch:hover { background: var(--hover); color: var(--text-primary); }
+  .swatch.selected {
+    border-color: var(--toast-info);
+    background: rgba(59,130,246,0.15);
+    color: var(--toast-info);
+  }
+
+  input[type=range] { width: 100%; accent-color: var(--toast-info); }
+
+  .hint {
+    background: rgba(139,92,246,0.06);
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .hint strong { color: var(--toast-progress); font-weight: 500; }
+
+  /* ── Preview area — fake planning ────────────── */
+  .preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 600px;
+    position: relative;
+  }
+
+  .fake-header {
+    display: grid;
+    grid-template-columns: 60px repeat(5, 1fr);
+    background: var(--elevated);
+    border-bottom: 1px solid var(--border);
+    height: 32px;
+  }
+  .fake-header > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-right: 1px solid var(--border);
+  }
+  .fake-header > div:last-child { border-right: none; }
+
+  .fake-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(5, 1fr);
+    position: relative;
+    min-height: 560px;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 47px,
+        rgba(255,255,255,0.03) 47px,
+        rgba(255,255,255,0.03) 48px
+      );
+  }
+  .fake-grid > div { border-right: 1px solid var(--border); position: relative; }
+  .fake-grid > div:last-child { border-right: none; }
+  .fake-tile {
+    position: absolute;
+    left: 4px; right: 4px;
+    border-left: 4px solid #3b82f6;
+    background: rgba(59,130,246,0.12);
+    border-radius: 2px;
+    padding: 3px 6px;
+    font-size: 10px;
+    color: #93c5fd;
+    line-height: 1.2;
+    overflow: hidden;
+  }
+
+  /* ── Toast container ─────────────────────────── */
+  .toast-stack {
+    position: fixed;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    transition: all 0.15s;
+  }
+  .toast-stack.pos-tr { top: 80px; right: 24px; align-items: flex-end; }
+  .toast-stack.pos-br { bottom: 24px; right: 24px; align-items: flex-end; }
+  .toast-stack.pos-tc { top: 80px; left: 50%; transform: translateX(-50%); align-items: center; }
+  .toast-stack.pos-bc { bottom: 24px; left: 50%; transform: translateX(-50%); align-items: center; }
+  .toast-stack.pos-tl { top: 80px; left: 24px; align-items: flex-start; }
+  .toast-stack.pos-bl { bottom: 24px; left: 24px; align-items: flex-start; }
+
+  .toast {
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 12px 14px;
+    pointer-events: auto;
+    min-width: 320px;
+    max-width: 420px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 3px 8px rgba(0,0,0,0.2);
+    animation: toastIn 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .toast.size-compact { min-width: 260px; max-width: 340px; padding: 10px 12px; }
+  .toast.size-large   { min-width: 380px; max-width: 500px; padding: 16px 18px; }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes toastOut {
+    to { opacity: 0; transform: translateX(30px) scale(0.96); }
+  }
+  .toast.leaving { animation: toastOut 0.2s ease-in forwards; }
+
+  .toast::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--toast-info);
+  }
+  .toast.t-info::before { background: var(--toast-info); }
+  .toast.t-success::before { background: var(--toast-success); }
+  .toast.t-error::before { background: var(--toast-error); }
+  .toast.t-progress::before { background: var(--toast-progress); }
+  .toast.t-waze::before { background: var(--toast-waze); }
+
+  .toast-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .toast-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .toast-icon.t-info { color: var(--toast-info); }
+  .toast-icon.t-success { color: var(--toast-success); }
+  .toast-icon.t-error { color: var(--toast-error); }
+  .toast-icon.t-progress { color: var(--toast-progress); }
+  .toast-icon.t-waze { color: var(--toast-waze); }
+
+  .toast-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .toast-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .toast-detail {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+  .toast-detail code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.05);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .toast-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    margin: -2px;
+    line-height: 0;
+    transition: color 0.12s;
+  }
+  .toast-close:hover { color: var(--text-primary); }
+
+  .toast-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .toast-action {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.12s;
+  }
+  .toast-action.primary {
+    background: rgba(245,158,11,0.2);
+    border-color: rgba(245,158,11,0.45);
+    color: var(--toast-waze);
+  }
+  .toast-action.primary:hover {
+    background: rgba(245,158,11,0.3);
+  }
+  .toast-action.ghost {
+    background: transparent;
+    color: var(--text-tertiary);
+    border-color: var(--border-light);
+  }
+  .toast-action.ghost:hover { color: var(--text-primary); background: var(--hover); }
+
+  /* Progress bar */
+  .toast-progress-bar {
+    margin-top: 8px;
+    height: 2px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+  }
+  .toast-progress-bar::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 30%;
+    background: var(--toast-progress);
+    animation: progressSlide 1.2s linear infinite;
+    border-radius: 1px;
+  }
+  @keyframes progressSlide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(420%); }
+  }
+
+  .toast-progress-bar.determinate::after {
+    animation: none;
+    width: var(--progress, 0%);
+    transition: width 0.3s ease-out;
+  }
+
+  /* Waze-style metric pill */
+  .waze-metrics {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  .metric {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .metric-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    font-family: Inter, system-ui;
+  }
+  .metric-value {
+    font-weight: 600;
+    color: var(--toast-success);
+  }
+  .metric-value.bad { color: var(--toast-error); }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(139,92,246,0.2);
+    border-top-color: var(--toast-progress);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Inspector (bottom) ──────────────────────── */
+  .inspector {
+    margin-top: 18px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-size: 11px;
+  }
+  .inspector h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text-secondary);
+  }
+  .inspector .log {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .inspector .log-row {
+    display: flex;
+    gap: 10px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text-tertiary);
+  }
+  .inspector .log-row .ts { color: var(--text-muted); }
+  .inspector .log-row .event { color: var(--text-secondary); font-weight: 500; min-width: 80px; }
+  .inspector .log-row .detail { color: var(--text-tertiary); }
+
+  .prompt-panel {
+    margin-top: 18px;
+    background: var(--elevated);
+    border: 1px solid rgba(139,92,246,0.3);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .prompt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(139,92,246,0.06);
+    border-bottom: 1px solid var(--border);
+  }
+  .prompt-header h3 { font-size: 12px; font-weight: 600; }
+  .copy-btn {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 4px;
+    background: rgba(139,92,246,0.15);
+    border: 1px solid rgba(139,92,246,0.4);
+    color: var(--toast-progress);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .copy-btn:hover { background: rgba(139,92,246,0.25); }
+  .copy-btn.copied {
+    background: rgba(52,211,153,0.2);
+    border-color: rgba(52,211,153,0.5);
+    color: #34d399;
+  }
+  .prompt-body {
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Compute Toaster — unifié</h1>
+  <span class="subtitle">Playground · stack, positions, variantes + Waze-style optimizer notif</span>
+</header>
+
+<div class="content">
+
+  <aside class="controls">
+    <h2>Paramètres</h2>
+
+    <div class="control-group">
+      <div class="control-label">Position stack</div>
+      <div class="swatch-grid positions" id="pos-swatches">
+        <button class="swatch" data-pos="tl">Top-L</button>
+        <button class="swatch" data-pos="tc">Top-C</button>
+        <button class="swatch" data-pos="tr">Top-R</button>
+        <button class="swatch" data-pos="bl">Bot-L</button>
+        <button class="swatch" data-pos="bc">Bot-C</button>
+        <button class="swatch selected" data-pos="br">Bot-R</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">Taille</div>
+      <div class="swatch-grid sizes" id="size-swatches">
+        <button class="swatch" data-size="compact">Compact</button>
+        <button class="swatch selected" data-size="normal">Normal</button>
+        <button class="swatch" data-size="large">Large</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>Durée auto-hide</span>
+        <span class="value" id="hide-value">4000 ms</span>
+      </div>
+      <input type="range" id="hide-slider" min="0" max="10000" step="500" value="4000">
+      <div class="control-label" style="margin-top: 6px;">
+        <span>0 (persistant)</span>
+        <span>10 s</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">Déclencheurs compute</div>
+      <button class="action-btn" data-action="edit"><span class="dot info"></span>Edit job → auto recompute</button>
+      <button class="action-btn" data-action="manual"><span class="dot progress"></span>Compute manuel (full)</button>
+      <button class="action-btn" data-action="autoplace"><span class="dot progress"></span>Auto-place job</button>
+      <button class="action-btn" data-action="success"><span class="dot success"></span>Success (standalone)</button>
+      <button class="action-btn" data-action="error"><span class="dot error"></span>Échec compute</button>
+      <button class="action-btn" data-action="waze"><span class="dot waze"></span>Waze : optim trouvée</button>
+      <button class="action-btn" data-action="chain"><span class="dot info"></span>Chaîne complète (edit → compute → done)</button>
+      <button class="action-btn" data-action="stacktest"><span class="dot info"></span>Stack test (3 events rapides)</button>
+      <button class="action-btn" data-action="clear">✕ Clear all</button>
+    </div>
+
+    <div class="control-group">
+      <div class="hint">
+        <strong>Stratégie de stack.</strong><br>
+        Un toast de progress en cours est <strong>mis à jour in-place</strong> quand son état évolue (started → done). Les events indépendants (success standalone, Waze) arrivent en stack. Max 3 visibles simultanés ; au-delà, les plus anciens sont fusionnés.
+      </div>
+    </div>
+  </aside>
+
+  <div>
+    <!-- Fake planning preview -->
+    <div class="preview">
+      <div class="fake-header">
+        <div>h</div>
+        <div>HP-01</div>
+        <div>HP-02</div>
+        <div>RO-01</div>
+        <div>FIN-01</div>
+        <div>FIN-02</div>
+      </div>
+      <div class="fake-grid">
+        <div></div>
+        <div><div class="fake-tile" style="top: 20px; height: 60px;">JOB-1021 · Maison D.</div><div class="fake-tile" style="top: 100px; height: 80px;">JOB-1025 · Studio Ora</div><div class="fake-tile" style="top: 220px; height: 70px;">JOB-1028 · BlueRoom</div></div>
+        <div><div class="fake-tile" style="top: 40px; height: 70px;">JOB-1022 · Nord Imp.</div><div class="fake-tile" style="top: 140px; height: 100px;">JOB-1027 · Clarté SA</div></div>
+        <div><div class="fake-tile" style="top: 10px; height: 130px;">JOB-1020 · Verdier</div><div class="fake-tile" style="top: 180px; height: 140px;">JOB-1026 · Horizon</div></div>
+        <div><div class="fake-tile" style="top: 60px; height: 55px;">JOB-1022 · Nord Imp.</div><div class="fake-tile" style="top: 160px; height: 80px;">JOB-1025 · Studio Ora</div></div>
+        <div><div class="fake-tile" style="top: 30px; height: 60px;">JOB-1021 · Maison D.</div><div class="fake-tile" style="top: 120px; height: 70px;">JOB-1027 · Clarté SA</div></div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="inspector">
+      <h3>Journal événements compute</h3>
+      <div class="log" id="log"></div>
+    </div>
+
+    <!-- Prompt synthesis -->
+    <div class="prompt-panel">
+      <div class="prompt-header">
+        <h3>Spec d'implémentation (copiable)</h3>
+        <button class="copy-btn" id="copy-prompt">Copier</button>
+      </div>
+      <pre class="prompt-body" id="prompt-body"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Toast stack portal -->
+<div class="toast-stack pos-br" id="toast-stack"></div>
+
+<script>
+/* ─────────────────────────────────────────────────────────
+   Toast manager — unified channel for all compute actions
+   ───────────────────────────────────────────────────────── */
+const state = {
+  position: 'br',
+  size: 'normal',
+  autoHideMs: 4000,
+  toasts: [],    // list of {id, type, title, detail, actions, pinned, progress}
+  logEntries: [],
+};
+
+const ICONS = {
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  error: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  progress: `<span class="spinner"></span>`,
+  waze: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2.05v3.03c3.39.49 6 3.39 6 6.92 0 .9-.18 1.75-.48 2.54l2.6 1.53c.56-1.24.88-2.62.88-4.07 0-5.18-3.95-9.45-9-9.95zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V2.05c-5.06.5-9 4.76-9 9.95 0 5.52 4.47 10 9.99 10 3.31 0 6.24-1.61 8.06-4.09l-2.6-1.53C16.17 17.98 14.21 19 12 19z"/></svg>`,
+};
+
+function log(event, detail) {
+  state.logEntries.unshift({ ts: new Date().toLocaleTimeString('fr-FR'), event, detail });
+  if (state.logEntries.length > 30) state.logEntries.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const container = document.getElementById('log');
+  container.innerHTML = state.logEntries.map(e =>
+    `<div class="log-row"><span class="ts">${e.ts}</span><span class="event">${e.event}</span><span class="detail">${e.detail}</span></div>`
+  ).join('');
+}
+
+function renderToasts() {
+  const stack = document.getElementById('toast-stack');
+  stack.className = `toast-stack pos-${state.position}`;
+
+  // clear existing
+  stack.innerHTML = '';
+  for (const t of state.toasts) {
+    const el = document.createElement('div');
+    el.className = `toast t-${t.type} size-${state.size}${t.leaving ? ' leaving' : ''}`;
+    el.dataset.id = t.id;
+
+    let actionsHtml = '';
+    if (t.actions && t.actions.length) {
+      actionsHtml = `<div class="toast-actions">${t.actions.map(a =>
+        `<button class="toast-action ${a.variant || 'ghost'}" data-act="${a.id}">${a.label}</button>`
+      ).join('')}</div>`;
+    }
+
+    let metricsHtml = '';
+    if (t.metrics) {
+      metricsHtml = `<div class="waze-metrics">${t.metrics.map(m =>
+        `<div class="metric"><span class="metric-label">${m.label}</span><span class="metric-value ${m.bad ? 'bad' : ''}">${m.value}</span></div>`
+      ).join('')}</div>`;
+    }
+
+    let progressHtml = '';
+    if (t.progress !== undefined) {
+      progressHtml = `<div class="toast-progress-bar${t.progress >= 0 ? ' determinate' : ''}" ${t.progress >= 0 ? `style="--progress: ${t.progress}%;"` : ''}></div>`;
+    }
+
+    el.innerHTML = `
+      <div class="toast-row">
+        <span class="toast-icon t-${t.type}">${ICONS[t.type]}</span>
+        <div class="toast-body">
+          <div class="toast-title">${t.title}</div>
+          ${t.detail ? `<div class="toast-detail">${t.detail}</div>` : ''}
+          ${metricsHtml}
+          ${actionsHtml}
+          ${progressHtml}
+        </div>
+        ${t.pinned ? '' : `<button class="toast-close" data-close="${t.id}">✕</button>`}
+      </div>`;
+    stack.appendChild(el);
+  }
+
+  stack.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => dismiss(btn.dataset.close));
+  });
+  stack.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const toast = state.toasts.find(t => t.actions && t.actions.some(a => a.id === btn.dataset.act));
+      if (!toast) return;
+      const action = toast.actions.find(a => a.id === btn.dataset.act);
+      if (action && action.onClick) action.onClick();
+    });
+  });
+}
+
+function show(toast) {
+  const id = toast.id || ('tst-' + Math.random().toString(36).slice(2, 9));
+  const full = { id, ...toast };
+  // Dedupe by id: in-place update if exists
+  const existingIdx = state.toasts.findIndex(t => t.id === id);
+  if (existingIdx >= 0) {
+    state.toasts[existingIdx] = full;
+    log('update', `${id}: ${toast.title}`);
+  } else {
+    // Cap at 3 visible
+    if (state.toasts.length >= 3) {
+      state.toasts.shift();
+    }
+    state.toasts.push(full);
+    log('show', `${id}: ${toast.title}`);
+  }
+  renderToasts();
+
+  // Auto-dismiss if not pinned and autoHideMs > 0
+  if (!full.pinned && state.autoHideMs > 0 && !full.noAutoHide) {
+    setTimeout(() => dismiss(id), state.autoHideMs);
+  }
+  return id;
+}
+
+function dismiss(id) {
+  const t = state.toasts.find(x => x.id === id);
+  if (!t) return;
+  t.leaving = true;
+  renderToasts();
+  log('dismiss', id);
+  setTimeout(() => {
+    state.toasts = state.toasts.filter(x => x.id !== id);
+    renderToasts();
+  }, 200);
+}
+
+function clearAll() {
+  state.toasts.forEach(t => t.leaving = true);
+  renderToasts();
+  setTimeout(() => {
+    state.toasts = [];
+    renderToasts();
+  }, 200);
+  log('clear', 'all toasts cleared');
+}
+
+/* ─────────────────────────────────────────────────────────
+   Compute event simulations
+   ───────────────────────────────────────────────────────── */
+
+function simulateCompute({ id, triggerLabel, durationMs = 1800, shouldFail = false }) {
+  show({
+    id, type: 'progress',
+    title: 'Recalcul du planning',
+    detail: triggerLabel,
+    progress: -1, // indeterminate
+    pinned: true,
+    noAutoHide: true,
+  });
+
+  setTimeout(() => {
+    if (shouldFail) {
+      show({
+        id, type: 'error',
+        title: 'Recalcul échoué',
+        detail: 'Engine timeout — vérifier scheduling-engine',
+        actions: [
+          { id: 'retry', label: 'Réessayer', variant: 'primary', onClick: () => simulateCompute({ id, triggerLabel, durationMs: 1500, shouldFail: false }) },
+          { id: 'ignore', label: 'Ignorer', variant: 'ghost', onClick: () => dismiss(id) },
+        ],
+        pinned: true,
+      });
+    } else {
+      show({
+        id, type: 'success',
+        title: 'Planning à jour',
+        detail: `${triggerLabel} · ${durationMs} ms`,
+        pinned: false,
+      });
+    }
+  }, durationMs);
+}
+
+function simulateWaze() {
+  const id = 'waze-' + Date.now();
+  show({
+    id, type: 'waze',
+    title: 'Optimisation trouvée',
+    detail: "L'exploration en arrière-plan a identifié une meilleure organisation.",
+    metrics: [
+      { label: 'Retards', value: '−2 jobs' },
+      { label: 'Makespan', value: '−4h 12m' },
+      { label: 'Changeovers', value: '−1', bad: false },
+    ],
+    actions: [
+      { id: 'apply', label: 'Appliquer', variant: 'primary', onClick: () => {
+        show({ id, type: 'success', title: 'Optimisation appliquée', detail: '3 jobs reprogrammés hors safety zone', pinned: false });
+      }},
+      { id: 'dismiss', label: 'Ignorer', variant: 'ghost', onClick: () => dismiss(id) },
+    ],
+    pinned: true,
+    noAutoHide: true,
+  });
+}
+
+/* ─────────────────────────────────────────────────────────
+   Wiring
+   ───────────────────────────────────────────────────────── */
+
+document.getElementById('pos-swatches').addEventListener('click', e => {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  document.querySelectorAll('#pos-swatches .swatch').forEach(s => s.classList.remove('selected'));
+  sw.classList.add('selected');
+  state.position = sw.dataset.pos;
+  renderToasts();
+  renderPrompt();
+});
+
+document.getElementById('size-swatches').addEventListener('click', e => {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  document.querySelectorAll('#size-swatches .swatch').forEach(s => s.classList.remove('selected'));
+  sw.classList.add('selected');
+  state.size = sw.dataset.size;
+  renderToasts();
+  renderPrompt();
+});
+
+document.getElementById('hide-slider').addEventListener('input', e => {
+  state.autoHideMs = parseInt(e.target.value, 10);
+  document.getElementById('hide-value').textContent = state.autoHideMs === 0 ? 'persistant' : state.autoHideMs + ' ms';
+  renderPrompt();
+});
+
+document.querySelectorAll('[data-action]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const action = btn.dataset.action;
+    switch (action) {
+      case 'edit':
+        simulateCompute({ id: 'compute-auto', triggerLabel: 'Auto-recompute : edit JOB-1025', durationMs: 1500 });
+        break;
+      case 'manual':
+        simulateCompute({ id: 'compute-manual', triggerLabel: 'Compute manuel · mode full', durationMs: 3200 });
+        break;
+      case 'autoplace':
+        simulateCompute({ id: 'autoplace-1033', triggerLabel: 'Auto-place JOB-1033', durationMs: 2100 });
+        break;
+      case 'success':
+        show({
+          type: 'success',
+          title: 'Schedule sauvegardé',
+          detail: 'Snapshot v247 persistée',
+        });
+        break;
+      case 'error':
+        simulateCompute({ id: 'compute-fail', triggerLabel: 'Auto-recompute : edit JOB-1027', durationMs: 2500, shouldFail: true });
+        break;
+      case 'waze':
+        simulateWaze();
+        break;
+      case 'chain':
+        show({ id: 'chain-1', type: 'info', title: 'JOB-1025 modifié', detail: 'deadline 2026-04-25 → 2026-04-20', pinned: false });
+        setTimeout(() => simulateCompute({ id: 'compute-chain', triggerLabel: 'Auto-recompute : JOB-1025', durationMs: 2200 }), 500);
+        setTimeout(() => simulateWaze(), 3200);
+        break;
+      case 'stacktest':
+        show({ id: 's1', type: 'info', title: 'JOB-1021 modifié', detail: 'priority 2 → 1' });
+        setTimeout(() => show({ id: 's2', type: 'info', title: 'JOB-1022 modifié', detail: 'quantity 500 → 750' }), 200);
+        setTimeout(() => simulateCompute({ id: 'compute-s', triggerLabel: '2 edits collapsés', durationMs: 2400 }), 500);
+        break;
+      case 'clear':
+        clearAll();
+        break;
+    }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────
+   Prompt synthesis
+   ───────────────────────────────────────────────────────── */
+function renderPrompt() {
+  const text = `Implémenter le Compute Toaster unifié pour Flux selon le design validé dans playground-compute-toaster.html.
+
+═══════════════════════════════════════════════════════
+CONCEPT
+═══════════════════════════════════════════════════════
+Canal unique pour tous les événements compute (auto-recompute, compute
+manuel, auto-place, background optimizer Waze). Une API show(toast)
+unique, qu'importe le caller. Le toast reflète l'état cycle de vie
+(progress → success OU error) avec mise à jour in-place sur le même id.
+
+═══════════════════════════════════════════════════════
+PARAMÈTRES VALIDÉS
+═══════════════════════════════════════════════════════
+- Position stack     : ${state.position.toUpperCase()}
+- Taille             : ${state.size}
+- Auto-hide          : ${state.autoHideMs === 0 ? 'persistant (pinned)' : state.autoHideMs + ' ms'}
+- Max stack visible  : 3 (plus ancien dégrade au-delà)
+- Animation entrée   : fadeIn + slide 10px, 200ms ease
+- Animation sortie   : fade + translateX 30px, 200ms
+
+═══════════════════════════════════════════════════════
+TYPES DE TOAST
+═══════════════════════════════════════════════════════
+1. info     (bleu #3b82f6)    — événement neutre, edit déclenché, etc.
+2. success  (vert #10b981)    — compute terminé avec succès
+3. error    (rouge #ef4444)   — compute échoué, avec retry/dismiss
+4. progress (violet #8b5cf6)  — compute en cours, spinner + bar indéterminée
+5. waze     (orange #f59e0b)  — optimisation trouvée, metrics + actions
+
+═══════════════════════════════════════════════════════
+API PROPOSÉE
+═══════════════════════════════════════════════════════
+const { show, dismiss, clearAll } = useComputeToaster();
+
+show({
+  id: 'compute-auto',                      // optional; collision = in-place update
+  type: 'progress' | 'info' | 'success' | 'error' | 'waze',
+  title: 'Recalcul du planning',
+  detail: 'edit JOB-1025',
+  progress?: number | -1,                  // -1 = indeterminate, 0..100 = determinate
+  pinned?: boolean,                        // true = ne pas auto-hide
+  noAutoHide?: boolean,
+  metrics?: [{ label, value, bad? }],      // Waze metrics
+  actions?: [{ id, label, variant, onClick }],
+});
+
+dismiss(id);
+clearAll();
+
+═══════════════════════════════════════════════════════
+INTÉGRATION — CALLERS À UNIFIER
+═══════════════════════════════════════════════════════
+- useAutoRecompute   → show progress (id stable) → update en success/error
+- ComputeModal       → même canal : feedback modal devient redondant
+- useAutoPlaceJob    → show progress 'Auto-place JOB-X' → success
+- useAutoPlaceALAP   → idem
+- (futur) BackgroundOptimizer → Waze-style toast avec actions apply/dismiss
+- StalenessBadge     → conservé pour fallback durable (persiste entre sessions)
+
+═══════════════════════════════════════════════════════
+COMPORTEMENT DE STACK
+═══════════════════════════════════════════════════════
+- Même id → update in-place, pas de nouveau toast
+- Différents id → stack, nouveau toast au-dessus (dernier = plus proche)
+- Max 3 visibles : le 4e fait tomber le plus ancien
+- Auto-hide respecté sauf si pinned/noAutoHide
+- User peut dismiss à tout moment (sauf pinned qui doit avoir action close explicite)
+
+═══════════════════════════════════════════════════════
+WAZE-STYLE BACKGROUND OPTIMIZER (FUTUR V2+)
+═══════════════════════════════════════════════════════
+- Déclencheur : après un compute manuel ou auto-recompute done,
+  lancer un explorer 60s avec seeds différents / SA / ALNS
+- Si solution trouvée améliore objective (makespan, retards, changeovers)
+  au-delà d'un seuil (ex : -5%), show({ type: 'waze', metrics: [...] })
+- User clique Apply → persist nouveau plan → autre compute terminé,
+  refresh snapshot, toast success final
+- User clique Ignore → dismiss + blacklist cette variante pour la session
+- Prérequis engine : support multi-seed / exploration post-solution
+  (pas confirmé en V1)
+
+═══════════════════════════════════════════════════════
+CSS TOKENS
+═══════════════════════════════════════════════════════
+--toast-info:     #3b82f6;
+--toast-success:  #10b981;
+--toast-error:    #ef4444;
+--toast-progress: #8b5cf6;
+--toast-waze:     #f59e0b;
+
+stack position : fixed, z-50
+padding        : ${state.size === 'compact' ? '10px 12px' : state.size === 'large' ? '16px 18px' : '12px 14px'}
+min-width      : ${state.size === 'compact' ? '260px' : state.size === 'large' ? '380px' : '320px'}
+max-width      : ${state.size === 'compact' ? '340px' : state.size === 'large' ? '500px' : '420px'}
+border-left    : 3px solid [color-by-type]
+shadow         : 0 10px 30px rgba(0,0,0,0.35), 0 3px 8px rgba(0,0,0,0.2)
+
+═══════════════════════════════════════════════════════
+REMPLACE / DÉPRÉCIE
+═══════════════════════════════════════════════════════
+- components/Toast/Toast.tsx actuel (simple, 1 toast, bottom-right)
+- hooks/useToast.ts — promu en useComputeToaster, API étendue
+- ComputeModal progress interne → routé vers toaster
+
+═══════════════════════════════════════════════════════
+REMARQUES UX
+═══════════════════════════════════════════════════════
+- Compute manuel via modal "Compute" : le modal peut se fermer immédiatement
+  et laisser le toast porter le feedback. Reduces modal friction.
+- Auto-recompute + manual concurrent : même id 'compute-schedule' →
+  dernier gagne, user voit 1 seul toast progress.
+- StalenessBadge persistant = différent du toast éphémère. Badge = état durable
+  de l'app, toast = événement ponctuel. Les deux coexistent sans conflit.
+`;
+
+  const body = document.getElementById('prompt-body');
+  body.textContent = text;
+  body.dataset.raw = text;
+}
+
+document.getElementById('copy-prompt').addEventListener('click', async () => {
+  const btn = document.getElementById('copy-prompt');
+  const raw = document.getElementById('prompt-body').dataset.raw || '';
+  try {
+    await navigator.clipboard.writeText(raw);
+    btn.textContent = '✓ Copié';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 1800);
+  } catch {
+    btn.textContent = 'Erreur';
+    setTimeout(() => { btn.textContent = 'Copier'; }, 1800);
+  }
+});
+
+renderPrompt();
+renderLog();
+</script>
+
+</body>
+</html>
