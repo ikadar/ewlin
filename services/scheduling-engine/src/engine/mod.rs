@@ -99,9 +99,18 @@ fn compute_inner(
         .map(|(i, s)| (s.id.clone(), i))
         .collect();
 
-    // Parse machine unavailability constraints into per-station blocked tick ranges.
-    // Each entry is (start_tick, end_tick) — the forward pass skips these ticks.
+    // Build per-station blocked tick ranges. Two sources feed this list:
+    //   1. Station.schedule_exceptions (new canonical source) — per-date
+    //      overrides declared on the domain entity itself.
+    //   2. SchedulingConstraint(MachineUnavailable) (legacy) — external
+    //      directives. Kept for backward-compat during the migration; will
+    //      be removed once all callers switch to Station.scheduleExceptions.
     let mut station_blocked_ranges: Vec<Vec<(usize, usize)>> = vec![Vec::new(); request.stations.len()];
+    for (station_idx, station) in request.stations.iter().enumerate() {
+        for range in station.blocked_ranges(start_date, options.horizon_days, tick_minutes) {
+            station_blocked_ranges[station_idx].push(range);
+        }
+    }
     for constraint in &request.constraints {
         if constraint.constraint_type != "MachineUnavailable" {
             continue;
@@ -1284,6 +1293,7 @@ mod integration_tests {
             drying_time_minutes: 0,
             max_operators: Some(1),
             capacity: Some(1),
+            schedule_exceptions: Vec::new(),
         }
     }
 
