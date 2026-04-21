@@ -123,7 +123,13 @@ export function TimelineColumn({
           />
         ))}
         {showNowLine && (
-          <NowLine currentTime={currentTime} startHour={startHour} pixelsPerHour={pixelsPerHour} />
+          <NowLine
+            currentTime={currentTime}
+            startHour={startHour}
+            pixelsPerHour={pixelsPerHour}
+            gridStartDate={gridStartDate}
+            collapses={effectiveCollapses}
+          />
         )}
       </div>
     </div>

@@ -115,7 +115,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
   const scrollToNow = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
-    const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate);
+    const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
     container.scrollTo({ top: Math.max(0, y - container.clientHeight / 2), behavior: 'smooth' });
   }, [gridStartDate]);
 
@@ -124,7 +124,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
     if (!scrollEl) return;
     const container = scrollEl;
     requestAnimationFrame(() => {
-      const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate);
+      const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
       container.scrollTop = Math.max(0, y - container.clientHeight / 2);
     });
   }, [scrollEl, gridStartDate, mode, id, snapshot]);
@@ -215,7 +215,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
     );
   }
 
-  const nowY = timeToYPosition(now, START_HOUR, PIXELS_PER_HOUR, gridStartDate);
+  const nowY = timeToYPosition(now, START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">

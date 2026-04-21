@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   snapToGrid,
   yPositionToTime,
-  timeToYPosition,
   formatTime,
   SNAP_INTERVAL_MINUTES,
   PIXELS_PER_SNAP,
 } from './snapUtils';
-import { PIXELS_PER_HOUR } from '../TimelineColumn';
+// `timeToYPosition` used to live here as a linear-only duplicate. It was
+// removed when the canonical (collapse-aware) version was made mandatory to
+// use; these tests now exercise the canonical one via `[]` for collapses.
+import { PIXELS_PER_HOUR, timeToYPosition } from '../TimelineColumn';
 
 describe('snapUtils', () => {
   describe('constants', () => {
@@ -65,17 +67,17 @@ describe('snapUtils', () => {
       const baseDate = new Date('2025-12-16T00:00:00');
 
       // Y=0 should be 6:00
-      const time0 = yPositionToTime(0, startHour, baseDate);
+      const time0 = yPositionToTime(0, startHour, baseDate, PIXELS_PER_HOUR, []);
       expect(time0.getHours()).toBe(6);
       expect(time0.getMinutes()).toBe(0);
 
       // Y=40 should be 6:30 (30 minutes = 40px)
-      const time40 = yPositionToTime(40, startHour, baseDate);
+      const time40 = yPositionToTime(40, startHour, baseDate, PIXELS_PER_HOUR, []);
       expect(time40.getHours()).toBe(6);
       expect(time40.getMinutes()).toBe(30);
 
       // Y=80 should be 7:00 (1 hour = 80px)
-      const time80 = yPositionToTime(80, startHour, baseDate);
+      const time80 = yPositionToTime(80, startHour, baseDate, PIXELS_PER_HOUR, []);
       expect(time80.getHours()).toBe(7);
       expect(time80.getMinutes()).toBe(0);
     });
@@ -84,7 +86,7 @@ describe('snapUtils', () => {
       const baseDate = new Date('2025-12-16T00:00:00');
 
       // Start at 8:00
-      const time = yPositionToTime(80, 8, baseDate);
+      const time = yPositionToTime(80, 8, baseDate, PIXELS_PER_HOUR, []);
       expect(time.getHours()).toBe(9);
       expect(time.getMinutes()).toBe(0);
     });
@@ -94,7 +96,7 @@ describe('snapUtils', () => {
       const startHour = 6;
 
       // Y=20 should be 6:15 (15 minutes = 20px)
-      const time = yPositionToTime(20, startHour, baseDate);
+      const time = yPositionToTime(20, startHour, baseDate, PIXELS_PER_HOUR, []);
       expect(time.getHours()).toBe(6);
       expect(time.getMinutes()).toBe(15);
     });
@@ -106,22 +108,21 @@ describe('snapUtils', () => {
 
       // 6:00 -> Y=0
       const date1 = new Date('2025-12-16T06:00:00');
-      expect(timeToYPosition(date1, startHour)).toBe(0);
+      expect(timeToYPosition(date1, startHour, PIXELS_PER_HOUR, undefined, [])).toBe(0);
 
       // 6:30 -> Y=40
       const date2 = new Date('2025-12-16T06:30:00');
-      expect(timeToYPosition(date2, startHour)).toBe(40);
+      expect(timeToYPosition(date2, startHour, PIXELS_PER_HOUR, undefined, [])).toBe(40);
 
       // 7:00 -> Y=80
       const date3 = new Date('2025-12-16T07:00:00');
-      expect(timeToYPosition(date3, startHour)).toBe(80);
+      expect(timeToYPosition(date3, startHour, PIXELS_PER_HOUR, undefined, [])).toBe(80);
     });
 
-    it('handles times before start hour with negative values', () => {
-      const startHour = 8;
-      const date = new Date('2025-12-16T06:00:00');
-      expect(timeToYPosition(date, startHour)).toBe(-160); // -2 hours * 80px
-    });
+    // Note: the previous "times before start hour → negative values" case was
+    // an artifact of the linear-only duplicate that used to live in this file.
+    // The canonical `timeToYPosition` wraps sub-`startHour` times into the
+    // next day (hours + 24) instead, so negative Y is not a valid state.
   });
 
   describe('formatTime', () => {
@@ -144,8 +145,8 @@ describe('snapUtils', () => {
 
       // Test various grid positions
       [0, 40, 80, 120, 200, 400, 800].forEach((y) => {
-        const time = yPositionToTime(y, startHour, baseDate);
-        const resultY = timeToYPosition(time, startHour);
+        const time = yPositionToTime(y, startHour, baseDate, PIXELS_PER_HOUR, []);
+        const resultY = timeToYPosition(time, startHour, PIXELS_PER_HOUR, undefined, []);
         expect(resultY).toBe(y);
       });
     });

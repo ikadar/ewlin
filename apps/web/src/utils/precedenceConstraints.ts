@@ -14,6 +14,7 @@ import type { ScheduleSnapshot, Task, TaskAssignment, Station, Element, Outsourc
 import { isOutsourcedTask, DRY_TIME_MS } from '@flux/types';
 import { parseTimestamp } from '@flux/schedule-validator';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
+import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { subtractWorkingTime, snapToNextWorkingTime, snapToPreviousWorkingTime, ceilToQuarterHour, floorToQuarterHour } from './workingTime';
 import { getElementTasks } from './taskHelpers';
 import { calculateDepartureDate, calculateReturnDate } from './outsourcingCalculation';
@@ -420,7 +421,8 @@ export function getPredecessorConstraint(
   snapshot: ScheduleSnapshot,
   startHour: number,
   pixelsPerHour: number,
-  gridStartDate?: Date
+  gridStartDate: Date | undefined,
+  collapses: readonly Collapse[],
 ): number | null {
   let latestEarliestStart: Date | null = null;
 
@@ -470,7 +472,7 @@ export function getPredecessorConstraint(
     }
   }
 
-  return timeToYPosition(latestEarliestStart, startHour, pixelsPerHour, gridStartDate);
+  return timeToYPosition(latestEarliestStart, startHour, pixelsPerHour, gridStartDate, collapses);
 }
 
 /** Information about drying time for visualization */
@@ -503,7 +505,8 @@ export function getSuccessorConstraint(
   snapshot: ScheduleSnapshot,
   startHour: number,
   pixelsPerHour: number,
-  gridStartDate?: Date
+  gridStartDate: Date | undefined,
+  collapses: readonly Collapse[],
 ): number | null {
   let earliestLatestStart: Date | null = null;
 
@@ -592,7 +595,7 @@ export function getSuccessorConstraint(
   }
   earliestLatestStart = floorToQuarterHour(earliestLatestStart);
 
-  return timeToYPosition(earliestLatestStart, startHour, pixelsPerHour, gridStartDate);
+  return timeToYPosition(earliestLatestStart, startHour, pixelsPerHour, gridStartDate, collapses);
 }
 
 /**
@@ -606,7 +609,8 @@ export function getDryingTimeInfo(
   snapshot: ScheduleSnapshot,
   startHour: number,
   pixelsPerHour: number,
-  gridStartDate?: Date
+  gridStartDate: Date | undefined,
+  collapses: readonly Collapse[],
 ): DryingTimeInfo | null {
   // Collect all predecessor assignments that are printing stations
   const printingPredecessors: TaskAssignment[] = [];
@@ -655,8 +659,8 @@ export function getDryingTimeInfo(
 
   return {
     predecessorStationId: mostConstraining.targetId,
-    predecessorEndY: timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate),
-    dryingEndY: timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate),
+    predecessorEndY: timeToYPosition(predecessorEnd, startHour, pixelsPerHour, gridStartDate, collapses),
+    dryingEndY: timeToYPosition(dryingEnd, startHour, pixelsPerHour, gridStartDate, collapses),
   };
 }
 
@@ -671,7 +675,8 @@ export function getOutsourcingTimeInfo(
   snapshot: ScheduleSnapshot,
   startHour: number,
   pixelsPerHour: number,
-  gridStartDate?: Date
+  gridStartDate: Date | undefined,
+  collapses: readonly Collapse[],
 ): OutsourcingTimeInfo | null {
   // Collect all outsourced predecessor assignments
   const outsourcedPredecessors: { assignment: TaskAssignment; task: OutsourcedTask }[] = [];
@@ -728,7 +733,7 @@ export function getOutsourcingTimeInfo(
     : parseTimestamp(mostConstraining.assignment.scheduledEnd);
 
   return {
-    departureY: timeToYPosition(departureTime, startHour, pixelsPerHour, gridStartDate),
-    returnY: timeToYPosition(returnTime, startHour, pixelsPerHour, gridStartDate),
+    departureY: timeToYPosition(departureTime, startHour, pixelsPerHour, gridStartDate, collapses),
+    returnY: timeToYPosition(returnTime, startHour, pixelsPerHour, gridStartDate, collapses),
   };
 }

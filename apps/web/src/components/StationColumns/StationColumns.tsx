@@ -38,8 +38,9 @@ export function StationColumns({
   // Calculate total height
   const totalHeight = hoursToDisplay * PIXELS_PER_HOUR;
 
-  // Calculate now line position
-  const nowPosition = timeToYPosition(now, startHour);
+  // Calculate now line position. Legacy single-day widget — no startDate,
+  // no collapses (pass explicit sentinels to satisfy the tightened signature).
+  const nowPosition = timeToYPosition(now, startHour, PIXELS_PER_HOUR, undefined, []);
 
   // Calculate departure marker position (if job has workshopExitDate)
   let departurePosition: number | null = null;
@@ -52,7 +53,7 @@ export function StationColumns({
       departureDate.getMonth() === today.getMonth() &&
       departureDate.getFullYear() === today.getFullYear()
     ) {
-      departurePosition = timeToYPosition(departureDate, startHour);
+      departurePosition = timeToYPosition(departureDate, startHour, PIXELS_PER_HOUR, undefined, []);
     }
   }
 

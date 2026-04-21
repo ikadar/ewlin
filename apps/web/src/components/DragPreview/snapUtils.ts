@@ -29,22 +29,28 @@ export function snapToGrid(y: number, pixelsPerHour: number = PIXELS_PER_HOUR): 
  * Convert a Y position to a Date, given the start hour of the grid.
  * Supports multi-day grids (REQ-14) where Y position can span multiple days.
  *
+ * `collapses` is REQUIRED (pass `[]` when the target context has none). This
+ * used to be optional and silently forced callers back to a linear inverse
+ * whenever forgotten — same bug family as `timeToYPosition`. Making it
+ * required turns a miss into a TypeScript error.
+ *
  * @param y - Y position in pixels (relative to grid top)
  * @param startHour - Starting hour of the grid (e.g., 6 for 6:00 AM)
  * @param baseDate - Optional base date (defaults to today). For multi-day grids, this is the grid start date.
  * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
- * @param collapses - Optional sorted list of collapse bands. Inverse of timeToYPosition's
- *   piecewise mapping. A `y` that lands inside a band's rendered range returns the band's
- *   `from` time (matching the timeToY clamp behavior).
+ * @param collapses - Sorted list of collapse bands (use `[]` for none).
+ *   Inverse of `timeToYPosition`'s piecewise mapping. A `y` that lands
+ *   inside a band's rendered range returns the band's `from` time
+ *   (matching the timeToY clamp behavior).
  */
 export function yPositionToTime(
   y: number,
   startHour: number,
-  baseDate?: Date,
-  pixelsPerHour: number = PIXELS_PER_HOUR,
-  collapses?: readonly Collapse[],
+  baseDate: Date | undefined,
+  pixelsPerHour: number,
+  collapses: readonly Collapse[],
 ): Date {
-  if (!collapses || collapses.length === 0) {
+  if (collapses.length === 0) {
     // Original linear path — kept verbatim so drag callers don't shift behavior.
     return linearYToTimeStartHour(y, startHour, pixelsPerHour, baseDate);
   }
@@ -97,20 +103,6 @@ function linearTimeToYMultiDay(time: Date, baseDate: Date, pixelsPerHour: number
   const timeDayUtc = Date.UTC(time.getFullYear(), time.getMonth(), time.getDate());
   const daysDiff = Math.round((timeDayUtc - startDayUtc) / (24 * 60 * 60 * 1000));
   const totalHours = daysDiff * 24 + time.getHours() + time.getMinutes() / 60;
-  return totalHours * pixelsPerHour;
-}
-
-/**
- * Convert a Date to Y position, given the start hour of the grid.
- * @param time - Date to convert
- * @param startHour - Starting hour of the grid
- * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
- * @returns Y position in pixels
- */
-export function timeToYPosition(time: Date, startHour: number, pixelsPerHour: number = PIXELS_PER_HOUR): number {
-  const hours = time.getHours() - startHour;
-  const minutes = time.getMinutes();
-  const totalHours = hours + minutes / 60;
   return totalHours * pixelsPerHour;
 }
 

@@ -3,24 +3,42 @@ import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 /**
  * Calculate Y position from time.
+ *
+ * `collapses` is REQUIRED (not optional) so callers must consciously decide
+ * whether the grid they address has collapse bands. Pass `[]` when the target
+ * context has none (focus view, minimap, linear tests).
+ *
+ * Background: this argument used to be optional, which silently downgraded
+ * callers to a pure-linear projection whenever forgotten. That caused two
+ * bugs in the same week (phantom recalage bleeding into the neighbour tile,
+ * scroll-to-date landing in the wrong place). Making it required turns every
+ * missed call into a TypeScript error.
+ *
+ * `startDate` stays optional to preserve the legacy single-day origin (y=0
+ * at `startHour`) used by a handful of single-day callers. When absent the
+ * function returns the same value it did before this change.
+ *
  * @param time - The time to convert
  * @param startHour - The starting hour of the timeline
  * @param pixelsPerHour - Pixels per hour (defaults to PIXELS_PER_HOUR constant)
- * @param startDate - Optional start date for multi-day grid (REQ-14)
- * @param collapses - Optional sorted list of collapse bands. When present, the
- *   mapping becomes piecewise-linear: each band earlier than `time` contributes
- *   exactly COLLAPSED_BAND_PX (instead of its real height in pixels). A `time`
- *   that lands inside a band is clamped to the band's start.
+ * @param startDate - Optional start date for multi-day grid (REQ-14). When
+ *   present, y=0 is midnight of `startDate`. When absent, y=0 is `startHour`
+ *   of the current day.
+ * @param collapses - Sorted list of collapse bands (use `[]` for none).
+ *   When non-empty, the mapping becomes piecewise-linear: each band earlier
+ *   than `time` contributes exactly its `heightPx` instead of its real
+ *   wall-clock height. A `time` that lands inside a band is clamped to the
+ *   band's start.
  */
 export function timeToYPosition(
   time: Date,
   startHour: number,
   pixelsPerHour: number = PIXELS_PER_HOUR,
-  startDate?: Date,
-  collapses?: readonly Collapse[],
+  startDate: Date | undefined,
+  collapses: readonly Collapse[],
 ): number {
   const linearY = linearTimeToY(time, startHour, pixelsPerHour, startDate);
-  if (!collapses || collapses.length === 0) return linearY;
+  if (collapses.length === 0) return linearY;
 
   let offset = 0;
   const timeMs = time.getTime();

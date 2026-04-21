@@ -149,7 +149,7 @@ describe('getPredecessorConstraint', () => {
       tasks: [task],
     });
 
-    const result = getPredecessorConstraint(task, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(task, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
     expect(result).toBeNull();
   });
 
@@ -166,7 +166,7 @@ describe('getPredecessorConstraint', () => {
       assignments: [], // No assignments
     });
 
-    const result = getPredecessorConstraint(task2, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(task2, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
     expect(result).toBeNull();
   });
 
@@ -194,7 +194,7 @@ describe('getPredecessorConstraint', () => {
       ],
     });
 
-    const result = getPredecessorConstraint(task2, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(task2, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // 10:00 is 4 hours from startHour 6
     // Expected Y = 4 * PIXELS_PER_HOUR
@@ -232,7 +232,7 @@ describe('getPredecessorConstraint', () => {
       ],
     });
 
-    const result = getPredecessorConstraint(cutTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(cutTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // 10:00 + 4h = 14:00, which is 8 hours from startHour 6
     // Expected Y = 8 * PIXELS_PER_HOUR
@@ -273,7 +273,7 @@ describe('getPredecessorConstraint', () => {
       }],
     });
 
-    const result = getPredecessorConstraint(cutTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(cutTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // 10:00 is 4 hours from startHour 6 (no dry time added)
     expect(result).toBe(4 * PIXELS_PER_HOUR);
@@ -292,7 +292,7 @@ describe('getSuccessorConstraint', () => {
       tasks: [task],
     });
 
-    const result = getSuccessorConstraint(task, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getSuccessorConstraint(task, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
     expect(result).toBeNull();
   });
 
@@ -309,7 +309,7 @@ describe('getSuccessorConstraint', () => {
       assignments: [], // No assignments
     });
 
-    const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
     expect(result).toBeNull();
   });
 
@@ -335,7 +335,7 @@ describe('getSuccessorConstraint', () => {
       stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
-    const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // Successor starts at 14:00, task1 duration is 60 min
     // Latest start for task1 = 14:00 - 60 min = 13:00
@@ -365,7 +365,7 @@ describe('getSuccessorConstraint', () => {
       stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
-    const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // Successor starts at 14:00, task1 duration is 120 min (2h)
     // Latest start for task1 = 14:00 - 2h = 12:00
@@ -564,7 +564,7 @@ describe('getPredecessorConstraint with outsourced predecessor (v0.5.12)', () =>
       providers: [createProvider('provider-1')],
     });
 
-    const result = getPredecessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // Manual return at 10:00 = 4 hours from startHour 6
     expect(result).toBe(4 * PIXELS_PER_HOUR);
@@ -592,7 +592,7 @@ describe('getPredecessorConstraint with outsourced predecessor (v0.5.12)', () =>
       providers: [createProvider('provider-1')],
     });
 
-    const result = getPredecessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getPredecessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // Scheduled end at 12:00 = 6 hours from startHour 6
     expect(result).toBe(6 * PIXELS_PER_HOUR);
@@ -626,7 +626,7 @@ describe('getSuccessorConstraint with outsourced successor (v0.5.12)', () => {
       providers: [createProvider('provider-1')],
     });
 
-    const result = getSuccessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getSuccessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // Manual departure at 14:00, internal task is 60 min
     // Latest start = 14:00 - 60 min = 13:00
@@ -657,7 +657,7 @@ describe('getSuccessorConstraint with outsourced successor (v0.5.12)', () => {
       providers: [createProvider('provider-1')],
     });
 
-    const result = getSuccessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getSuccessorConstraint(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     // Scheduled departure at 16:00, internal task is 60 min
     // Latest start = 16:00 - 60 min = 15:00
@@ -693,7 +693,7 @@ describe('getOutsourcingTimeInfo (v0.5.13)', () => {
       stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
-    const result = getOutsourcingTimeInfo(task2, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getOutsourcingTimeInfo(task2, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
     expect(result).toBeNull();
   });
 
@@ -720,7 +720,7 @@ describe('getOutsourcingTimeInfo (v0.5.13)', () => {
       providers: [createProvider('provider-1')],
     });
 
-    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     expect(result).not.toBeNull();
     // Departure at 14:00 = 8 hours from startHour 6
@@ -754,7 +754,7 @@ describe('getOutsourcingTimeInfo (v0.5.13)', () => {
       providers: [createProvider('provider-1')],
     });
 
-    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
 
     expect(result).not.toBeNull();
     // Departure at 14:00 = 8 hours from startHour 6
@@ -777,7 +777,7 @@ describe('getOutsourcingTimeInfo (v0.5.13)', () => {
       providers: [createProvider('provider-1')],
     });
 
-    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR);
+    const result = getOutsourcingTimeInfo(internalTask, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
     expect(result).toBeNull();
   });
 });

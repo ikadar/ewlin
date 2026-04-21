@@ -80,23 +80,33 @@ describe('NowLine', () => {
 describe('timeToYPosition', () => {
   it('calculates position for exact hour', () => {
     const time = new Date(2024, 11, 16, 8, 0);
-    expect(timeToYPosition(time, 6)).toBe(160); // (8-6) * 80
+    expect(timeToYPosition(time, 6, 80, undefined, [])).toBe(160); // (8-6) * 80
   });
 
   it('calculates position for half hour', () => {
     const time = new Date(2024, 11, 16, 8, 30);
-    expect(timeToYPosition(time, 6)).toBe(200); // (8-6) * 80 + 40
+    expect(timeToYPosition(time, 6, 80, undefined, [])).toBe(200); // (8-6) * 80 + 40
   });
 
   it('handles times after midnight with wrap-around', () => {
     const time = new Date(2024, 11, 16, 2, 0);
     // 2h with startHour=6 => (2+24-6) * 80 = 20 * 80 = 1600
-    expect(timeToYPosition(time, 6)).toBe(1600);
+    expect(timeToYPosition(time, 6, 80, undefined, [])).toBe(1600);
   });
 
   it('handles times at startHour', () => {
     const time = new Date(2024, 11, 16, 6, 0);
-    expect(timeToYPosition(time, 6)).toBe(0);
+    expect(timeToYPosition(time, 6, 80, undefined, [])).toBe(0);
+  });
+
+  it('refuses to compile without explicit collapses', () => {
+    const time = new Date(2024, 11, 16, 8, 0);
+    // Guard against a future regression that would re-introduce the optional
+    // `collapses` parameter. The silent fallback to a linear projection was
+    // the root cause of the "phantom recalage" and "DateStrip click lands
+    // elsewhere" bugs, so missing this argument must stay a type error.
+    // @ts-expect-error — collapses is required
+    timeToYPosition(time, 6, 80, undefined);
   });
 });
 

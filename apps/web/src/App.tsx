@@ -29,6 +29,7 @@ import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell'
 import { Toast } from './components/Toast';
 import { useToast, useMassUnschedule } from './hooks';
 import { computeCollapses } from './utils/computeCollapses';
+import type { Collapse } from './components/SchedulingGrid/collapseConfig';
 import { yPositionToTime } from './components/DragPreview/snapUtils';
 import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { getErrorMessage } from './store/api/errorNormalization';
@@ -92,6 +93,9 @@ interface KeyboardContext {
   gridRef: React.RefObject<SchedulingGridHandle | null>;
   pixelsPerHour: number;
   gridStartDate: Date;
+  /** Collapse bands currently active on the grid — required by `timeToYPosition`
+   *  calls inside the jump-to handlers so scroll targets match the rendered Y. */
+  collapses: readonly Collapse[];
   setSelectedJobId: (id: string | null) => void;
 }
 
@@ -130,7 +134,7 @@ function handleJumpToDeparture(e: KeyboardEvent, ctx: KeyboardContext): boolean 
     e.preventDefault();
     if (ctx.selectedJob?.workshopExitDate && ctx.gridRef.current) {
       const departureDate = new Date(ctx.selectedJob.workshopExitDate);
-      const y = timeToYPosition(departureDate, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate);
+      const y = timeToYPosition(departureDate, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate, ctx.collapses);
       const viewportHeight = ctx.gridRef.current.getViewportHeight();
       const scrollTarget = Math.max(0, y - viewportHeight + 100);
       ctx.gridRef.current.scrollToY(scrollTarget);
@@ -145,7 +149,7 @@ function handleJumpToToday(e: KeyboardEvent, ctx: KeyboardContext): boolean {
     e.preventDefault();
     if (ctx.gridRef.current) {
       const now = new Date();
-      const y = timeToYPosition(now, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate);
+      const y = timeToYPosition(now, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate, ctx.collapses);
       const viewportHeight = ctx.gridRef.current.getViewportHeight();
       const scrollTarget = Math.max(0, y - viewportHeight / 2);
       ctx.gridRef.current.scrollToY(scrollTarget);
@@ -807,7 +811,7 @@ function AppContent() {
 
     // Calculate Y position for today at current time
     const now = new Date();
-    const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate);
+    const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
     // Scroll to center today in the viewport
     const viewportHeight = gridRef.current.getViewportHeight();
@@ -815,7 +819,7 @@ function AppContent() {
     gridRef.current.scrollToY(scrollTarget, 'instant');
 
     hasScrolledToToday.current = true;
-  }, [pixelsPerHour, gridStartDate]);
+  }, [pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // REQ-15: Get departure date for selected job
   const departureDate = useMemo(() => {
@@ -1156,6 +1160,7 @@ function AppContent() {
       gridRef,
       pixelsPerHour,
       gridStartDate,
+      collapses: effectiveCollapses,
       setSelectedJobId,
     };
 
@@ -1263,7 +1268,7 @@ function AppContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleComputeIncremental]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleComputeIncremental]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
@@ -1297,7 +1302,7 @@ function AppContent() {
 
     // Calculate Y position from assignment's scheduledStart (multi-day aware)
     const startTime = new Date(assignment.scheduledStart);
-    const y = timeToYPosition(startTime, START_HOUR, pixelsPerHour, gridStartDate);
+    const y = timeToYPosition(startTime, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
     // Position the tile ~20vh from top of viewport
     const viewportHeight = gridRef.current.getViewportHeight();
@@ -1325,7 +1330,7 @@ function AppContent() {
       scrollTargetX,
       scrollTargetY,
     });
-  }, [activeStations, categoryMap, pixelsPerHour, gridStartDate]);
+  }, [activeStations, categoryMap, pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // JobCard click: select + center grid on the earliest non-completed tile of the job
   // (mirrors OperatorSchedulePage.handleSelectJob for behavioral parity between views).
@@ -1556,11 +1561,15 @@ function AppContent() {
   const handleDateClick = useCallback((date: Date) => {
     if (!gridRef.current) return;
 
-    // Calculate Y position for the start of the clicked day (at START_HOUR)
-    // Use multi-day calculation with gridStartDate
+    // Calculate Y position for the start of the clicked day (at START_HOUR).
+    // Must feed `effectiveCollapses` to `timeToYPosition` so the target Y
+    // matches the grid's collapse-aware layout — otherwise the click lands on
+    // a Y computed as if the grid were purely linear, sending the viewport
+    // far away from the requested date. `OperatorSchedulePage.handleDateClick`
+    // already does this; parity with its call shape is what this branch owes.
     const targetDate = new Date(date);
     targetDate.setHours(START_HOUR, 0, 0, 0);
-    const y = timeToYPosition(targetDate, START_HOUR, pixelsPerHour, gridStartDate);
+    const y = timeToYPosition(targetDate, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
     // Scroll to position with a small offset from top
     const scrollTarget = Math.max(0, y);
@@ -1570,7 +1579,7 @@ function AppContent() {
       date: date.toISOString().split('T')[0],
       scrollTarget,
     });
-  }, [pixelsPerHour, gridStartDate]);
+  }, [pixelsPerHour, gridStartDate, effectiveCollapses]);
 
   // Scroll grid to today on initial load
   useEffect(() => {
@@ -1774,20 +1783,20 @@ function AppContent() {
     selectedJobId,
     onJumpToToday: useCallback(() => {
       if (gridRef.current) {
-        const now = new Date();
-        const diffMs = now.getTime() - gridStartDate.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        const y = diffHours * pixelsPerHour;
+        // Route through `timeToYPosition` so the scroll is collapse-aware.
+        // Previous impl used a raw `diffHours * pixelsPerHour` formula that
+        // ignored collapses entirely — silently misaligned with the grid.
+        const y = timeToYPosition(new Date(), START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
         gridRef.current.scrollToY(y - 200, 'smooth');
       }
-    }, [gridStartDate, pixelsPerHour]),
+    }, [gridStartDate, pixelsPerHour, effectiveCollapses]),
     onJumpToDeparture: useCallback(() => {
       if (gridRef.current && selectedJob?.workshopExitDate) {
         const deadline = getDeadlineDate(selectedJob.workshopExitDate);
-        const y = timeToYPosition(deadline, START_HOUR, pixelsPerHour, gridStartDate);
+        const y = timeToYPosition(deadline, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
         gridRef.current.scrollToY(y - 200, 'smooth');
       }
-    }, [selectedJob, pixelsPerHour, gridStartDate]),
+    }, [selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses]),
     onPrevJob: useCallback(() => {
       if (!selectedJobId || orderedJobIds.length === 0) return;
       const idx = orderedJobIds.indexOf(selectedJobId);

@@ -653,7 +653,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         departureDate.getMonth() === today.getMonth() &&
         departureDate.getFullYear() === today.getFullYear()
       ) {
-        departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour);
+        // Single-day mode: no startDate, no collapses. Pass explicit sentinels
+        // so this legacy branch compiles against the tightened signature.
+        departurePosition = timeToYPosition(departureDate, startHour, pixelsPerHour, undefined, []);
       }
     }
   }

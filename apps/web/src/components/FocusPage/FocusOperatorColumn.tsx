@@ -136,8 +136,8 @@ export function FocusOperatorColumn({
         const station = stationMap.get(task.stationId);
         const assignment = operatorAssignments.find((a) => a.id === slice.assignmentId);
 
-        const top = timeToYPosition(slice.from, startHour, pixelsPerHour, gridStartDate);
-        const bottom = timeToYPosition(slice.to, startHour, pixelsPerHour, gridStartDate);
+        const top = timeToYPosition(slice.from, startHour, pixelsPerHour, gridStartDate, []);
+        const bottom = timeToYPosition(slice.to, startHour, pixelsPerHour, gridStartDate, []);
         const height = Math.max(bottom - top, 8);
 
         const isLate =

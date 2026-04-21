@@ -64,7 +64,7 @@ describe('timeToY / yToTime piecewise round-trip', () => {
 
   it('gives the linear Y when no collapses', () => {
     const t = new Date(2026, 3, 14, 6, 0); // Tue 06:00 → 30h after baseDate
-    expect(timeToYPosition(t, 0, PX, baseDate)).toBe(30 * PX);
+    expect(timeToYPosition(t, 0, PX, baseDate, [])).toBe(30 * PX);
   });
 
   it('shrinks Y for times after a band by (realPx - heightPx)', () => {

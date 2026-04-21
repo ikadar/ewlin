@@ -74,7 +74,10 @@ export const Minimap = memo(function Minimap({
   // Convert a time (ms) to a grid scrollTop position
   const timeToScrollY = useCallback((timeMs: number) => {
     const time = new Date(timeMs);
-    return timeToYPosition(time, startHour, pixelsPerHour, startDate);
+    // Minimap renders a linear density projection, not a collapse-aware one —
+    // bands would distort the per-pixel time density. If we ever want to
+    // visualise collapses on the minimap, it needs a dedicated design.
+    return timeToYPosition(time, startHour, pixelsPerHour, startDate, []);
   }, [startHour, pixelsPerHour, startDate]);
 
   const windowStartScrollY = timeToScrollY(windowStartMs);

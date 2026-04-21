@@ -7,7 +7,6 @@ export type { ValidationMessageProps } from './ValidationMessage';
 export {
   snapToGrid,
   yPositionToTime,
-  timeToYPosition,
   formatTime,
   getPixelsPerSnap,
   SNAP_INTERVAL_MINUTES,
