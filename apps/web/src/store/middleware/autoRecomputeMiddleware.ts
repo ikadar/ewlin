@@ -26,7 +26,6 @@ import { stationApi } from '../api/stationApi';
 import { stationCategoryApi } from '../api/stationCategoryApi';
 import { providerApi } from '../api/providerApi';
 import { fluxApi } from '../api/fluxApi';
-import { constraintApi } from '../api/constraintApi';
 
 type TriggerFn = (reason: string) => void;
 
@@ -59,10 +58,7 @@ type AutoRecomputeEndpointName =
   | Extract<keyof typeof providerApi.endpoints,
       'createProvider' | 'updateProvider' | 'deleteProvider'>
   // Element prerequisite status — flipping to Ready unblocks held tasks.
-  | Extract<keyof typeof fluxApi.endpoints, 'updateElementPrerequisite'>
-  // Scheduling constraints — direct engine directives.
-  | Extract<keyof typeof constraintApi.endpoints,
-      'createSchedulingConstraint' | 'deleteSchedulingConstraint'>;
+  | Extract<keyof typeof fluxApi.endpoints, 'updateElementPrerequisite'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -91,8 +87,6 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updateProvider',
   'deleteProvider',
   'updateElementPrerequisite',
-  'createSchedulingConstraint',
-  'deleteSchedulingConstraint',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {

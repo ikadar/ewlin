@@ -10,7 +10,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
-import { constraintApi } from './api/constraintApi';
 import { autoRecomputeMiddleware } from './middleware/autoRecomputeMiddleware';
 import { templateApi } from './api/templateApi';
 import { clientApi } from './api/clientApi';
@@ -58,7 +57,6 @@ export const store = configureStore({
     [adminUserApi.reducerPath]: adminUserApi.reducer,
     [adminUserGroupApi.reducerPath]: adminUserGroupApi.reducer,
     [consoleApi.reducerPath]: consoleApi.reducer,
-    [constraintApi.reducerPath]: constraintApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -88,7 +86,6 @@ export const store = configureStore({
       .concat(adminUserApi.middleware)
       .concat(adminUserGroupApi.middleware)
       .concat(consoleApi.middleware)
-      .concat(constraintApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we

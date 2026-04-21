@@ -20,7 +20,6 @@ const SETTINGS_ITEMS = [
   { label: 'Formats feuille (Impositions)', path: '/settings/feuille-formats' },
   { label: 'Templates',                   path: '/settings/templates' },
   { label: 'Safety Zone',                 path: '/settings/safety-zone' },
-  { label: 'Contraintes scheduling',      path: '/settings/scheduling-constraints' },
 ];
 
 /**
