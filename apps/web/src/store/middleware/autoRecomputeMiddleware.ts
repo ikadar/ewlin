@@ -66,6 +66,10 @@ const AUTO_RECOMPUTE_ENDPOINTS = new Set<string>([
   // Element prerequisite status — flipping to Ready unblocks previously
   // held tasks, changing what the engine can schedule.
   'updateElementPrerequisite',
+  // Scheduling constraints — direct engine directives (machine down,
+  // operator absent, pinned start, duration override).
+  'createSchedulingConstraint',
+  'deleteSchedulingConstraint',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {
