@@ -67,6 +67,8 @@ import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
 import { SafetyBand } from '../components/SafetyBand';
+import { buildSequenceIndexLookup, isInSafetyZone, makeSafetyKey } from '../utils/safetyZone';
+import { useSetSafetyOverrideMutation } from '../store';
 import { OperatorHeader } from '../components/OperatorHeaders';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
@@ -306,6 +308,39 @@ export default function OperatorSchedulePage() {
   const lateJobIds = useMemo(
     () => new Set(snapshot.lateJobs.map((lj) => lj.jobId)),
     [snapshot.lateJobs],
+  );
+
+  // Safety zone derivations — mirror App.tsx so the operator view
+  // surfaces the same Sky snowflake widget on in-zone tiles.
+  const sequenceIndexByTaskId = useMemo(
+    () => buildSequenceIndexLookup(snapshot),
+    [snapshot.jobs, snapshot.elements, snapshot.tasks],
+  );
+  const safetyOverrideLookup = useMemo(() => {
+    const m = new Map<string, boolean>();
+    (snapshot.safetyOverrides ?? []).forEach((o) => {
+      if (o.isOverridden) m.set(makeSafetyKey(o.jobId, o.sequenceIndex, o.stationId), true);
+    });
+    return m;
+  }, [snapshot.safetyOverrides]);
+  const [setSafetyOverride] = useSetSafetyOverrideMutation();
+  const handleToggleFrozenOverride = useCallback(
+    async (jobId: string, sequenceIndex: number, stationId: string) => {
+      const existing = (snapshot.safetyOverrides ?? []).find(
+        (o) =>
+          o.jobId === jobId && o.sequenceIndex === sequenceIndex && o.stationId === stationId,
+      );
+      const next = existing ? !existing.isOverridden : true;
+      try {
+        await setSafetyOverride({
+          jobId,
+          body: { sequenceIndex, stationId, isOverridden: next },
+        }).unwrap();
+      } catch (err) {
+        console.error('Failed to toggle safety override (operator view)', err);
+      }
+    },
+    [snapshot.safetyOverrides, setSafetyOverride],
   );
 
   // ---- Group assignments by operator ----
@@ -1002,6 +1037,17 @@ export default function OperatorSchedulePage() {
       ? { start: taskStart, end: new Date(taskStart.getTime() + setupMinutes * 60_000) }
       : undefined;
 
+    // Safety zone per-tile state.
+    const zoneHours = snapshot.safetyZoneHours ?? 0;
+    const inZone = zoneHours > 0 && assignment
+      ? isInSafetyZone(assignment.scheduledStart, zoneHours, new Date())
+      : false;
+    const seqIdx = task ? sequenceIndexByTaskId.get(task.id) : undefined;
+    const stationIdForTile = task && isInternalTask(task) ? task.stationId : undefined;
+    const isOverridden = inZone && seqIdx !== undefined && stationIdForTile
+      ? safetyOverrideLookup.get(makeSafetyKey(job.id, seqIdx, stationIdForTile)) === true
+      : false;
+
     return (
       <TileSegment
         key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -1026,6 +1072,12 @@ export default function OperatorSchedulePage() {
         assignmentId={assignment?.id}
         isPinned={assignment?.isPinned ?? false}
         onTogglePin={handleTogglePin}
+        taskId={task?.id}
+        stationId={stationIdForTile}
+        sequenceIndex={seqIdx}
+        inSafetyZone={inZone}
+        isFrozenOverridden={isOverridden}
+        onToggleFrozenOverride={handleToggleFrozenOverride}
         {...positionProps}
       />
     );

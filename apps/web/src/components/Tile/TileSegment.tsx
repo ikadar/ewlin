@@ -58,6 +58,18 @@ interface TileSegmentProps {
   isPinned?: boolean;
   /** Callback when the inline pin icon is clicked. Omit to render the segment read-only. */
   onTogglePin?: (assignmentId: string) => void;
+  /** Task id — needed to key the safety override lookup + cascade FK on Rust payload. */
+  taskId?: string;
+  /** Station id on which this task is placed — part of the override tuple key. */
+  stationId?: string;
+  /** Flat sequence index inside the job (0-based) — part of the override tuple key. */
+  sequenceIndex?: number;
+  /** Whether this tile falls inside the current safety zone boundary. */
+  inSafetyZone?: boolean;
+  /** Whether the user has explicitly released this tile from the freeze. */
+  isFrozenOverridden?: boolean;
+  /** Callback when the Sky snowflake is clicked. Receives (jobId, sequenceIndex, stationId). */
+  onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
 }
 
 /**
@@ -111,7 +123,25 @@ export function TileSegment({
   assignmentId,
   isPinned,
   onTogglePin,
+  stationId,
+  sequenceIndex,
+  inSafetyZone = false,
+  isFrozenOverridden = false,
+  onToggleFrozenOverride,
 }: TileSegmentProps) {
+  // Safety zone visual integration mirrors Tile.tsx so both planning
+  // surfaces (machine grid + operator grid) stay visually consistent.
+  const isSafetyFrozen = inSafetyZone && !isFrozenOverridden;
+  const safetyZoneClass = isSafetyFrozen
+    ? 'safety-zone-frozen'
+    : inSafetyZone && isFrozenOverridden
+      ? 'safety-zone-overridden'
+      : '';
+  const canToggleFrozen =
+    onToggleFrozenOverride !== undefined &&
+    jobId !== undefined &&
+    stationId !== undefined &&
+    sequenceIndex !== undefined;
   const colors = getStateInlineColors(tileState);
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
@@ -152,7 +182,7 @@ export function TileSegment({
 
   return (
     <div
-      className="absolute cursor-pointer"
+      className={`absolute cursor-pointer ${safetyZoneClass}`}
       style={{
         top: `${top + (sawtoothTop ? 0 : 1)}px`,
         height: `${totalHeight - (sawtoothTop ? 0 : 1) - (sawtoothBottom ? 0 : 1)}px`,
@@ -164,6 +194,8 @@ export function TileSegment({
       data-testid={`tile-segment-${segmentKey}`}
       data-job-id={jobId}
       data-pinned={isPinned ? 'true' : 'false'}
+      data-safety-frozen={isSafetyFrozen ? 'true' : undefined}
+      data-safety-overridden={inSafetyZone && isFrozenOverridden ? 'true' : undefined}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div
@@ -250,6 +282,31 @@ export function TileSegment({
                   onTogglePin(assignmentId);
                 }}
               />
+            </span>
+          )}
+          {inSafetyZone && canToggleFrozen && (
+            <span className="inline-flex align-middle mr-1">
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
+                  isFrozenOverridden
+                    ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
+                    : 'text-sky-400 hover:text-sky-300'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Narrowed by canToggleFrozen above.
+                  onToggleFrozenOverride!(jobId!, sequenceIndex!, stationId!);
+                }}
+                aria-label={
+                  isFrozenOverridden
+                    ? 'Override actif — clic pour restaurer le freeze auto'
+                    : 'Frozen par safety zone — clic pour libérer'
+                }
+              >
+                <path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z" />
+              </svg>
             </span>
           )}
           {label}
