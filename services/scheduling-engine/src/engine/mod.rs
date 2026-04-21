@@ -1384,6 +1384,8 @@ mod integration_tests {
             fbi_max_iterations: 1,
             multi_start: false,
             perturbed_starts: 0,
+            skip_lns: None,
+            lns_budget_ms: None,
         })
     }
 
@@ -1898,7 +1900,7 @@ mod integration_tests {
             stations: vec![station],
             operators: vec![alice],
             jobs,
-            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0 }),
+            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None }),
             station_groups: Vec::new(),
             constraints: Vec::new(),
             occupied_slots: Vec::new(),
@@ -1958,7 +1960,7 @@ mod integration_tests {
                 make_2step_job("B", fmt(48)), // listed first, loose
                 make_2step_job("A", fmt(5)),  // listed second, tight
             ],
-            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0 }),
+            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None }),
             station_groups: Vec::new(),
             constraints: Vec::new(),
             occupied_slots: Vec::new(),
