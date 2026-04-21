@@ -10,6 +10,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { scheduleApi } from './api/scheduleApi';
+import { autoRecomputeMiddleware } from './middleware/autoRecomputeMiddleware';
 import { templateApi } from './api/templateApi';
 import { clientApi } from './api/clientApi';
 import { referentApi } from './api/referentApi';
@@ -84,7 +85,12 @@ export const store = configureStore({
       .concat(authApi.middleware)
       .concat(adminUserApi.middleware)
       .concat(adminUserGroupApi.middleware)
-      .concat(consoleApi.middleware),
+      .concat(consoleApi.middleware)
+      // Fires useAutoRecompute.trigger when a scheduling-constraint
+      // mutation fulfils. Registered last so the API middlewares run
+      // first and the /fulfilled action is fully processed before we
+      // dispatch the trigger.
+      .concat(autoRecomputeMiddleware),
   devTools: import.meta.env.DEV,
 });
 

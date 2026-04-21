@@ -14,10 +14,11 @@
  * session.
  */
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { useAutoRecompute, useComputeToaster } from '../hooks';
 import type { ComputeToastMetric } from '../hooks/useComputeToaster';
 import { ComputeToastStack } from '../components/ComputeToastStack';
+import { registerAutoRecomputeTrigger } from '../store/middleware/autoRecomputeMiddleware';
 
 interface ContextValue {
   /**
@@ -97,6 +98,15 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
       });
     }
   });
+
+  // Expose this trigger to the RTK middleware so every mutation in the
+  // auto-recompute allow-list (see autoRecomputeMiddleware) can call
+  // trigger() without importing React state. The debounce inside the
+  // hook absorbs chained mutations into a single compute run.
+  useEffect(() => {
+    registerAutoRecomputeTrigger(autoRecompute.trigger);
+    return () => registerAutoRecomputeTrigger(null);
+  }, [autoRecompute.trigger]);
 
   const value: ContextValue = {
     trigger: autoRecompute.trigger,
