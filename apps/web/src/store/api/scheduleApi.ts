@@ -333,13 +333,19 @@ export const scheduleApi = createApi({
      */
     clearAllAssignments: builder.mutation<
       { unassignedCount: number },
-      { includeInProgress?: boolean; fuseSplits?: boolean; includePinned?: boolean } | void
+      {
+        includeInProgress?: boolean;
+        fuseSplits?: boolean;
+        includePinned?: boolean;
+        includeFrozen?: boolean;
+      } | void
     >({
       query: (opts) => {
         const params = new URLSearchParams();
         if (opts && opts.includeInProgress) params.set('includeInProgress', '1');
         if (opts && opts.fuseSplits) params.set('fuseSplits', '1');
         if (opts && opts.includePinned) params.set('includePinned', '1');
+        if (opts && opts.includeFrozen) params.set('includeFrozen', '1');
         const qs = params.toString();
         return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
       },

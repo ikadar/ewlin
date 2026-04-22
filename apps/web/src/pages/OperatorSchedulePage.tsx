@@ -72,7 +72,7 @@ import { useSetSafetyOverrideMutation } from '../store';
 import { OperatorHeader } from '../components/OperatorHeaders';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
-import { useVirtualScroll, isAssignmentVisible, useMassUnschedule, useToast } from '../hooks';
+import { useVirtualScroll, isAssignmentVisible, useMassUnschedule, useToast, useLiftAndRecompute } from '../hooks';
 import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
 import { ComputeModal } from '../components/ComputeModal/ComputeModal';
 import { useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
@@ -135,6 +135,7 @@ export default function OperatorSchedulePage() {
   }, [dispatch]);
   const { showToast } = useToast();
   const autoRecompute = useAutoRecomputeCtx();
+  const liftAndRecompute = useLiftAndRecompute();
 
   const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
   const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
@@ -658,21 +659,17 @@ export default function OperatorSchedulePage() {
         return;
       }
 
-      // ---- Ctrl+Alt+P: incremental compute (all unplaced) ----
-      // Two-phase delivery: Phase-1 FBI (no LNS) surfaces immediately
-      // via ComputeReportToast; Phase-2 LNS fires in the background
-      // through the shared auto-recompute runtime and emits a Waze-style
-      // toast if it improves the schedule. Matches the post-edit
-      // auto-recompute flow. Validated in playground-compute-info-toast.html.
+      // ---- Ctrl+Alt+P: lift + re-plan ----
+      // Lift every non-pinned, non-frozen placed tile, then kick an
+      // incremental compute. Phase-1 FBI surfaces via ComputeReportToast;
+      // Phase-2 LNS runs in the background through the shared runtime.
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
-        autoRecompute.startComputeReport({
-          mode: 'incremental',
+        void liftAndRecompute({
           snapshot,
-          skipLns: true,
           onDone: (result) => {
             invalidateSnapshot();
-            runBackgroundLns(result, 'ctrl+alt+p incremental');
+            runBackgroundLns(result, 'ctrl+alt+p lift-then-compute');
           },
         });
         return;
@@ -749,7 +746,7 @@ export default function OperatorSchedulePage() {
     selectedJobId, selectedJob, orderedJobIds, pixelsPerHour, gridStartDate,
     massUnschedule, handleComputeIncremental, handleComputeJob,
     handleClearJobAssignments, handlePinAllJobTiles, handleZoomChange,
-    autoRecompute, snapshot, invalidateSnapshot,
+    autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot,
   ]);
 
   // ---- Now line ----

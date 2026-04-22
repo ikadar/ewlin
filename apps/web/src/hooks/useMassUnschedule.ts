@@ -2,6 +2,12 @@ import { useState, useCallback } from 'react';
 import { isInternalTask } from '@flux/types';
 import type { ScheduleSnapshot } from '@flux/types';
 import { useClearAllAssignmentsMutation, useFuseTaskMutation } from '../store';
+import {
+  buildOverrideLookup,
+  buildSequenceIndexLookup,
+  isInSafetyZone,
+  makeSafetyKey,
+} from '../utils/safetyZone';
 
 export interface MassUnscheduleState {
   count: number;
@@ -17,11 +23,31 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
 
   const getClearableCount = useCallback((includeInProgress = false, includePinned = false) => {
     if (!snapshotData) return 0;
-    const nowStr = new Date().toISOString();
+    const now = new Date();
+    const nowStr = now.toISOString();
+    const hours = snapshotData.safetyZoneHours ?? 0;
+    const overrides = buildOverrideLookup(snapshotData);
+    const seqByTask = hours > 0 ? buildSequenceIndexLookup(snapshotData) : null;
+    const jobByTask = new Map<string, string>();
+    if (seqByTask) {
+      for (const job of snapshotData.jobs) {
+        for (const tid of job.taskIds ?? []) jobByTask.set(tid, job.id);
+      }
+    }
+    const tasksById = new Map(snapshotData.tasks.map((t) => [t.id, t]));
     return snapshotData.assignments.filter((a) => {
       if (a.isCompleted) return false;
       if (!includePinned && a.isPinned) return false;
       if (!includeInProgress && a.scheduledStart <= nowStr && (!a.scheduledEnd || a.scheduledEnd > nowStr)) return false;
+      if (seqByTask && isInSafetyZone(a.scheduledStart, hours, now)) {
+        const jobId = jobByTask.get(a.taskId);
+        const seqIdx = seqByTask.get(a.taskId);
+        const task = tasksById.get(a.taskId);
+        if (jobId !== undefined && seqIdx !== undefined && task && isInternalTask(task)) {
+          const overridden = overrides.get(makeSafetyKey(jobId, seqIdx, a.targetId)) === true;
+          if (!overridden) return false;
+        }
+      }
       return true;
     }).length;
   }, [snapshotData]);

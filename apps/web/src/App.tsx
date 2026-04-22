@@ -29,7 +29,7 @@ import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { Toast } from './components/Toast';
-import { useToast, useMassUnschedule } from './hooks';
+import { useToast, useMassUnschedule, useLiftAndRecompute } from './hooks';
 import { useAutoRecomputeCtx } from './contexts/AutoRecomputeContext';
 import { runBackgroundLns } from './hooks/autoRecomputeRuntime';
 import { computeCollapses } from './utils/computeCollapses';
@@ -315,6 +315,7 @@ function AppContent() {
   // navigates away (e.g. from /flux). App.tsx just consumes the ready
   // `trigger` + status bits.
   const autoRecompute = useAutoRecomputeCtx();
+  const liftAndRecompute = useLiftAndRecompute();
 
   // v0.4.38: URL-based job selection with React Router
   // Use local state for fast UI updates, sync URL silently
@@ -1204,19 +1205,16 @@ function AppContent() {
         return;
       }
 
-      // Ctrl+Alt+P: incremental compute (all unplaced jobs) — delivered
-      // through the ComputeReportToast. Phase-1 (FBI) only; LNS runs in
-      // the background via the shared auto-recompute runtime. Matches
-      // the OperatorSchedulePage handler. See playground-compute-info-toast.html.
+      // Ctrl+Alt+P: lift every non-pinned, non-frozen tile, then re-run
+      // the engine (Phase-1 FBI via ComputeReportToast; LNS in background).
+      // Effectively a global re-plan of the free portion of the schedule.
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
-        autoRecompute.startComputeReport({
-          mode: 'incremental',
+        void liftAndRecompute({
           snapshot,
-          skipLns: true,
           onDone: (result) => {
             invalidateSnapshot();
-            runBackgroundLns(result, 'ctrl+alt+p incremental');
+            runBackgroundLns(result, 'ctrl+alt+p lift-then-compute');
           },
         });
         return;
@@ -1298,7 +1296,7 @@ function AppContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, snapshot, invalidateSnapshot]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
