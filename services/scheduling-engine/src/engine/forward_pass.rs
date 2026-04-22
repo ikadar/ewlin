@@ -80,6 +80,53 @@ impl PreparedConcurrentGroup {
     }
 }
 
+/// Count contiguous ticks starting at `t` where BOTH:
+///   - the station is free (`grid.is_station_free`), AND
+///   - at least one operator qualified for the station is available
+///     (`operator_availability.is_available`).
+///
+/// Scan stops at the first tick that fails either condition, or at
+/// `max_ticks`, or at the grid horizon — whichever comes first. Returns
+/// the count of valid ticks before the stop.
+///
+/// This is the primitive the scoring filter uses to decide "can this
+/// action START here?": if the returned window is shorter than the
+/// chunk_mini floor (min'd with action.art), we don't let the action
+/// start — it will be re-considered at later ticks. Station-free alone
+/// is insufficient because an operator-absent window would let the
+/// action's `skip_ahead` stretch its span beyond what the scoring saw.
+pub fn available_work_window(
+    grid: &ScheduleGrid,
+    operator_skills: &[Vec<(usize, f64)>],
+    operator_availability: &OperatorAvailability,
+    station_idx: usize,
+    t: usize,
+    max_ticks: usize,
+) -> usize {
+    if station_idx >= grid.num_stations || t >= grid.num_ticks {
+        return 0;
+    }
+    let cap = (grid.num_ticks - t).min(max_ticks);
+    let mut run = 0usize;
+    while run < cap {
+        let tick = t + run;
+        if !grid.is_station_free(station_idx, tick) {
+            break;
+        }
+        let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
+            skills
+                .iter()
+                .any(|(s, p)| *s == station_idx && *p > 0.0)
+                && operator_availability.is_available(op, tick)
+        });
+        if !any_op {
+            break;
+        }
+        run += 1;
+    }
+    run
+}
+
 /// Translate the operators' string-keyed concurrent groups into the
 /// idx-keyed PreparedConcurrentGroup form used by the hot loop.
 ///
@@ -797,16 +844,22 @@ pub fn run_forward_pass(
                     .max(task_floor)
                     .min(attrs.max_chunk_ticks.max(1));
                 let needed = action.art.min(chunk_mini_ticks) as usize;
-                // Using station_free_run_from captures the "other task
-                // blocks the cell" case (ALAP pre-reservation with
-                // usize::MAX sentinel, pinned pre-placement,
-                // station_blocked_ranges). Operator-availability idle
-                // is handled separately by the in-flight skip_ahead
-                // reservation (cells get marked with the active
-                // action_idx while the operator is away), so the run
-                // counted here is contiguous for our purposes.
+                // The work window must cover both station freedom AND
+                // operator availability. Station-only lookahead misses
+                // operator-absent cells that would extend the task's
+                // wallclock span via skip_ahead, letting other tasks
+                // slip into cells the running task will ultimately
+                // claim. This is the primary source of the residual
+                // StationConflicts after the first chunk_mini fix.
                 if needed > 0 {
-                    let window = grid.station_free_run_from(station_idx, t, needed);
+                    let window = available_work_window(
+                        grid,
+                        operator_skills,
+                        operator_availability,
+                        station_idx,
+                        t,
+                        needed,
+                    );
                     if window < needed { continue; }
                 }
             }
