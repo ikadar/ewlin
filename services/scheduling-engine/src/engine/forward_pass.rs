@@ -1640,6 +1640,22 @@ fn assign_action_at_tick(
                         && operator_availability.is_available(op_idx, skip_to)
                 });
                 if any_avail { break; }
+                // Don't overwrite a cell owned by another action. If
+                // we did, the other action's emitted span would
+                // overlap ours on those cells and the validator would
+                // flag a StationConflict. Breaking here returns
+                // `SkipTo(skip_to)` which lets the outer loop retry
+                // this action at `skip_to`; if the cell is still
+                // claimed next time, the action stalls until the
+                // blocker completes. The MAX sentinel (ALAP pre-
+                // block, maintenance, pin pre-placement) is also
+                // treated as "owned by another" here — we never punch
+                // through it during skip_ahead.
+                if let Some(occupant) = grid.station_action_at(station_idx, skip_to) {
+                    if occupant != action_idx {
+                        break;
+                    }
+                }
                 grid.assign_station(station_idx, skip_to, action_idx);
                 if let Some(g) = group_idx { grid.increment_group(g, skip_to); }
                 // Peremption is a physical property (ink dries, registration
