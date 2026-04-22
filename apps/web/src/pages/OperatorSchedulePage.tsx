@@ -899,6 +899,7 @@ export default function OperatorSchedulePage() {
           setupWindow={setupWindow}
           recalages={assignment?.recalages}
           jobId={job.id}
+          taskId={task.id}
           {...positionProps}
         />
       );

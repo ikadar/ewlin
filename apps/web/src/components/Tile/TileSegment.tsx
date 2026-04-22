@@ -10,6 +10,7 @@ import { Pin } from 'lucide-react';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
+import { useHoverCrosslink } from '../../hooks';
 
 interface TileSegmentProps {
   /** Unique key for this segment */
@@ -123,12 +124,15 @@ export function TileSegment({
   assignmentId,
   isPinned,
   onTogglePin,
+  taskId,
   stationId,
   sequenceIndex,
   inSafetyZone = false,
   isFrozenOverridden = false,
   onToggleFrozenOverride,
 }: TileSegmentProps) {
+  // JDP ↔ operator grid hover crosslink — heartbeat pulse on paired tiles
+  const crosslink = useHoverCrosslink(taskId);
   // Safety zone visual integration mirrors Tile.tsx so both planning
   // surfaces (machine grid + operator grid) stay visually consistent.
   const isSafetyFrozen = inSafetyZone && !isFrozenOverridden;
@@ -196,6 +200,7 @@ export function TileSegment({
       data-pinned={isPinned ? 'true' : 'false'}
       data-safety-frozen={isSafetyFrozen ? 'true' : undefined}
       data-safety-overridden={inSafetyZone && isFrozenOverridden ? 'true' : undefined}
+      {...crosslink}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div
