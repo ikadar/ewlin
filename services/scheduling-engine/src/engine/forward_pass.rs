@@ -582,7 +582,18 @@ pub fn run_forward_pass(
     // them and successors see their fixed end_tick when checking precedence.
     // The grid is marked occupied for the pinned interval so other actions
     // don't try to use the same station slot.
-    pre_place_pinned_actions(grid, actions, grow_ticks, &mut assignments, tick_minutes, start_date);
+    pre_place_pinned_actions(
+        grid,
+        actions,
+        grow_ticks,
+        &mut assignments,
+        tick_minutes,
+        start_date,
+        station_attrs,
+        operator_skills,
+        operator_availability,
+        operator_groups,
+    );
 
     // Start scheduling from now (rounded up to tick boundary), not midnight.
     // Tasks cannot be placed in the past.
@@ -1552,6 +1563,10 @@ fn pre_place_pinned_actions(
     assignments: &mut Vec<ComputedAssignment>,
     tick_minutes: u32,
     start_date: NaiveDate,
+    station_attrs: &[StationAttrs],
+    operator_skills: &[Vec<(usize, f64)>],
+    operator_availability: &OperatorAvailability,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
 ) {
     for i in 0..actions.len() {
         if !actions[i].is_pinned {
@@ -1602,16 +1617,54 @@ fn pre_place_pinned_actions(
             grid.assign_station(station_idx, t, i);
         }
 
+        // Find and assign a default operator roster over the pinned
+        // window. Persistence rule: PHP keeps the user's chosen operators
+        // from the DB when present; it only adopts this roster when the
+        // DB assignment has an empty operator list (a corrupted-legacy
+        // state we are trying to self-heal). Without this pass, the
+        // engine used to emit an empty operators array for every pinned
+        // task, so any DB row that ever lost its operators had no way
+        // of recovering them on subsequent computes.
+        let max_ops = if station_idx < station_attrs.len() {
+            station_attrs[station_idx].max_operators
+        } else {
+            1
+        };
+        let setup_ticks = actions[i].setup_ticks as usize;
+        for t in start_t..end_t {
+            let in_run_phase = setup_ticks == 0 || (t - start_t) >= setup_ticks;
+            let ops = find_operators_for_station(
+                grid,
+                t,
+                station_idx,
+                operator_skills,
+                operator_availability,
+                operator_groups,
+                &actions[i].assigned_operators,
+                max_ops,
+                !in_run_phase,
+            );
+            for &op_idx in &ops {
+                // Attention 0.0 mirrors what the main-loop assign path
+                // writes for pinned timeslots; the post-processing pass
+                // in `mod.rs` recomputes meaningful attention values.
+                grid.assign_operator(op_idx, t, station_idx, 0.0);
+                if !actions[i].assigned_operators.contains(&op_idx) {
+                    actions[i].assigned_operators.push(op_idx);
+                }
+            }
+        }
+
         // Mark the action as already-completed for the main loop.
         actions[i].start_tick = Some(start_t);
         actions[i].end_tick = Some(end_t);
         actions[i].art = 0;
         actions[i].eat = total_ticks as u32;
 
-        // Emit the ComputedAssignment now. Operators are intentionally
-        // empty — the PHP persistence layer keeps the existing pinned
-        // assignment (with its existing operators) instead of applying
-        // this one.
+        // Emit the ComputedAssignment. If `find_operators_for_station`
+        // produced a roster above, `build_assignment_for` will include
+        // them. PHP decides whether to adopt them (repair empty-DB
+        // state) or keep its own (user's explicit choice).
         let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
         assignments.push(assignment);
     }
