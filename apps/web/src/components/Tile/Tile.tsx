@@ -129,15 +129,18 @@ export const Tile = memo(function Tile({
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
   const { isVisible: showTooltip, onMouseEnter: handleTooltipEnter, onMouseLeave: handleTooltipLeave } = useTooltipDelay();
-  // JDP ↔ grid crosslink — pulse matching tiles on hover
+  // JDP ↔ grid crosslink — pulse only fires when the tile belongs to the
+  // currently selected job (i.e. the one whose JDP is open). Other jobs'
+  // tiles keep data-flux-task-id so JDP-side hovers still find them, but
+  // hovering them directly in the grid stays silent.
   const crosslink = useHoverCrosslink(task.id);
   const handleMouseEnter = (e: React.MouseEvent) => {
     handleTooltipEnter();
-    crosslink.onMouseEnter?.(e);
+    if (isSelected) crosslink.onMouseEnter?.(e);
   };
   const handleMouseLeave = (e: React.MouseEvent) => {
     handleTooltipLeave();
-    crosslink.onMouseLeave?.(e);
+    if (isSelected) crosslink.onMouseLeave?.(e);
   };
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;

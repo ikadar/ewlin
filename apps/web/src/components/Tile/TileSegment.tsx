@@ -61,6 +61,9 @@ interface TileSegmentProps {
   onTogglePin?: (assignmentId: string) => void;
   /** Task id — needed to key the safety override lookup + cascade FK on Rust payload. */
   taskId?: string;
+  /** Whether this segment belongs to the currently selected job.
+   *  Gates the JDP ↔ grid hover crosslink so only selected-job tiles pulse. */
+  isSelected?: boolean;
   /** Station id on which this task is placed — part of the override tuple key. */
   stationId?: string;
   /** Flat sequence index inside the job (0-based) — part of the override tuple key. */
@@ -129,10 +132,13 @@ export function TileSegment({
   sequenceIndex,
   inSafetyZone = false,
   isFrozenOverridden = false,
+  isSelected = false,
   onToggleFrozenOverride,
 }: TileSegmentProps) {
-  // JDP ↔ operator grid hover crosslink — heartbeat pulse on paired tiles
+  // JDP ↔ operator grid hover crosslink — only selected-job segments pulse.
   const crosslink = useHoverCrosslink(taskId);
+  const hoverEnter = isSelected ? crosslink.onMouseEnter : undefined;
+  const hoverLeave = isSelected ? crosslink.onMouseLeave : undefined;
   // Safety zone visual integration mirrors Tile.tsx so both planning
   // surfaces (machine grid + operator grid) stay visually consistent.
   const isSafetyFrozen = inSafetyZone && !isFrozenOverridden;
@@ -200,7 +206,9 @@ export function TileSegment({
       data-pinned={isPinned ? 'true' : 'false'}
       data-safety-frozen={isSafetyFrozen ? 'true' : undefined}
       data-safety-overridden={inSafetyZone && isFrozenOverridden ? 'true' : undefined}
-      {...crosslink}
+      data-flux-task-id={crosslink['data-flux-task-id']}
+      onMouseEnter={hoverEnter}
+      onMouseLeave={hoverLeave}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div

@@ -900,12 +900,13 @@ export default function OperatorSchedulePage() {
           recalages={assignment?.recalages}
           jobId={job.id}
           taskId={task.id}
+          isSelected={selectedJobId === job.id}
           {...positionProps}
         />
       );
     });
   }, [
-    lens.state.activeColumnId, lensActiveSlices, lensRange.gridStartMs,
+    lens.state.activeColumnId, lensActiveSlices, lensRange.gridStartMs, selectedJobId,
     taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now,
   ]);
 
@@ -1094,6 +1095,7 @@ export default function OperatorSchedulePage() {
         inSafetyZone={inZone}
         isFrozenOverridden={isOverridden}
         onToggleFrozenOverride={handleToggleFrozenOverride}
+        isSelected={selectedJobId === job.id}
         {...positionProps}
       />
     );
