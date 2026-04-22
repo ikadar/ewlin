@@ -26,6 +26,9 @@ export { useAutoRecompute } from './useAutoRecompute';
 export { useComputeToaster } from './useComputeToaster';
 export type { ComputeToast, ComputeToastType, ComputeToastAction, ComputeToastMetric } from './useComputeToaster';
 
+export { useHoverCrosslink } from './useHoverCrosslink';
+export type { HoverCrosslinkProps } from './useHoverCrosslink';
+
 // NOTE: do NOT re-export useLiftAndRecompute from this barrel.
 // It depends on AutoRecomputeContext, which itself imports from
 // '../hooks' — re-exporting here closes a circular module cycle

@@ -8,7 +8,7 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import type { PrerequisiteBlockingInfo } from '../../utils';
-import { useTooltipDelay } from '../../hooks';
+import { useTooltipDelay, useHoverCrosslink } from '../../hooks';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
@@ -128,7 +128,17 @@ export const Tile = memo(function Tile({
   sequenceIndex,
 }: TileProps) {
   // Unified tooltip delay (500ms show, 0ms hide)
-  const { isVisible: showTooltip, onMouseEnter: handleMouseEnter, onMouseLeave: handleMouseLeave } = useTooltipDelay();
+  const { isVisible: showTooltip, onMouseEnter: handleTooltipEnter, onMouseLeave: handleTooltipLeave } = useTooltipDelay();
+  // JDP ↔ grid crosslink — pulse matching tiles on hover
+  const crosslink = useHoverCrosslink(task.id);
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    handleTooltipEnter();
+    crosslink.onMouseEnter?.(e);
+  };
+  const handleMouseLeave = (e: React.MouseEvent) => {
+    handleTooltipLeave();
+    crosslink.onMouseLeave?.(e);
+  };
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;
 
@@ -240,6 +250,7 @@ export const Tile = memo(function Tile({
       data-scheduled-start={assignment.scheduledStart}
       data-scheduled-end={assignment.scheduledEnd}
       data-task-id={task.id}
+      data-flux-task-id={task.id}
       data-station-id={task.stationId}
       data-has-conflict={hasConflict ? 'true' : undefined}
       data-is-blocked={isBlocked ? 'true' : undefined}

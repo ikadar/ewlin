@@ -3,6 +3,7 @@ import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, Outsourced
 import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
+import { useHoverCrosslink } from '../../hooks';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -130,6 +131,9 @@ export const TaskTile = memo(function TaskTile({
   operatorAssignments,
   onJumpToOperatorSlice,
 }: TaskTileProps) {
+  // JDP ↔ grid hover crosslink — heartbeat pulse on the paired tile(s)
+  const crosslink = useHoverCrosslink(task.id);
+
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
     const style = TILE_STYLES[tileState];
@@ -182,6 +186,7 @@ export const TaskTile = memo(function TaskTile({
         className={`${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''}`}
         style={{ borderLeftColor: style.borderColor }}
         onContextMenu={handleOutsourcedContextMenu}
+        {...crosslink}
       >
         <OutsourcingMiniForm
           task={task as OutsourcedTask}
@@ -278,6 +283,7 @@ export const TaskTile = memo(function TaskTile({
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        {...crosslink}
       >
         <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -383,6 +389,7 @@ export const TaskTile = memo(function TaskTile({
       style={tileInlineStyle}
       data-testid={`task-tile-${task.id}`}
       onContextMenu={handleUnplacedContextMenu}
+      {...crosslink}
     >
       <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
         <div className="flex items-center gap-1.5 min-w-0">

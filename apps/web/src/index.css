@@ -156,6 +156,38 @@ body {
   white-space: nowrap;
 }
 
+/* ── JDP ↔ Grid hover crosslink (one-shot heartbeat) ──
+ * Both the TaskTile rows in the JobDetailsPanel and the Tile elements
+ * in the SchedulingGrid carry `data-flux-task-id={task.id}`. Hovering
+ * either side adds `flux-hover-linked` to every matching node, which
+ * plays a single white heartbeat pulse. Animation-fill-mode `forwards`
+ * holds the final (invisible) keyframe — re-hovering re-triggers it.
+ *
+ * See apps/web/src/hooks/useHoverCrosslink.ts + playground-jdp-grid-crosslink.html
+ */
+.flux-hover-linked {
+  position: relative;
+  z-index: 15;
+}
+.flux-hover-linked::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: rgba(255, 255, 255, 0.58);
+  z-index: 10;
+  animation: flux-hover-heartbeat 1050ms ease-in-out 1 forwards;
+}
+@keyframes flux-hover-heartbeat {
+  0%   { opacity: 0; }
+  12%  { opacity: 0.45; }
+  22%  { opacity: 0.08; }
+  34%  { opacity: 0.45; }
+  56%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
 /* ── Compute toaster indeterminate progress ── */
 @keyframes progress-slide {
   0%   { transform: translateX(-100%); }

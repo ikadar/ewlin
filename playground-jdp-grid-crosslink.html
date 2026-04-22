@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Playground v11 — JDP ↔ Grid hover crosslink</title>
+<style>
+  :root {
+    font-size: 13px;
+
+    --zinc-50:  #fafafa;  --zinc-100: #f4f4f5;  --zinc-200: #e4e4e7;
+    --zinc-300: #d4d4d8;  --zinc-400: #a1a1aa;  --zinc-500: #71717a;
+    --zinc-600: #52525b;  --zinc-700: #3f3f46;  --zinc-800: #27272a;
+    --zinc-900: #18181b;  --zinc-950: #09090b;
+
+    --state-default:         #3b82f6;
+    --state-default-text:    #93c5fd;
+    --state-default-outline: rgba(59, 130, 246, 0.25);
+
+    /* ► Controls write these. Everything else reads them. ◄ */
+    --hover-scale: 1.03;
+    --hover-glow-width: 3px;
+    --hover-glow-color: rgba(56, 189, 248, 0.98);
+    --hover-duration: 150ms;
+    --hover-ease: cubic-bezier(0.2, 0, 0.2, 1);
+    --hover-delay: 0ms;
+    /* Pulse knobs */
+    --pulse-spread: 14px;
+    --pulse-period: 1400ms;
+    --pulse-play: running;          /* paused | running */
+    --pulse-iterations: infinite;   /* 1 | 2 | 3 | 5 | infinite */
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--zinc-950); color: var(--zinc-200);
+    font-family: "Inter", -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+
+  .app { display: grid; grid-template-columns: 340px 300px 1fr; height: 100vh; }
+  .controls, .jdp, .grid-wrap { overflow-y: auto; }
+
+  /* ══ HOVER-LINK — outline for inner glow, ::before for pulsating halo ══ */
+  .hoverable {
+    position: relative;
+    outline: 0 solid transparent;
+    outline-offset: 0;
+    transition:
+      transform var(--hover-duration) var(--hover-ease) var(--hover-delay),
+      outline-width var(--hover-duration) var(--hover-ease) var(--hover-delay),
+      outline-color var(--hover-duration) var(--hover-ease) var(--hover-delay);
+    will-change: transform, outline-width;
+  }
+  .hoverable::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 120ms var(--hover-ease);
+  }
+  .hoverable.is-hover-linked {
+    transform: scale(var(--hover-scale));
+    outline: var(--hover-glow-width) solid var(--hover-glow-color);
+    outline-offset: calc(-1 * var(--hover-glow-width));
+    z-index: 15;
+  }
+  .hoverable.is-hover-linked::before {
+    opacity: 1;
+    animation-play-state: var(--pulse-play);
+  }
+
+  /* ── Pulse styles — switched via body[data-pulse-style="…"] ── */
+  body[data-pulse-style="none"] .hoverable.is-hover-linked::before {
+    animation: none;
+  }
+  body[data-pulse-style="breath"] .hoverable.is-hover-linked::before {
+    background-color: var(--hover-glow-color);
+    animation: pulse-breath var(--pulse-period) ease-in-out var(--pulse-iterations) forwards;
+  }
+  @keyframes pulse-breath {
+    0%, 100% { opacity: 0; }
+    50%      { opacity: 0.32; }
+  }
+  body[data-pulse-style="heartbeat"] .hoverable.is-hover-linked::before {
+    background-color: var(--hover-glow-color);
+    animation: pulse-heartbeat var(--pulse-period) ease-in-out var(--pulse-iterations) forwards;
+  }
+  @keyframes pulse-heartbeat {
+    0%   { opacity: 0; }
+    12%  { opacity: 0.45; }
+    22%  { opacity: 0.08; }
+    34%  { opacity: 0.45; }
+    56%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  body[data-pulse-style="shine"] .hoverable.is-hover-linked::before {
+    background: linear-gradient(100deg, transparent 30%, var(--hover-glow-color) 50%, transparent 70%);
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    opacity: 0.5;
+    animation: pulse-shine var(--pulse-period) linear var(--pulse-iterations) forwards;
+  }
+  @keyframes pulse-shine {
+    0%   { background-position: -120% 0; }
+    100% { background-position: 220% 0; }
+  }
+  body[data-pulse-style="ripple"] .hoverable.is-hover-linked::before {
+    background: var(--hover-glow-color);
+    animation: pulse-ripple var(--pulse-period) ease-out var(--pulse-iterations) forwards;
+  }
+  @keyframes pulse-ripple {
+    0%   { clip-path: circle(0% at 50% 50%); opacity: 0.65; }
+    100% { clip-path: circle(80% at 50% 50%); opacity: 0; }
+  }
+  body[data-pulse-style="glow"] .hoverable.is-hover-linked::before {
+    animation: pulse-glow var(--pulse-period) ease-in-out var(--pulse-iterations) forwards;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: inset 0 0 2px 0 transparent; }
+    50%      { box-shadow: inset 0 0 var(--pulse-spread) 2px var(--hover-glow-color); }
+  }
+  body[data-pulse-style="halo"] .hoverable.is-hover-linked::before {
+    animation: pulse-halo var(--pulse-period) ease-out var(--pulse-iterations) forwards;
+  }
+  @keyframes pulse-halo {
+    0%   { box-shadow: 0 0 0 0 var(--hover-glow-color); }
+    100% { box-shadow: 0 0 0 var(--pulse-spread) transparent; }
+  }
+
+  /* ══ CONTROLS COLUMN ══ */
+  .controls {
+    background: var(--zinc-900);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .version-banner {
+    background: linear-gradient(90deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04));
+    border: 1px solid rgba(34,197,94,0.35);
+    color: #86efac;
+    padding: 6px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .version-banner .hint { font-weight: 400; color: #bbf7d0; font-size: 10px; }
+
+  .controls h1 { font-size: 14px; font-weight: 600; margin: 0; }
+  .subtitle { font-size: 11px; color: var(--zinc-400); line-height: 1.5; }
+
+  .control-group {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 12px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .label {
+    font-size: 10px; font-weight: 600; color: var(--zinc-500);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-row input[type=range] { flex: 1; accent-color: var(--state-default); }
+  .slider-row .val {
+    font-size: 11px; color: var(--zinc-300); min-width: 64px;
+    font-family: "JetBrains Mono", ui-monospace, monospace; text-align: right;
+  }
+  .segmented {
+    display: grid; gap: 4px; grid-auto-flow: column; grid-auto-columns: 1fr;
+    background: var(--zinc-800); border-radius: 6px; padding: 3px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .segmented button {
+    font: inherit; font-size: 11px; padding: 5px 6px; border-radius: 4px;
+    background: transparent; color: var(--zinc-400); border: 0; cursor: pointer;
+  }
+  .segmented button.active { background: rgba(59,130,246,0.22); color: #cfe3ff; }
+  .segmented button:hover:not(.active) { color: var(--zinc-200); }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 9px; border-radius: 6px;
+    background: var(--zinc-800); border: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer; user-select: none;
+  }
+  .toggle-row .lbl { font-size: 12px; color: var(--zinc-200); }
+  .toggle-row .hint { font-size: 10px; color: var(--zinc-600); margin-top: 1px; }
+  .toggle { width: 30px; height: 17px; border-radius: 9px; background: var(--zinc-700); position: relative; transition: background 0.2s; flex-shrink: 0; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--zinc-500); transition: transform 0.2s, background 0.2s; }
+  .toggle-row.on .toggle { background: var(--state-default); }
+  .toggle-row.on .toggle::after { transform: translateX(13px); background: #fff; }
+
+  /* Debug read-out — shows computed CSS values in real time.
+     If this line doesn't update when you move a slider, we have a JS issue. */
+  .debug-line {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px; color: var(--zinc-400); line-height: 1.6;
+    padding: 8px 10px; border-radius: 6px;
+    background: var(--zinc-950); border: 1px solid rgba(255,255,255,0.05);
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* Side-by-side preview: "before" tile (no hover) vs "after" tile (forced hover) */
+  .demo-pair {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .demo-tile {
+    height: 64px;
+    background: rgba(59,130,246,0.20);
+    border-left: 3px solid var(--state-default);
+    padding: 8px 10px;
+    position: relative;
+    font-size: 11px; font-weight: 500; color: #cfe3ff;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .demo-tile .cap {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--zinc-500);
+  }
+  .demo-tile.on .cap { color: #86efac; }
+
+  .prompt-section { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .prompt-box {
+    background: var(--zinc-950); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px;
+    padding: 9px 10px; font-size: 11px; color: var(--zinc-400);
+    font-family: "JetBrains Mono", ui-monospace, monospace; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto;
+  }
+  .copy-btn {
+    margin-top: 6px; width: 100%; padding: 7px; border-radius: 6px;
+    border: 1px solid var(--zinc-700); background: var(--zinc-800);
+    color: var(--zinc-200); font: inherit; font-size: 11px; cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--state-default); border-color: var(--state-default); }
+
+  /* ══ JDP (300px, zinc-900) ══ */
+  .jdp { background: var(--zinc-900); border-right: 1px solid rgba(255,255,255,0.05); }
+  .jdp-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    position: sticky; top: 0; background: var(--zinc-900); z-index: 5;
+  }
+  .jdp-header .title-row { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; }
+  .jdp-header .job-ref {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-weight: 600; font-size: 14.5px; color: var(--zinc-50);
+    letter-spacing: -0.01em;
+  }
+  .jdp-header .job-client {
+    font-size: 12px; color: var(--zinc-400); flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .jdp-header .close-btn {
+    width: 20px; height: 20px; display: grid; place-items: center;
+    color: var(--zinc-500); cursor: pointer; border-radius: 4px;
+    font-size: 14px; line-height: 1; user-select: none;
+  }
+  .jdp-header .job-desc {
+    font-size: 12.5px; color: var(--zinc-300); margin-top: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .deadlines {
+    display: flex; gap: 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 3px;
+    padding: 8px; margin-top: 10px; font-size: 12px;
+  }
+  .deadline-item { display: flex; align-items: baseline; gap: 5px; color: var(--zinc-400); }
+  .deadline-item strong { color: var(--zinc-200); font-weight: 600; }
+  .priority-chip {
+    margin-left: auto; align-self: center;
+    padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 600;
+    background: rgba(245, 158, 11, 0.15); color: #fbbf24;
+  }
+  .jdp-section-label {
+    font-size: 10px; font-weight: 600; color: var(--zinc-500);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 14px 16px 6px;
+  }
+  .element-group { padding: 0 8px 8px; }
+  .element-header {
+    font-size: 11px; color: var(--zinc-500); padding: 6px 8px 4px;
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .element-header .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--zinc-700); }
+
+  .tile-row {
+    width: 100%;
+    border: 0;
+    border-left: 4px solid var(--state-default);
+    background: transparent;
+    margin: 0 0 4px;
+    padding: 0;
+    text-align: left;
+    display: flex; flex-direction: column;
+    cursor: default;
+    box-shadow: inset 0 0 0 1px var(--state-default-outline);  /* original thin outline */
+  }
+  .tile-row:hover { filter: brightness(1.18); }
+  .tile-row .head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    min-height: 32px; padding: 7px 10px 7px 11px;
+    font-size: 12.5px;
+  }
+  .tile-row .head-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .ico-btn {
+    display: inline-grid; place-items: center; flex-shrink: 0;
+    width: 16px; height: 16px; color: var(--zinc-600);
+  }
+  .ico-btn.pin { color: var(--zinc-700); }
+  .tile-row .name {
+    font-weight: 500; color: var(--state-default-text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .tile-row .duration {
+    font-size: 11px; color: var(--zinc-400);
+    font-family: "JetBrains Mono", ui-monospace, monospace; flex-shrink: 0;
+  }
+  .tile-row .ops {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 0 10px 8px 11px;
+  }
+  .op-row {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(63, 63, 70, 0.45);
+    border-radius: 3px;
+    padding: 3px 7px;
+  }
+  .op-row .op-dot { width: 6px; height: 6px; border-radius: 50%; background: #60a5fa; flex-shrink: 0; }
+  .op-row .op-name {
+    font-size: 11.5px; color: var(--zinc-300);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+  }
+  .op-row .op-time {
+    font-size: 10.5px; color: var(--zinc-500);
+    font-family: "JetBrains Mono", ui-monospace, monospace; flex-shrink: 0;
+  }
+
+  /* ══ Planning grid ══ */
+  .grid-wrap { background: var(--zinc-950); }
+  .grid-header {
+    padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    position: sticky; top: 0; background: var(--zinc-950); z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .grid-header .title { font-size: 13px; font-weight: 600; }
+  .grid-header .legend { font-size: 10px; color: var(--zinc-500); }
+  .time-strip {
+    display: grid; grid-template-columns: 110px repeat(10, 1fr);
+    padding: 8px 0 4px;
+    position: sticky; top: 41px; background: var(--zinc-950); z-index: 4;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .time-strip .tick {
+    font-size: 10px; color: var(--zinc-600); text-align: left;
+    padding-left: 4px; font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+  .station-row {
+    display: grid; grid-template-columns: 110px 1fr;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    min-height: 76px;
+  }
+  .station-label {
+    padding: 12px; font-size: 12px; color: var(--zinc-400);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    background: var(--zinc-900);
+    display: flex; align-items: center;
+  }
+  .station-lane {
+    position: relative;
+    background: linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px) 0 0 / 10% 100%;
+  }
+
+  .tile {
+    position: absolute; top: 8px; bottom: 8px;
+    cursor: pointer; user-select: none;
+    border-left-width: 2px; border-left-style: solid;
+    padding: 4px 8px;
+    /* no overflow: hidden — the pulse halo must be free to extend outside */
+  }
+  .tile .tile-ref {
+    font-size: 11px; font-weight: 500; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tile .tile-pin { width: 12px; height: 12px; color: var(--zinc-700); flex-shrink: 0; }
+  .tile .tile-ops {
+    font-size: 9px; color: var(--zinc-400); line-height: 1.2; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .tile.state-default { border-left-color: var(--state-default); background: rgba(59, 130, 246, 0.14); }
+  .tile.state-default .tile-ref { color: var(--state-default-text); }
+  .tile.state-other-1 { border-left-color: #65a30d; background: rgba(101, 163, 13, 0.18); }
+  .tile.state-other-1 .tile-ref { color: #bef264; }
+  .tile.state-other-2 { border-left-color: #be185d; background: rgba(190, 24, 93, 0.18); }
+  .tile.state-other-2 .tile-ref { color: #f9a8d4; }
+
+  /* White selection ring — ::after, matches App.tsx injected style */
+  .tile.job-selected.outlined::after {
+    content: '';
+    position: absolute; inset: 0;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .footer-note {
+    padding: 10px 16px; font-size: 10px; color: var(--zinc-600);
+    border-top: 1px solid rgba(255,255,255,0.04);
+    background: var(--zinc-900);
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- ═══════════ CONTROLS ═══════════ -->
+    <aside class="controls">
+      <div class="version-banner">
+        <span>playground v11 <span id="build-time" class="hint"></span></span>
+        <span class="hint">Cmd+Shift+R si pas v5</span>
+      </div>
+      <h1>JDP ↔ Grid hover crosslink</h1>
+      <div class="subtitle">Phase 1 — survole une tuile (centre ou droite), la paire s'allume.</div>
+
+      <div class="control-group">
+        <span class="label">Scale au hover</span>
+        <div class="slider-row">
+          <input type="range" id="scale" min="1.00" max="1.10" step="0.005" value="1.03" />
+          <span class="val" id="scale-val">1.030</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="label">Glow — épaisseur</span>
+        <div class="slider-row">
+          <input type="range" id="glow-width" min="0" max="8" step="0.5" value="3" />
+          <span class="val" id="glow-width-val">3.0 px</span>
+        </div>
+        <span class="label" style="margin-top:8px">Couleur</span>
+        <div class="segmented" id="glow-color-group">
+          <button data-rgb="56,189,248" class="active">sky</button>
+          <button data-rgb="96,165,250">blue</button>
+          <button data-rgb="167,139,250">violet</button>
+          <button data-rgb="251,191,36">amber</button>
+          <button data-rgb="255,255,255">white</button>
+        </div>
+        <span class="label" style="margin-top:8px">Opacité du glow</span>
+        <div class="slider-row">
+          <input type="range" id="glow-opacity" min="0" max="1" step="0.02" value="0.98" />
+          <span class="val" id="glow-opacity-val">0.98</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="label">Durée (ms)</span>
+        <div class="segmented" id="duration-group">
+          <button data-val="50">50</button>
+          <button data-val="100">100</button>
+          <button data-val="150" class="active">150</button>
+          <button data-val="200">200</button>
+          <button data-val="300">300</button>
+        </div>
+        <span class="label" style="margin-top:8px">Easing</span>
+        <div class="segmented" id="ease-group">
+          <button data-val="linear">linear</button>
+          <button data-val="ease-out">ease-out</button>
+          <button data-val="cubic-bezier(0.2, 0, 0.2, 1)" class="active">grafana</button>
+          <button data-val="cubic-bezier(0.4, 0, 0.2, 1)">material</button>
+        </div>
+        <span class="label" style="margin-top:8px">Délai (ms)</span>
+        <div class="segmented" id="delay-group" style="grid-auto-flow: unset; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto;">
+          <button data-val="0" class="active">0</button>
+          <button data-val="80">80</button>
+          <button data-val="150">150</button>
+          <button data-val="250">250</button>
+          <button data-val="500">500</button>
+          <button data-val="750">750</button>
+          <button data-val="1000">1000</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="label">Style du pulse</span>
+        <div class="segmented" id="pulse-style-group" style="grid-auto-flow: unset; grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto;">
+          <button data-val="none">none</button>
+          <button data-val="breath" class="active">breath</button>
+          <button data-val="heartbeat">heart</button>
+          <button data-val="shine">shine</button>
+          <button data-val="ripple">ripple</button>
+          <button data-val="glow">glow</button>
+          <button data-val="halo">halo</button>
+        </div>
+        <div style="font-size:10px; color:var(--zinc-600); line-height:1.5; margin-top:2px">
+          <strong style="color:var(--zinc-400)">breath</strong> alpha fade · <strong style="color:var(--zinc-400)">heart</strong> double-beat · <strong style="color:var(--zinc-400)">shine</strong> shimmer diagonal · <strong style="color:var(--zinc-400)">ripple</strong> cercle qui s'étend · <strong style="color:var(--zinc-400)">glow</strong> inner glow respire · <strong style="color:var(--zinc-400)">halo</strong> anneau externe
+        </div>
+        <span class="label" style="margin-top:8px">Amplitude (spread / glow max)</span>
+        <div class="slider-row">
+          <input type="range" id="pulse-spread" min="4" max="32" step="1" value="14" />
+          <span class="val" id="pulse-spread-val">14 px</span>
+        </div>
+        <span class="label" style="margin-top:8px">Période (ms)</span>
+        <div class="slider-row">
+          <input type="range" id="pulse-period" min="500" max="3000" step="50" value="1400" />
+          <span class="val" id="pulse-period-val">1400 ms</span>
+        </div>
+        <span class="label" style="margin-top:8px">Répétitions max</span>
+        <div class="segmented" id="pulse-iterations-group">
+          <button data-val="1">1</button>
+          <button data-val="2">2</button>
+          <button data-val="3">3</button>
+          <button data-val="5">5</button>
+          <button data-val="infinite" class="active">∞</button>
+        </div>
+        <div style="font-size:10px; color:var(--zinc-600); line-height:1.5; margin-top:2px">
+          Après N cycles, le pulse s'éteint — seul le glow reste. Pour rejouer : quitte/re-survole la tuile.
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="label">Environnement</span>
+        <div class="toggle-row on" id="toggle-outline">
+          <div>
+            <div class="lbl">Contour blanc du job actif</div>
+            <div class="hint">Ring 2px 70% via ::after.</div>
+          </div>
+          <div class="toggle"></div>
+        </div>
+        <div class="toggle-row on" id="toggle-symmetric" style="margin-top:6px">
+          <div>
+            <div class="lbl">Symétrie JDP ↔ grille</div>
+            <div class="hint">Off = hover unidirectionnel.</div>
+          </div>
+          <div class="toggle"></div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <span class="label">Aperçu live (côte à côte)</span>
+        <div class="demo-pair">
+          <div class="demo-tile hoverable">
+            <span class="cap">base</span>
+            <span>sans hover</span>
+          </div>
+          <div class="demo-tile hoverable is-hover-linked on">
+            <span class="cap">hover</span>
+            <span>avec hover</span>
+          </div>
+        </div>
+        <div id="debug-line" class="debug-line"></div>
+      </div>
+
+      <div class="prompt-section">
+        <span class="label" style="display:block; margin-bottom:6px">CSS à porter</span>
+        <div class="prompt-box" id="prompt-box"></div>
+        <button class="copy-btn" id="copy-btn">Copier</button>
+      </div>
+    </aside>
+
+    <!-- ═══════════ JDP MOCK ═══════════ -->
+    <section class="jdp">
+      <div class="jdp-header">
+        <div class="title-row">
+          <span class="job-ref">BROC-450</span>
+          <span class="job-client">Acme Communication</span>
+          <span class="close-btn">×</span>
+        </div>
+        <div class="job-desc">Brochure commerciale 32 p. — dos carré collé</div>
+        <div class="deadlines">
+          <div class="deadline-item">📅 <span>Dep.</span> <strong>mer 24 avr</strong></div>
+          <div class="deadline-item">✓ <span>D.L. BAT</span> <strong>lun 22 avr</strong></div>
+          <span class="priority-chip">Important</span>
+        </div>
+      </div>
+
+      <div class="jdp-section-label">Séquence</div>
+      <div class="element-group">
+        <div class="element-header"><span class="dot"></span>Élément 1 — Feuille A</div>
+        <button class="tile-row hoverable" data-task="t1">
+          <div class="head">
+            <div class="head-left">
+              <span class="ico-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>
+              <span class="ico-btn pin"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2l2 7h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z"/></svg></span>
+              <span class="name">Heidelberg XL 106</span>
+            </div>
+            <span class="duration">1h30</span>
+          </div>
+          <div class="ops">
+            <div class="op-row"><div class="op-dot"></div><span class="op-name">T. Renaud</span><span class="op-time">24/04 08:00–09:30</span></div>
+          </div>
+        </button>
+        <button class="tile-row hoverable" data-task="t2">
+          <div class="head">
+            <div class="head-left">
+              <span class="ico-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>
+              <span class="ico-btn pin"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2l2 7h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z"/></svg></span>
+              <span class="name">Heidelberg XL 106 <span style="color:var(--zinc-500); font-weight:400">· calage</span></span>
+            </div>
+            <span class="duration">0h45</span>
+          </div>
+          <div class="ops">
+            <div class="op-row"><div class="op-dot"></div><span class="op-name">T. Renaud</span><span class="op-time">24/04 09:30–10:15</span></div>
+            <div class="op-row"><div class="op-dot"></div><span class="op-name">P. Moreau</span><span class="op-time">24/04 09:30–10:15</span></div>
+          </div>
+        </button>
+        <button class="tile-row hoverable" data-task="t3">
+          <div class="head">
+            <div class="head-left">
+              <span class="ico-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>
+              <span class="ico-btn pin"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2l2 7h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z"/></svg></span>
+              <span class="name">Heidelberg XL 106 <span style="color:var(--zinc-500); font-weight:400">· tirage</span></span>
+            </div>
+            <span class="duration">2h15</span>
+          </div>
+          <div class="ops">
+            <div class="op-row"><div class="op-dot"></div><span class="op-name">T. Renaud</span><span class="op-time">24/04 10:15–12:30</span></div>
+          </div>
+        </button>
+
+        <div class="element-header" style="margin-top:6px"><span class="dot"></span>Élément 2 — Façonnage</div>
+        <button class="tile-row hoverable" data-task="t5">
+          <div class="head">
+            <div class="head-left">
+              <span class="ico-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>
+              <span class="ico-btn pin"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2l2 7h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z"/></svg></span>
+              <span class="name">Polar 115</span>
+            </div>
+            <span class="duration">1h30</span>
+          </div>
+          <div class="ops">
+            <div class="op-row"><div class="op-dot"></div><span class="op-name">P. Moreau</span><span class="op-time">24/04 14:00–15:30</span></div>
+          </div>
+        </button>
+        <button class="tile-row hoverable" data-task="t6">
+          <div class="head">
+            <div class="head-left">
+              <span class="ico-btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>
+              <span class="ico-btn pin"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2l2 7h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z"/></svg></span>
+              <span class="name">Stahl KH 82</span>
+            </div>
+            <span class="duration">1h15</span>
+          </div>
+          <div class="ops">
+            <div class="op-row"><div class="op-dot"></div><span class="op-name">M. Lefèvre</span><span class="op-time">24/04 15:30–16:45</span></div>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══════════ GRID ═══════════ -->
+    <section class="grid-wrap">
+      <div class="grid-header">
+        <span class="title">Planning machine — mer 24 avril</span>
+        <span class="legend">Contour blanc = job BROC-450</span>
+      </div>
+      <div class="time-strip" id="time-strip"></div>
+      <div id="grid-body"></div>
+      <div class="footer-note">Les tuiles vertes / roses appartiennent à d'autres jobs — elles ne réagissent pas au hover depuis le JDP.</div>
+    </section>
+  </div>
+
+<script>
+  'use strict';
+  console.log('[playground v11] loaded at', new Date().toISOString());
+  document.getElementById('build-time').textContent =
+    '· ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const root = document.documentElement;
+
+  /* ═══ grid ═══ */
+  const startHour = 8, endHour = 18, hours = endHour - startHour;
+  document.getElementById('time-strip').innerHTML =
+    '<div class="tick"></div>' +
+    Array.from({ length: hours }, (_, i) => `<div class="tick">${String(startHour + i).padStart(2,'0')}:00</div>`).join('');
+
+  const stations = [
+    { id: 'heid',  label: 'Heidelberg XL 106' },
+    { id: 'polar', label: 'Polar 115' },
+    { id: 'stahl', label: 'Stahl KH 82' },
+  ];
+  const PIN_SVG = '<svg class="tile-pin" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2 7h6l-5 4 2 7-5-4-5 4 2-7-5-4h6z"/></svg>';
+  const tiles = [
+    { task: 't1', station: 'heid',  start: 8.00,  end: 9.50,  ref: 'BROC-450 · Acme', ops: 'T. Renaud',            state: 'state-default', selected: true },
+    { task: 't2', station: 'heid',  start: 9.50,  end: 10.25, ref: 'BROC-450 · Acme', ops: 'T. Renaud, P. Moreau', state: 'state-default', selected: true },
+    { task: 't3', station: 'heid',  start: 10.25, end: 12.50, ref: 'BROC-450 · Acme', ops: 'T. Renaud',            state: 'state-default', selected: true },
+    { task: 't5', station: 'polar', start: 14.00, end: 15.50, ref: 'BROC-450 · Acme', ops: 'P. Moreau',            state: 'state-default', selected: true },
+    { task: 't6', station: 'stahl', start: 15.50, end: 16.75, ref: 'BROC-450 · Acme', ops: 'M. Lefèvre',           state: 'state-default', selected: true },
+    { task: 'o1', station: 'heid',  start: 13.00, end: 14.75, ref: 'FLY-321 · Lemoyne',   ops: 'J. Durand',        state: 'state-other-1' },
+    { task: 'o2', station: 'polar', start: 9.00,  end: 11.00, ref: 'CAT-458 · Moreau SA', ops: 'P. Moreau',        state: 'state-other-2' },
+    { task: 'o3', station: 'polar', start: 16.00, end: 17.50, ref: 'BR-612 · Nantel',     ops: 'T. Renaud',        state: 'state-other-1' },
+    { task: 'o4', station: 'stahl', start: 8.50,  end: 11.00, ref: 'FLY-321 · Lemoyne',   ops: 'M. Lefèvre',       state: 'state-other-1' },
+    { task: 'o5', station: 'stahl', start: 12.00, end: 14.50, ref: 'DEP-501 · Caillot',   ops: 'M. Lefèvre',       state: 'state-other-2' },
+  ];
+  const pct = (h) => ((h - startHour) / hours) * 100;
+  const gridBody = document.getElementById('grid-body');
+  for (const st of stations) {
+    const row = document.createElement('div');
+    row.className = 'station-row';
+    row.innerHTML = `<div class="station-label">${st.label}</div><div class="station-lane" id="lane-${st.id}"></div>`;
+    gridBody.appendChild(row);
+  }
+  for (const t of tiles) {
+    const lane = document.getElementById(`lane-${t.station}`);
+    const el = document.createElement('div');
+    const cls = ['tile', 'hoverable', t.state];
+    if (t.selected) cls.push('job-selected', 'outlined');
+    el.className = cls.join(' ');
+    el.dataset.task = t.task;
+    el.style.left = pct(t.start) + '%';
+    el.style.width = (pct(t.end) - pct(t.start)) + '%';
+    el.innerHTML = `<div class="tile-ref">${PIN_SVG}${t.ref}</div><div class="tile-ops">${t.ops}</div>`;
+    lane.appendChild(el);
+  }
+
+  /* ═══ hover cross-link ═══ */
+  let symmetric = true;
+  let currentHoverTask = null;
+  function setHover(taskId, side) {
+    if (currentHoverTask === taskId) return;
+    currentHoverTask = taskId;
+    document.querySelectorAll('.hoverable.is-hover-linked').forEach((el) => {
+      if (el.classList.contains('on')) return;  // permanent demo tile
+      el.classList.remove('is-hover-linked');
+    });
+    if (!taskId) return;
+    const scope = symmetric ? document
+      : (side === 'jdp' ? document.querySelector('.jdp') : document.querySelector('.grid-wrap'));
+    scope.querySelectorAll(`[data-task="${taskId}"]`).forEach((el) => el.classList.add('is-hover-linked'));
+  }
+  function bindHover(scope, side) {
+    scope.querySelectorAll('[data-task]').forEach((el) => {
+      el.addEventListener('mouseenter', () => setHover(el.dataset.task, side));
+      el.addEventListener('mouseleave', () => setHover(null, side));
+    });
+  }
+  bindHover(document.querySelector('.jdp'), 'jdp');
+  bindHover(document.querySelector('.grid-wrap'), 'grid');
+
+  /* ═══ debug + prompt (declared BEFORE controls so bindSlider's initial apply() can call them) ═══ */
+  const debugLine = document.getElementById('debug-line');
+  const promptBox = document.getElementById('prompt-box');
+  const readVar = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+  function updateDebug() {
+    debugLine.textContent =
+      `pulse-style:         ${document.body.dataset.pulseStyle ?? '—'}\n` +
+      `--hover-scale:       ${readVar('--hover-scale')}\n` +
+      `--hover-glow-width:  ${readVar('--hover-glow-width')}\n` +
+      `--hover-glow-color:  ${readVar('--hover-glow-color')}\n` +
+      `--hover-duration:    ${readVar('--hover-duration')}\n` +
+      `--hover-ease:        ${readVar('--hover-ease')}\n` +
+      `--hover-delay:       ${readVar('--hover-delay')}\n` +
+      `--pulse-spread:      ${readVar('--pulse-spread')}\n` +
+      `--pulse-period:      ${readVar('--pulse-period')}\n` +
+      `--pulse-iterations:  ${readVar('--pulse-iterations')}`;
+  }
+  /* Pulse-style-specific CSS blocks for the export prompt */
+  const PULSE_BLOCKS = {
+    none: '',
+    breath: `
+.hoverable.is-hover-linked::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-color: ${'${glow}'};
+  animation: pulse-breath ${'${period}'} ease-in-out ${'${iterations}'} forwards;
+}
+@keyframes pulse-breath {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 0.32; }
+}`,
+    heartbeat: `
+.hoverable.is-hover-linked::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-color: ${'${glow}'};
+  animation: pulse-heartbeat ${'${period}'} ease-in-out ${'${iterations}'} forwards;
+}
+@keyframes pulse-heartbeat {
+  0%   { opacity: 0; }
+  12%  { opacity: 0.45; }
+  22%  { opacity: 0.08; }
+  34%  { opacity: 0.45; }
+  56%  { opacity: 0; }
+  100% { opacity: 0; }
+}`,
+    shine: `
+.hoverable.is-hover-linked::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, ${'${glow}'} 50%, transparent 70%);
+  background-size: 220% 100%; background-repeat: no-repeat;
+  opacity: 0.5;
+  animation: pulse-shine ${'${period}'} linear ${'${iterations}'} forwards;
+}
+@keyframes pulse-shine {
+  0%   { background-position: -120% 0; }
+  100% { background-position: 220% 0; }
+}`,
+    ripple: `
+.hoverable.is-hover-linked::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: ${'${glow}'};
+  animation: pulse-ripple ${'${period}'} ease-out ${'${iterations}'} forwards;
+}
+@keyframes pulse-ripple {
+  0%   { clip-path: circle(0% at 50% 50%); opacity: 0.65; }
+  100% { clip-path: circle(80% at 50% 50%); opacity: 0; }
+}`,
+    glow: `
+.hoverable.is-hover-linked::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  animation: pulse-glow ${'${period}'} ease-in-out ${'${iterations}'} forwards;
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: inset 0 0 2px 0 transparent; }
+  50%      { box-shadow: inset 0 0 ${'${spread}'} 2px ${'${glow}'}; }
+}`,
+    halo: `
+.hoverable.is-hover-linked::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  animation: pulse-halo ${'${period}'} ease-out ${'${iterations}'} forwards;
+}
+@keyframes pulse-halo {
+  0%   { box-shadow: 0 0 0 0 ${'${glow}'}; }
+  100% { box-shadow: 0 0 0 ${'${spread}'} transparent; }
+}`,
+  };
+  function updatePrompt() {
+    const style = document.body.dataset.pulseStyle ?? 'none';
+    const block = (PULSE_BLOCKS[style] ?? '')
+      .replaceAll('${glow}', readVar('--hover-glow-color'))
+      .replaceAll('${period}', readVar('--pulse-period'))
+      .replaceAll('${spread}', readVar('--pulse-spread'))
+      .replaceAll('${iterations}', readVar('--pulse-iterations'));
+    promptBox.textContent =
+`.hoverable {
+  position: relative;
+  outline: 0 solid transparent;
+  transition:
+    transform     ${readVar('--hover-duration')} ${readVar('--hover-ease')} ${readVar('--hover-delay')},
+    outline-width ${readVar('--hover-duration')} ${readVar('--hover-ease')} ${readVar('--hover-delay')},
+    outline-color ${readVar('--hover-duration')} ${readVar('--hover-ease')} ${readVar('--hover-delay')};
+}
+.hoverable.is-hover-linked {
+  transform: scale(${readVar('--hover-scale')});
+  outline: ${readVar('--hover-glow-width')} solid ${readVar('--hover-glow-color')};
+  outline-offset: calc(-1 * ${readVar('--hover-glow-width')});
+  z-index: 15;
+}${block}`;
+  }
+
+  /* ═══ controls ═══ */
+  function bindSlider(id, cssVar, toCss, toDisplay) {
+    const input = document.getElementById(id);
+    const out = document.getElementById(`${id}-val`);
+    if (!input || !out) { console.warn('[playground] missing slider:', id); return; }
+    const apply = () => {
+      const css = toCss(input.value);
+      root.style.setProperty(cssVar, css);
+      out.textContent = toDisplay(input.value);
+      console.log('[playground]', cssVar, '→', css);
+      updateDebug();
+      updatePrompt();
+    };
+    input.addEventListener('input', apply);
+    input.addEventListener('change', apply);
+    apply();
+  }
+  bindSlider('scale', '--hover-scale', (v) => v, (v) => Number(v).toFixed(3));
+  bindSlider('glow-width', '--hover-glow-width', (v) => `${v}px`, (v) => `${Number(v).toFixed(1)} px`);
+  bindSlider('pulse-spread', '--pulse-spread', (v) => `${v}px`, (v) => `${v} px`);
+  bindSlider('pulse-period', '--pulse-period', (v) => `${v}ms`, (v) => `${v} ms`);
+
+  function bindSegmented(groupId, cssVar, unit) {
+    const group = document.getElementById(groupId);
+    if (!group) { console.warn('[playground] missing group:', groupId); return; }
+    group.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const val = unit ? `${btn.dataset.val}${unit}` : btn.dataset.val;
+        root.style.setProperty(cssVar, val);
+        console.log('[playground]', cssVar, '→', val);
+        updateDebug();
+        updatePrompt();
+      });
+    });
+  }
+  /* Glow color = hue (segmented) × opacity (slider), composed in JS. */
+  let glowRgb = '56,189,248';
+  let glowAlpha = 0.98;
+  function writeGlowColor() {
+    root.style.setProperty('--hover-glow-color', `rgba(${glowRgb}, ${glowAlpha})`);
+    console.log('[playground] --hover-glow-color → rgba(' + glowRgb + ', ' + glowAlpha + ')');
+    updateDebug();
+    updatePrompt();
+  }
+  document.getElementById('glow-color-group').querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.getElementById('glow-color-group').querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      glowRgb = btn.dataset.rgb;
+      writeGlowColor();
+    });
+  });
+  const opacityInput = document.getElementById('glow-opacity');
+  const opacityOut = document.getElementById('glow-opacity-val');
+  const applyOpacity = () => {
+    glowAlpha = parseFloat(opacityInput.value);
+    opacityOut.textContent = glowAlpha.toFixed(2);
+    writeGlowColor();
+  };
+  opacityInput.addEventListener('input', applyOpacity);
+  opacityInput.addEventListener('change', applyOpacity);
+  applyOpacity();
+
+  bindSegmented('duration-group',        '--hover-duration',     'ms');
+  bindSegmented('ease-group',            '--hover-ease',         '');
+  bindSegmented('delay-group',           '--hover-delay',        'ms');
+  bindSegmented('pulse-iterations-group','--pulse-iterations',   '');
+
+  /* toggles */
+  document.getElementById('toggle-outline').addEventListener('click', (e) => {
+    const t = e.currentTarget;
+    t.classList.toggle('on');
+    const on = t.classList.contains('on');
+    document.querySelectorAll('.tile.job-selected').forEach((el) => el.classList.toggle('outlined', on));
+  });
+  document.getElementById('toggle-symmetric').addEventListener('click', (e) => {
+    const t = e.currentTarget;
+    t.classList.toggle('on');
+    symmetric = t.classList.contains('on');
+  });
+  /* Pulse style selector — writes data-pulse-style on <body> instead of a CSS var */
+  document.getElementById('pulse-style-group').querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.getElementById('pulse-style-group').querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.body.dataset.pulseStyle = btn.dataset.val;
+      updateDebug();
+      updatePrompt();
+    });
+  });
+  document.body.dataset.pulseStyle = 'breath';  // default
+
+  /* initial fill (bindSlider/bindSegmented initial apply() already called these,
+     but calling once more is harmless and covers edge cases) */
+  updateDebug();
+  updatePrompt();
+
+  document.getElementById('copy-btn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(promptBox.textContent);
+      const btn = document.getElementById('copy-btn');
+      const prev = btn.textContent;
+      btn.textContent = 'Copié ✓';
+      setTimeout(() => { btn.textContent = prev; }, 1200);
+    } catch {
+      const range = document.createRange();
+      range.selectNode(promptBox);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  });
+</script>
+</body>
+</html>
