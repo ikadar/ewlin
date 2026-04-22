@@ -351,33 +351,36 @@ export const Tile = memo(function Tile({
           className={`${colorClasses.text} text-[11px] font-medium leading-tight truncate`}
           data-testid="tile-content"
         >
-          <span className="inline-pin align-middle mr-1">
-            <Pin
-              className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
-                assignment.isPinned
-                  ? 'text-amber-500 hover:text-amber-400'
-                  : 'text-zinc-700 hover:text-zinc-400'
-              }`}
-              onClick={handleTogglePin}
-            />
+          <span
+            onClick={handleTogglePin}
+            className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
+              assignment.isPinned
+                ? 'text-amber-500 hover:text-amber-400'
+                : 'text-zinc-700 hover:text-zinc-400'
+            }`}
+            title={assignment.isPinned ? 'Désépingler' : 'Épingler'}
+          >
+            <Pin className="w-3 h-3 shrink-0" />
           </span>
           {inSafetyZone && (
-            <span className="inline-flex align-middle mr-1">
+            <span
+              onClick={handleToggleFrozen}
+              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
+                isFrozenOverridden
+                  ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
+                  : 'text-sky-400 hover:text-sky-300'
+              }`}
+              aria-label={
+                isFrozenOverridden
+                  ? 'Override actif — clic pour restaurer le freeze auto'
+                  : 'Frozen par safety zone — clic pour libérer'
+              }
+            >
               <svg
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 data-testid="tile-safety-flocon"
-                className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
-                  isFrozenOverridden
-                    ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
-                    : 'text-sky-400 hover:text-sky-300'
-                }`}
-                onClick={handleToggleFrozen}
-                aria-label={
-                  isFrozenOverridden
-                    ? 'Override actif — clic pour restaurer le freeze auto'
-                    : 'Frozen par safety zone — clic pour libérer'
-                }
+                className="w-3 h-3 shrink-0"
               >
                 <path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z" />
               </svg>
