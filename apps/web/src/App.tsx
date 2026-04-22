@@ -31,6 +31,7 @@ import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell'
 import { Toast } from './components/Toast';
 import { useToast, useMassUnschedule } from './hooks';
 import { useAutoRecomputeCtx } from './contexts/AutoRecomputeContext';
+import { runBackgroundLns } from './hooks/autoRecomputeRuntime';
 import { computeCollapses } from './utils/computeCollapses';
 import type { Collapse } from './components/SchedulingGrid/collapseConfig';
 import { yPositionToTime } from './components/DragPreview/snapUtils';
@@ -1203,10 +1204,21 @@ function AppContent() {
         return;
       }
 
-      // Ctrl+Alt+P: incremental compute (all unplaced jobs)
+      // Ctrl+Alt+P: incremental compute (all unplaced jobs) — delivered
+      // through the ComputeReportToast. Phase-1 (FBI) only; LNS runs in
+      // the background via the shared auto-recompute runtime. Matches
+      // the OperatorSchedulePage handler. See playground-compute-info-toast.html.
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
-        handleComputeIncremental();
+        autoRecompute.startComputeReport({
+          mode: 'incremental',
+          snapshot,
+          skipLns: true,
+          onDone: (result) => {
+            invalidateSnapshot();
+            runBackgroundLns(result, 'ctrl+alt+p incremental');
+          },
+        });
         return;
       }
 
@@ -1286,7 +1298,7 @@ function AppContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, handleComputeIncremental]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, snapshot, invalidateSnapshot]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);

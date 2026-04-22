@@ -14,10 +14,17 @@
  * session.
  */
 
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
+import type { ScheduleSnapshot } from '@flux/types';
+import type { ComputeScheduleResult } from '../store';
 import { useAutoRecompute, useComputeToaster } from '../hooks';
+import {
+  useComputeReportStream,
+  type ComputeReportMode,
+} from '../hooks/useComputeReportStream';
 import type { ComputeToastMetric } from '../hooks/useComputeToaster';
 import { ComputeToastStack } from '../components/ComputeToastStack';
+import { ComputeReportToast } from '../components/ComputeReportToast/ComputeReportToast';
 import { registerAutoRecomputeTrigger } from '../store/middleware/autoRecomputeMiddleware';
 
 interface ContextValue {
@@ -49,12 +56,31 @@ interface ContextValue {
     pinned?: boolean;
     progress?: number;
   }) => string;
+  /**
+   * Start an SSE compute and surface the "pendant / après" info through
+   * the ComputeReportToast (replaces ComputeModal for the Ctrl+Alt+P
+   * shortcut path — see playground-compute-info-toast.html).
+   *
+   * `skipLns: true` asks the engine to return as soon as FBI stabilises,
+   * leaving the LNS pass for the background auto-recompute runtime —
+   * matching the two-phase flow used by post-edit auto-recompute.
+   */
+  startComputeReport: (input: {
+    mode: ComputeReportMode;
+    jobId?: string;
+    snapshot: ScheduleSnapshot;
+    skipLns?: boolean;
+    onDone?: (result: ComputeScheduleResult) => void;
+  }) => void;
+  /** Close the report toast immediately. */
+  dismissComputeReport: () => void;
 }
 
 const AutoRecomputeContext = createContext<ContextValue | null>(null);
 
 export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
   const computeToaster = useComputeToaster();
+  const reportStream = useComputeReportStream();
 
   const autoRecompute = useAutoRecompute((event, reason, extra) => {
     const toastId = 'auto-recompute';
@@ -123,6 +149,34 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
     return () => registerAutoRecomputeTrigger(null);
   }, [autoRecompute.trigger]);
 
+  const pendingOnDoneRef = useRef<((result: ComputeScheduleResult) => void) | null>(null);
+
+  const startComputeReport = useCallback(
+    (input: {
+      mode: ComputeReportMode;
+      jobId?: string;
+      snapshot: ScheduleSnapshot;
+      skipLns?: boolean;
+      onDone?: (result: ComputeScheduleResult) => void;
+    }) => {
+      const { onDone, ...rest } = input;
+      // One-shot callback fires when the stream's phase flips to 'done'
+      // (see effect below). Receives the Phase-1 result so callers can
+      // chain a background LNS pass seeded with the same baseline.
+      pendingOnDoneRef.current = onDone ?? null;
+      reportStream.start(rest);
+    },
+    [reportStream],
+  );
+
+  useEffect(() => {
+    if (reportStream.state.phase === 'done' && reportStream.state.result) {
+      const cb = pendingOnDoneRef.current;
+      pendingOnDoneRef.current = null;
+      cb?.(reportStream.state.result);
+    }
+  }, [reportStream.state.phase, reportStream.state.result]);
+
   const value: ContextValue = {
     trigger: autoRecompute.trigger,
     retry: autoRecompute.retry,
@@ -131,6 +185,8 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
     lastError: autoRecompute.lastError,
     lastRanAt: autoRecompute.lastRanAt,
     showToast: computeToaster.show,
+    startComputeReport,
+    dismissComputeReport: reportStream.clear,
   };
 
   return (
@@ -138,6 +194,7 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Toast stack rendered at root so it survives route changes. */}
       <ComputeToastStack toasts={computeToaster.toasts} onDismiss={computeToaster.dismiss} />
+      <ComputeReportToast state={reportStream.state} onDismiss={reportStream.clear} />
     </AutoRecomputeContext.Provider>
   );
 }

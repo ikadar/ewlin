@@ -75,6 +75,8 @@ import { ErrorState } from '../components/ErrorState';
 import { useVirtualScroll, isAssignmentVisible, useMassUnschedule, useToast } from '../hooks';
 import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
 import { ComputeModal } from '../components/ComputeModal/ComputeModal';
+import { useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
+import { runBackgroundLns } from '../hooks/autoRecomputeRuntime';
 import { SmartCompactModal } from '../components/SmartCompactModal';
 import { ScheduleEvaluationModal } from '../components/ScheduleEvaluationModal';
 import { ShortcutFooter } from '../components/ShortcutFooter/ShortcutFooter';
@@ -132,6 +134,7 @@ export default function OperatorSchedulePage() {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
   const { showToast } = useToast();
+  const autoRecompute = useAutoRecomputeCtx();
 
   const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
   const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
@@ -656,9 +659,22 @@ export default function OperatorSchedulePage() {
       }
 
       // ---- Ctrl+Alt+P: incremental compute (all unplaced) ----
+      // Two-phase delivery: Phase-1 FBI (no LNS) surfaces immediately
+      // via ComputeReportToast; Phase-2 LNS fires in the background
+      // through the shared auto-recompute runtime and emits a Waze-style
+      // toast if it improves the schedule. Matches the post-edit
+      // auto-recompute flow. Validated in playground-compute-info-toast.html.
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
-        handleComputeIncremental();
+        autoRecompute.startComputeReport({
+          mode: 'incremental',
+          snapshot,
+          skipLns: true,
+          onDone: (result) => {
+            invalidateSnapshot();
+            runBackgroundLns(result, 'ctrl+alt+p incremental');
+          },
+        });
         return;
       }
 
@@ -733,6 +749,7 @@ export default function OperatorSchedulePage() {
     selectedJobId, selectedJob, orderedJobIds, pixelsPerHour, gridStartDate,
     massUnschedule, handleComputeIncremental, handleComputeJob,
     handleClearJobAssignments, handlePinAllJobTiles, handleZoomChange,
+    autoRecompute, snapshot, invalidateSnapshot,
   ]);
 
   // ---- Now line ----

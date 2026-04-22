@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Compute Info Toast (CTRL+ALT+P)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    font-size: 13px;
+    --base: rgb(15 15 15);
+    --surface: rgb(26 26 26);
+    --elevated: rgb(36 36 36);
+    --hover: rgb(44 44 44);
+    --border: rgb(42 42 42);
+    --border-light: rgb(58 58 58);
+    --text-primary: rgb(245 245 245);
+    --text-secondary: rgb(209 209 209);
+    --text-tertiary: rgb(161 161 161);
+    --text-muted: rgb(128 128 128);
+
+    --accent-blue: #3b82f6;
+    --accent-green: #22c55e;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-orange: #f97316;
+    --accent-yellow: #fbbf24;
+    --accent-violet: #8b5cf6;
+  }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: var(--base);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--text-tertiary); font-size: 12px; }
+  header .kbd-hero {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 7px;
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: var(--text-primary);
+  }
+
+  /* ── Main grid ──────────────────────────────────── */
+  .content {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    padding: 20px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    letter-spacing: -0.2px;
+    color: var(--text-primary);
+  }
+  .panel h3 {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 14px 0 8px;
+  }
+
+  .controls { position: sticky; top: 76px; height: fit-content; }
+  .control-group { margin-bottom: 16px; }
+  .control-group:last-child { margin-bottom: 0; }
+
+  .btn {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn:hover { background: var(--hover); border-color: rgb(80 80 80); }
+  .btn.primary { background: var(--accent-blue); border-color: var(--accent-blue); color: white; }
+  .btn.primary:hover { background: #2563eb; border-color: #2563eb; }
+  .btn + .btn { margin-top: 6px; }
+  .btn-kbd {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+  }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .option input { cursor: pointer; }
+
+  /* ── Simulated app background ───────────────────── */
+  .fake-app {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    height: calc(100vh - 112px);
+    overflow: hidden;
+    position: relative;
+  }
+  .fake-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .fake-toolbar .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green);
+  }
+  .fake-toolbar .title {
+    font-size: 12px; font-weight: 500; color: var(--text-primary);
+  }
+  .fake-toolbar .meta {
+    font-size: 11px; color: var(--text-muted);
+  }
+  .fake-toolbar .meta + .meta { margin-left: 4px; }
+  .fake-grid {
+    display: grid;
+    grid-template-columns: 140px repeat(8, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 11px;
+  }
+  .fake-grid .cell {
+    background: var(--surface);
+    padding: 7px 8px;
+    color: var(--text-tertiary);
+  }
+  .fake-grid .head {
+    background: var(--elevated);
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .fake-grid .tile {
+    background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(59,130,246,0.12));
+    border-left: 2px solid var(--accent-blue);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .fake-grid .tile.amber {
+    background: linear-gradient(135deg, rgba(245,158,11,0.25), rgba(245,158,11,0.12));
+    border-left-color: var(--accent-amber);
+  }
+  .fake-grid .tile.red {
+    background: linear-gradient(135deg, rgba(239,68,68,0.25), rgba(239,68,68,0.12));
+    border-left-color: var(--accent-red);
+  }
+  .fake-legend {
+    margin-top: 14px;
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .fake-legend span::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    margin-right: 5px;
+    border-radius: 2px;
+    vertical-align: -1px;
+  }
+  .fake-legend .l-blue::before { background: var(--accent-blue); }
+  .fake-legend .l-amber::before { background: var(--accent-amber); }
+  .fake-legend .l-red::before { background: var(--accent-red); }
+
+  .hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Toast stack ─────────────────────────────────── */
+  .toast-stack {
+    position: fixed;
+    top: 76px;
+    right: 20px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 380px;
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    background: var(--elevated);
+    border: 1px solid var(--border-light);
+    border-left-width: 3px;
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.5);
+    animation: slide-in 180ms ease-out;
+    font-size: 12px;
+  }
+  .toast.pending { border-left-color: var(--accent-violet); }
+  .toast.ok { border-left-color: var(--accent-green); }
+  .toast.warn { border-left-color: var(--accent-amber); }
+  .toast.err { border-left-color: var(--accent-red); }
+
+  @keyframes slide-in {
+    from { transform: translateX(12px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes fade-out {
+    to { transform: translateX(12px); opacity: 0; }
+  }
+  .toast.leaving { animation: fade-out 180ms ease-in forwards; }
+
+  .toast-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .toast-icon {
+    width: 15px; height: 15px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .toast.pending .toast-icon { color: var(--accent-violet); }
+  .toast.ok .toast-icon { color: var(--accent-green); }
+  .toast.warn .toast-icon { color: var(--accent-amber); }
+  .toast-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .toast-title-meta {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
+  .toast-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 2px;
+    line-height: 1;
+    margin: -2px -2px 0 0;
+  }
+  .toast-close:hover { color: var(--text-primary); }
+
+  /* ── Pendant toast content ────────────────────────── */
+  .steps { margin-top: 10px; display: flex; flex-direction: column; gap: 1px; }
+  .step { display: flex; gap: 8px; padding: 3px 0; align-items: flex-start; }
+  .step-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+  }
+  .step-icon.done { color: var(--accent-green); }
+  .step-icon.active {
+    border: 1.5px solid var(--border-light);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    width: 11px; height: 11px;
+  }
+  .step-icon.pending { color: rgba(255,255,255,0.2); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .step-body { flex: 1; min-width: 0; }
+  .step-label {
+    font-size: 11.5px;
+    line-height: 1.35;
+  }
+  .step.done .step-label { color: var(--text-tertiary); }
+  .step.active .step-label { color: var(--text-primary); font-weight: 500; }
+  .step.pending .step-label { color: rgba(255,255,255,0.25); }
+  .step-detail {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    line-height: 1.3;
+  }
+  .step-elapsed {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  /* ── Après toast content ──────────────────────────── */
+  .ratio-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 10px 0 6px;
+  }
+  .ratio-big {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+  .ratio-caption {
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+  .ratio-bar {
+    height: 8px;
+    background: rgb(50 50 50);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+  }
+  .ratio-bar .on { height: 100%; background: var(--accent-green); }
+  .ratio-bar .late { height: 100%; background: var(--accent-red); }
+
+  .stats-row {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+
+  .divider {
+    margin: 10px 0;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .section-head {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .prio-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 4px;
+  }
+  .prio-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .prio-label {
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    width: 62px;
+    flex-shrink: 0;
+  }
+  .prio-bar {
+    flex: 1;
+    height: 7px;
+    background: rgb(50 50 50);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+  }
+  .prio-bar .on { height: 100%; background: var(--accent-green); }
+  .prio-bar .late { height: 100%; background: var(--accent-red); }
+  .prio-count {
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    width: 58px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .late-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 11px;
+  }
+  .late-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .late-ref { font-weight: 600; color: var(--text-primary); }
+  .late-client { color: var(--text-muted); margin-left: 4px; }
+  .late-delay {
+    margin-left: auto;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .late-delay.amber { color: var(--accent-amber); }
+  .late-delay.red { color: var(--accent-red); }
+  .late-more {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    padding: 3px 0;
+  }
+
+  /* ── Section header inside controls ──────────────── */
+  .meta-box {
+    background: var(--base);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.55;
+  }
+  .meta-box strong { color: var(--text-primary); font-weight: 600; }
+
+  /* ── Scenario tabs ────────────────────────────────── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    background: var(--base);
+    padding: 3px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1;
+    padding: 6px 8px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .tab.active {
+    background: var(--elevated);
+    color: var(--text-primary);
+  }
+  .tab:hover:not(.active) { color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Compute Info Toast</h1>
+  <span class="subtitle">Contenu des modales "pendant" et "après" relocalisé dans le toaster via <kbd>CTRL</kbd>+<kbd>ALT</kbd>+<kbd>P</kbd></span>
+  <div class="kbd-hero">
+    <kbd>CTRL</kbd><kbd>ALT</kbd><kbd>P</kbd>
+    <span>→ toggle</span>
+  </div>
+</header>
+
+<div class="content">
+
+  <!-- ── CONTROLS ─────────────────────────────── -->
+  <aside class="panel controls">
+    <h2>Scénarios</h2>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-phase="pendant">Pendant</button>
+      <button class="tab" data-phase="apres">Après</button>
+    </div>
+
+    <div class="control-group">
+      <button class="btn primary" id="btn-trigger">
+        Déclencher toast
+        <span class="btn-kbd">CTRL+ALT+P</span>
+      </button>
+      <button class="btn" id="btn-clear">
+        Vider la pile
+      </button>
+    </div>
+
+    <h3>État de calcul</h3>
+    <div class="control-group" id="pendant-controls">
+      <label class="option"><input type="radio" name="pendant-step" value="1"> Lecture des jobs</label>
+      <label class="option"><input type="radio" name="pendant-step" value="2" checked> Optimisation FBI</label>
+      <label class="option"><input type="radio" name="pendant-step" value="3"> Recherche LNS</label>
+      <label class="option"><input type="radio" name="pendant-step" value="4"> Persistance</label>
+    </div>
+
+    <h3>Scope résultat</h3>
+    <div class="control-group" id="apres-controls" style="display:none">
+      <label class="option"><input type="radio" name="apres-mode" value="full" checked> Full (tous les jobs)</label>
+      <label class="option"><input type="radio" name="apres-mode" value="selective"> Selective (1 job)</label>
+      <label class="option"><input type="checkbox" id="has-late" checked> Inclure des jobs en retard</label>
+    </div>
+
+    <div class="meta-box">
+      <strong>Note :</strong> le toast réutilise l'API <code>useComputeToaster</code> existante (top-right, max 3 visibles). Ici la largeur est poussée à <strong>380px</strong> pour loger la vue "après" (ratio + priorités + liste).
+    </div>
+  </aside>
+
+  <!-- ── FAKE APP ──────────────────────────────── -->
+  <main class="fake-app">
+    <div class="fake-toolbar">
+      <div class="dot"></div>
+      <span class="title">Planning — Atelier principal</span>
+      <span class="meta">Lundi 21 avril, 08:00</span>
+      <span class="meta">· 142 jobs actifs</span>
+      <span class="meta">· 7 retards prévus</span>
+    </div>
+
+    <div class="fake-grid">
+      <div class="cell head">Machine</div>
+      <div class="cell head">08h</div>
+      <div class="cell head">09h</div>
+      <div class="cell head">10h</div>
+      <div class="cell head">11h</div>
+      <div class="cell head">12h</div>
+      <div class="cell head">13h</div>
+      <div class="cell head">14h</div>
+      <div class="cell head">15h</div>
+
+      <div class="cell head">HP Indigo 12k</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile amber">J-4820</div>
+      <div class="cell tile amber">J-4820</div>
+      <div class="cell">—</div>
+      <div class="cell tile">J-4901</div>
+      <div class="cell tile">J-4901</div>
+
+      <div class="cell head">Speedmaster 106</div>
+      <div class="cell tile">J-4795</div>
+      <div class="cell tile">J-4795</div>
+      <div class="cell">—</div>
+      <div class="cell tile red">J-4755</div>
+      <div class="cell tile red">J-4755</div>
+      <div class="cell tile red">J-4755</div>
+      <div class="cell tile">J-4888</div>
+      <div class="cell tile">J-4888</div>
+
+      <div class="cell head">Stahl TD78</div>
+      <div class="cell">—</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile amber">J-4820</div>
+      <div class="cell">—</div>
+      <div class="cell">—</div>
+      <div class="cell tile">J-4901</div>
+      <div class="cell tile">J-4901</div>
+
+      <div class="cell head">Muller Martini</div>
+      <div class="cell">—</div>
+      <div class="cell">—</div>
+      <div class="cell tile">J-4795</div>
+      <div class="cell tile red">J-4755</div>
+      <div class="cell tile red">J-4755</div>
+      <div class="cell tile">J-4888</div>
+      <div class="cell tile">J-4888</div>
+      <div class="cell">—</div>
+
+      <div class="cell head">Kolbus DA-270</div>
+      <div class="cell">—</div>
+      <div class="cell">—</div>
+      <div class="cell">—</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile">J-4812</div>
+      <div class="cell tile amber">J-4820</div>
+      <div class="cell">—</div>
+      <div class="cell tile">J-4901</div>
+    </div>
+
+    <div class="fake-legend">
+      <span class="l-blue">À l'heure</span>
+      <span class="l-amber">Serré</span>
+      <span class="l-red">En retard</span>
+    </div>
+
+    <div class="hint">
+      Appuie sur <kbd>CTRL</kbd>+<kbd>ALT</kbd>+<kbd>P</kbd> ou clique le bouton pour afficher l'info toast.
+    </div>
+  </main>
+</div>
+
+<!-- ── TOAST STACK ──────────────────────────────── -->
+<div class="toast-stack" id="stack"></div>
+
+<script>
+  // ── State ───────────────────────────────────────
+  let phase = 'pendant';
+  const stack = document.getElementById('stack');
+
+  // ── Phase tabs ──────────────────────────────────
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      phase = btn.dataset.phase;
+      document.getElementById('pendant-controls').style.display = phase === 'pendant' ? '' : 'none';
+      document.getElementById('apres-controls').style.display = phase === 'apres' ? '' : 'none';
+    });
+  });
+
+  // ── Triggers ────────────────────────────────────
+  document.getElementById('btn-trigger').addEventListener('click', spawnToast);
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    stack.innerHTML = '';
+  });
+
+  // Global shortcut
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.altKey && (e.key === 'p' || e.key === 'P')) {
+      e.preventDefault();
+      spawnToast();
+    }
+  });
+
+  function spawnToast() {
+    // Cap at 3 visible, drop oldest
+    while (stack.children.length >= 3) stack.removeChild(stack.firstChild);
+
+    const t = phase === 'pendant' ? buildPendantToast() : buildApresToast();
+    stack.appendChild(t);
+  }
+
+  // ── Pendant toast ───────────────────────────────
+  function buildPendantToast() {
+    const activeStepIdx = parseInt(
+      document.querySelector('input[name="pendant-step"]:checked').value,
+      10,
+    );
+
+    const steps = [
+      { label: 'Lecture des jobs et machines', detail: '142 jobs, 687 tâches à placer' },
+      { label: 'Optimisation FBI — passe 3/8', detail: '412 tâches placées, 7 jobs en retard' },
+      { label: "Recherche d'améliorations", detail: 'Tentative 6, meilleur : 5 retards — amélioration trouvée' },
+      { label: 'Enregistrement du planning', detail: null },
+    ];
+
+    const stepsHtml = steps.map((s, i) => {
+      let state;
+      if (i + 1 < activeStepIdx) state = 'done';
+      else if (i + 1 === activeStepIdx) state = 'active';
+      else state = 'pending';
+
+      const icon = state === 'done' ? '<div class="step-icon done">✓</div>'
+        : state === 'active' ? '<div class="step-icon active"></div>'
+        : '<div class="step-icon pending">○</div>';
+
+      const elapsed = state === 'active' ? `<span class="step-elapsed">${(Math.random() * 2 + 0.4).toFixed(1)}s</span>` : '';
+
+      return `
+        <div class="step ${state}">
+          ${icon}
+          <div class="step-body">
+            <div class="step-label">${s.label}</div>
+            ${s.detail && state !== 'pending' ? `<div class="step-detail">${s.detail}</div>` : ''}
+          </div>
+          ${elapsed}
+        </div>
+      `;
+    }).join('');
+
+    const el = document.createElement('div');
+    el.className = 'toast pending';
+    el.innerHTML = `
+      <div class="toast-head">
+        <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 6v6l4 2"></path>
+        </svg>
+        <div class="toast-title">
+          Calcul du planning en cours
+          <span class="toast-title-meta">· mode full</span>
+        </div>
+        <button class="toast-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="steps">${stepsHtml}</div>
+    `;
+    el.querySelector('.toast-close').addEventListener('click', () => dismiss(el));
+    return el;
+  }
+
+  // ── Après toast ─────────────────────────────────
+  function buildApresToast() {
+    const mode = document.querySelector('input[name="apres-mode"]:checked').value;
+    const hasLate = document.getElementById('has-late').checked;
+
+    if (mode === 'selective') {
+      return buildSelectiveToast(hasLate);
+    }
+    return buildFullToast(hasLate);
+  }
+
+  function buildFullToast(hasLate) {
+    const totalJobs = 142;
+    const lateJobs = hasLate ? [
+      { ref: 'J-4755', client: 'Éditions Laffont', delay: 4320, prio: 0 },
+      { ref: 'J-4820', client: 'Magazine Vert', delay: 1440, prio: 1 },
+      { ref: 'J-4833', client: 'Librairie Mollat', delay: 720, prio: 1 },
+      { ref: 'J-4817', client: 'Agence Kenzo', delay: 480, prio: 2 },
+      { ref: 'J-4840', client: 'Édition du Seuil', delay: 180, prio: 2 },
+      { ref: 'J-4845', client: 'Gallimard', delay: 120, prio: 2 },
+      { ref: 'J-4850', client: 'Actes Sud', delay: 90, prio: 2 },
+    ] : [];
+    const lateCount = lateJobs.length;
+    const onTime = totalJobs - lateCount;
+    const pct = Math.round((onTime / totalJobs) * 100);
+
+    const tierData = [
+      { tier: 0, color: '#ef4444', label: 'Impératif', total: 3, late: lateJobs.filter(l => l.prio === 0).length },
+      { tier: 1, color: '#f97316', label: 'Important', total: 18, late: lateJobs.filter(l => l.prio === 1).length },
+      { tier: 2, color: '#fbbf24', label: 'Standard', total: 82, late: lateJobs.filter(l => l.prio === 2).length },
+      { tier: 3, color: '#22c55e', label: 'Flexible', total: 39, late: lateJobs.filter(l => l.prio === 3).length },
+    ];
+
+    const prioHtml = tierData.map(t => {
+      const ontime = t.total - t.late;
+      const p = Math.round((ontime / t.total) * 100);
+      return `
+        <div class="prio-row">
+          <div class="prio-dot" style="background:${t.color}"></div>
+          <span class="prio-label">${t.label}</span>
+          <div class="prio-bar">
+            ${p > 0 ? `<div class="on" style="width:${p}%"></div>` : ''}
+            ${p < 100 ? `<div class="late" style="width:${100 - p}%"></div>` : ''}
+          </div>
+          <span class="prio-count">${ontime}/${t.total} <span style="color:var(--text-muted)">(${p}%)</span></span>
+        </div>
+      `;
+    }).join('');
+
+    const lateHtml = lateCount === 0 ? '' : `
+      <div class="divider"></div>
+      <div class="section-head">${lateCount > 5 ? `Jobs les plus en retard (${lateCount} au total)` : 'Jobs en retard'}</div>
+      ${lateJobs.slice(0, 5).map(l => `
+        <div class="late-row">
+          <div class="late-dot" style="background:${tierData[l.prio].color}"></div>
+          <span class="late-ref">${l.ref}</span><span class="late-client">${l.client}</span>
+          <span class="late-delay ${l.delay > 7 * 24 * 60 ? 'red' : 'amber'}">+${formatDelay(l.delay)}</span>
+        </div>
+      `).join('')}
+      ${lateCount > 5 ? `<div class="late-more">et ${lateCount - 5} autres…</div>` : ''}
+    `;
+
+    const el = document.createElement('div');
+    el.className = 'toast pending';
+    el.innerHTML = `
+      <div class="toast-head">
+        <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M20 6L9 17l-5-5"></path>
+        </svg>
+        <div class="toast-title">
+          Calcul terminé
+          <span class="toast-title-meta">· 2.3s · 3 passes</span>
+        </div>
+        <button class="toast-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="ratio-row">
+        <span class="ratio-big">${pct}%</span>
+        <span class="ratio-caption">${onTime} à l'heure sur ${totalJobs} jobs</span>
+      </div>
+      <div class="ratio-bar">
+        ${pct > 0 ? `<div class="on" style="width:${pct}%"></div>` : ''}
+        ${pct < 100 ? `<div class="late" style="width:${100 - pct}%"></div>` : ''}
+      </div>
+      <div class="stats-row">
+        <span>687/687 tâches placées</span>
+      </div>
+      <div class="divider"></div>
+      <div class="section-head">Par priorité</div>
+      ${prioHtml}
+      ${lateHtml}
+    `;
+    el.querySelector('.toast-close').addEventListener('click', () => dismiss(el));
+    return el;
+  }
+
+  function buildSelectiveToast(hasLate) {
+    const el = document.createElement('div');
+    el.className = 'toast pending';
+    el.innerHTML = `
+      <div class="toast-head">
+        <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M20 6L9 17l-5-5"></path>
+        </svg>
+        <div class="toast-title">
+          Placement — Job J-4820
+          <span class="toast-title-meta">· selective</span>
+        </div>
+        <button class="toast-close" aria-label="Fermer">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+        <div style="width:10px;height:10px;border-radius:50%;background:${hasLate ? 'var(--accent-amber)' : 'var(--accent-green)'};flex-shrink:0;"></div>
+        <span style="font-size:12px;font-weight:600;color:var(--text-primary);">Job J-4820</span>
+        <span style="font-size:12px;font-weight:500;color:${hasLate ? 'var(--accent-amber)' : 'var(--accent-green)'};">
+          ${hasLate ? 'en retard de 1j' : "à l'heure"}
+        </span>
+      </div>
+      <div class="stats-row">
+        <span>12/12 tâches placées</span>
+        <span>840ms</span>
+      </div>
+    `;
+    el.querySelector('.toast-close').addEventListener('click', () => dismiss(el));
+    return el;
+  }
+
+  function formatDelay(min) {
+    if (min < 60) return `${min}min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `${h}h`;
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    return rh ? `${d}j ${rh}h` : `${d}j`;
+  }
+
+  function dismiss(el) {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 180);
+  }
+</script>
+
+</body>
+</html>

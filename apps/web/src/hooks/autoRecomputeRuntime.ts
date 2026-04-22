@@ -129,6 +129,23 @@ export function triggerAutoRecompute(reason?: string): void {
 }
 
 /**
+ * Kick off the Phase-2 LNS stream against an already-computed baseline
+ * without rerunning Phase 1. Used by the Ctrl+Alt+P flow, whose Phase-1
+ * result comes from the ComputeReportToast stream (skip_lns=true). The
+ * LNS stream persists the improved schedule if it beats the baseline,
+ * emits the usual `optimized` / `lns-no-change` / `lns-failed` events,
+ * and invalidates the snapshot so the grid picks up the new assignments.
+ */
+export function runBackgroundLns(
+  baseline: ComputeScheduleResult,
+  reason?: string,
+): void {
+  if (!bindings) return;
+  lastReason = reason ?? lastReason;
+  void runPhase2Lns(baseline, bindings.invalidateSnapshot);
+}
+
+/**
  * Immediate retry — bypasses the debounce window. Used by the
  * staleness badge retry button.
  */
@@ -179,11 +196,13 @@ async function runPhase2Lns(
   abortCtrl = controller;
 
   try {
+    const token = localStorage.getItem('flux_auth_token') ?? '';
     const response = await fetch('/api/v1/schedule/compute-lns/stream', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ mode: 'full' }),
       signal: controller.signal,
