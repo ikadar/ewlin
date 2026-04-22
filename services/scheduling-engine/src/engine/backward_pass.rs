@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::NaiveDate;
 
@@ -126,6 +126,7 @@ pub fn compute_last_values(
                     successor_gap_ticks,
                     remaining_chain_work: 0, // computed below
                     last_tick: None,
+                    additional_successors: Vec::new(),
                 });
 
                 task_id_to_ba_idx.insert(task.id.clone(), idx);
@@ -220,6 +221,8 @@ pub fn compute_last_values_with_placements(
     start_date: NaiveDate,
     horizon_ticks: usize,
     alap_tiers: &[u8],
+    station_blocked_ranges: &[Vec<(usize, usize)>],
+    occupied_slots: &[(usize, Vec<usize>, usize, usize)],
 ) -> (HashMap<String, u64>, Vec<BackwardPlacement>) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -286,6 +289,7 @@ pub fn compute_last_values_with_placements(
                     successor_gap_ticks,
                     remaining_chain_work: 0,
                     last_tick: None,
+                    additional_successors: Vec::new(),
                 });
 
                 task_id_to_ba_idx.insert(task.id.clone(), idx);
@@ -301,6 +305,90 @@ pub fn compute_last_values_with_placements(
     }
 
     compute_chain_work(&mut backward_actions);
+
+    // B1 fix: wire cross-element and cross-job successors.
+    //
+    // `successor_idx` above captures only the intra-element chain. For ALAP
+    // to correctly order elements whose first task depends on a prerequisite
+    // element's last task, we attach cross-element / cross-job edges as
+    // `additional_successors` on the predecessor's last-task BackwardAction.
+    //
+    // Restriction: both endpoints must share the same tier. Cross-tier
+    // dependencies don't fit ALAP's tier-by-tier scheduling — they are
+    // handled by the forward pass. In practice cross-element within a job
+    // is always same-tier (tier is a job attribute), so this only restricts
+    // cross-job `required_job_ids`.
+    {
+        let mut elem_first: HashMap<String, usize> = HashMap::new();
+        let mut elem_last: HashMap<String, usize> = HashMap::new();
+        let mut job_first: HashMap<String, usize> = HashMap::new();
+        let mut job_last: HashMap<String, usize> = HashMap::new();
+        for (i, ba) in backward_actions.iter().enumerate() {
+            if let Some(eid) = task_id_to_element_id(&ba.task_id, jobs) {
+                elem_first.entry(eid.clone()).or_insert(i);
+                elem_last.insert(eid, i);
+            }
+            job_first.entry(ba.job_id.clone()).or_insert(i);
+            job_last.insert(ba.job_id.clone(), i);
+        }
+
+        for job in jobs {
+            for element in &job.elements {
+                if element.prerequisite_element_ids.is_empty() {
+                    continue;
+                }
+                let Some(&consumer_first) = elem_first.get(&element.id) else {
+                    continue;
+                };
+                for prereq_id in &element.prerequisite_element_ids {
+                    let Some(&prereq_last) = elem_last.get(prereq_id) else {
+                        continue;
+                    };
+                    if backward_actions[prereq_last].deadline_priority
+                        != backward_actions[consumer_first].deadline_priority
+                    {
+                        continue;
+                    }
+                    let pred_station = backward_actions[prereq_last].station_idx;
+                    let gap = if pred_station < stations.len()
+                        && stations[pred_station].is_press
+                    {
+                        minutes_to_ticks(
+                            stations[pred_station].drying_time_minutes,
+                            tick_minutes,
+                        )
+                    } else {
+                        0
+                    };
+                    backward_actions[prereq_last]
+                        .additional_successors
+                        .push((consumer_first, gap));
+                }
+            }
+        }
+
+        for job in jobs {
+            if job.required_job_ids.is_empty() {
+                continue;
+            }
+            let Some(&consumer_first) = job_first.get(&job.id) else {
+                continue;
+            };
+            for req_id in &job.required_job_ids {
+                let Some(&prereq_last) = job_last.get(req_id) else {
+                    continue;
+                };
+                if backward_actions[prereq_last].deadline_priority
+                    != backward_actions[consumer_first].deadline_priority
+                {
+                    continue;
+                }
+                backward_actions[prereq_last]
+                    .additional_successors
+                    .push((consumer_first, 0));
+            }
+        }
+    }
 
     let num_stations = stations.len();
     let num_operators = operators.len();
@@ -318,8 +406,55 @@ pub fn compute_last_values_with_placements(
         num_operators, effective_horizon, tick_minutes, start_date, schedules,
     );
 
+    // Bugs A+B fix: seed the backward grid with the same pre-blocks the
+    // forward grid will receive. Without this, ALAP may reserve cells that
+    // later get overwritten by pinned tasks, existing assignments, or
+    // station maintenance windows — a silent desync that can create
+    // invalid placements.
+    for (station_idx, ranges) in station_blocked_ranges.iter().enumerate() {
+        if station_idx >= num_stations {
+            continue;
+        }
+        for &(start_t, end_t) in ranges {
+            let clamped_end = end_t.min(effective_horizon);
+            for t in start_t..clamped_end {
+                grid.assign_station(station_idx, t, usize::MAX);
+            }
+        }
+    }
+    for &(station_idx, ref op_indices, start_t, end_t) in occupied_slots {
+        let clamped_end = end_t.min(effective_horizon);
+        for t in start_t..clamped_end {
+            if station_idx < num_stations {
+                grid.assign_station(station_idx, t, usize::MAX);
+            }
+            for &op_idx in op_indices {
+                if op_idx < num_operators {
+                    grid.assign_operator(op_idx, t, station_idx, 0.0);
+                }
+            }
+        }
+    }
+
+    // Build task_id → element_id map for per-element rollback tracking (B3 fix).
+    // ALAP may succeed on the terminal task of an element and fail on its
+    // intra-element predecessor, which would leave the terminal's placement
+    // orphaned while its predecessor falls through to forward_pass with a
+    // crushed deadline. B3 fix: if ANY task in an element chain fails ALAP,
+    // roll back ALL of that element's ALAP placements so the entire element
+    // goes through forward_pass uniformly.
+    let mut task_to_element: HashMap<String, String> = HashMap::new();
+    for job in jobs {
+        for element in &job.elements {
+            for task in &element.tasks {
+                task_to_element.insert(task.id.clone(), element.id.clone());
+            }
+        }
+    }
+
     // Phase 1: Place ALAP tiers only (e.g., imperative + important)
     let mut placements: Vec<BackwardPlacement> = Vec::new();
+    let mut failed_elements: HashSet<String> = HashSet::new();
 
     for &tier in alap_tiers {
         let mut placed = vec![false; backward_actions.len()];
@@ -327,12 +462,22 @@ pub fn compute_last_values_with_placements(
         loop {
             let eligible: Vec<usize> = (0..backward_actions.len())
                 .filter(|&i| {
-                    !placed[i]
-                        && backward_actions[i].deadline_priority == tier
-                        && match backward_actions[i].successor_idx {
-                            None => true,
-                            Some(succ) => placed[succ],
-                        }
+                    if placed[i] || backward_actions[i].deadline_priority != tier {
+                        return false;
+                    }
+                    let main_ok = match backward_actions[i].successor_idx {
+                        None => true,
+                        Some(succ) => placed[succ],
+                    };
+                    if !main_ok {
+                        return false;
+                    }
+                    // B1: cross-element / cross-job successors must all be
+                    // placed before this predecessor can be ALAP-placed.
+                    backward_actions[i]
+                        .additional_successors
+                        .iter()
+                        .all(|&(succ, _)| placed[succ])
                 })
                 .collect();
 
@@ -341,16 +486,25 @@ pub fn compute_last_values_with_placements(
             }
 
             for &ai in &eligible {
-                // Compute effective deadline from successor if present
+                // Compute effective deadline from ALL successors (intra +
+                // cross-element + cross-job). The tightest succ.last_tick - gap
+                // wins — the predecessor must finish before ANY of them starts.
+                let mut effective_deadline = backward_actions[ai].deadline_ticks;
                 if let Some(succ) = backward_actions[ai].successor_idx {
                     if let Some(succ_last) = backward_actions[succ].last_tick {
                         let gap = backward_actions[ai].successor_gap_ticks as u64;
-                        let effective = succ_last.saturating_sub(gap);
-                        if effective < backward_actions[ai].deadline_ticks {
-                            backward_actions[ai].deadline_ticks = effective;
-                        }
+                        effective_deadline =
+                            effective_deadline.min(succ_last.saturating_sub(gap));
                     }
                 }
+                let extras = backward_actions[ai].additional_successors.clone();
+                for (succ, gap) in extras {
+                    if let Some(succ_last) = backward_actions[succ].last_tick {
+                        effective_deadline =
+                            effective_deadline.min(succ_last.saturating_sub(gap as u64));
+                    }
+                }
+                backward_actions[ai].deadline_ticks = effective_deadline;
             }
 
             let mut sorted_eligible = eligible.clone();
@@ -383,9 +537,25 @@ pub fn compute_last_values_with_placements(
                         operator_indices: ops,
                         deadline_priority: backward_actions[ai].deadline_priority,
                     });
+                } else if let Some(elem_id) = task_to_element.get(&backward_actions[ai].task_id) {
+                    // Partial failure (no ticks collected) → mark element for rollback.
+                    failed_elements.insert(elem_id.clone());
                 }
             }
         }
+    }
+
+    // B3 rollback: drop every ALAP placement that belongs to an element with
+    // at least one task that failed ALAP. These elements will go through the
+    // forward_pass uniformly; their intra-element precedence is enforced
+    // there via predecessor_idx.
+    if !failed_elements.is_empty() {
+        placements.retain(|p| {
+            task_to_element
+                .get(&p.task_id)
+                .map(|eid| !failed_elements.contains(eid))
+                .unwrap_or(true)
+        });
     }
 
     // Phase 2: Place remaining tiers (for LAST values only, placements discarded)
@@ -428,6 +598,29 @@ struct BackwardAction {
     successor_gap_ticks: u32,
     remaining_chain_work: u32,
     last_tick: Option<u64>,
+    /// Cross-element + cross-job successor links (B1 fix). Each entry is
+    /// `(successor_ba_idx, gap_ticks)`. A task is backward-eligible when
+    /// every additional successor has `last_tick` set, mirroring how the
+    /// intra-element `successor_idx` is handled. The effective deadline
+    /// is tightened by `min(own deadline, succ.last_tick - gap)` over all
+    /// main + additional successors.
+    additional_successors: Vec<(usize, u32)>,
+}
+
+/// O(sum tasks) lookup of a task's owning element id. Used during the
+/// one-shot cross-element wiring pass, so we don't pay the cost of a full
+/// HashMap when jobs don't have cross-element prereqs.
+fn task_id_to_element_id(task_id: &str, jobs: &[JobInput]) -> Option<String> {
+    for job in jobs {
+        for element in &job.elements {
+            for task in &element.tasks {
+                if task.id == task_id {
+                    return Some(element.id.clone());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Compute remaining_chain_work for each action.
@@ -731,6 +924,17 @@ fn place_backward(
 
         occupied_ticks.push(t);
         work_remaining -= productivity;
+    }
+
+    // Bug D fix: if the backward walk exited with work still remaining,
+    // the placement is incomplete — its `occupied_ticks` span doesn't
+    // cover the task's full duration. Returning it as a success silently
+    // emits a BackwardPlacement whose window is too short and tricks the
+    // caller into thinking the task is safely scheduled. Treat it as a
+    // clean failure so the element-rollback logic (B3 fix) removes it
+    // and the task goes through forward_pass uniformly.
+    if work_remaining > 0.001 {
+        return (0, Vec::new(), Vec::new());
     }
 
     if let Some(&earliest) = occupied_ticks.last() {

@@ -5,6 +5,7 @@ mod grid;
 pub mod lns;
 pub mod moore;
 pub mod pre_split;
+pub mod precedence_validator;
 pub mod similarity;
 
 use std::collections::HashMap;

@@ -158,6 +158,12 @@ pub fn run_with_fbi(
                 tick_minutes, start_date,
                 initial_ticks_for_last,
                 &[0, 1], // ALAP tiers: imperative + important
+                // Bugs A+B: seed the backward grid with the same constraints
+                // the forward grid will enforce. Without this, ALAP may book
+                // cells that later get overwritten by pinned tasks or
+                // maintenance windows, silently desynchronising the two grids.
+                station_blocked_ranges,
+                occupied_slots,
             );
             // Store placements for later merging into occupied_slots
             alap_placements = placements;
@@ -249,10 +255,32 @@ pub fn run_with_fbi(
         // Mark ALAP-placed actions as done so the forward pass skips them.
         // Without this, the forward pass wastes time trying to place actions
         // whose station slots are blocked — O(actions × ticks) wasted cycles.
+        //
+        // B2 fix: use the REAL ALAP (start_tick, end_tick) instead of 0. Any
+        // non-ALAP action whose `predecessor_idx` (or `additional_predecessors`)
+        // points at an ALAP action will now see the true completion time and
+        // correctly wait for it, instead of passing the precedence gate
+        // trivially at end_tick=0.
+        //
+        // Chunks: pre_split may split a long ALAP task into multiple chunk
+        // actions (first keeps the original task_id, rest get "_chunk_N"
+        // suffixes). We match via `chunk_info.original_task_id` when present
+        // to cover all chunks uniformly — downstream's predecessor_idx is
+        // remapped by pre_split to point at the LAST chunk, and that chunk's
+        // end_tick must reflect the task's actual completion.
+        let alap_endpoints: HashMap<&str, (usize, usize)> = alap_placements
+            .iter()
+            .map(|p| (p.task_id.as_str(), (p.start_tick, p.end_tick)))
+            .collect();
         for action in actions.iter_mut() {
-            if alap_task_ids.contains(action.task_id.as_str()) {
-                action.start_tick = Some(0);
-                action.end_tick = Some(0);
+            let id_for_lookup: &str = action
+                .chunk_info
+                .as_ref()
+                .map(|(_, _, orig)| orig.as_str())
+                .unwrap_or(action.task_id.as_str());
+            if let Some(&(start, end)) = alap_endpoints.get(id_for_lookup) {
+                action.start_tick = Some(start);
+                action.end_tick = Some(end);
                 action.art = 0;
             }
         }
