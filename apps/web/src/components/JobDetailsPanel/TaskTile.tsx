@@ -3,7 +3,7 @@ import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, Outsourced
 import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
-import { useHoverCrosslink } from '../../hooks';
+import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -265,6 +265,7 @@ export const TaskTile = memo(function TaskTile({
     const handleClick = () => {
       if (onJumpToTask && assignment) {
         onJumpToTask(assignment);
+        pulseTaskTiles(task.id);
       }
     };
 
@@ -352,6 +353,7 @@ export const TaskTile = memo(function TaskTile({
                 if (!isClickable || !fromDate) return;
                 e.stopPropagation();
                 onJumpToOperatorSlice!(op.operatorId, fromDate);
+                pulseTaskTiles(task.id);
               };
               return (
                 <div

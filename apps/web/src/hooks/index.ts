@@ -26,7 +26,7 @@ export { useAutoRecompute } from './useAutoRecompute';
 export { useComputeToaster } from './useComputeToaster';
 export type { ComputeToast, ComputeToastType, ComputeToastAction, ComputeToastMetric } from './useComputeToaster';
 
-export { useHoverCrosslink } from './useHoverCrosslink';
+export { useHoverCrosslink, pulseTaskTiles } from './useHoverCrosslink';
 export type { HoverCrosslinkProps } from './useHoverCrosslink';
 
 // NOTE: do NOT re-export useLiftAndRecompute from this barrel.
