@@ -406,6 +406,22 @@ export default function OperatorSchedulePage() {
     container.scrollTo({ top, left, behavior: 'smooth' });
   }, [operators, pixelsPerHour, gridStartDate, effectiveCollapses]);
 
+  // ---- JDP tile click: scroll to the earliest operator slice for that task ----
+  // Operator view has no "tile" per se — the nearest analogue is the first
+  // operator slice. Mirrors handleSelectJob's earliest-op selection.
+  const handleJumpToTask = useCallback((assignment: TaskAssignment) => {
+    if (!assignment.operators || assignment.operators.length === 0) return;
+    let earliestOp: { operatorId: string; from?: string } | null = null;
+    for (const op of assignment.operators) {
+      if (!op.from) continue;
+      if (!earliestOp || !earliestOp.from || new Date(op.from) < new Date(earliestOp.from)) {
+        earliestOp = op;
+      }
+    }
+    if (!earliestOp?.from) return;
+    scrollToOperatorSlice(earliestOp.operatorId, new Date(earliestOp.from));
+  }, [scrollToOperatorSlice]);
+
   // ---- JobCard click: select + center grid on 1st non-completed tile of the job ----
   const handleSelectJob = useCallback((jobId: string | null) => {
     // Toggle: if re-clicking the selected card, deselect (no scroll)
@@ -1149,6 +1165,7 @@ export default function OperatorSchedulePage() {
             onSelectJob={setSelectedJobId}
             snapshotOperators={snapshot.operators}
             onJumpToOperatorSlice={scrollToOperatorSlice}
+            onJumpToTask={handleJumpToTask}
           />
         </div>
       )}
