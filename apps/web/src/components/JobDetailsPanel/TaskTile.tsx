@@ -328,7 +328,13 @@ export const TaskTile = memo(function TaskTile({
         </div>
         {operatorAssignments && operatorAssignments.length > 0 && (
           <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
-            {operatorAssignments.map((op, i) => {
+            {[...operatorAssignments].sort((a, b) => {
+              // Chronological order by start time. Absent `from` is pushed
+              // to the end (defensive — shouldn't happen on scheduled tasks).
+              const ta = a.from ? new Date(a.from).getTime() : Number.POSITIVE_INFINITY;
+              const tb = b.from ? new Date(b.from).getTime() : Number.POSITIVE_INFINITY;
+              return ta - tb;
+            }).map((op, i) => {
               const nameParts = op.name.split(' ');
               const displayName = nameParts.length >= 2
                 ? `${nameParts[0].charAt(0)}. ${nameParts.slice(1).join(' ')}`
