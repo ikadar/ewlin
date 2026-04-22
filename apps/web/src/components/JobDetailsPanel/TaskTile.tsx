@@ -186,7 +186,6 @@ export const TaskTile = memo(function TaskTile({
         className={`${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''}`}
         style={{ borderLeftColor: style.borderColor }}
         onContextMenu={handleOutsourcedContextMenu}
-        {...crosslink}
       >
         <OutsourcingMiniForm
           task={task as OutsourcedTask}
