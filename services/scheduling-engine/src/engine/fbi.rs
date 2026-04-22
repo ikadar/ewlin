@@ -165,8 +165,23 @@ pub fn run_with_fbi(
                 station_blocked_ranges,
                 occupied_slots,
             );
-            // Store placements for later merging into occupied_slots
-            alap_placements = placements;
+            // Store placements for later merging into occupied_slots.
+            //
+            // Drop any ALAP placement whose start_tick is before `now_tick`:
+            // the backward pass honestly computes a feasible slot from the
+            // job's deadline, but if the deadline is close to or in the
+            // past the slot lands in the past too — we cannot execute
+            // there. Let the forward pass handle those tasks; it starts
+            // at `now_tick` and will emit them as (late) real-time
+            // placements. Without this filter, past ALAP slots both (a)
+            // produce assignments scheduled in the past on the UI and
+            // (b) pre-block forward-grid cells from `now_tick` until the
+            // ALAP end, which forces competing tier 2/3 jobs to collide
+            // elsewhere and creates visible double-occupation tiles.
+            alap_placements = placements
+                .into_iter()
+                .filter(|p| p.start_tick >= now_tick)
+                .collect();
             lv
         } else {
             compute_last_values(
