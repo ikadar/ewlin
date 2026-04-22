@@ -1633,7 +1633,7 @@ fn pre_place_pinned_actions(
         let setup_ticks = actions[i].setup_ticks as usize;
         for t in start_t..end_t {
             let in_run_phase = setup_ticks == 0 || (t - start_t) >= setup_ticks;
-            let ops = find_operators_for_station(
+            let mut ops = find_operators_for_station(
                 grid,
                 t,
                 station_idx,
@@ -1644,14 +1644,44 @@ fn pre_place_pinned_actions(
                 max_ops,
                 !in_run_phase,
             );
+            // Availability fallback: if no operator can be found within
+            // their scheduled hours (pin is in the middle of the night,
+            // on a holiday, etc.), pick any qualified operator anyway.
+            // The user's pin is authoritative — they've said the task
+            // runs at this time, so we treat the operator assignment as
+            // an implicit overtime/exception rather than leaving the
+            // tile orphaned.
+            if ops.is_empty() {
+                let mut fallback: Vec<(usize, f64)> = operator_skills
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(op, skills)| {
+                        skills
+                            .iter()
+                            .find(|(s, _)| *s == station_idx)
+                            .and_then(|(_, p)| if *p > 0.0 { Some((op, *p)) } else { None })
+                    })
+                    .collect();
+                fallback.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                ops = fallback
+                    .into_iter()
+                    .take(max_ops as usize)
+                    .map(|(op, _)| op)
+                    .collect();
+            }
             for &op_idx in &ops {
-                // Attention 0.0 mirrors what the main-loop assign path
-                // writes for pinned timeslots; the post-processing pass
-                // in `mod.rs` recomputes meaningful attention values.
                 grid.assign_operator(op_idx, t, station_idx, 0.0);
                 if !actions[i].assigned_operators.contains(&op_idx) {
                     actions[i].assigned_operators.push(op_idx);
                 }
+            }
+            // `build_assignment_for` builds the `operators` field of the
+            // emitted ComputedAssignment from `tick_operator_log`, not
+            // from the grid snapshot. We need to push each productive
+            // tick's roster here so the emission actually contains the
+            // operators we just assigned.
+            if !ops.is_empty() {
+                actions[i].tick_operator_log.push((t, ops));
             }
         }
 
