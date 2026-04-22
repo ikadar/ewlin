@@ -58,10 +58,12 @@ export function pulseTaskTiles(taskId: string | undefined): void {
           playPulse(gridTiles);
         }
       },
-      { threshold: 0.4 },
+      { threshold: 0.3 },
     );
     gridTiles.forEach((el) => observer.observe(el));
-    window.setTimeout(() => observer.disconnect(), 2000);
+    // Long scrolls across multi-day grids can take 3-4s at default browser
+    // smooth-scroll speed. Give the observer enough runway before giving up.
+    window.setTimeout(() => observer.disconnect(), 6000);
   }
 }
 
