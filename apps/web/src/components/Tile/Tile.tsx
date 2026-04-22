@@ -103,6 +103,7 @@ export const Tile = memo(function Tile({
   top,
   height,
   onSelect,
+  isSelected = false,
   hasConflict = false,
   onTogglePin,
   pixelsPerHour = PIXELS_PER_HOUR,
