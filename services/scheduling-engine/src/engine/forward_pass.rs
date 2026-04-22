@@ -80,25 +80,35 @@ impl PreparedConcurrentGroup {
     }
 }
 
-/// Count contiguous ticks starting at `t` where BOTH:
-///   - the station is free (`grid.is_station_free`), AND
-///   - at least one operator qualified for the station is available
-///     (`operator_availability.is_available`).
+/// Count contiguous ticks starting at `t` where the station is
+/// workable (station free AND ≥1 qualified operator available) for a
+/// specific scoring action, taking **tier-based preemption** into
+/// account when the scoring action is overdue.
 ///
-/// Scan stops at the first tick that fails either condition, or at
-/// `max_ticks`, or at the grid horizon — whichever comes first. Returns
-/// the count of valid ticks before the stop.
+/// Passability rules for each candidate cell:
+///   - Station cell is free → pass.
+///   - Station cell is owned by `usize::MAX` sentinel (ALAP pre-block
+///     or maintenance window) → NOT pass, stop scan.
+///   - Station cell is owned by another action L:
+///       * If `scoring_priority < L.deadline_priority` (scoring task
+///         is in a more-urgent tier) AND `scoring_slack < 0` (already
+///         past its LAST target): pass anyway (scoring task will
+///         preempt L when it claims the cell productively).
+///       * Otherwise: stop scan.
+///   - Operator availability fails (no qualified op) → stop scan.
 ///
-/// This is the primitive the scoring filter uses to decide "can this
-/// action START here?": if the returned window is shorter than the
-/// chunk_mini floor (min'd with action.art), we don't let the action
-/// start — it will be re-considered at later ticks. Station-free alone
-/// is insufficient because an operator-absent window would let the
-/// action's `skip_ahead` stretch its span beyond what the scoring saw.
+/// This is the primitive used by the scoring filter. `scoring_slack`
+/// must be `action.last as i64 - t as i64 - action.art as i64` — the
+/// same slack used for urgency scoring. Preemption only fires when
+/// the scoring action is strictly more prioritary AND already late,
+/// matching the "policy B" relaxation pattern already in place.
 pub fn available_work_window(
     grid: &ScheduleGrid,
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &OperatorAvailability,
+    actions: &[Action],
+    scoring_priority: u8,
+    scoring_slack: i64,
     station_idx: usize,
     t: usize,
     max_ticks: usize,
@@ -110,8 +120,26 @@ pub fn available_work_window(
     let mut run = 0usize;
     while run < cap {
         let tick = t + run;
-        if !grid.is_station_free(station_idx, tick) {
-            break;
+        match grid.station_action_at(station_idx, tick) {
+            None => { /* free — pass */ }
+            Some(occupant_idx) if occupant_idx == usize::MAX => {
+                // ALAP pre-block / station_blocked_ranges / pinned
+                // placement sentinel. Not eligible for tier preemption.
+                break;
+            }
+            Some(occupant_idx) if occupant_idx < actions.len() => {
+                let occupant_priority = actions[occupant_idx].deadline_priority;
+                let preempt = scoring_priority < occupant_priority && scoring_slack < 0;
+                if !preempt {
+                    break;
+                }
+                // Preemption allowed — scoring task will displace L
+                // when it claims this cell productively.
+            }
+            Some(_) => {
+                // Unknown action idx; defensive break.
+                break;
+            }
         }
         let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
             skills
@@ -781,6 +809,68 @@ pub fn run_forward_pass(
         }
 
         // ============================================================
+        // VIRTUAL RESERVATION — project each already-active action's
+        // remaining PRODUCTIVE run onto the grid before scoring new
+        // candidates.
+        //
+        // Intent: a task B scored at tick T must see grid[T+1..] as
+        // busy where already-active task A will claim cells. Without
+        // this, B slips in and A stalls later — producing the
+        // scoring-race StationConflict pattern.
+        //
+        // Constraints:
+        //   1. We start at `t+1`, not `t`. Cell `t` itself is reserved
+        //      for already-active actions via Phase 1A, which runs
+        //      right after. Reserving `t` here would block new
+        //      candidates from starting at `t` even when the active
+        //      action will claim `t` legitimately via 1A.
+        //   2. We only mark cells where an operator is *available*.
+        //      Operator-idle cells are eventually covered by
+        //      skip_ahead at run-time; reserving them ahead of time
+        //      would block other tasks from legitimately using the
+        //      station during the active action's idle windows.
+        //   3. Counting stops once we've reserved `art` productive
+        //      cells for the action — that's the remaining work it
+        //      needs. Cells beyond that aren't ours to claim.
+        //   4. Marking is conditional on the cell being currently
+        //      free — we never overwrite another action's or
+        //      ALAP-sentinel's cell.
+        for action_idx in 0..actions.len() {
+            let a = &actions[action_idx];
+            if a.start_tick.is_none() || a.end_tick.is_some() || a.art == 0 {
+                continue;
+            }
+            let station = a.station_idx;
+            let art = a.art as usize;
+            let scan_cap = (grid.num_ticks.saturating_sub(t + 1)).min(art * 5);
+            let mut reserved = 0usize;
+            for offset in 0..scan_cap {
+                if reserved >= art {
+                    break;
+                }
+                let future_t = t + 1 + offset;
+                if !grid.is_station_free(station, future_t) {
+                    // Another action owns this cell — we can't claim it,
+                    // and scanning further for this reservation is
+                    // moot because the active action will itself hit
+                    // this wall when it runs.
+                    break;
+                }
+                let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
+                    skills
+                        .iter()
+                        .any(|(s, p)| *s == station && *p > 0.0)
+                        && operator_availability.is_available(op, future_t)
+                });
+                if !any_op {
+                    continue; // operator-idle; skip_ahead will cover at run-time
+                }
+                grid.assign_station(station, future_t, action_idx);
+                reserved += 1;
+            }
+        }
+
+        // ============================================================
         // Score actions eligible TO START at this tick (predecessors
         // satisfied, station free, group not full, retry cooldown OK).
         // ============================================================
@@ -844,18 +934,20 @@ pub fn run_forward_pass(
                     .max(task_floor)
                     .min(attrs.max_chunk_ticks.max(1));
                 let needed = action.art.min(chunk_mini_ticks) as usize;
-                // The work window must cover both station freedom AND
-                // operator availability. Station-only lookahead misses
-                // operator-absent cells that would extend the task's
-                // wallclock span via skip_ahead, letting other tasks
-                // slip into cells the running task will ultimately
-                // claim. This is the primary source of the residual
-                // StationConflicts after the first chunk_mini fix.
+                // Work window must cover station freedom, operator
+                // availability, AND (if the scoring task is both more
+                // urgent and already past its LAST) tier-preempt
+                // lower-priority active actions already parked on the
+                // grid by the virtual-reservation step.
                 if needed > 0 {
+                    let scoring_slack = action.last as i64 - t as i64 - action.art as i64;
                     let window = available_work_window(
                         grid,
                         operator_skills,
                         operator_availability,
+                        actions,
+                        action.deadline_priority,
+                        scoring_slack,
                         station_idx,
                         t,
                         needed,
