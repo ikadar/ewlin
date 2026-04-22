@@ -965,13 +965,45 @@ fn place_backward(
         // Productive tick — reset skip counter.
         consecutive_skipped = 0;
 
+        // Productivity computation — direct from skills/groups, NOT via
+        // `productivity_at_tick`. The forward-pass helper inspects the
+        // grid to decide "on station?" based on already-written load,
+        // but at this point in `place_backward` the grid has NOT been
+        // updated with our upcoming operator assignment yet — so that
+        // helper would always return 0.0, `work_remaining` would never
+        // decrement, and the backward walk would silently fail
+        // (returning `(0, vec![], vec![])` via the Bug D fix below).
+        //
+        // We inspect each selected operator's EXISTING load to classify:
+        //   - load == 0 → our assignment makes them solo → skill proficiency
+        //   - load == 1 → find_operators_for_station's Priority B selected
+        //     them as a pair candidate, so our assignment completes a
+        //     declared concurrent group → use that group's productivity
+        //     for our side of the pair.
         let productivity: f64 = if operators.is_empty() {
             1.0
         } else if in_run_phase {
             operators.iter().map(|&op| {
-                super::forward_pass::productivity_at_tick(
-                    op, station_idx, t, grid, operator_groups, operator_skills,
-                )
+                let load = grid.operator_stations_at(op, t);
+                match load[0].or(load[1]) {
+                    None => operator_skills[op]
+                        .iter()
+                        .find(|(s, _)| *s == station_idx)
+                        .map(|(_, p)| *p)
+                        .unwrap_or(0.0),
+                    Some(other_station) => {
+                        let pair = if other_station < station_idx {
+                            [other_station, station_idx]
+                        } else {
+                            [station_idx, other_station]
+                        };
+                        operator_groups[op]
+                            .iter()
+                            .find(|g| g.station_pair == pair)
+                            .and_then(|g| g.productivity_for(station_idx))
+                            .unwrap_or(0.0)
+                    }
+                }
             }).sum()
         } else {
             1.0
