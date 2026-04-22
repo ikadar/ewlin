@@ -297,25 +297,27 @@ export function TileSegment({
               />
             </span>
           )}
-          {inSafetyZone && canToggleFrozen && (
+          {inSafetyZone && (
             <span className="inline-flex align-middle mr-1">
               <svg
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
+                data-testid="tile-segment-safety-flocon"
+                className={`w-3 h-3 shrink-0 transition-colors ${
+                  canToggleFrozen ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'
+                } ${
                   isFrozenOverridden
                     ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
                     : 'text-sky-400 hover:text-sky-300'
                 }`}
-                onClick={(e) => {
+                onClick={canToggleFrozen ? (e) => {
                   e.stopPropagation();
-                  // Narrowed by canToggleFrozen above.
                   onToggleFrozenOverride!(jobId!, sequenceIndex!, stationId!);
-                }}
+                } : undefined}
                 aria-label={
                   isFrozenOverridden
                     ? 'Override actif — clic pour restaurer le freeze auto'
-                    : 'Frozen par safety zone — clic pour libérer'
+                    : 'Frozen par safety zone' + (canToggleFrozen ? ' — clic pour libérer' : '')
                 }
               >
                 <path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z" />

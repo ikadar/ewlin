@@ -366,6 +366,7 @@ export const Tile = memo(function Tile({
               <svg
                 viewBox="0 0 24 24"
                 fill="currentColor"
+                data-testid="tile-safety-flocon"
                 className={`w-3 h-3 shrink-0 pointer-events-auto cursor-pointer transition-colors ${
                   isFrozenOverridden
                     ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
