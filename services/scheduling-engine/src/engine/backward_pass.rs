@@ -127,6 +127,8 @@ pub fn compute_last_values(
                     remaining_chain_work: 0, // computed below
                     last_tick: None,
                     additional_successors: Vec::new(),
+                    is_pinned: task.is_pinned,
+                    pinned_start_tick: task.pinned_start_tick.map(|t| t as u64),
                 });
 
                 task_id_to_ba_idx.insert(task.id.clone(), idx);
@@ -290,6 +292,8 @@ pub fn compute_last_values_with_placements(
                     remaining_chain_work: 0,
                     last_tick: None,
                     additional_successors: Vec::new(),
+                    is_pinned: task.is_pinned,
+                    pinned_start_tick: task.pinned_start_tick.map(|t| t as u64),
                 });
 
                 task_id_to_ba_idx.insert(task.id.clone(), idx);
@@ -511,6 +515,15 @@ pub fn compute_last_values_with_placements(
             sorted_eligible.sort_by_key(|&i| backward_actions[i].deadline_ticks);
 
             for &ai in &sorted_eligible {
+                // Pinned actions: fix last_tick at the pin and skip ALAP.
+                // Don't emit a BackwardPlacement — the forward pass owns pin
+                // emission via pre_place_pinned_actions, so emitting here
+                // would double-book the station and duplicate the assignment.
+                if place_backward_pinned(ai, &mut backward_actions, &mut grid, effective_horizon) {
+                    placed[ai] = true;
+                    continue;
+                }
+
                 let (last, ticks, ops) = place_backward(
                     ai,
                     &backward_actions,
@@ -605,6 +618,13 @@ struct BackwardAction {
     /// is tightened by `min(own deadline, succ.last_tick - gap)` over all
     /// main + additional successors.
     additional_successors: Vec<(usize, u32)>,
+    /// User-pinned anchor: when true, `last_tick` must be fixed at
+    /// `pinned_start_tick` rather than computed ALAP, so the propagation
+    /// `predecessor.effective_deadline = succ.last_tick - gap` correctly
+    /// squeezes predecessors to end before the pin, not before the
+    /// unconstrained ALAP value.
+    is_pinned: bool,
+    pinned_start_tick: Option<u64>,
 }
 
 /// O(sum tasks) lookup of a task's owning element id. Used during the
@@ -709,6 +729,10 @@ fn run_backward_tier(
 
         // Place each eligible action backward from its effective deadline
         for &ai in &eligible {
+            if place_backward_pinned(ai, actions, grid, horizon_ticks) {
+                placed[ai] = true;
+                continue;
+            }
             let (last, _ticks, _ops) = place_backward(
                 ai,
                 actions,
@@ -779,6 +803,10 @@ fn run_backward_edd(
 
         // Place each eligible action backward from its effective deadline
         for &ai in &eligible {
+            if place_backward_pinned(ai, actions, grid, horizon_ticks) {
+                placed[ai] = true;
+                continue;
+            }
             let (last, _ticks, _ops) = place_backward(
                 ai,
                 actions,
@@ -793,6 +821,41 @@ fn run_backward_edd(
             placed[ai] = true;
         }
     }
+}
+
+/// Short-circuit the ALAP search for user-pinned actions: fix `last_tick`
+/// at the pinned start so predecessor deadline tightening (via
+/// `succ.last_tick - gap`) correctly squeezes upstream tasks before the
+/// pin. Also reserves station cells so other ALAP tasks can't book the
+/// pin's window.
+///
+/// Returns `true` when the pin was handled. Returns `false` when the action
+/// is not pinned, or is pinned but has no `pinned_start_tick` — the caller
+/// must then fall through to the regular `place_backward` ALAP search.
+/// Forward pass's `pre_place_pinned_actions` handles the actual placement
+/// emission, so we intentionally do NOT emit a `BackwardPlacement` here.
+fn place_backward_pinned(
+    action_idx: usize,
+    actions: &mut [BackwardAction],
+    grid: &mut ScheduleGrid,
+    horizon_ticks: usize,
+) -> bool {
+    let (is_pinned, pin_start_opt, station, duration) = {
+        let ba = &actions[action_idx];
+        (ba.is_pinned, ba.pinned_start_tick, ba.station_idx, ba.total_ticks as u64)
+    };
+    if !is_pinned {
+        return false;
+    }
+    let Some(pin_start) = pin_start_opt else {
+        return false;
+    };
+    let pin_end = (pin_start + duration).min(horizon_ticks as u64);
+    for t in pin_start..pin_end {
+        grid.assign_station(station, t as usize, usize::MAX);
+    }
+    actions[action_idx].last_tick = Some(pin_start);
+    true
 }
 
 /// Place a single action backward from its deadline.
@@ -979,4 +1042,178 @@ fn minutes_to_ticks(minutes: u32, tick_minutes: u32) -> u32 {
         return minutes;
     }
     (minutes + tick_minutes - 1) / tick_minutes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::job::{ElementInput, JobInput, TaskInput};
+    use crate::model::operator::{OperatorInput, OperatorSkill};
+    use crate::model::station::StationInput;
+    use crate::engine::forward_pass::{build_prepared_groups, StationAttrs};
+    use std::collections::HashMap;
+
+    fn station(id: &str) -> StationInput {
+        StationInput {
+            id: id.to_string(),
+            name: id.to_string(),
+            attention_full: Some(1.0),
+            attention_run: Some(1.0),
+            max_run_attention: Some(1.0),
+            masked_time_enabled: false,
+            attention_masked: None,
+            masked_productivity: None,
+            tick_minutes: Some(60),
+            peremption_threshold_minutes: None,
+            max_chunk_minutes: None,
+            category_id: None,
+            similarity_criteria: None,
+            similarity_score_rules: None,
+            is_press: false,
+            drying_time_minutes: 0,
+            max_operators: Some(1),
+            capacity: Some(1),
+            schedule_exceptions: Vec::new(),
+        }
+    }
+
+    fn operator_all_stations(id: &str, station_ids: &[&str]) -> OperatorInput {
+        OperatorInput {
+            id: id.to_string(),
+            first_name: id.to_string(),
+            last_name: "Test".to_string(),
+            role: "operator".to_string(),
+            operating_schedules: None,
+            schedule_rotation_reference_week: None,
+            skills: station_ids
+                .iter()
+                .map(|s| OperatorSkill { station_id: s.to_string(), proficiency: 1.0 })
+                .collect(),
+            concurrent_groups: vec![],
+            absences: vec![],
+        }
+    }
+
+    /// Regression: pinned MIDDLE task. Before the fix the backward pass
+    /// ignored `is_pinned`, so `last_tick` for a pinned mid-job task was
+    /// computed via ALAP (or came out as 0 on failure) rather than being
+    /// anchored at `pinned_start_tick`. The fix short-circuits the ALAP
+    /// search and fixes `last_tick = pinned_start_tick`, which is what
+    /// propagates to predecessors via `succ.last - gap`.
+    #[test]
+    fn compute_last_values_pins_middle_task_at_pinned_start_tick() {
+        let stations = vec![station("press"), station("lamin"), station("cut")];
+        let alice = operator_all_stations("alice", &["press", "lamin", "cut"]);
+
+        let pinned_tick: usize = 10;
+
+        let job = JobInput {
+            id: "job-1".into(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: "elem-1".into(),
+                name: None,
+                tasks: vec![
+                    TaskInput {
+                        id: "task-print".into(),
+                        station_id: "press".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 0,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        predecessor_gap_minutes: 0,
+                    },
+                    TaskInput {
+                        id: "task-laminate".into(),
+                        station_id: "lamin".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 1,
+                        is_pinned: true,
+                        pinned_start_tick: Some(pinned_tick),
+                        predecessor_gap_minutes: 0,
+                    },
+                    TaskInput {
+                        id: "task-cut".into(),
+                        station_id: "cut".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 2,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        predecessor_gap_minutes: 0,
+                    },
+                ],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let station_id_to_idx: HashMap<String, usize> = stations
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.id.clone(), i))
+            .collect();
+
+        let station_attrs: Vec<StationAttrs> = stations
+            .iter()
+            .map(|s| StationAttrs {
+                attention_full: s.effective_attention_full(),
+                attention_run: s.effective_attention_run(),
+                max_run_attention: s.effective_max_run_attention(),
+                masked_time_enabled: s.masked_time_enabled,
+                peremption_ticks: 0,
+                max_operators: s.effective_max_operators(),
+                similarity_criteria: s.similarity_criteria.clone().unwrap_or_default(),
+                similarity_score_rules: s.similarity_score_rules.clone().unwrap_or_default(),
+            })
+            .collect();
+
+        let operator_skills: Vec<Vec<(usize, f64)>> = vec![alice.clone()]
+            .iter()
+            .map(|op| {
+                op.skills
+                    .iter()
+                    .filter_map(|sk| {
+                        station_id_to_idx
+                            .get(&sk.station_id)
+                            .map(|&idx| (idx, sk.proficiency))
+                    })
+                    .collect()
+            })
+            .collect();
+
+        let operator_groups = build_prepared_groups(&[alice.clone()], &station_id_to_idx);
+
+        let start_date = NaiveDate::from_ymd_opt(2026, 4, 22).unwrap();
+        let tick_minutes: u32 = 60;
+        let horizon_ticks: usize = 48;
+
+        let last_values = compute_last_values(
+            &[job],
+            &stations,
+            &[alice],
+            &station_attrs,
+            &operator_skills,
+            &operator_groups,
+            tick_minutes,
+            start_date,
+            horizon_ticks,
+            BackwardOrdering::TierFirst,
+        );
+
+        // This is the CORE assertion: the pinned task's last_tick is the
+        // pinned start, not some ALAP value or 0-on-failure sentinel.
+        assert_eq!(
+            last_values.get("task-laminate").copied(),
+            Some(pinned_tick as u64),
+            "pinned middle task must have last_tick == pinned_start_tick (got {:?})",
+            last_values.get("task-laminate")
+        );
+    }
 }
