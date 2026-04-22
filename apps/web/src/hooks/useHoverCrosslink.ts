@@ -9,35 +9,60 @@ export interface HoverCrosslinkProps {
 /** Duration of the heartbeat animation (matches @keyframes flux-hover-heartbeat). */
 const PULSE_MS = 1050;
 
-/**
- * Imperatively fire the hover pulse on every DOM node carrying
- * `data-flux-task-id={taskId}`. Used by click handlers that scroll the
- * grid to a tile — the one-shot heartbeat becomes a visual confirmation
- * that "this is where we just navigated to", without requiring the user
- * to hover the destination manually.
- *
- * Restarts the CSS animation cleanly by removing the class, forcing a
- * reflow, and re-adding it. Removes the class after the full duration
- * so the tile returns to its quiet state.
- */
-export function pulseTaskTiles(taskId: string | undefined): void {
-  if (!taskId) return;
-  const els = document.querySelectorAll<HTMLElement>(
-    `[data-flux-task-id="${CSS.escape(taskId)}"]`,
-  );
-  if (els.length === 0) return;
-
+/** Low-level restart: remove the class, force reflow, re-add, auto-clean. */
+function playPulse(els: HTMLElement[]): void {
   els.forEach((el) => {
     el.classList.remove('flux-hover-linked');
-    // Force reflow so re-adding the class restarts the animation instead
-    // of being no-op'd by the browser (same rule = no transition kick).
+    // Force reflow so re-adding restarts the animation (same rule = no-op
+    // without the sync read).
     void el.offsetWidth;
     el.classList.add('flux-hover-linked');
   });
-
   window.setTimeout(() => {
     els.forEach((el) => el.classList.remove('flux-hover-linked'));
-  }, PULSE_MS + 100); // small buffer past the last keyframe
+  }, PULSE_MS + 100);
+}
+
+/**
+ * Imperative pulse used by click handlers that scroll the grid to a
+ * task. JDP rows (source of the click) pulse immediately — click
+ * confirmation. Grid tiles (destination) wait until they scroll into
+ * view via IntersectionObserver, so the heartbeat greets the user when
+ * the tile actually arrives instead of playing off-screen.
+ *
+ * Fallback: if the destination never becomes visible (e.g. clipped by
+ * a lens, scroll cancelled), the observer disconnects after 2s — the
+ * pulse quietly drops instead of looping forever.
+ */
+export function pulseTaskTiles(taskId: string | undefined): void {
+  if (!taskId) return;
+  const all = document.querySelectorAll<HTMLElement>(
+    `[data-flux-task-id="${CSS.escape(taskId)}"]`,
+  );
+  if (all.length === 0) return;
+
+  const jdpRows: HTMLElement[] = [];
+  const gridTiles: HTMLElement[] = [];
+  all.forEach((el) => {
+    if (el.matches('[data-testid^="task-tile-"]')) jdpRows.push(el);
+    else gridTiles.push(el);
+  });
+
+  if (jdpRows.length > 0) playPulse(jdpRows);
+
+  if (gridTiles.length > 0) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          observer.disconnect();
+          playPulse(gridTiles);
+        }
+      },
+      { threshold: 0.4 },
+    );
+    gridTiles.forEach((el) => observer.observe(el));
+    window.setTimeout(() => observer.disconnect(), 2000);
+  }
 }
 
 /**
