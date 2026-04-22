@@ -26,4 +26,8 @@ export { useAutoRecompute } from './useAutoRecompute';
 export { useComputeToaster } from './useComputeToaster';
 export type { ComputeToast, ComputeToastType, ComputeToastAction, ComputeToastMetric } from './useComputeToaster';
 
-export { useLiftAndRecompute } from './useLiftAndRecompute';
+// NOTE: do NOT re-export useLiftAndRecompute from this barrel.
+// It depends on AutoRecomputeContext, which itself imports from
+// '../hooks' — re-exporting here closes a circular module cycle
+// that crashes the bundle with a TDZ error at load time. Import
+// the hook directly from './useLiftAndRecompute' instead.
