@@ -27,12 +27,33 @@ pub struct StationAttrs {
     /// ticks during setup, setup expires and must be redone.
     pub peremption_ticks: u32,
     pub max_operators: u32,
+    /// Max chunk size in ticks. Upper bound for chunk decisions — forces the
+    /// engine to re-evaluate scheduling at least every this many ticks.
+    pub max_chunk_ticks: u32,
+    /// Chunk-mini: k factor on setup_ticks. A task must produce at least
+    /// `k × setup_ticks` of work in a single contiguous window.
+    pub chunk_mini_setup_multiplier: f64,
+    /// Chunk-mini: p fraction of the total task duration. A chunk shorter
+    /// than `p × total_task_ticks` is forbidden (caps chunk count).
+    pub chunk_mini_task_percentage: f64,
     /// Similarity criteria — empty when the station's category has none.
     /// Used by the scoring loop to compute a compatibility_bonus against the
     /// previous action on this station.
     pub similarity_criteria: Vec<crate::model::station::SimilarityCriterion>,
     /// Scoring rules — empty when the category has none (Typographie).
     pub similarity_score_rules: Vec<crate::model::station::SimilarityScoreRule>,
+}
+
+impl StationAttrs {
+    /// Compute the effective chunk_mini ticks for this station given a task's
+    /// total duration. Result = min(max_chunk, max(k × setup, p × task_total)).
+    /// Returns a value in ticks, always ≤ max_chunk_ticks.
+    pub fn chunk_mini_ticks(&self, setup_ticks: u32, task_total_ticks: u32) -> u32 {
+        let setup_floor = (self.chunk_mini_setup_multiplier * setup_ticks as f64).ceil() as u32;
+        let task_floor =
+            (self.chunk_mini_task_percentage * task_total_ticks as f64).ceil() as u32;
+        setup_floor.max(task_floor).min(self.max_chunk_ticks.max(1))
+    }
 }
 
 /// A pair of stations an operator can supervise simultaneously, prepared
@@ -145,6 +166,11 @@ pub struct Action {
     /// Original ART (setup + run ticks) at action creation. Used for
     /// incremental job_remaining_art updates when the action completes.
     pub original_art: u32,
+    /// Total work ticks of the ORIGINAL task (before any pre_split
+    /// chunking). All chunks of the same task share the same value so
+    /// the chunk_mini `p * task_total` computation is stable across
+    /// chunks. Non-chunked actions have this equal to `original_art`.
+    pub task_total_ticks: u32,
     /// Sum of per-tick productivity contributions, used for the
     /// effective_productivity field reported in ComputedAssignment.
     pub total_productivity: f64,
@@ -738,6 +764,53 @@ pub fn run_forward_pass(
                 if !all_done { continue; }
             }
             if !grid.is_station_free(action.station_idx, t) { continue; }
+
+            // Chunk-mini lookahead — refuse to start this action in a
+            // window too short to respect the station's chunk-mini
+            // policy. Two bounds:
+            //   k × setup  — setup must be amortised (economic floor)
+            //   p × task   — no over-fragmentation of the original task
+            // Capped by max_chunk_ticks (a chunk can never be required
+            // bigger than max_chunk). Then min'd with action.art so a
+            // task shorter than the floor is accepted at its natural
+            // size (exception courte).
+            //
+            // Policy B relaxation: when `slack` (last - t - art) is
+            // negative, the action is already past its LAST target and
+            // we loosen the task-percentage bound to avoid letting an
+            // anti-fragmentation rule push a late job even later. The
+            // setup multiplier is never relaxed — starting a chunk we
+            // can't amortise is wasteful regardless of lateness.
+            {
+                let station_idx = action.station_idx;
+                let attrs = &station_attrs[station_idx];
+                let slack_preview = action.last as i64 - t as i64 - action.art as i64;
+                let setup_floor =
+                    (attrs.chunk_mini_setup_multiplier * action.setup_ticks as f64).ceil() as u32;
+                let task_floor = if slack_preview < 0 {
+                    0
+                } else {
+                    (attrs.chunk_mini_task_percentage * action.task_total_ticks as f64).ceil()
+                        as u32
+                };
+                let chunk_mini_ticks = setup_floor
+                    .max(task_floor)
+                    .min(attrs.max_chunk_ticks.max(1));
+                let needed = action.art.min(chunk_mini_ticks) as usize;
+                // Using station_free_run_from captures the "other task
+                // blocks the cell" case (ALAP pre-reservation with
+                // usize::MAX sentinel, pinned pre-placement,
+                // station_blocked_ranges). Operator-availability idle
+                // is handled separately by the in-flight skip_ahead
+                // reservation (cells get marked with the active
+                // action_idx while the operator is away), so the run
+                // counted here is contiguous for our purposes.
+                if needed > 0 {
+                    let window = grid.station_free_run_from(station_idx, t, needed);
+                    if window < needed { continue; }
+                }
+            }
+
             if action.station_idx < station_to_group.len() {
                 if let Some((group_idx, max_concurrent)) = station_to_group[action.station_idx] {
                     if grid.group_active_count(group_idx, t) >= max_concurrent {
@@ -2167,6 +2240,7 @@ mod peremption_tests {
             idle_ticks,
             tick_operator_log: Vec::new(),
             original_art: setup_ticks + run_ticks,
+            task_total_ticks: setup_ticks + run_ticks,
             total_productivity: 0.0,
             ticks_counted: 0,
             is_pinned: false,

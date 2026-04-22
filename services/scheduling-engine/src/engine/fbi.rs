@@ -66,6 +66,13 @@ pub fn run_with_fbi(
                 0
             },
             max_operators: s.effective_max_operators(),
+            max_chunk_ticks: if tick_minutes > 0 {
+                (s.effective_max_chunk() + tick_minutes - 1) / tick_minutes
+            } else {
+                s.effective_max_chunk()
+            },
+            chunk_mini_setup_multiplier: s.effective_chunk_mini_setup_multiplier(),
+            chunk_mini_task_percentage: s.effective_chunk_mini_task_percentage(),
             similarity_criteria: s.similarity_criteria.clone().unwrap_or_default(),
             similarity_score_rules: s.similarity_score_rules.clone().unwrap_or_default(),
         })

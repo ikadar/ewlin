@@ -452,6 +452,8 @@ mod tests {
                 max_operators: None,
                 capacity: None,
                 schedule_exceptions: Vec::new(),
+                chunk_mini_setup_multiplier: None,
+                chunk_mini_task_percentage: None,
             }
         }
 

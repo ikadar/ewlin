@@ -693,6 +693,7 @@ pub fn build_actions(
                     run_ticks,
                     art: total_ticks,
                     original_art: total_ticks,
+                    task_total_ticks: total_ticks,
                     eat: 0,
                     last,
                     predecessor_idx,
@@ -1276,6 +1277,8 @@ mod integration_tests {
             max_operators: Some(1),
             capacity: Some(1),
             schedule_exceptions: Vec::new(),
+            chunk_mini_setup_multiplier: None,
+            chunk_mini_task_percentage: None,
         }
     }
 

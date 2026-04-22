@@ -66,6 +66,20 @@ pub struct StationInput {
     pub tick_minutes: Option<u32>,
     pub peremption_threshold_minutes: Option<u32>,
     pub max_chunk_minutes: Option<u32>,
+    /// Minimum-chunk-size setup multiplier (k). The scheduler refuses to
+    /// start a task in a window shorter than `k * setup_ticks` so the
+    /// setup cost is amortised by at least this much productive work.
+    /// Default 2.0 = "setup ≤ 33% of total station occupation time".
+    #[serde(default)]
+    pub chunk_mini_setup_multiplier: Option<f64>,
+    /// Minimum-chunk-size task-fraction (p). The scheduler refuses to
+    /// start a task in a window smaller than `p * total_task_ticks`,
+    /// which bounds the number of chunks a task can be broken into.
+    /// Default 0.5 = "max 2 chunks for tasks smaller than max_chunk".
+    /// Automatically capped by max_chunk_minutes — a chunk can never
+    /// be required to be bigger than max_chunk.
+    #[serde(default)]
+    pub chunk_mini_task_percentage: Option<f64>,
     #[serde(default)]
     pub category_id: Option<String>,
     #[serde(default)]
@@ -160,6 +174,8 @@ mod schedule_exception_tests {
             tick_minutes: Some(60),
             peremption_threshold_minutes: None,
             max_chunk_minutes: None,
+            chunk_mini_setup_multiplier: None,
+            chunk_mini_task_percentage: None,
             category_id: None,
             similarity_criteria: None,
             similarity_score_rules: None,
@@ -341,6 +357,18 @@ impl StationInput {
 
     pub fn effective_max_chunk(&self) -> u32 {
         self.max_chunk_minutes.unwrap_or(420)
+    }
+
+    /// k = "a chunk must produce at least k × setup_minutes of work to
+    /// be economically worthwhile". Default 2.0.
+    pub fn effective_chunk_mini_setup_multiplier(&self) -> f64 {
+        self.chunk_mini_setup_multiplier.unwrap_or(2.0).max(0.0)
+    }
+
+    /// p = "no chunk should be shorter than p × total_task_minutes".
+    /// Default 0.5 → max 2 chunks for tasks smaller than max_chunk.
+    pub fn effective_chunk_mini_task_percentage(&self) -> f64 {
+        self.chunk_mini_task_percentage.unwrap_or(0.5).clamp(0.0, 1.0)
     }
 
     pub fn effective_capacity(&self) -> u32 {

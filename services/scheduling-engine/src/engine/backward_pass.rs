@@ -1106,6 +1106,8 @@ mod tests {
             max_operators: Some(1),
             capacity: Some(1),
             schedule_exceptions: Vec::new(),
+            chunk_mini_setup_multiplier: None,
+            chunk_mini_task_percentage: None,
         }
     }
 
@@ -1201,6 +1203,9 @@ mod tests {
                 masked_time_enabled: s.masked_time_enabled,
                 peremption_ticks: 0,
                 max_operators: s.effective_max_operators(),
+                max_chunk_ticks: s.effective_max_chunk() / 60u32.max(1),
+                chunk_mini_setup_multiplier: s.effective_chunk_mini_setup_multiplier(),
+                chunk_mini_task_percentage: s.effective_chunk_mini_task_percentage(),
                 similarity_criteria: s.similarity_criteria.clone().unwrap_or_default(),
                 similarity_score_rules: s.similarity_score_rules.clone().unwrap_or_default(),
             })

@@ -122,6 +122,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 run_ticks: chunk_run,
                 art: chunk_total,
                 original_art: chunk_total,
+                task_total_ticks: action.task_total_ticks,
                 eat: 0,
                 last: action.last,
                 predecessor_idx,
@@ -221,6 +222,7 @@ mod tests {
             idle_ticks: 0,
             tick_operator_log: Vec::new(),
             original_art: setup_ticks + run_ticks,
+            task_total_ticks: setup_ticks + run_ticks,
             total_productivity: 0.0,
             ticks_counted: 0,
             is_pinned: false,
@@ -255,6 +257,8 @@ mod tests {
             max_operators: None,
             capacity: None,
             schedule_exceptions: Vec::new(),
+            chunk_mini_setup_multiplier: None,
+            chunk_mini_task_percentage: None,
         }
     }
 
@@ -351,6 +355,7 @@ pub fn clone_action(a: &Action) -> Action {
         run_ticks: a.run_ticks,
         art: a.art,
         original_art: a.original_art,
+        task_total_ticks: a.task_total_ticks,
         eat: a.eat,
         last: a.last,
         predecessor_idx: a.predecessor_idx,

@@ -99,6 +99,30 @@ impl ScheduleGrid {
         self.station_ticks[station * self.num_ticks + t].is_none()
     }
 
+    /// Count contiguous ticks starting at `t` where the station is free.
+    /// Scans up to `max_ticks` cells or `num_ticks - t`, whichever is smaller.
+    /// Returns 0 if `t` itself is occupied / out of bounds.
+    ///
+    /// This is the "forward available window" primitive used by the main-loop
+    /// scoring filter to decide whether a candidate start tick is worth it.
+    /// Operator availability is checked separately — callers intersect the
+    /// two (station AND operator) to get the true work window.
+    pub fn station_free_run_from(&self, station: usize, t: usize, max_ticks: usize) -> usize {
+        if station >= self.num_stations || t >= self.num_ticks {
+            return 0;
+        }
+        let cap = (self.num_ticks - t).min(max_ticks);
+        let base = station * self.num_ticks + t;
+        let mut run = 0usize;
+        while run < cap {
+            if self.station_ticks[base + run].is_some() {
+                break;
+            }
+            run += 1;
+        }
+        run
+    }
+
     /// Assign a station at tick t to an action
     pub fn assign_station(&mut self, station: usize, t: usize, action_idx: usize) {
         if t < self.num_ticks && station < self.num_stations {
