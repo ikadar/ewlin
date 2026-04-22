@@ -68,11 +68,29 @@ export function pulseTaskTiles(taskId: string | undefined): void {
 }
 
 /**
+ * Viewport check against the window — grid tiles sit in scroll containers
+ * clipped by the window, so their bounding rect reflects the actual
+ * clipped position and a window-relative test is enough.
+ */
+function isInViewport(el: HTMLElement): boolean {
+  const rect = el.getBoundingClientRect();
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return rect.bottom > 0 && rect.right > 0 && rect.top < vh && rect.left < vw;
+}
+
+/**
  * Crosslink a JDP tile row with its matching grid tile(s): while the mouse
  * hovers either side, every DOM node carrying `data-flux-task-id={taskId}`
  * gets the `flux-hover-linked` class, triggering the one-shot heartbeat
  * animation defined in index.css. Stateless on the React side — we poke
  * the DOM directly so we never cascade re-renders across the whole grid.
+ *
+ * Gated on viewport: if the task has grid tiles but none are currently
+ * visible, the heartbeat is skipped entirely — otherwise hovering a JDP
+ * row would pulse it while hinting at an offscreen crosslink target the
+ * user can't see. Tasks without any grid tile (e.g. outsourced) still
+ * animate normally.
  *
  * Usage:
  *   <div {...useHoverCrosslink(task.id)}>…</div>
@@ -84,7 +102,16 @@ export function useHoverCrosslink(taskId: string | undefined): HoverCrosslinkPro
     return {
       'data-flux-task-id': taskId,
       onMouseEnter: () => {
-        document.querySelectorAll(selector).forEach((el) => el.classList.add('flux-hover-linked'));
+        const all = document.querySelectorAll<HTMLElement>(selector);
+        if (all.length === 0) return;
+
+        const gridTiles: HTMLElement[] = [];
+        all.forEach((el) => {
+          if (!el.matches('[data-testid^="task-tile-"]')) gridTiles.push(el);
+        });
+        if (gridTiles.length > 0 && !gridTiles.some(isInViewport)) return;
+
+        all.forEach((el) => el.classList.add('flux-hover-linked'));
       },
       onMouseLeave: () => {
         document.querySelectorAll(selector).forEach((el) => el.classList.remove('flux-hover-linked'));
