@@ -19,6 +19,21 @@ pub struct BackwardPlacement {
     pub end_tick: usize,
     pub operator_indices: Vec<usize>,
     pub deadline_priority: u8,
+    /// Per-tick operator roster for every tick this placement actually
+    /// occupied on the grid. Used at emission time so ALAP operator
+    /// windows reflect the REAL work segments rather than the task's
+    /// outer envelope.
+    ///
+    /// Walking backward may leave holes between ticks when a later-
+    /// deadline task has already claimed cells in the middle — A
+    /// keeps going beyond those cells and ends up with a sparse
+    /// `occupied_ticks` set. The outer envelope `[start_tick, end_tick)`
+    /// still covers the whole wall-clock window, but the operator is
+    /// physically on the station only at `tick_operator_log` entries;
+    /// emitting a single wide window would overlap the task that holds
+    /// the middle ticks and trick the station-conflict validator into
+    /// reporting a false positive.
+    pub tick_operator_log: Vec<(usize, Vec<usize>)>,
 }
 
 /// Ordering strategy for the backward pass.
@@ -524,7 +539,7 @@ pub fn compute_last_values_with_placements(
                     continue;
                 }
 
-                let (last, ticks, ops) = place_backward(
+                let (last, ticks, ops, tick_log) = place_backward(
                     ai,
                     &backward_actions,
                     &mut grid,
@@ -549,6 +564,7 @@ pub fn compute_last_values_with_placements(
                         end_tick,
                         operator_indices: ops,
                         deadline_priority: backward_actions[ai].deadline_priority,
+                        tick_operator_log: tick_log,
                     });
                 } else if let Some(elem_id) = task_to_element.get(&backward_actions[ai].task_id) {
                     // Partial failure (no ticks collected) → mark element for rollback.
@@ -733,7 +749,7 @@ fn run_backward_tier(
                 placed[ai] = true;
                 continue;
             }
-            let (last, _ticks, _ops) = place_backward(
+            let (last, _ticks, _ops, _tick_log) = place_backward(
                 ai,
                 actions,
                 grid,
@@ -807,7 +823,7 @@ fn run_backward_edd(
                 placed[ai] = true;
                 continue;
             }
-            let (last, _ticks, _ops) = place_backward(
+            let (last, _ticks, _ops, _tick_log) = place_backward(
                 ai,
                 actions,
                 grid,
@@ -874,7 +890,7 @@ fn place_backward(
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
-) -> (u64, Vec<usize>, Vec<usize>) {
+) -> (u64, Vec<usize>, Vec<usize>, Vec<(usize, Vec<usize>)>) {
     let station_idx = actions[action_idx].station_idx;
     let setup_ticks = actions[action_idx].setup_ticks;
     let run_ticks = actions[action_idx].run_ticks;
@@ -882,19 +898,23 @@ fn place_backward(
     let deadline = actions[action_idx].deadline_ticks as usize;
 
     if total_work <= 0.0 {
-        return (deadline.min(horizon_ticks) as u64, Vec::new(), Vec::new());
+        return (deadline.min(horizon_ticks) as u64, Vec::new(), Vec::new(), Vec::new());
     }
 
     let attrs = if station_idx < station_attrs.len() {
         &station_attrs[station_idx]
     } else {
-        return (0, Vec::new(), Vec::new());
+        return (0, Vec::new(), Vec::new(), Vec::new());
     };
 
     // Walk backward from deadline, collecting ticks where this task can run.
     let mut work_remaining = total_work;
     let mut occupied_ticks: Vec<usize> = Vec::new();
     let mut all_operators: Vec<usize> = Vec::new();
+    // Parallel to occupied_ticks: operators assigned at that tick.
+    // Used downstream so ALAP emission can build fine-grained operator
+    // windows per productive segment instead of a single wide span.
+    let mut tick_operator_log: Vec<(usize, Vec<usize>)> = Vec::new();
     let mut t = deadline.min(horizon_ticks);
 
     // Peremption bookkeeping: track consecutive skipped ticks during the
@@ -1018,6 +1038,7 @@ fn place_backward(
         }
 
         occupied_ticks.push(t);
+        tick_operator_log.push((t, operators));
         work_remaining -= productivity;
     }
 
@@ -1029,13 +1050,19 @@ fn place_backward(
     // clean failure so the element-rollback logic (B3 fix) removes it
     // and the task goes through forward_pass uniformly.
     if work_remaining > 0.001 {
-        return (0, Vec::new(), Vec::new());
+        return (0, Vec::new(), Vec::new(), Vec::new());
     }
 
+    // `occupied_ticks` and `tick_operator_log` were built by walking
+    // backward, so they're in descending tick order. Callers that want to
+    // produce contiguous-segment emissions expect ascending order — sort
+    // here once rather than forcing every caller to re-sort.
+    tick_operator_log.sort_by_key(|(t, _)| *t);
+
     if let Some(&earliest) = occupied_ticks.last() {
-        (earliest as u64, occupied_ticks, all_operators)
+        (earliest as u64, occupied_ticks, all_operators, tick_operator_log)
     } else {
-        (0, Vec::new(), Vec::new())
+        (0, Vec::new(), Vec::new(), Vec::new())
     }
 }
 

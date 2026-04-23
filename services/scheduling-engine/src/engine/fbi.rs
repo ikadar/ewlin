@@ -222,7 +222,38 @@ pub fn run_with_fbi(
 
 
         // Build grid
-        let initial_ticks = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
+        //
+        // `initial_ticks` is just horizon_days worth of cells. ALAP
+        // placements, occupied slots, or station blocked ranges can
+        // legitimately point beyond that — their deadlines can land
+        // anywhere in `effective_horizon` (see backward_pass.rs). The
+        // grid grows dynamically during the forward pass, but the
+        // pre-block loops below run BEFORE the forward pass starts,
+        // so any cell beyond `grid.num_ticks` at that moment is
+        // silently dropped by `assign_station`. That produced a
+        // quiet desync where tier-0/1 ALAP placements scheduled past
+        // `initial_ticks` left ZERO sentinel marks on the grid, and
+        // the forward pass then freely placed tier-2/3 tasks on top
+        // of them — the root cause of the remaining alap-vs-fwd
+        // station-conflict pairs.
+        //
+        // Walk every pre-block source, find the highest tick any of
+        // them needs, and grow the grid up front so the subsequent
+        // assign_station calls actually land in backing storage.
+        let initial_ticks_base = (horizon_days as usize) * 24 * 60 / (tick_minutes as usize);
+        let mut required_ticks = initial_ticks_base;
+        for p in &alap_placements {
+            required_ticks = required_ticks.max(p.end_tick);
+        }
+        for &(_, _, _, end_t) in occupied_slots {
+            required_ticks = required_ticks.max(end_t);
+        }
+        for ranges in station_blocked_ranges.iter() {
+            for &(_, end_t) in ranges {
+                required_ticks = required_ticks.max(end_t);
+            }
+        }
+        let initial_ticks = required_ticks;
         let mut grid = ScheduleGrid::new(num_stations, num_operators, initial_ticks, tick_minutes);
 
         // Pre-block station ticks for machine unavailability constraints.
@@ -260,15 +291,48 @@ pub fn run_with_fbi(
             .map(|p| p.task_id.as_str())
             .collect();
 
+        // Use per-tick operator rosters when available so the pre-block
+        // reflects the placement's actual work pattern. Without this,
+        // marking every operator from `operator_indices` on every tick of
+        // `[start_tick, end_tick)` creates ghost operator load on cells
+        // the placement's backward walk never touched — e.g. another
+        // tighter-deadline placement that filled a hole in the middle
+        // would see its operators falsely load-bearing at those cells.
         for p in &alap_placements {
             let clamped_end = p.end_tick.min(initial_ticks);
-            for t in p.start_tick..clamped_end {
-                if p.station_idx < num_stations {
-                    grid.assign_station(p.station_idx, t, usize::MAX);
+            if std::env::var("FLUX_TRACE_ALAP").is_ok() {
+                eprintln!(
+                    "[ALAP-PREBLOCK] task={} station_idx={} ticks=[{}, {}) ops={:?}",
+                    &p.task_id[..8.min(p.task_id.len())],
+                    p.station_idx,
+                    p.start_tick,
+                    clamped_end,
+                    p.operator_indices,
+                );
+            }
+            if !p.tick_operator_log.is_empty() {
+                for &(t, ref ops) in p.tick_operator_log.iter() {
+                    if t >= initial_ticks {
+                        continue;
+                    }
+                    if p.station_idx < num_stations {
+                        grid.assign_station(p.station_idx, t, usize::MAX);
+                    }
+                    for &op_idx in ops {
+                        if op_idx < num_operators {
+                            grid.assign_operator(op_idx, t, p.station_idx, 0.0);
+                        }
+                    }
                 }
-                for &op_idx in &p.operator_indices {
-                    if op_idx < num_operators {
-                        grid.assign_operator(op_idx, t, p.station_idx, 0.0);
+            } else {
+                for t in p.start_tick..clamped_end {
+                    if p.station_idx < num_stations {
+                        grid.assign_station(p.station_idx, t, usize::MAX);
+                    }
+                    for &op_idx in &p.operator_indices {
+                        if op_idx < num_operators {
+                            grid.assign_operator(op_idx, t, p.station_idx, 0.0);
+                        }
                     }
                 }
             }
@@ -422,6 +486,17 @@ pub fn run_with_fbi(
         best_assignments.retain(|a| !alap_task_ids.contains(a.task_id.as_str()));
 
         // Convert placements to ComputedAssignment
+        //
+        // Operator windows are built PER-TICK from `tick_operator_log` and
+        // merged into contiguous segments (ticks separated by more than 1
+        // form a break). The naive approach of emitting a single
+        // `[start_tick, end_tick)` window per operator produces span-wide
+        // operator entries that overlap any task scheduled inside the
+        // placement's holes — notably another ALAP placement with a
+        // tighter deadline that was placed first and claimed the middle
+        // ticks. That false overlap is what surfaces as a StationConflict
+        // at the validator even when physically the two tasks never share
+        // an operator at the same tick.
         for p in &alap_placements {
             let station_id = if p.station_idx < stations.len() {
                 stations[p.station_idx].id.clone()
@@ -432,20 +507,36 @@ pub fn run_with_fbi(
             let start_dt = tick_to_datetime(p.start_tick, tick_minutes, start_date);
             let end_dt = tick_to_datetime(p.end_tick, tick_minutes, start_date);
 
-            let op_assignments: Vec<crate::model::schedule::OperatorAssignment> = p.operator_indices.iter()
-                .filter_map(|&op_idx| {
-                    if op_idx < operators.len() {
-                        Some(crate::model::schedule::OperatorAssignment {
-                            operator_id: operators[op_idx].id.clone(),
-                            from: start_dt.clone(),
-                            to: end_dt.clone(),
-                            attention: 1.0,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let op_assignments: Vec<crate::model::schedule::OperatorAssignment> = if p
+                .tick_operator_log
+                .is_empty()
+            {
+                // Degenerate: placement with no per-tick log (shouldn't
+                // happen for real work but harmless fallback). Emit the
+                // wide window so downstream code still sees operators.
+                p.operator_indices
+                    .iter()
+                    .filter_map(|&op_idx| {
+                        if op_idx < operators.len() {
+                            Some(crate::model::schedule::OperatorAssignment {
+                                operator_id: operators[op_idx].id.clone(),
+                                from: start_dt.clone(),
+                                to: end_dt.clone(),
+                                attention: 1.0,
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            } else {
+                build_alap_operator_assignments(
+                    &p.tick_operator_log,
+                    operators,
+                    tick_minutes,
+                    start_date,
+                )
+            };
 
             best_assignments.push(ComputedAssignment {
                 task_id: p.task_id.clone(),
@@ -476,6 +567,68 @@ fn tick_to_datetime(tick: usize, tick_minutes: u32, start_date: NaiveDate) -> St
     let dt = start_date.and_hms_opt(0, 0, 0).unwrap()
         + chrono::Duration::minutes(total_minutes);
     dt.format("%Y-%m-%dT%H:%M:%S").to_string()
+}
+
+/// Build per-operator contiguous segments from an ALAP placement's
+/// `tick_operator_log`. Mirrors what `build_operator_assignments` does
+/// for forward-pass actions: adjacent ticks for the same operator merge
+/// into one segment, a one-tick gap forces a new segment.
+///
+/// Input contract: the log is ascending by tick (sorted in place by
+/// `place_backward` before being stored on the placement).
+fn build_alap_operator_assignments(
+    tick_operator_log: &[(usize, Vec<usize>)],
+    operators: &[OperatorInput],
+    tick_minutes: u32,
+    start_date: NaiveDate,
+) -> Vec<crate::model::schedule::OperatorAssignment> {
+    // Collect per-operator list of ticks they were active on. Each op_idx
+    // gets an ascending Vec<usize>.
+    let mut per_op: std::collections::HashMap<usize, Vec<usize>> =
+        std::collections::HashMap::new();
+    for (tick, ops) in tick_operator_log {
+        for &op_idx in ops {
+            per_op.entry(op_idx).or_default().push(*tick);
+        }
+    }
+
+    let mut out: Vec<crate::model::schedule::OperatorAssignment> = Vec::new();
+    for (op_idx, ticks) in per_op {
+        if op_idx >= operators.len() || ticks.is_empty() {
+            continue;
+        }
+        let operator_id = operators[op_idx].id.clone();
+
+        // Walk sorted ticks, start a new segment each time a tick is
+        // more than 1 apart from the previous one.
+        let mut seg_start = ticks[0];
+        let mut seg_last = ticks[0];
+        for &t in &ticks[1..] {
+            if t == seg_last + 1 {
+                seg_last = t;
+            } else {
+                out.push(crate::model::schedule::OperatorAssignment {
+                    operator_id: operator_id.clone(),
+                    from: tick_to_datetime(seg_start, tick_minutes, start_date),
+                    to: tick_to_datetime(seg_last + 1, tick_minutes, start_date),
+                    attention: 1.0,
+                });
+                seg_start = t;
+                seg_last = t;
+            }
+        }
+        out.push(crate::model::schedule::OperatorAssignment {
+            operator_id,
+            from: tick_to_datetime(seg_start, tick_minutes, start_date),
+            to: tick_to_datetime(seg_last + 1, tick_minutes, start_date),
+            attention: 1.0,
+        });
+    }
+
+    // Stabilise order: segments ascending by (from, operator_id) so
+    // fixture snapshots diff cleanly.
+    out.sort_by(|a, b| a.from.cmp(&b.from).then(a.operator_id.cmp(&b.operator_id)));
+    out
 }
 
 /// Run FBI with a specific backward ordering and station groups.
