@@ -10,7 +10,7 @@
  * report toast is visible at a time. Re-triggering replaces it.
  */
 
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect } from 'react';
 import { CheckCircle2, Loader2, X, AlertCircle } from 'lucide-react';
 import type { ComputeReportState, ComputeReportLateJob } from '../../hooks/useComputeReportStream';
 import type { ScheduleSnapshot } from '@flux/types';
@@ -250,8 +250,10 @@ function FullSection({
 }) {
   // Denominator must be placed jobs only — counting unplaced jobs as
   // "on time" silently inflates the ratio (an unscheduled job isn't
-  // on time, it just hasn't been attempted).
-  const placedJobIds = useMemo(() => buildPlacedJobIds(snapshot), [snapshot]);
+  // on time, it just hasn't been attempted). Inlined (no useMemo) to
+  // keep FullSection hook-free; the snapshot-sized scan is cheap and
+  // avoids adding a hook to an otherwise-pure sub-component.
+  const placedJobIds = buildPlacedJobIds(snapshot);
   const totalJobs = placedJobIds.size;
   const onTime = Math.max(0, totalJobs - lateJobs.length);
   const pct = totalJobs > 0 ? Math.round((onTime / totalJobs) * 100) : 100;
