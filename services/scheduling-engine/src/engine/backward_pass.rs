@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use chrono::NaiveDate;
 
@@ -9,40 +9,23 @@ use crate::model::station::StationInput;
 use super::forward_pass::{OperatorAvailability, OperatorScheduleData, PreparedConcurrentGroup, StationAttrs};
 use super::grid::ScheduleGrid;
 
-/// A placement produced by the backward pass for ALAP scheduling.
-#[derive(Debug, Clone)]
-pub struct BackwardPlacement {
-    pub task_id: String,
-    pub job_id: String,
-    pub station_idx: usize,
-    pub start_tick: usize,
-    pub end_tick: usize,
-    pub operator_indices: Vec<usize>,
-    pub deadline_priority: u8,
-    /// Per-tick operator roster for every tick this placement actually
-    /// occupied on the grid. Used at emission time so ALAP operator
-    /// windows reflect the REAL work segments rather than the task's
-    /// outer envelope.
-    ///
-    /// Walking backward may leave holes between ticks when a later-
-    /// deadline task has already claimed cells in the middle — A
-    /// keeps going beyond those cells and ends up with a sparse
-    /// `occupied_ticks` set. The outer envelope `[start_tick, end_tick)`
-    /// still covers the whole wall-clock window, but the operator is
-    /// physically on the station only at `tick_operator_log` entries;
-    /// emitting a single wide window would overlap the task that holds
-    /// the middle ticks and trick the station-conflict validator into
-    /// reporting a false positive.
-    pub tick_operator_log: Vec<(usize, Vec<usize>)>,
-}
-
 /// Ordering strategy for the backward pass.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BackwardOrdering {
-    /// Process jobs by deadline priority tier first (imperative before flexible).
+    /// Tier-by-tier (0 → 3), intra-tier sort by deadline ascending (EDD).
     TierFirst,
-    /// Process jobs by earliest deadline first (EDD).
+    /// Tier-by-tier (0 → 3), intra-tier sort by slack
+    /// (`effective_deadline − remaining_chain_work`). Critical path first.
+    SlackFirst,
+    /// Globally by deadline ascending, ignoring tiers.
     EarliestDeadline,
+}
+
+/// Intra-tier sort strategy used by `run_backward_tier`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum IntraTierSort {
+    Deadline,
+    Slack,
 }
 
 /// Compute LAST values using a reverse forward pass.
@@ -50,13 +33,18 @@ pub enum BackwardOrdering {
 /// Runs backward from each task's deadline toward t=0, using the same grid,
 /// operator availability, and attention mechanics as the forward pass.
 ///
-/// With `TierFirst` ordering, jobs are processed by deadline priority tier
-/// (imperative first, flexible last), then EDD within each tier.
-/// With `EarliestDeadline` ordering, all jobs are processed globally by
-/// deadline ascending, ignoring tiers. This can produce different LAST
-/// values because capacity is reserved in a different order.
+/// - `TierFirst`: tier-by-tier (0 → 3), intra-tier sort by deadline (EDD).
+/// - `SlackFirst`: tier-by-tier, intra-tier sort by slack (critical path first).
+/// - `EarliestDeadline`: globally by deadline, ignoring tiers.
 ///
-/// Returns HashMap<task_id, LAST_tick> for use by the forward pass.
+/// `station_blocked_ranges` and `occupied_slots` seed the backward grid with
+/// the same constraints the forward grid will enforce, so LAST values respect
+/// maintenance and existing assignments across all FBI iterations. Cross-element
+/// (`prerequisite_element_ids`) and cross-job (`required_job_ids`) edges are
+/// wired as `additional_successors` for same-tier pairs so a prerequisite's
+/// last task is tightened by the consumer's first-task `last_tick - gap`.
+///
+/// Returns `HashMap<task_id, LAST_tick>` for use by the forward pass.
 pub fn compute_last_values(
     jobs: &[JobInput],
     stations: &[StationInput],
@@ -68,6 +56,8 @@ pub fn compute_last_values(
     start_date: NaiveDate,
     horizon_ticks: usize,
     ordering: BackwardOrdering,
+    station_blocked_ranges: &[Vec<(usize, usize)>],
+    occupied_slots: &[(usize, Vec<usize>, usize, usize)],
 ) -> HashMap<String, u64> {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -159,184 +149,15 @@ pub fn compute_last_values(
         }
     }
 
-    // Compute remaining_chain_work: this task + all predecessors not yet placed
-    // Walk predecessor chains (since we stored successor links, we need to invert)
+    // Compute remaining_chain_work: this task + all predecessors.
     compute_chain_work(&mut backward_actions);
 
-    // Build grid and operator availability for backward pass
-    let num_stations = stations.len();
-    let num_operators = operators.len();
-    let schedules: Vec<OperatorScheduleData> = operators
-        .iter()
-        .map(|op| OperatorScheduleData {
-            schedules: op.operating_schedules.clone(),
-            reference_week: op.schedule_rotation_reference_week,
-            absences: op.absences.clone(),
-        })
-        .collect();
-
-    let mut grid = ScheduleGrid::new(num_stations, num_operators, effective_horizon, tick_minutes);
-    let operator_availability = OperatorAvailability::new(
-        num_operators, effective_horizon, tick_minutes, start_date, schedules,
-    );
-
-    match ordering {
-        BackwardOrdering::TierFirst => {
-            // Process by tier: imperative first, then important, standard, flexible
-            let tiers = [0u8, 1, 2, 3];
-            for tier in &tiers {
-                run_backward_tier(
-                    *tier,
-                    &mut backward_actions,
-                    &mut grid,
-                    station_attrs,
-                    operator_skills,
-                    operator_groups,
-                    &operator_availability,
-                    effective_horizon,
-                );
-            }
-        }
-        BackwardOrdering::EarliestDeadline => {
-            // Process ALL actions globally by deadline ascending, ignoring tiers.
-            // This produces different LAST values because capacity reservation
-            // order changes: a tight-deadline flexible job can reserve capacity
-            // before a loose-deadline imperative job.
-            run_backward_edd(
-                &mut backward_actions,
-                &mut grid,
-                station_attrs,
-                operator_skills,
-                operator_groups,
-                &operator_availability,
-                effective_horizon,
-            );
-        }
-    }
-
-    // Collect LAST values
-    let mut last_values: HashMap<String, u64> = HashMap::new();
-    for ba in &backward_actions {
-        let last = ba.last_tick.unwrap_or(0);
-        last_values.insert(ba.task_id.clone(), last);
-    }
-
-    last_values
-}
-
-/// Like `compute_last_values`, but also returns ALAP placements for jobs
-/// in the specified priority tiers (e.g., [0, 1] for imperative + important).
-/// These placements can be converted to occupied_slots for a second FBI pass.
-pub fn compute_last_values_with_placements(
-    jobs: &[JobInput],
-    stations: &[StationInput],
-    operators: &[OperatorInput],
-    station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
-    operator_groups: &[Vec<PreparedConcurrentGroup>],
-    tick_minutes: u32,
-    start_date: NaiveDate,
-    horizon_ticks: usize,
-    alap_tiers: &[u8],
-    station_blocked_ranges: &[Vec<(usize, usize)>],
-    occupied_slots: &[(usize, Vec<usize>, usize, usize)],
-) -> (HashMap<String, u64>, Vec<BackwardPlacement>) {
-    let station_id_to_idx: HashMap<String, usize> = stations
-        .iter()
-        .enumerate()
-        .map(|(i, s)| (s.id.clone(), i))
-        .collect();
-
-    let mut backward_actions: Vec<BackwardAction> = Vec::new();
-    let mut task_id_to_ba_idx: HashMap<String, usize> = HashMap::new();
-
-    let max_deadline_ticks: usize = jobs
-        .iter()
-        .filter_map(|j| {
-            j.deadline.as_ref()
-                .and_then(|d| parse_deadline_to_ticks(d, tick_minutes, start_date))
-                .map(|t| t as usize)
-        })
-        .max()
-        .unwrap_or(horizon_ticks);
-    let effective_horizon = horizon_ticks.max(max_deadline_ticks + 1);
-
-    let mut tiered_jobs: Vec<(u8, &JobInput)> = jobs.iter().map(|j| (j.deadline_priority, j)).collect();
-    tiered_jobs.sort_by_key(|(tier, _)| *tier);
-
-    for (_, job) in &tiered_jobs {
-        let deadline_ticks = job
-            .deadline
-            .as_ref()
-            .and_then(|d| parse_deadline_to_ticks(d, tick_minutes, start_date))
-            .unwrap_or(effective_horizon as u64);
-
-        for element in &job.elements {
-            let mut sorted_tasks = element.tasks.clone();
-            sorted_tasks.sort_by_key(|t| t.sequence_order);
-
-            for (ti, task) in sorted_tasks.iter().enumerate() {
-                let station_idx = match station_id_to_idx.get(&task.station_id) {
-                    Some(&idx) => idx,
-                    None => continue,
-                };
-
-                let setup_ticks = minutes_to_ticks(task.setup_minutes, tick_minutes);
-                let run_ticks = minutes_to_ticks(task.run_minutes, tick_minutes);
-                let total_ticks = setup_ticks + run_ticks;
-
-                let successor_gap_ticks = if station_idx < stations.len() && stations[station_idx].is_press {
-                    minutes_to_ticks(stations[station_idx].drying_time_minutes, tick_minutes)
-                } else {
-                    0
-                };
-
-                let idx = backward_actions.len();
-                backward_actions.push(BackwardAction {
-                    idx,
-                    task_id: task.id.clone(),
-                    job_id: job.id.clone(),
-                    station_idx,
-                    setup_ticks,
-                    run_ticks,
-                    total_ticks,
-                    deadline_ticks,
-                    deadline_priority: job.deadline_priority,
-                    successor_idx: None,
-                    successor_gap_ticks,
-                    remaining_chain_work: 0,
-                    last_tick: None,
-                    additional_successors: Vec::new(),
-                    is_pinned: task.is_pinned,
-                    pinned_start_tick: task.pinned_start_tick.map(|t| t as u64),
-                });
-
-                task_id_to_ba_idx.insert(task.id.clone(), idx);
-
-                if ti > 0 {
-                    let pred_task_id = &sorted_tasks[ti - 1].id;
-                    if let Some(&pred_idx) = task_id_to_ba_idx.get(pred_task_id) {
-                        backward_actions[pred_idx].successor_idx = Some(idx);
-                    }
-                }
-            }
-        }
-    }
-
-    compute_chain_work(&mut backward_actions);
-
-    // B1 fix: wire cross-element and cross-job successors.
-    //
-    // `successor_idx` above captures only the intra-element chain. For ALAP
-    // to correctly order elements whose first task depends on a prerequisite
-    // element's last task, we attach cross-element / cross-job edges as
-    // `additional_successors` on the predecessor's last-task BackwardAction.
-    //
-    // Restriction: both endpoints must share the same tier. Cross-tier
-    // dependencies don't fit ALAP's tier-by-tier scheduling — they are
-    // handled by the forward pass. In practice cross-element within a job
-    // is always same-tier (tier is a job attribute), so this only restricts
-    // cross-job `required_job_ids`.
+    // Wire cross-element (`prerequisite_element_ids`) and cross-job
+    // (`required_job_ids`) edges as `additional_successors` so the effective
+    // deadline of a prerequisite's last task is tightened by the consumer's
+    // first-task `last_tick - gap`. Same-tier restriction keeps
+    // tier-stratified processing well-ordered; cross-tier dependencies rely
+    // on the forward pass for coordination.
     {
         let mut elem_first: HashMap<String, usize> = HashMap::new();
         let mut elem_last: HashMap<String, usize> = HashMap::new();
@@ -409,6 +230,7 @@ pub fn compute_last_values_with_placements(
         }
     }
 
+    // Build grid and operator availability for backward pass
     let num_stations = stations.len();
     let num_operators = operators.len();
     let schedules: Vec<OperatorScheduleData> = operators
@@ -425,11 +247,9 @@ pub fn compute_last_values_with_placements(
         num_operators, effective_horizon, tick_minutes, start_date, schedules,
     );
 
-    // Bugs A+B fix: seed the backward grid with the same pre-blocks the
-    // forward grid will receive. Without this, ALAP may reserve cells that
-    // later get overwritten by pinned tasks, existing assignments, or
-    // station maintenance windows — a silent desync that can create
-    // invalid placements.
+    // Seed the backward grid with the same pre-blocks the forward grid will
+    // enforce. Without this, LAST values would be optimistic and propose
+    // positions later invalidated by maintenance or existing assignments.
     for (station_idx, ranges) in station_blocked_ranges.iter().enumerate() {
         if station_idx >= num_stations {
             continue;
@@ -455,194 +275,58 @@ pub fn compute_last_values_with_placements(
         }
     }
 
-    // Build task_id → element_id map for per-element rollback tracking (B3 fix).
-    // ALAP may succeed on the terminal task of an element and fail on its
-    // intra-element predecessor, which would leave the terminal's placement
-    // orphaned while its predecessor falls through to forward_pass with a
-    // crushed deadline. B3 fix: if ANY task in an element chain fails ALAP,
-    // roll back ALL of that element's ALAP placements so the entire element
-    // goes through forward_pass uniformly.
-    let mut task_to_element: HashMap<String, String> = HashMap::new();
-    for job in jobs {
-        for element in &job.elements {
-            for task in &element.tasks {
-                task_to_element.insert(task.id.clone(), element.id.clone());
-            }
-        }
-    }
-
-    // Phase 1: Place ALAP tiers only (e.g., imperative + important)
-    let mut placements: Vec<BackwardPlacement> = Vec::new();
-    let mut failed_elements: HashSet<String> = HashSet::new();
-
-    for &tier in alap_tiers {
-        let mut placed = vec![false; backward_actions.len()];
-
-        loop {
-            let eligible: Vec<usize> = (0..backward_actions.len())
-                .filter(|&i| {
-                    if placed[i] || backward_actions[i].deadline_priority != tier {
-                        return false;
-                    }
-                    let main_ok = match backward_actions[i].successor_idx {
-                        None => true,
-                        Some(succ) => placed[succ],
-                    };
-                    if !main_ok {
-                        return false;
-                    }
-                    // B1: cross-element / cross-job successors must all be
-                    // placed before this predecessor can be ALAP-placed.
-                    backward_actions[i]
-                        .additional_successors
-                        .iter()
-                        .all(|&(succ, _)| placed[succ])
-                })
-                .collect();
-
-            if eligible.is_empty() {
-                break;
-            }
-
-            for &ai in &eligible {
-                // Compute effective deadline from ALL successors (intra +
-                // cross-element + cross-job). The tightest succ.last_tick - gap
-                // wins — the predecessor must finish before ANY of them starts.
-                let mut effective_deadline = backward_actions[ai].deadline_ticks;
-                if let Some(succ) = backward_actions[ai].successor_idx {
-                    if let Some(succ_last) = backward_actions[succ].last_tick {
-                        let gap = backward_actions[ai].successor_gap_ticks as u64;
-                        effective_deadline =
-                            effective_deadline.min(succ_last.saturating_sub(gap));
-                    }
-                }
-                let extras = backward_actions[ai].additional_successors.clone();
-                for (succ, gap) in extras {
-                    if let Some(succ_last) = backward_actions[succ].last_tick {
-                        effective_deadline =
-                            effective_deadline.min(succ_last.saturating_sub(gap as u64));
-                    }
-                }
-                backward_actions[ai].deadline_ticks = effective_deadline;
-            }
-
-            let mut sorted_eligible = eligible.clone();
-            sorted_eligible.sort_by_key(|&i| backward_actions[i].deadline_ticks);
-
-            for &ai in &sorted_eligible {
-                // Pinned actions: fix last_tick at the pin and skip ALAP.
-                // Don't emit a BackwardPlacement — the forward pass owns pin
-                // emission via pre_place_pinned_actions, so emitting here
-                // would double-book the station and duplicate the assignment.
-                if place_backward_pinned(ai, &mut backward_actions, &mut grid, effective_horizon) {
-                    placed[ai] = true;
-                    continue;
-                }
-
-                let (last, ticks, ops, tick_log) = place_backward(
-                    ai,
-                    &backward_actions,
+    match ordering {
+        BackwardOrdering::TierFirst => {
+            for tier in &[0u8, 1, 2, 3] {
+                run_backward_tier(
+                    *tier,
+                    &mut backward_actions,
                     &mut grid,
                     station_attrs,
                     operator_skills,
                     operator_groups,
                     &operator_availability,
                     effective_horizon,
+                    IntraTierSort::Deadline,
                 );
-                backward_actions[ai].last_tick = Some(last);
-                placed[ai] = true;
-
-                // Collect placement if ticks were actually assigned
-                if !ticks.is_empty() {
-                    let start_tick = *ticks.iter().min().unwrap();
-                    let end_tick = *ticks.iter().max().unwrap() + 1;
-                    placements.push(BackwardPlacement {
-                        task_id: backward_actions[ai].task_id.clone(),
-                        job_id: backward_actions[ai].job_id.clone(),
-                        station_idx: backward_actions[ai].station_idx,
-                        start_tick,
-                        end_tick,
-                        operator_indices: ops,
-                        deadline_priority: backward_actions[ai].deadline_priority,
-                        tick_operator_log: tick_log,
-                    });
-                } else if let Some(elem_id) = task_to_element.get(&backward_actions[ai].task_id) {
-                    // Partial failure (no ticks collected) → mark element for rollback.
-                    failed_elements.insert(elem_id.clone());
-                }
             }
+        }
+        BackwardOrdering::SlackFirst => {
+            for tier in &[0u8, 1, 2, 3] {
+                run_backward_tier(
+                    *tier,
+                    &mut backward_actions,
+                    &mut grid,
+                    station_attrs,
+                    operator_skills,
+                    operator_groups,
+                    &operator_availability,
+                    effective_horizon,
+                    IntraTierSort::Slack,
+                );
+            }
+        }
+        BackwardOrdering::EarliestDeadline => {
+            run_backward_edd(
+                &mut backward_actions,
+                &mut grid,
+                station_attrs,
+                operator_skills,
+                operator_groups,
+                &operator_availability,
+                effective_horizon,
+            );
         }
     }
 
-    // B3 rollback: drop every ALAP placement that belongs to an element with
-    // at least one task that failed ALAP. These elements will go through the
-    // forward_pass uniformly; their intra-element precedence is enforced
-    // there via predecessor_idx.
-    //
-    // Consumer-cascade: keeping a consumer element's ALAP placement while
-    // its prerequisite element's placements have been torn down would let
-    // the forward pass see the consumer's first task as already done
-    // (art = 0, end_tick = Some(...)) but the prerequisite's tasks as
-    // still running. The forward pass's precedence gate only checks
-    // `pred.end + gap <= t` when scoring the CONSUMER; when the consumer
-    // is already marked done it is never scored, so the gap stops being
-    // enforced and the prerequisite is free to run wherever it fits,
-    // even after the consumer finished. Cascade the rollback up the
-    // prerequisite graph so the entire subtree falls back to the
-    // forward pass together.
-    if !failed_elements.is_empty() {
-        loop {
-            let mut added_any = false;
-            for job in jobs {
-                for element in &job.elements {
-                    if failed_elements.contains(&element.id) {
-                        continue;
-                    }
-                    let depends_on_failed = element
-                        .prerequisite_element_ids
-                        .iter()
-                        .any(|pid| failed_elements.contains(pid));
-                    if depends_on_failed {
-                        failed_elements.insert(element.id.clone());
-                        added_any = true;
-                    }
-                }
-            }
-            if !added_any {
-                break;
-            }
-        }
-        placements.retain(|p| {
-            task_to_element
-                .get(&p.task_id)
-                .map(|eid| !failed_elements.contains(eid))
-                .unwrap_or(true)
-        });
-    }
-
-    // Phase 2: Place remaining tiers (for LAST values only, placements discarded)
-    let remaining_tiers: Vec<u8> = (0..=3u8).filter(|t| !alap_tiers.contains(t)).collect();
-    for &tier in &remaining_tiers {
-        run_backward_tier(
-            tier,
-            &mut backward_actions,
-            &mut grid,
-            station_attrs,
-            operator_skills,
-            operator_groups,
-            &operator_availability,
-            effective_horizon,
-        );
-    }
-
-    // Collect LAST values for all actions
+    // Collect LAST values
     let mut last_values: HashMap<String, u64> = HashMap::new();
     for ba in &backward_actions {
         let last = ba.last_tick.unwrap_or(0);
         last_values.insert(ba.task_id.clone(), last);
     }
 
-    (last_values, placements)
+    last_values
 }
 
 /// A backward action: represents a task being placed backward from its deadline.
@@ -722,7 +406,13 @@ fn compute_chain_work(actions: &mut Vec<BackwardAction>) {
 }
 
 /// Run the backward pass for a single priority tier.
-/// Process terminal tasks first (last in element chain), then their predecessors.
+/// Process terminal tasks first (last in element chain or whose all successors —
+/// intra-element + cross-element + cross-job — are placed), then their
+/// predecessors. `sort_mode` selects the intra-tier ordering within each
+/// eligibility wave:
+///   - `Deadline`: effective deadline ascending (EDD, classical).
+///   - `Slack`: `effective_deadline − remaining_chain_work` ascending
+///     (critical-path / tight-slack first).
 fn run_backward_tier(
     tier: u8,
     actions: &mut Vec<BackwardAction>,
@@ -732,57 +422,77 @@ fn run_backward_tier(
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
+    sort_mode: IntraTierSort,
 ) {
-    // Collect terminal actions for this tier (those with no successor, or whose successor is placed)
-    // Process iteratively: place terminal tasks, then their predecessors become terminal, etc.
     let mut placed = vec![false; actions.len()];
 
     loop {
-        // Find eligible actions: this tier, not placed, either terminal or successor already placed
         let mut eligible: Vec<usize> = Vec::new();
         for i in 0..actions.len() {
             if placed[i] || actions[i].deadline_priority != tier {
                 continue;
             }
-            match actions[i].successor_idx {
-                None => eligible.push(i), // terminal task
-                Some(succ) => {
-                    if placed[succ] {
-                        eligible.push(i); // predecessor of a placed task
-                    }
-                }
+            let main_ok = match actions[i].successor_idx {
+                None => true,
+                Some(succ) => placed[succ],
+            };
+            if !main_ok {
+                continue;
             }
+            // Cross-element / cross-job successors must all be placed too,
+            // so their `last_tick` is available for effective-deadline
+            // tightening below.
+            let extras_ok = actions[i]
+                .additional_successors
+                .iter()
+                .all(|&(succ, _)| placed[succ]);
+            if !extras_ok {
+                continue;
+            }
+            eligible.push(i);
         }
 
         if eligible.is_empty() {
             break;
         }
 
-        // For each eligible action, compute its effective deadline
-        // (either job deadline or successor's LAST - gap)
+        // Tighten effective deadline by every successor (intra + cross).
         for &ai in &eligible {
-            let effective_deadline = match actions[ai].successor_idx {
-                Some(succ) => {
-                    let succ_last = actions[succ].last_tick.unwrap_or(actions[succ].deadline_ticks);
-                    succ_last.saturating_sub(actions[ai].successor_gap_ticks as u64)
+            let mut effective_deadline = actions[ai].deadline_ticks;
+            if let Some(succ) = actions[ai].successor_idx {
+                let succ_last = actions[succ].last_tick.unwrap_or(actions[succ].deadline_ticks);
+                let gap = actions[ai].successor_gap_ticks as u64;
+                effective_deadline = effective_deadline.min(succ_last.saturating_sub(gap));
+            }
+            let extras = actions[ai].additional_successors.clone();
+            for (succ, gap) in extras {
+                if let Some(succ_last) = actions[succ].last_tick {
+                    effective_deadline =
+                        effective_deadline.min(succ_last.saturating_sub(gap as u64));
                 }
-                None => actions[ai].deadline_ticks,
-            };
-            // Update deadline to effective (may be tighter than job deadline)
-            // We store it back for scoring
-            actions[ai].deadline_ticks = effective_deadline.min(actions[ai].deadline_ticks);
+            }
+            actions[ai].deadline_ticks = effective_deadline;
         }
 
-        // Sort eligible by deadline ascending (EDD within tier)
-        eligible.sort_by_key(|&i| actions[i].deadline_ticks);
+        match sort_mode {
+            IntraTierSort::Deadline => {
+                eligible.sort_by_key(|&i| actions[i].deadline_ticks);
+            }
+            IntraTierSort::Slack => {
+                eligible.sort_by_key(|&i| {
+                    actions[i]
+                        .deadline_ticks
+                        .saturating_sub(actions[i].remaining_chain_work as u64)
+                });
+            }
+        }
 
-        // Place each eligible action backward from its effective deadline
         for &ai in &eligible {
             if place_backward_pinned(ai, actions, grid, horizon_ticks) {
                 placed[ai] = true;
                 continue;
             }
-            let (last, _ticks, _ops, _tick_log) = place_backward(
+            let last = place_backward(
                 ai,
                 actions,
                 grid,
@@ -800,7 +510,7 @@ fn run_backward_tier(
 
 /// Run the backward pass with pure EDD ordering (ignoring tiers).
 /// All actions are processed globally by deadline ascending. Within each
-/// iteration of the loop, eligible actions (terminal or successor placed)
+/// iteration of the loop, eligible actions (terminal or all successors placed)
 /// are sorted by effective deadline and placed.
 fn run_backward_edd(
     actions: &mut Vec<BackwardAction>,
@@ -814,49 +524,57 @@ fn run_backward_edd(
     let mut placed = vec![false; actions.len()];
 
     loop {
-        // Find eligible actions: not placed, either terminal or successor already placed
-        // No tier filter — all actions compete globally
         let mut eligible: Vec<usize> = Vec::new();
         for i in 0..actions.len() {
             if placed[i] {
                 continue;
             }
-            match actions[i].successor_idx {
-                None => eligible.push(i),
-                Some(succ) => {
-                    if placed[succ] {
-                        eligible.push(i);
-                    }
-                }
+            let main_ok = match actions[i].successor_idx {
+                None => true,
+                Some(succ) => placed[succ],
+            };
+            if !main_ok {
+                continue;
             }
+            let extras_ok = actions[i]
+                .additional_successors
+                .iter()
+                .all(|&(succ, _)| placed[succ]);
+            if !extras_ok {
+                continue;
+            }
+            eligible.push(i);
         }
 
         if eligible.is_empty() {
             break;
         }
 
-        // Compute effective deadlines (same logic as run_backward_tier)
         for &ai in &eligible {
-            let effective_deadline = match actions[ai].successor_idx {
-                Some(succ) => {
-                    let succ_last = actions[succ].last_tick.unwrap_or(actions[succ].deadline_ticks);
-                    succ_last.saturating_sub(actions[ai].successor_gap_ticks as u64)
+            let mut effective_deadline = actions[ai].deadline_ticks;
+            if let Some(succ) = actions[ai].successor_idx {
+                let succ_last = actions[succ].last_tick.unwrap_or(actions[succ].deadline_ticks);
+                let gap = actions[ai].successor_gap_ticks as u64;
+                effective_deadline = effective_deadline.min(succ_last.saturating_sub(gap));
+            }
+            let extras = actions[ai].additional_successors.clone();
+            for (succ, gap) in extras {
+                if let Some(succ_last) = actions[succ].last_tick {
+                    effective_deadline =
+                        effective_deadline.min(succ_last.saturating_sub(gap as u64));
                 }
-                None => actions[ai].deadline_ticks,
-            };
-            actions[ai].deadline_ticks = effective_deadline.min(actions[ai].deadline_ticks);
+            }
+            actions[ai].deadline_ticks = effective_deadline;
         }
 
-        // Sort eligible globally by deadline ascending (EDD)
         eligible.sort_by_key(|&i| actions[i].deadline_ticks);
 
-        // Place each eligible action backward from its effective deadline
         for &ai in &eligible {
             if place_backward_pinned(ai, actions, grid, horizon_ticks) {
                 placed[ai] = true;
                 continue;
             }
-            let (last, _ticks, _ops, _tick_log) = place_backward(
+            let last = place_backward(
                 ai,
                 actions,
                 grid,
@@ -907,13 +625,23 @@ fn place_backward_pinned(
     true
 }
 
-/// Place a single action backward from its deadline.
-/// Walk backward tick by tick, finding operators at each tick.
-/// Uses proficiency-aware work tracking: each tick contributes the operator's
-/// proficiency (not a flat 1.0), so tasks with lower-proficiency operators
-/// correctly require more ticks. Setup phase uses solo operators; run phase
-/// allows paired operators via concurrent groups.
-/// Returns (LAST_tick, occupied_ticks, operator_indices_used).
+/// Place a single action backward from its deadline, returning its `LAST_tick`.
+///
+/// Walks backward tick by tick, finding operators at each tick and consuming
+/// proficiency-weighted work until `work_remaining` is exhausted. Setup phase
+/// uses solo operators; run phase allows paired operators via concurrent
+/// groups. Setup re-calage cost across long idle windows is accounted for
+/// via the peremption rule (mirrors the forward pass).
+///
+/// The backward grid is mutated: productive ticks are marked with
+/// `action_idx` on the station and with operator load. Grid mutations scope
+/// to the backward pass — they do not leak to the forward grid, but they
+/// are what makes later tiers see tighter feasibility in the same pass.
+///
+/// Returns `0` on failure (the walk exited with work still remaining because
+/// the feasibility window is too short, or the station index is invalid).
+/// A `0` return is a clean sentinel: callers interpret it as "no feasible
+/// LAST", which the forward pass absorbs as maximum urgency.
 fn place_backward(
     action_idx: usize,
     actions: &[BackwardAction],
@@ -923,7 +651,7 @@ fn place_backward(
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
-) -> (u64, Vec<usize>, Vec<usize>, Vec<(usize, Vec<usize>)>) {
+) -> u64 {
     let station_idx = actions[action_idx].station_idx;
     let setup_ticks = actions[action_idx].setup_ticks;
     let run_ticks = actions[action_idx].run_ticks;
@@ -931,31 +659,20 @@ fn place_backward(
     let deadline = actions[action_idx].deadline_ticks as usize;
 
     if total_work <= 0.0 {
-        return (deadline.min(horizon_ticks) as u64, Vec::new(), Vec::new(), Vec::new());
+        return deadline.min(horizon_ticks) as u64;
     }
 
     let attrs = if station_idx < station_attrs.len() {
         &station_attrs[station_idx]
     } else {
-        return (0, Vec::new(), Vec::new(), Vec::new());
+        return 0;
     };
 
-    // Walk backward from deadline, collecting ticks where this task can run.
     let mut work_remaining = total_work;
-    let mut occupied_ticks: Vec<usize> = Vec::new();
-    let mut all_operators: Vec<usize> = Vec::new();
-    // Parallel to occupied_ticks: operators assigned at that tick.
-    // Used downstream so ALAP emission can build fine-grained operator
-    // windows per productive segment instead of a single wide span.
-    let mut tick_operator_log: Vec<(usize, Vec<usize>)> = Vec::new();
+    let mut earliest_productive: Option<usize> = None;
     let mut t = deadline.min(horizon_ticks);
 
-    // Peremption bookkeeping: track consecutive skipped ticks during the
-    // backward walk. If we skip >= peremption_ticks ticks while still
-    // consuming run work (i.e., forward view = run interrupted by a long
-    // idle window), add setup_ticks back to work_remaining. This mirrors
-    // the forward-pass post-setup peremption rule so that LAST estimates
-    // account for re-calage cost across weekends/off-shifts.
+    // Peremption bookkeeping: see forward-pass post-setup peremption rule.
     let peremption_ticks = attrs.peremption_ticks;
     let mut consecutive_skipped: u32 = 0;
     let mut peremption_applied: u32 = 0;
@@ -967,8 +684,6 @@ fn place_backward(
             if *peremption_applied >= super::forward_pass::MAX_PEREMPTION_RETRIES {
                 return;
             }
-            // Only applies while we still have run work to go (work_remaining
-            // exceeds setup_ticks in the backward perspective = run phase).
             if *work_remaining <= setup_ticks as f64 {
                 return;
             }
@@ -1015,7 +730,6 @@ fn place_backward(
             continue;
         }
 
-        // Productive tick — reset skip counter.
         consecutive_skipped = 0;
 
         // Productivity computation — direct from skills/groups, NOT via
@@ -1023,16 +737,7 @@ fn place_backward(
         // grid to decide "on station?" based on already-written load,
         // but at this point in `place_backward` the grid has NOT been
         // updated with our upcoming operator assignment yet — so that
-        // helper would always return 0.0, `work_remaining` would never
-        // decrement, and the backward walk would silently fail
-        // (returning `(0, vec![], vec![])` via the Bug D fix below).
-        //
-        // We inspect each selected operator's EXISTING load to classify:
-        //   - load == 0 → our assignment makes them solo → skill proficiency
-        //   - load == 1 → find_operators_for_station's Priority B selected
-        //     them as a pair candidate, so our assignment completes a
-        //     declared concurrent group → use that group's productivity
-        //     for our side of the pair.
+        // helper would always return 0.0 and the walk would never advance.
         let productivity: f64 = if operators.is_empty() {
             1.0
         } else if in_run_phase {
@@ -1065,38 +770,19 @@ fn place_backward(
         grid.assign_station(station_idx, t, action_idx);
         for &op_idx in &operators {
             grid.assign_operator(op_idx, t, station_idx, 0.0);
-            if !all_operators.contains(&op_idx) {
-                all_operators.push(op_idx);
-            }
         }
 
-        occupied_ticks.push(t);
-        tick_operator_log.push((t, operators));
+        earliest_productive = Some(t);
         work_remaining -= productivity;
     }
 
-    // Bug D fix: if the backward walk exited with work still remaining,
-    // the placement is incomplete — its `occupied_ticks` span doesn't
-    // cover the task's full duration. Returning it as a success silently
-    // emits a BackwardPlacement whose window is too short and tricks the
-    // caller into thinking the task is safely scheduled. Treat it as a
-    // clean failure so the element-rollback logic (B3 fix) removes it
-    // and the task goes through forward_pass uniformly.
+    // Bug D guard: incomplete backward walk → clean failure sentinel so
+    // the forward pass absorbs the task as maximum-urgency ASAP work.
     if work_remaining > 0.001 {
-        return (0, Vec::new(), Vec::new(), Vec::new());
+        return 0;
     }
 
-    // `occupied_ticks` and `tick_operator_log` were built by walking
-    // backward, so they're in descending tick order. Callers that want to
-    // produce contiguous-segment emissions expect ascending order — sort
-    // here once rather than forcing every caller to re-sort.
-    tick_operator_log.sort_by_key(|(t, _)| *t);
-
-    if let Some(&earliest) = occupied_ticks.last() {
-        (earliest as u64, occupied_ticks, all_operators, tick_operator_log)
-    } else {
-        (0, Vec::new(), Vec::new(), Vec::new())
-    }
+    earliest_productive.map(|t| t as u64).unwrap_or(0)
 }
 
 fn parse_deadline_to_ticks(deadline: &str, tick_minutes: u32, start_date: NaiveDate) -> Option<u64> {
@@ -1302,6 +988,8 @@ mod tests {
             start_date,
             horizon_ticks,
             BackwardOrdering::TierFirst,
+            &[],
+            &[],
         );
 
         // This is the CORE assertion: the pinned task's last_tick is the
