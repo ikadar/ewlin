@@ -2,7 +2,11 @@ import type { MassUnscheduleState } from '../hooks/useMassUnschedule';
 
 interface Props {
   state: MassUnscheduleState;
-  getClearableCount: (includeInProgress?: boolean, includePinned?: boolean) => number;
+  getClearableCount: (
+    includeInProgress?: boolean,
+    includePinned?: boolean,
+    includeFrozen?: boolean,
+  ) => number;
   onConfirm: () => void;
   onDismiss: () => void;
   onUpdate: (updater: (prev: MassUnscheduleState | null) => MassUnscheduleState | null) => void;
@@ -26,7 +30,7 @@ export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDi
           Les tuiles terminées seront toujours conservées.
         </p>
         <p className="text-flux-text-primary font-mono mb-4" style={{ fontSize: '13px' }}>
-          {getClearableCount(state.includeInProgress, state.includePinned)} tuile(s) à effacer
+          {getClearableCount(state.includeInProgress, state.includePinned, state.includeFrozen)} tuile(s) à effacer
         </p>
         <div className="flex flex-col gap-2 mb-6">
           <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
@@ -55,6 +59,15 @@ export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDi
               className="accent-red-600"
             />
             Inclure les tuiles épinglées
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
+            <input
+              type="checkbox"
+              checked={state.includeFrozen}
+              onChange={(e) => onUpdate((prev) => prev ? { ...prev, includeFrozen: e.target.checked } : prev)}
+              className="accent-red-600"
+            />
+            Inclure les tuiles avec flocon actif (safety zone)
           </label>
         </div>
         <div className="flex justify-end gap-3">

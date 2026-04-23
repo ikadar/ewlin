@@ -14,6 +14,10 @@ export interface MassUnscheduleState {
   includeInProgress: boolean;
   fuseSplits: boolean;
   includePinned: boolean;
+  /** Also lift tiles whose flocon is active (safety-zone-frozen, not
+   *  yet user-overridden). Mirrors the `includeFrozen` flag on the
+   *  clearAllAssignments endpoint. */
+  includeFrozen: boolean;
 }
 
 export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
@@ -21,7 +25,11 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
   const [fuseTask] = useFuseTaskMutation();
   const [confirmState, setConfirmState] = useState<MassUnscheduleState | null>(null);
 
-  const getClearableCount = useCallback((includeInProgress = false, includePinned = false) => {
+  const getClearableCount = useCallback((
+    includeInProgress = false,
+    includePinned = false,
+    includeFrozen = false,
+  ) => {
     if (!snapshotData) return 0;
     const now = new Date();
     const nowStr = now.toISOString();
@@ -39,7 +47,9 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
       if (a.isCompleted) return false;
       if (!includePinned && a.isPinned) return false;
       if (!includeInProgress && a.scheduledStart <= nowStr && (!a.scheduledEnd || a.scheduledEnd > nowStr)) return false;
-      if (seqByTask && isInSafetyZone(a.scheduledStart, hours, now)) {
+      // Safety-zone filter: skipped entirely when `includeFrozen` is on
+      // (the user opted in to lift active-flocon tiles).
+      if (!includeFrozen && seqByTask && isInSafetyZone(a.scheduledStart, hours, now)) {
         const jobId = jobByTask.get(a.taskId);
         const seqIdx = seqByTask.get(a.taskId);
         const task = tasksById.get(a.taskId);
@@ -53,17 +63,28 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
   }, [snapshotData]);
 
   const trigger = useCallback(() => {
-    const countAll = getClearableCount(true, true);
+    const countAll = getClearableCount(true, true, true);
     if (countAll > 0) {
-      setConfirmState({ count: getClearableCount(), includeInProgress: false, fuseSplits: false, includePinned: false });
+      setConfirmState({
+        count: getClearableCount(),
+        includeInProgress: false,
+        fuseSplits: false,
+        includePinned: false,
+        includeFrozen: false,
+      });
     }
   }, [getClearableCount]);
 
   const confirm = useCallback(async () => {
     if (!confirmState) return;
-    const { includeInProgress, fuseSplits, includePinned } = confirmState;
+    const { includeInProgress, fuseSplits, includePinned, includeFrozen } = confirmState;
     setConfirmState(null);
-    const result = await clearAllAssignments({ includeInProgress, fuseSplits, includePinned }).unwrap();
+    const result = await clearAllAssignments({
+      includeInProgress,
+      fuseSplits,
+      includePinned,
+      includeFrozen,
+    }).unwrap();
 
     if (fuseSplits && snapshotData) {
       const nowStr = new Date().toISOString();
