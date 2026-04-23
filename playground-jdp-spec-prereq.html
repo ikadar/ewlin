@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JDP — Spec + Prérequis (playground)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #050505;
+    color: #e4e4e7;
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ========== App layout ========== */
+  .app { display: flex; height: 100vh; }
+  .controls {
+    width: 340px;
+    background: #0c0c0d;
+    border-right: 1px solid #1a1a1d;
+    padding: 18px 16px 22px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-toolbar {
+    padding: 10px 16px;
+    background: #0c0c0d;
+    border-bottom: 1px solid #1a1a1d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .preview-toolbar .title {
+    font-size: 11px; color: #71717a;
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .preview-toolbar .meta {
+    font-size: 10.5px; color: #a1a1aa;
+    font-family: 'JetBrains Mono', monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .preview-stage {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 32px 24px 40px;
+    overflow-y: auto;
+    background: radial-gradient(ellipse at top, #0f0f12 0%, #050505 60%);
+  }
+
+  /* ========== Controls ========== */
+  .controls h1 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .controls .subtitle {
+    font-size: 11px;
+    color: #71717a;
+    margin-bottom: 18px;
+    line-height: 1.55;
+  }
+  .controls .subtitle b { color: #a1a1aa; font-weight: 500; }
+
+  .group { margin-bottom: 16px; }
+  .group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: #52525b;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .group p.hint {
+    font-size: 10px;
+    color: #52525b;
+    margin-top: 4px;
+    line-height: 1.45;
+  }
+  .section-sep {
+    margin: 16px -16px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #27272a 20%, #27272a 80%, transparent);
+  }
+  .section-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #a1a1aa;
+    font-weight: 600;
+    margin-bottom: 12px;
+    padding: 2px 8px;
+    background: rgba(59,130,246,0.08);
+    border-left: 2px solid rgba(59,130,246,0.5);
+    border-radius: 0 3px 3px 0;
+  }
+  .section-title.purple {
+    background: rgba(168,85,247,0.08);
+    border-left-color: rgba(168,85,247,0.5);
+    color: #d8b4fe;
+  }
+  .section-title.green {
+    background: rgba(16,185,129,0.08);
+    border-left-color: rgba(16,185,129,0.5);
+    color: #6ee7b7;
+  }
+
+  .segmented {
+    display: flex;
+    gap: 3px;
+    background: #0a0a0b;
+    border: 1px solid #1a1a1d;
+    border-radius: 5px;
+    padding: 3px;
+    flex-wrap: wrap;
+  }
+  .segmented button {
+    flex: 1 1 auto;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    padding: 6px 6px;
+    font-size: 10.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.12s;
+    white-space: nowrap;
+    font-weight: 500;
+    min-width: 0;
+  }
+  .segmented button:hover { color: #d4d4d8; background: rgba(255,255,255,0.04); }
+  .segmented button.active {
+    background: rgba(59,130,246,0.18);
+    color: #93c5fd;
+    box-shadow: inset 0 0 0 1px rgba(59,130,246,0.3);
+  }
+  .segmented.purple button.active {
+    background: rgba(168,85,247,0.18);
+    color: #d8b4fe;
+    box-shadow: inset 0 0 0 1px rgba(168,85,247,0.3);
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0a0a0b;
+    border: 1px solid #1a1a1d;
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    color: #d4d4d8;
+  }
+  .toggle-row input { cursor: pointer; }
+
+  .presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-top: 3px;
+  }
+  .preset-btn {
+    background: #141417;
+    border: 1px solid #27272a;
+    color: #d4d4d8;
+    padding: 7px 6px;
+    font-size: 10.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.12s;
+    font-weight: 500;
+    text-align: center;
+  }
+  .preset-btn:hover {
+    background: #1c1c21;
+    border-color: #3f3f46;
+    color: #fafafa;
+  }
+  .preset-btn.highlight {
+    background: rgba(59,130,246,0.12);
+    border-color: rgba(59,130,246,0.4);
+    color: #93c5fd;
+  }
+  .preset-btn.highlight:hover {
+    background: rgba(59,130,246,0.22);
+  }
+
+  #reset {
+    width: 100%;
+    background: #141417;
+    border: 1px solid #27272a;
+    color: #a1a1aa;
+    padding: 9px 0;
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.12s;
+    margin-top: 6px;
+  }
+  #reset:hover { background: #1c1c21; color: #e4e4e7; }
+
+  /* ========== Panel — LOCKED BASELINE (400px) ========== */
+  .panel {
+    width: 400px;
+    --radius-tile: 0;
+    --radius-btn: 4px;
+    --radius-badge: 3px;
+
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    flex-shrink: 0;
+    color: #e4e4e7;
+    min-height: 400px;
+    max-height: calc(100vh - 110px);
+  }
+
+  /* -------- Header -------- */
+  .panel-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+  }
+  .header-topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .header-identity {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    min-width: 0;
+    flex: 1;
+  }
+  .job-ref {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #fafafa;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.01em;
+  }
+  .header-identity::after {
+    content: none;
+  }
+  .sep-dot { color: #52525b; margin: 0 7px; }
+  .header-client {
+    font-size: 12px;
+    color: #a1a1aa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    color: #71717a;
+    cursor: pointer;
+    padding: 4px;
+    margin: -4px;
+    flex-shrink: 0;
+    border-radius: var(--radius-btn);
+  }
+  .close-btn:hover { color: #e4e4e7; background: rgba(255,255,255,0.05); }
+
+  .header-desc {
+    font-size: 12.5px;
+    color: #d4d4d8;
+    margin-bottom: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* -------- Deadlines box -------- */
+  .deadlines-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: var(--radius-badge);
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+  .deadline-primary, .deadline-bat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #e4e4e7;
+    cursor: pointer;
+  }
+  .deadline-primary:hover, .deadline-bat:hover { color: #fafafa; }
+  .deadline-primary .ico, .deadline-bat .ico { color: #71717a; flex-shrink: 0; }
+  .deadline-primary strong, .deadline-bat strong { font-weight: 600; color: #fafafa; }
+  .priority-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--radius-badge);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: rgba(239,68,68,0.15);
+    color: #fca5a5;
+    flex-shrink: 0;
+  }
+
+  /* -------- Deps row -------- */
+  .deps-block {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-bottom: 10px;
+  }
+  .dep-row-label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .dep-label {
+    font-size: 10px;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .dep-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: var(--radius-badge);
+    font-size: 10.5px;
+    background: rgba(168,85,247,0.12);
+    border: 1px solid rgba(168,85,247,0.25);
+    color: #d8b4fe;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* -------- Header prereq strip (variation) -------- */
+  .header-prereq-strip {
+    display: flex;
+    gap: 6px;
+    margin-top: -2px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* -------- Action buttons -------- */
+  .action-buttons { display: flex; gap: 6px; }
+  .btn-modify, .btn-compute {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    font-weight: 500;
+    border-radius: var(--radius-btn);
+    cursor: pointer;
+    border: 1px solid;
+    font-family: inherit;
+    transition: all 0.12s;
+  }
+  .btn-modify {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.09);
+    color: #e4e4e7;
+  }
+  .btn-compute {
+    background: rgba(59,130,246,0.18);
+    border-color: #3b82f6;
+    color: #93c5fd;
+  }
+
+  /* -------- Task list -------- */
+  .task-list {
+    padding: 12px 12px 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .element-section {
+    background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 0;
+    padding: 10px 10px 11px;
+    margin-bottom: 10px;
+  }
+  .element-section:last-child { margin-bottom: 0; }
+
+  .element-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .element-name {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #e4e4e7;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .element-header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* -------- Spec (variations) -------- */
+  .spec-inline {
+    font-size: 11px;
+    color: #a1a1aa;
+    margin: -2px 0 9px 0;
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+  .spec-inline .sep { color: #3f3f46; margin: 0 6px; }
+  .spec-inline .v { color: #d4d4d8; }
+
+  .spec-inline.compact { font-size: 10px; margin-top: -3px; margin-bottom: 8px; }
+  .spec-inline.comfortable { font-size: 11.5px; margin-bottom: 10px; }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    font-size: 10.5px;
+    margin: -2px 0 10px 0;
+    padding: 7px 9px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 3px;
+  }
+  .spec-grid.compact { font-size: 9.5px; padding: 5px 8px; }
+  .spec-grid.comfortable { font-size: 11.5px; padding: 8px 10px; }
+  .spec-grid .k { color: #71717a; }
+  .spec-grid .v { color: #e4e4e7; font-weight: 500; }
+
+  .spec-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 11px;
+    margin: -2px 0 10px 0;
+  }
+  .spec-kv.compact { font-size: 10px; }
+  .spec-kv.comfortable { font-size: 11.5px; }
+  .spec-kv .kv-row { display: flex; gap: 8px; line-height: 1.5; }
+  .spec-kv .k {
+    color: #71717a;
+    min-width: 74px;
+    flex-shrink: 0;
+  }
+  .spec-kv .v { color: #d4d4d8; }
+
+  .spec-table {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 10px;
+    font-size: 10px;
+    margin: -2px 0 10px 0;
+    padding: 7px 8px;
+    background: rgba(0,0,0,0.15);
+    border: 1px dashed rgba(255,255,255,0.04);
+    border-radius: 3px;
+  }
+  .spec-table.compact { font-size: 9px; }
+  .spec-table.comfortable { font-size: 11px; grid-template-columns: repeat(2, 1fr); }
+  .spec-table .cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .spec-table .cell .k {
+    font-size: 8.5px;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .spec-table .cell .v {
+    color: #d4d4d8;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* -------- Prereq pastilles (variations) -------- */
+  .prereq-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: -2px 0 9px 0;
+  }
+  .prereq-row.inline-right {
+    margin: 0;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .prereq-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: var(--radius-badge);
+    font-size: 10px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    line-height: 1.35;
+  }
+  /* Semantic color (vert/ambre) */
+  .prereq-pill.semantic.ok {
+    background: rgba(34,197,94,0.10);
+    border-color: rgba(34,197,94,0.2);
+    color: #86efac;
+  }
+  .prereq-pill.semantic.warn {
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(245,158,11,0.3);
+    color: #fcd34d;
+  }
+  /* Neutral color (gris si OK, ambre si bloqué) */
+  .prereq-pill.neutral.ok {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+    color: #a1a1aa;
+  }
+  .prereq-pill.neutral.warn {
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(245,158,11,0.3);
+    color: #fcd34d;
+  }
+  /* Blocker-only affichage géré par JS (on ne rend pas les OK) */
+
+  .prereq-pill .glyph {
+    display: inline-block;
+    width: 10px;
+    text-align: center;
+    font-weight: 700;
+  }
+  .prereq-pill.icon-only {
+    padding: 2px 5px;
+    gap: 0;
+  }
+  .prereq-pill .label { color: inherit; opacity: 0.75; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .prereq-pill .status { color: inherit; font-weight: 600; }
+  .prereq-pill .date { color: inherit; opacity: 0.55; font-size: 9.5px; margin-left: 2px; }
+
+  .prereq-pill.inline-small {
+    padding: 1px 5px;
+    font-size: 9.5px;
+    gap: 3px;
+  }
+  .prereq-pill.inline-small .label { font-size: 8.5px; }
+
+  /* On TaskTile */
+  .tile-prereq-col {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 6px 6px 6px 0;
+  }
+  .tile-prereq-col .prereq-pill {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+
+  /* -------- Task tiles (simplified repro) -------- */
+  .tiles { display: flex; flex-direction: column; gap: 4px; }
+  .task-tile {
+    position: relative;
+    background: transparent;
+    border-radius: 0;
+    overflow: hidden;
+    border-left: 3px solid #3b82f6;
+    transition: filter 0.12s;
+    display: flex;
+    align-items: stretch;
+  }
+  .task-tile.scheduled {
+    background: rgba(255,255,255,0.02);
+    outline: 1px solid rgba(59,130,246,0.2);
+    outline-offset: -1px;
+  }
+  .task-tile.completed {
+    background: rgba(34,197,94,0.08);
+    border-left-color: #22c55e;
+    opacity: 0.6;
+  }
+  .task-tile.unplaced {
+    background: rgba(59,130,246,0.09);
+  }
+  .tile-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px 7px 11px;
+    min-height: 32px;
+  }
+  .tile-status-circle {
+    width: 14px; height: 14px;
+    border: 1.5px solid #52525b;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tile-status-circle.done {
+    background: #22c55e;
+    border-color: #22c55e;
+  }
+  .pin-icon {
+    width: 11px; height: 11px;
+    color: #3f3f46;
+    flex-shrink: 0;
+  }
+  .tile-task-name {
+    font-size: 11.5px;
+    color: #e4e4e7;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tile-station {
+    font-size: 10.5px;
+    color: #71717a;
+  }
+  .tile-duration {
+    font-size: 10.5px;
+    color: #a1a1aa;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+  }
+  .tile-operator-row {
+    font-size: 9.5px;
+    color: #71717a;
+    padding: 0 10px 6px 11px;
+    display: flex;
+    gap: 8px;
+  }
+
+  /* Icons inline (SVG fallback text) */
+  .ic { display: inline-block; vertical-align: middle; }
+
+  /* Visibility helpers */
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ========== CONTROLS ========== -->
+  <aside class="controls">
+    <h1>JDP + Spec &amp; Prérequis</h1>
+    <p class="subtitle">
+      Joue sur où et comment la <b>spec</b> (ligne 4 du tooltip) et les <b>prérequis</b> (ligne 5) s'intègrent dans la JDP
+      verrouillée le 17/04. But : identifier le rendu qui rend le tooltip vraiment inutile.
+    </p>
+
+    <!-- Presets -->
+    <div class="group">
+      <h3>Préréglages rapides</h3>
+      <div class="presets">
+        <button class="preset-btn" data-preset="baseline">Baseline (sans)</button>
+        <button class="preset-btn" data-preset="tooltip-parity">Parité tooltip</button>
+        <button class="preset-btn" data-preset="spec-only">Spec seule</button>
+        <button class="preset-btn" data-preset="prereq-only">Prérequis seuls</button>
+        <button class="preset-btn highlight" data-preset="recommended">Recommandé</button>
+        <button class="preset-btn" data-preset="ultra-min">Ultra-minimal</button>
+      </div>
+    </div>
+
+    <div class="section-sep"></div>
+    <div class="section-title">Spec (ligne 4)</div>
+
+    <div class="group">
+      <h3>Placement</h3>
+      <div class="segmented" data-radio="spec.placement">
+        <button data-v="off">Off</button>
+        <button data-v="inline">Inline</button>
+        <button data-v="grid" class="active">Grille</button>
+      </div>
+      <div class="segmented" data-radio="spec.placement" style="margin-top:4px">
+        <button data-v="kv">Liste k/v</button>
+        <button data-v="table">Micro-tableau</button>
+      </div>
+      <p class="hint">
+        <b>Inline</b>: une ligne discrète sous le nom de l'élément, séparateurs "·".
+        <b>Grille</b>: 2-col label/valeur (comme dans le tooltip actuel).
+        <b>Liste</b>: "Format: A4" alignés.
+        <b>Micro-tableau</b>: cases petites, dense.
+      </p>
+    </div>
+
+    <div class="group">
+      <h3>Champs affichés</h3>
+      <div class="segmented" data-radio="spec.fields">
+        <button data-v="all" class="active">Tous</button>
+        <button data-v="critical">Critiques</button>
+        <button data-v="minimal">Minimal</button>
+      </div>
+      <p class="hint">
+        <b>Critiques</b> : Format, Papier, Pagination, Impression.
+        <b>Minimal</b> : Format + Papier uniquement.
+      </p>
+    </div>
+
+    <div class="group">
+      <h3>Densité</h3>
+      <div class="segmented" data-radio="spec.density">
+        <button data-v="compact">Compact</button>
+        <button data-v="standard" class="active">Standard</button>
+        <button data-v="comfortable">Conf.</button>
+      </div>
+    </div>
+
+    <div class="section-sep"></div>
+    <div class="section-title purple">Prérequis (ligne 5)</div>
+
+    <div class="group">
+      <h3>Placement</h3>
+      <div class="segmented purple" data-radio="prereq.placement">
+        <button data-v="off">Off</button>
+        <button data-v="header">Header</button>
+        <button data-v="element-row" class="active">Sous élém.</button>
+      </div>
+      <div class="segmented purple" data-radio="prereq.placement" style="margin-top:4px">
+        <button data-v="inline-right">Inline droite</button>
+        <button data-v="task-tile">Sur tuile</button>
+      </div>
+      <p class="hint">
+        <b>Header</b>: 4 pastilles sous le bloc deadline (= ce qui était rejeté 17/04, à re-juger).
+        <b>Sous élém.</b>: ligne dédiée sous le nom.
+        <b>Inline droite</b>: petites pastilles à droite du nom d'élément.
+        <b>Sur tuile</b>: colonne fine à droite de chaque TaskTile.
+      </p>
+    </div>
+
+    <div class="group">
+      <h3>Densité d'affichage</h3>
+      <div class="segmented purple" data-radio="prereq.density">
+        <button data-v="icon">Icône</button>
+        <button data-v="icon-label">+ Label</button>
+        <button data-v="icon-label-status" class="active">+ Status</button>
+      </div>
+      <div class="segmented purple" data-radio="prereq.density" style="margin-top:4px">
+        <button data-v="icon-label-status-date">+ Date</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Couleur</h3>
+      <div class="segmented purple" data-radio="prereq.color">
+        <button data-v="semantic" class="active">Sémantique</button>
+        <button data-v="neutral">Neutre</button>
+        <button data-v="blocker-only">Bloqueurs seuls</button>
+      </div>
+      <p class="hint">
+        <b>Sémantique</b>: vert si OK, ambre sinon.
+        <b>Neutre</b>: gris si OK, ambre si bloqué (= dramatise le bloqueur).
+        <b>Bloqueurs seuls</b>: n'affiche rien si tout est OK.
+      </p>
+    </div>
+
+    <div class="group">
+      <label class="toggle-row">
+        <span>Masquer le bloc si tout est OK</span>
+        <input type="checkbox" data-toggle="prereq.hideWhenOK">
+      </label>
+    </div>
+
+    <div class="section-sep"></div>
+    <div class="section-title green">Contexte</div>
+
+    <div class="group">
+      <h3>Scénario de données</h3>
+      <div class="segmented" data-radio="scenario">
+        <button data-v="mixed" class="active">Mixte</button>
+        <button data-v="all-ok">Tout OK</button>
+        <button data-v="all-blocked">Tout bloqué</button>
+      </div>
+      <p class="hint">
+        Change l'état des prérequis pour tester chaque combinaison dans chaque cas.
+      </p>
+    </div>
+
+    <button id="reset">↻ Reset presets</button>
+  </aside>
+
+  <!-- ========== PREVIEW ========== -->
+  <main class="preview">
+    <div class="preview-toolbar">
+      <span class="title">Preview</span>
+      <span class="meta" id="config-meta"></span>
+    </div>
+    <div class="preview-stage">
+      <div class="panel" id="panel"><!-- render target --></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ========== State ==========
+const DEFAULTS = {
+  'spec.placement': 'grid',
+  'spec.fields': 'all',
+  'spec.density': 'standard',
+  'prereq.placement': 'element-row',
+  'prereq.density': 'icon-label-status',
+  'prereq.color': 'semantic',
+  'prereq.hideWhenOK': false,
+  scenario: 'mixed',
+};
+const state = { ...DEFAULTS };
+
+// ========== Mock data ==========
+const baseJob = {
+  reference: 'REF-2026-0412',
+  client: 'Imprimerie Moderne',
+  description: 'Brochure 16 pages · dorure + découpe',
+  exit: '28/04/2026 à 17h00',
+  priority: 'Impératif',
+  batDeadline: '24/04/2026 à 12h00',
+  requiredJobs: ['REF-2026-0405'],
+  dependentJobs: ['REF-2026-0420', 'REF-2026-0422'],
+  elements: [
+    {
+      name: 'Couverture',
+      spec: {
+        format: '21 × 29,7',
+        papier: 'Offset 300g',
+        pagination: '4p',
+        imposition: '2-up',
+        impression: 'Quadri R/V',
+        surfacage: 'Pellic. brillant',
+        quantite: '1 000 ex',
+        qteFeuilles: '250 F',
+      },
+      tasks: [
+        { name: 'Impression', station: 'Offset 5 coul.', duration: '2h40', state: 'scheduled' },
+        { name: 'Pelliculage', station: 'Pellic. Auto', duration: '1h10', state: 'unplaced' },
+      ],
+    },
+    {
+      name: 'Intérieur',
+      spec: {
+        format: '21 × 29,7',
+        papier: 'Bouffant 100g',
+        pagination: '12p',
+        imposition: '8-up',
+        impression: 'Quadri R/V',
+        quantite: '1 000 ex',
+        qteFeuilles: '1 500 F',
+      },
+      tasks: [
+        { name: 'Impression', station: 'Offset 8 coul.', duration: '4h20', state: 'completed' },
+        { name: 'Assemblage', station: 'Assembleuse', duration: '1h40', state: 'scheduled' },
+      ],
+    },
+  ],
+};
+
+// Three prereq scenarios (applied to both elements independently)
+const SCENARIO_PREREQS = {
+  mixed: [
+    { // couverture — all ready
+      papier:  { ready: true,  status: 'Livré',       date: '12/04' },
+      bat:     { ready: true,  status: 'Validé',      date: '18/04' },
+      plaques: { ready: true,  status: 'Prêtes',      date: null },
+      forme:   { ready: true,  status: 'Sur stock',   date: null },
+    },
+    { // intérieur — partially blocked
+      papier:  { ready: false, status: 'Commandé',        date: '22/04' },
+      bat:     { ready: false, status: 'Attente fichiers', date: null },
+      plaques: { ready: false, status: 'À faire',          date: null },
+      forme:   { ready: true,  status: 'N/A',              date: null, hidden: true },
+    },
+  ],
+  'all-ok': [
+    {
+      papier:  { ready: true, status: 'Livré',       date: '12/04' },
+      bat:     { ready: true, status: 'Validé',      date: '18/04' },
+      plaques: { ready: true, status: 'Prêtes',      date: null },
+      forme:   { ready: true, status: 'Sur stock',   date: null },
+    },
+    {
+      papier:  { ready: true, status: 'Livré',       date: '20/04' },
+      bat:     { ready: true, status: 'Validé',      date: '19/04' },
+      plaques: { ready: true, status: 'Prêtes',      date: null },
+      forme:   { ready: true, status: 'N/A',         date: null, hidden: true },
+    },
+  ],
+  'all-blocked': [
+    {
+      papier:  { ready: false, status: 'À commander', date: null },
+      bat:     { ready: false, status: 'BAT envoyé',  date: '20/04' },
+      plaques: { ready: false, status: 'À faire',     date: null },
+      forme:   { ready: false, status: 'Commandée',   date: '21/04' },
+    },
+    {
+      papier:  { ready: false, status: 'Attente',         date: null },
+      bat:     { ready: false, status: 'Attente fichiers', date: null },
+      plaques: { ready: false, status: 'À faire',          date: null },
+      forme:   { ready: true,  status: 'N/A',              date: null, hidden: true },
+    },
+  ],
+};
+
+const PREREQ_LABELS = {
+  papier: 'Papier', bat: 'BAT', plaques: 'Plaques', forme: 'Forme',
+};
+const PREREQ_GLYPH = {
+  papier: '📄', bat: '✎', plaques: '▦', forme: '✂',
+};
+// Simple ASCII fallback glyphs (more neutral)
+const PREREQ_GLYPH_ASCII = {
+  papier: 'P', bat: 'B', plaques: 'Pl', forme: 'F',
+};
+
+// ========== Helpers ==========
+function pickSpecFields(spec) {
+  if (state['spec.fields'] === 'minimal') {
+    return [
+      ['Format', spec.format],
+      ['Papier', spec.papier],
+    ].filter(([, v]) => v);
+  }
+  if (state['spec.fields'] === 'critical') {
+    return [
+      ['Format', spec.format],
+      ['Papier', spec.papier],
+      ['Pagination', spec.pagination],
+      ['Impression', spec.impression],
+    ].filter(([, v]) => v);
+  }
+  // all
+  return [
+    ['Format', spec.format],
+    ['Papier', spec.papier],
+    ['Pagination', spec.pagination],
+    ['Imposition', spec.imposition],
+    ['Impression', spec.impression],
+    ['Surfaçage', spec.surfacage],
+    ['Quantité', spec.quantite],
+    ['Qté feuilles', spec.qteFeuilles],
+  ].filter(([, v]) => v);
+}
+
+function renderSpecBlock(spec) {
+  const placement = state['spec.placement'];
+  if (placement === 'off') return '';
+  const density = state['spec.density'];
+  const fields = pickSpecFields(spec);
+  if (fields.length === 0) return '';
+
+  if (placement === 'inline') {
+    const bits = fields.map(([, v]) => `<span class="v">${escape(v)}</span>`).join('<span class="sep">·</span>');
+    return `<div class="spec-inline ${density}">${bits}</div>`;
+  }
+  if (placement === 'grid') {
+    const rows = fields.map(([k, v]) => `<span class="k">${escape(k)}</span><span class="v">${escape(v)}</span>`).join('');
+    return `<div class="spec-grid ${density}">${rows}</div>`;
+  }
+  if (placement === 'kv') {
+    const rows = fields.map(([k, v]) => `<div class="kv-row"><span class="k">${escape(k)}</span><span class="v">${escape(v)}</span></div>`).join('');
+    return `<div class="spec-kv ${density}">${rows}</div>`;
+  }
+  if (placement === 'table') {
+    const cells = fields.map(([k, v]) => `<div class="cell"><span class="k">${escape(k)}</span><span class="v">${escape(v)}</span></div>`).join('');
+    return `<div class="spec-table ${density}">${cells}</div>`;
+  }
+  return '';
+}
+
+function shouldShowPrereqPill(item) {
+  if (item.hidden) return false;
+  if (state['prereq.color'] === 'blocker-only' && item.ready) return false;
+  return true;
+}
+
+function renderPrereqPill(key, item, options = {}) {
+  if (!shouldShowPrereqPill(item)) return '';
+  const { small = false, iconOnly = false } = options;
+  const density = state['prereq.density'];
+  const color = state['prereq.color'];
+  const classReady = item.ready ? 'ok' : 'warn';
+  const colorClass = color === 'neutral' ? 'neutral' : 'semantic';
+  const glyph = item.ready ? '✓' : '⚠';
+  const classes = [
+    'prereq-pill',
+    colorClass,
+    classReady,
+    small ? 'inline-small' : '',
+    iconOnly || density === 'icon' ? 'icon-only' : '',
+  ].filter(Boolean).join(' ');
+
+  let inner = `<span class="glyph">${glyph}</span>`;
+  if (!iconOnly && density !== 'icon') {
+    inner += `<span class="label">${PREREQ_LABELS[key]}</span>`;
+  }
+  if (density === 'icon-label-status' || density === 'icon-label-status-date') {
+    inner += `<span class="status">${escape(item.status)}</span>`;
+  }
+  if (density === 'icon-label-status-date' && item.date) {
+    inner += `<span class="date">${escape(item.date)}</span>`;
+  }
+  return `<span class="${classes}" title="${PREREQ_LABELS[key]} — ${escape(item.status)}${item.date ? ' (' + item.date + ')' : ''}">${inner}</span>`;
+}
+
+function renderPrereqRow(prereqs, options = {}) {
+  if (state['prereq.placement'] === 'off') return '';
+  const pills = ['papier', 'bat', 'plaques', 'forme']
+    .map(k => renderPrereqPill(k, prereqs[k], options))
+    .filter(Boolean)
+    .join('');
+  if (!pills) return '';
+  if (state['prereq.hideWhenOK']) {
+    const anyWarn = ['papier','bat','plaques','forme'].some(k => !prereqs[k].hidden && !prereqs[k].ready);
+    if (!anyWarn) return '';
+  }
+  const classes = ['prereq-row'];
+  if (options.inlineRight) classes.push('inline-right');
+  return `<div class="${classes.join(' ')}">${pills}</div>`;
+}
+
+function aggregateHeaderPrereqs(elements) {
+  // Aggregate "worst" status per prereq key across all elements.
+  // If any element has it blocked → show as warn.
+  const agg = {};
+  for (const k of ['papier','bat','plaques','forme']) {
+    let anyWarn = false, anyVisible = false, firstStatus = null, firstDate = null;
+    for (const e of elements) {
+      const p = e.prereqs[k];
+      if (p.hidden) continue;
+      anyVisible = true;
+      if (!p.ready) { anyWarn = true; firstStatus = p.status; firstDate = p.date; break; }
+      if (firstStatus === null) { firstStatus = p.status; firstDate = p.date; }
+    }
+    agg[k] = anyVisible
+      ? { ready: !anyWarn, status: firstStatus, date: firstDate, hidden: !anyVisible }
+      : { ready: true, status: 'N/A', date: null, hidden: true };
+  }
+  return agg;
+}
+
+function escape(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',
+  }[c]));
+}
+
+// ========== Render JDP ==========
+function render() {
+  const job = { ...baseJob };
+  const preqSet = SCENARIO_PREREQS[state.scenario];
+  job.elements = job.elements.map((el, i) => ({ ...el, prereqs: preqSet[i] }));
+
+  // Header prereq strip (aggregated)
+  const aggPrereqs = aggregateHeaderPrereqs(job.elements);
+
+  const panel = document.getElementById('panel');
+  panel.innerHTML = `
+    <div class="panel-header">
+      <div class="header-topline">
+        <div class="header-identity">
+          <span class="job-ref">${job.reference}</span>
+          <span class="sep-dot">·</span>
+          <span class="header-client">${job.client}</span>
+        </div>
+        <button class="close-btn" aria-label="Fermer">${svgClose()}</button>
+      </div>
+      <div class="header-desc">${job.description}</div>
+      <div class="deadlines-box">
+        <div class="deadline-primary">
+          ${svgCalendar()}
+          <span>Dep. <strong>${job.exit}</strong></span>
+          <span class="priority-chip">${job.priority}</span>
+        </div>
+        <div class="deadline-bat">
+          ${svgCalendarCheck()}
+          <span>D.L. BAT <strong>${job.batDeadline}</strong></span>
+        </div>
+      </div>
+      <div class="deps-block">
+        <div class="dep-row-label">
+          <span class="dep-label">Prérequis</span>
+          ${job.requiredJobs.map(r => `<span class="dep-pill">${r}</span>`).join('')}
+        </div>
+        <div class="dep-row-label">
+          <span class="dep-label">Requis par</span>
+          ${job.dependentJobs.map(r => `<span class="dep-pill">${r}</span>`).join('')}
+        </div>
+      </div>
+      ${state['prereq.placement'] === 'header'
+        ? `<div class="header-prereq-strip">${renderPrereqRow(aggPrereqs, {}).replace(/^<div class="[^"]*">|<\/div>$/g, '')}</div>`
+        : ''}
+      <div class="action-buttons">
+        <button class="btn-modify">Modifier</button>
+        <button class="btn-compute">Calculer</button>
+      </div>
+    </div>
+    <div class="task-list">
+      ${job.elements.map(el => renderElement(el)).join('')}
+    </div>
+  `;
+
+  updateMeta();
+}
+
+function renderElement(el) {
+  const placement = state['prereq.placement'];
+  const specBlock = renderSpecBlock(el.spec);
+
+  // Element header right-side content (precedence badge or prereq pills)
+  let headerRight = '';
+  if (placement === 'inline-right') {
+    const row = renderPrereqRow(el.prereqs, { small: true, inlineRight: true });
+    headerRight = row.replace(/^<div class="prereq-row inline-right">/, '')
+                     .replace(/<\/div>$/, '');
+    if (headerRight) headerRight = `<div class="element-header-right">${headerRight}</div>`;
+  }
+
+  // Prereq block under element name
+  const prereqRowBlock = placement === 'element-row'
+    ? renderPrereqRow(el.prereqs)
+    : '';
+
+  return `
+    <div class="element-section">
+      <div class="element-header">
+        <span class="element-name">${el.name}</span>
+        ${headerRight}
+      </div>
+      ${specBlock}
+      ${prereqRowBlock}
+      <div class="tiles">
+        ${el.tasks.map(t => renderTile(t, el.prereqs)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderTile(task, prereqs) {
+  const placement = state['prereq.placement'];
+  const showOnTile = placement === 'task-tile';
+  const circle = task.state === 'completed'
+    ? '<div class="tile-status-circle done"></div>'
+    : '<div class="tile-status-circle"></div>';
+  const pin = svgPin();
+
+  const prereqCol = showOnTile
+    ? `<div class="tile-prereq-col">${
+        ['papier','bat','plaques','forme']
+          .map(k => renderPrereqPill(k, prereqs[k], { small: true }))
+          .filter(Boolean)
+          .join('')
+      }</div>`
+    : '';
+
+  return `
+    <div class="task-tile ${task.state}">
+      <div class="tile-body">
+        ${circle}
+        ${pin}
+        <span class="tile-task-name">${task.name}</span>
+        <span class="tile-station">${task.station}</span>
+        <span class="tile-duration">${task.duration}</span>
+      </div>
+      ${prereqCol}
+    </div>
+  `;
+}
+
+function updateMeta() {
+  const parts = [];
+  parts.push(`spec=${state['spec.placement']}`);
+  if (state['spec.placement'] !== 'off') {
+    parts.push(state['spec.fields']);
+    parts.push(state['spec.density']);
+  }
+  parts.push('·');
+  parts.push(`prereq=${state['prereq.placement']}`);
+  if (state['prereq.placement'] !== 'off') {
+    parts.push(state['prereq.density']);
+    parts.push(state['prereq.color']);
+    if (state['prereq.hideWhenOK']) parts.push('hide-if-ok');
+  }
+  parts.push('·');
+  parts.push(`scenario=${state.scenario}`);
+  document.getElementById('config-meta').textContent = parts.join(' ');
+}
+
+// SVG helpers
+function svgClose() {
+  return `<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+}
+function svgCalendar() {
+  return `<svg class="ic ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`;
+}
+function svgCalendarCheck() {
+  return `<svg class="ic ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"></path><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M16 19l2 2 4-4"></path></svg>`;
+}
+function svgPin() {
+  return `<svg class="pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path></svg>`;
+}
+
+// ========== Controls wiring ==========
+function setRadio(path, value) {
+  state[path] = value;
+  // Update button UI: all segmented for this path should reflect the new active
+  document.querySelectorAll(`[data-radio="${path}"]`).forEach(group => {
+    group.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.v === value);
+    });
+  });
+  render();
+}
+
+function applyPreset(name) {
+  const presets = {
+    baseline: {
+      'spec.placement': 'off',
+      'prereq.placement': 'off',
+      'prereq.hideWhenOK': false,
+    },
+    'tooltip-parity': {
+      'spec.placement': 'grid',
+      'spec.fields': 'all',
+      'spec.density': 'standard',
+      'prereq.placement': 'element-row',
+      'prereq.density': 'icon-label-status-date',
+      'prereq.color': 'semantic',
+      'prereq.hideWhenOK': false,
+    },
+    'spec-only': {
+      'spec.placement': 'inline',
+      'spec.fields': 'all',
+      'spec.density': 'standard',
+      'prereq.placement': 'off',
+    },
+    'prereq-only': {
+      'spec.placement': 'off',
+      'prereq.placement': 'element-row',
+      'prereq.density': 'icon-label-status',
+      'prereq.color': 'semantic',
+      'prereq.hideWhenOK': false,
+    },
+    recommended: {
+      'spec.placement': 'inline',
+      'spec.fields': 'all',
+      'spec.density': 'standard',
+      'prereq.placement': 'inline-right',
+      'prereq.density': 'icon-label',
+      'prereq.color': 'neutral',
+      'prereq.hideWhenOK': true,
+    },
+    'ultra-min': {
+      'spec.placement': 'inline',
+      'spec.fields': 'critical',
+      'spec.density': 'compact',
+      'prereq.placement': 'inline-right',
+      'prereq.density': 'icon',
+      'prereq.color': 'blocker-only',
+      'prereq.hideWhenOK': false,
+    },
+  };
+  const p = presets[name];
+  if (!p) return;
+  Object.entries(p).forEach(([k, v]) => { state[k] = v; });
+  refreshAllControls();
+  render();
+}
+
+function refreshAllControls() {
+  document.querySelectorAll('[data-radio]').forEach(group => {
+    const path = group.dataset.radio;
+    group.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.v === state[path]);
+    });
+  });
+  document.querySelectorAll('[data-toggle]').forEach(inp => {
+    const path = inp.dataset.toggle;
+    inp.checked = !!state[path];
+  });
+}
+
+// Wire segmented buttons
+document.querySelectorAll('[data-radio]').forEach(group => {
+  const path = group.dataset.radio;
+  group.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => setRadio(path, b.dataset.v));
+  });
+});
+// Wire toggles
+document.querySelectorAll('[data-toggle]').forEach(inp => {
+  inp.addEventListener('change', () => {
+    state[inp.dataset.toggle] = inp.checked;
+    render();
+  });
+});
+// Wire presets
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.addEventListener('click', () => applyPreset(b.dataset.preset));
+});
+// Reset
+document.getElementById('reset').addEventListener('click', () => {
+  Object.entries(DEFAULTS).forEach(([k, v]) => { state[k] = v; });
+  refreshAllControls();
+  render();
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>

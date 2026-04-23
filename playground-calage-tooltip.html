@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tooltip de calage — matrice</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #050505;
+    color: #e4e4e7;
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ========== App layout ========== */
+  .app { display: flex; height: 100vh; }
+  .controls {
+    width: 340px;
+    background: #0c0c0d;
+    border-right: 1px solid #1a1a1d;
+    padding: 18px 16px 22px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .preview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-toolbar {
+    padding: 10px 16px;
+    background: #0c0c0d;
+    border-bottom: 1px solid #1a1a1d;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .preview-toolbar .title {
+    font-size: 11px; color: #71717a;
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .preview-toolbar .meta {
+    font-size: 10.5px; color: #a1a1aa;
+    font-family: 'JetBrains Mono', monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .preview-stage {
+    flex: 1;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 48px 32px 40px 64px;
+    overflow: auto;
+    background: radial-gradient(ellipse at top, #0f0f12 0%, #050505 60%);
+    position: relative;
+  }
+
+  /* ========== Controls ========== */
+  .controls h1 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .controls .subtitle {
+    font-size: 11px;
+    color: #71717a;
+    margin-bottom: 18px;
+    line-height: 1.55;
+  }
+  .controls .subtitle b { color: #a1a1aa; font-weight: 500; }
+
+  .group { margin-bottom: 16px; }
+  .group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: #52525b;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .group p.hint {
+    font-size: 10px;
+    color: #52525b;
+    margin-top: 4px;
+    line-height: 1.45;
+  }
+  .section-sep {
+    margin: 16px -16px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #27272a 20%, #27272a 80%, transparent);
+  }
+  .section-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+    margin-bottom: 12px;
+    padding: 2px 8px;
+    background: rgba(16,185,129,0.08);
+    border-left: 2px solid rgba(16,185,129,0.5);
+    border-radius: 0 3px 3px 0;
+    color: #6ee7b7;
+  }
+
+  .segmented {
+    display: flex;
+    gap: 3px;
+    background: #0a0a0b;
+    border: 1px solid #1a1a1d;
+    border-radius: 5px;
+    padding: 3px;
+    flex-wrap: wrap;
+  }
+  .segmented button {
+    flex: 1 1 auto;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    padding: 6px 6px;
+    font-size: 10.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.12s;
+    white-space: nowrap;
+    font-weight: 500;
+    min-width: 0;
+  }
+  .segmented button:hover { color: #d4d4d8; background: rgba(255,255,255,0.04); }
+  .segmented button.active {
+    background: rgba(16,185,129,0.18);
+    color: #6ee7b7;
+    box-shadow: inset 0 0 0 1px rgba(16,185,129,0.3);
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0a0a0b;
+    border: 1px solid #1a1a1d;
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    color: #d4d4d8;
+    cursor: pointer;
+    margin-bottom: 5px;
+  }
+  .toggle-row:hover { background: #131315; }
+  .toggle-row input { cursor: pointer; }
+
+  #reset {
+    width: 100%;
+    background: #141417;
+    border: 1px solid #27272a;
+    color: #a1a1aa;
+    padding: 9px 0;
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.12s;
+    margin-top: 6px;
+  }
+  #reset:hover { background: #1c1c21; color: #e4e4e7; }
+
+  /* ========== Grid column ========== */
+  .station-col {
+    position: relative;
+    width: 220px;
+    background: #0f0f12;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 14px 0 20px;
+    flex-shrink: 0;
+  }
+  .station-header {
+    font-size: 10px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: #71717a;
+    padding: 0 12px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .tile {
+    position: relative;
+    margin: 2px 10px;
+    background: rgba(59,130,246,0.10);
+    border-left: 3px solid #3b82f6;
+    padding: 9px 10px;
+    font-size: 11.5px;
+    min-height: 62px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+  }
+  .tile.second { background: rgba(168,85,247,0.10); border-left-color: #a855f7; min-height: 74px; }
+  .tile.third  { background: rgba(20,184,166,0.10); border-left-color: #14b8a6; min-height: 58px; }
+
+  .tile .tile-ref {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fafafa;
+  }
+  .tile .tile-client { font-size: 10.5px; color: #a1a1aa; }
+  .tile .tile-meta {
+    font-size: 10px;
+    color: #71717a;
+    margin-top: auto;
+    display: flex; gap: 8px;
+  }
+  .tile .tile-meta span { font-variant-numeric: tabular-nums; }
+
+  /* ========== Similarity badge ========== */
+  .sim-badge {
+    position: absolute;
+    top: 0;
+    right: 4px;
+    transform: translateY(calc(-50% - 2px));
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    z-index: 10;
+    padding: 2px 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    background: rgba(0,0,0,0.2);
+    transition: background 0.12s;
+  }
+  .sim-badge:hover { background: rgba(16,185,129,0.12); }
+  .sim-badge.selected {
+    background: rgba(16,185,129,0.20);
+    box-shadow: 0 0 0 1px rgba(16,185,129,0.6);
+  }
+  .sim-badge .chain-link {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+  }
+  .sim-badge.zero-score { opacity: 0.45; }
+
+  /* ========== Tooltip (matrix layout) ========== */
+  .calage-tooltip {
+    position: absolute;
+    z-index: 100;
+    background: #1a1a1d;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 5px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(16,185,129,0.08);
+    padding: 10px 12px;
+    font-size: 11.5px;
+    color: #d4d4d8;
+    pointer-events: none;
+  }
+
+  .tt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 7px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .tt-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+  .tt-title {
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6ee7b7;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .tt-transition {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tt-transition .from { color: #a1a1aa; }
+  .tt-transition .arrow { color: #52525b; margin: 0 5px; }
+  .tt-transition .to { color: #fafafa; font-weight: 600; }
+
+  .tt-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .tt-chain { display: inline-flex; gap: 2px; }
+  .tt-score-text {
+    font-size: 11px;
+    color: #e4e4e7;
+    font-variant-numeric: tabular-nums;
+  }
+  .tt-score-text strong {
+    color: #fafafa;
+    font-weight: 600;
+  }
+  .tt-station {
+    font-size: 9.5px;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  /* ===== The matrix itself ===== */
+  .tt-matrix {
+    display: grid;
+    gap: 1px;
+    background: rgba(255,255,255,0.05);
+    margin-bottom: 10px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .tt-matrix .cell {
+    background: #1f1f23;
+    padding: 5px 8px;
+    font-size: 10.5px;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    line-height: 1.3;
+    color: #d4d4d8;
+  }
+  .tt-matrix .cell.header {
+    font-family: Inter, sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #71717a;
+    font-weight: 600;
+    background: #16161a;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .tt-matrix .cell.row-label {
+    font-family: Inter, sans-serif;
+    font-size: 10px;
+    color: #71717a;
+    font-weight: 500;
+    background: #16161a;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .tt-matrix .cell.row-label.ref {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #a1a1aa;
+    font-weight: 600;
+  }
+  .tt-matrix .cell.match {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 5px 8px;
+    font-family: Inter, sans-serif;
+  }
+  .tt-matrix .cell.match.ok  { color: #6ee7b7; background: rgba(16,185,129,0.12); }
+  .tt-matrix .cell.match.no  { color: #fcd34d; background: rgba(245,158,11,0.13); }
+  .tt-matrix .cell.match.neutral { color: #52525b; background: #1a1a1e; }
+
+  /* Per-column coloring variant (paints both Job A & B cells) */
+  .tt-matrix.colored .cell.v-ok { background: rgba(16,185,129,0.08); color: #a7f3d0; }
+  .tt-matrix.colored .cell.v-no { background: rgba(245,158,11,0.09); color: #fde68a; }
+  .tt-matrix.colored .cell.v-neutral { background: rgba(0,0,0,0.2); color: #71717a; }
+
+  /* Match-as-word variant */
+  .tt-matrix .cell.match.word {
+    font-family: Inter, sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Match-as-equal-sign variant */
+  .tt-matrix .cell.match.equals {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 400;
+  }
+
+  /* Compact density */
+  .tt-matrix.compact .cell { padding: 3px 6px; font-size: 10px; }
+  .tt-matrix.compact .cell.match { font-size: 11px; padding: 3px 6px; }
+  .tt-matrix.compact .cell.header { font-size: 8.5px; padding-top: 4px; padding-bottom: 4px; }
+
+  /* ===== Rules & hint ===== */
+  .tt-block { margin-top: 8px; }
+  .tt-block-title {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #52525b;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+
+  .tt-rules-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tt-rule-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    font-size: 10px;
+    border-radius: 3px;
+    background: rgba(16,185,129,0.10);
+    color: #6ee7b7;
+    border: 1px solid rgba(16,185,129,0.18);
+  }
+  .tt-rule-chip.silent {
+    background: rgba(255,255,255,0.02);
+    color: #52525b;
+    border-color: rgba(255,255,255,0.06);
+    text-decoration: line-through;
+    text-decoration-color: #3f3f46;
+  }
+  .tt-rule-chip .pts { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tt-rule-chip .pts.silent { color: #52525b; }
+
+  .tt-no-rules {
+    font-style: italic;
+    color: #71717a;
+    font-size: 10px;
+    padding: 2px 0;
+  }
+
+  .tt-hint {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: rgba(59,130,246,0.08);
+    border-left: 2px solid rgba(59,130,246,0.5);
+    border-radius: 0 3px 3px 0;
+    font-size: 10.5px;
+    color: #93c5fd;
+    line-height: 1.45;
+  }
+
+  /* Instruction blurb */
+  .instruction {
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    color: #52525b;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    text-align: center;
+    max-width: 460px;
+  }
+  .instruction b { color: #a1a1aa; font-weight: 500; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ========== CONTROLS ========== -->
+  <aside class="controls">
+    <h1>Tooltip de calage — matrice</h1>
+    <p class="subtitle">
+      Tableau aligné : <b>1 colonne par critère</b>, <b>1 ligne par job</b>, <b>1 ligne d'adéquation</b>.
+      Lecture d'un coup d'œil : les valeurs sont alignées verticalement, l'écart saute aux yeux.
+    </p>
+
+    <div class="group">
+      <h3>Scénario de transition</h3>
+      <div class="segmented" data-radio="scenario">
+        <button data-v="partial" class="active">Mixte</button>
+        <button data-v="all-match">Tout match</button>
+      </div>
+      <div class="segmented" data-radio="scenario" style="margin-top: 4px">
+        <button data-v="format-desc">Fmt. desc.</button>
+        <button data-v="no-match">Rien ne match</button>
+        <button data-v="neutralized">Neutralisés</button>
+      </div>
+      <p class="hint">
+        Change la comparaison entre les tuiles <b>1→2</b> (sélectionnée). 2→3 reste fixe.
+      </p>
+    </div>
+
+    <div class="section-sep"></div>
+    <div class="section-title">Matrice</div>
+
+    <div class="group">
+      <h3>En-tête de ligne (gauche)</h3>
+      <div class="segmented" data-radio="rowLabels">
+        <button data-v="generic" class="active">A / B / Match</button>
+        <button data-v="ref">Refs</button>
+        <button data-v="none">Aucun</button>
+      </div>
+      <p class="hint">
+        <b>Refs</b>: affiche les vraies références (REF-0411 etc.) à la place de "A"/"B".
+      </p>
+    </div>
+
+    <div class="group">
+      <h3>Ligne d'adéquation</h3>
+      <div class="segmented" data-radio="matchStyle">
+        <button data-v="glyph" class="active">✓ ✗ ⊘</button>
+        <button data-v="equals">= ≠ —</button>
+        <button data-v="word">OK / KO</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <label class="toggle-row">
+        <span>Couleur de fond par colonne</span>
+        <input type="checkbox" data-toggle="coloredColumns">
+      </label>
+      <p class="hint">
+        Repeint les <b>valeurs</b> aussi en vert/ambre (pas seulement la ligne match). Plus lisible d'un œil, plus "coloré".
+      </p>
+    </div>
+
+    <div class="group">
+      <h3>Densité</h3>
+      <div class="segmented" data-radio="density">
+        <button data-v="standard" class="active">Standard</button>
+        <button data-v="compact">Compact</button>
+      </div>
+    </div>
+
+    <div class="section-sep"></div>
+    <div class="section-title">Autour de la matrice</div>
+
+    <div class="group">
+      <h3>Labels de colonnes</h3>
+      <div class="segmented" data-radio="labelStyle">
+        <button data-v="french" class="active">Français</button>
+        <button data-v="code">Code</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <label class="toggle-row">
+        <span>Bloc <b>Règles appliquées</b></span>
+        <input type="checkbox" data-toggle="showRules" checked>
+      </label>
+      <label class="toggle-row">
+        <span>Règles <b>non-déclenchées</b> (grisées)</span>
+        <input type="checkbox" data-toggle="showSilentRules">
+      </label>
+      <label class="toggle-row">
+        <span>Hint <b>"pour +1 pt…"</b></span>
+        <input type="checkbox" data-toggle="showHint">
+      </label>
+    </div>
+
+    <div class="section-sep"></div>
+    <div class="section-title">Cas du score 0</div>
+
+    <div class="group">
+      <div class="segmented" data-radio="zeroScore">
+        <button data-v="hidden" class="active">Masquer badge</button>
+        <button data-v="dim">Chaîne éteinte</button>
+      </div>
+      <p class="hint">
+        À tester avec le scénario <b>Rien ne match</b>.
+        <b>Chaîne éteinte</b>: garde le badge survolable même à score 0.
+      </p>
+    </div>
+
+    <button id="reset">↻ Reset</button>
+  </aside>
+
+  <!-- ========== PREVIEW ========== -->
+  <main class="preview">
+    <div class="preview-toolbar">
+      <span class="title">Preview — matrice de calage</span>
+      <span class="meta" id="config-meta"></span>
+    </div>
+    <div class="preview-stage">
+      <div class="instruction">
+        Clique sur un badge pour afficher son tooltip.<br>
+        En prod, délai hover ≈ <b>1000 ms</b>.
+      </div>
+
+      <div class="station-col" style="margin-top: 52px">
+        <div class="station-header">Offset 5 couleurs</div>
+
+        <div class="tile">
+          <div class="tile-ref">REF-2026-0411</div>
+          <div class="tile-client">Imp. Bellevue</div>
+          <div class="tile-meta"><span id="tile1-fmt">70×100</span><span>·</span><span id="tile1-paper">Offset 250g</span></div>
+        </div>
+
+        <div class="sim-badge selected" id="badge-1-2" data-transition="1-2"></div>
+
+        <div class="tile second">
+          <div class="tile-ref" id="tile2-ref">REF-2026-0412</div>
+          <div class="tile-client" id="tile2-client">Imp. Moderne</div>
+          <div class="tile-meta" id="tile2-meta"></div>
+        </div>
+
+        <div class="sim-badge" id="badge-2-3" data-transition="2-3"></div>
+
+        <div class="tile third">
+          <div class="tile-ref">REF-2026-0413</div>
+          <div class="tile-client">Éd. Papyrus</div>
+          <div class="tile-meta"><span>21×29,7</span><span>·</span><span>Offset 300g</span></div>
+        </div>
+      </div>
+
+      <div class="calage-tooltip" id="tooltip"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ========== State ==========
+const DEFAULTS = {
+  scenario: 'partial',
+  rowLabels: 'generic',
+  matchStyle: 'glyph',
+  coloredColumns: false,
+  density: 'standard',
+  labelStyle: 'french',
+  showRules: true,
+  showSilentRules: false,
+  showHint: false,
+  zeroScore: 'hidden',
+  selectedBadge: '1-2',
+};
+const state = { ...DEFAULTS };
+
+// ========== Domain data ==========
+const STATION = {
+  name: 'Offset 5 coul.',
+  category: {
+    rules: [
+      { id: 'fmt-eq',     name: 'Même format',                 points: 1, group: null,      criteriaCodes: ['format'] },
+      { id: 'fmt-desc',   name: 'Format décroissant',          points: 1, group: null,      kind: 'format-descending' },
+      { id: 'paper-t',    name: 'Même type de papier',         points: 1, group: 'paper',   criteriaCodes: ['paper_type'] },
+      { id: 'paper-full', name: 'Même papier (type + grammage)', points: 2, group: 'paper', criteriaCodes: ['paper_type','paper_weight'] },
+      { id: 'impression', name: 'Même impression',             points: 1, group: null,      criteriaCodes: ['impression'] },
+    ],
+    criteria: [
+      { code: 'format',       label: 'Format' },
+      { code: 'paper_type',   label: 'Type papier' },
+      { code: 'paper_weight', label: 'Grammage' },
+      { code: 'impression',   label: 'Impression' },
+    ],
+  },
+};
+const MAX_POINTS = 5;
+
+const SCENARIOS = {
+  partial: {
+    from: { ref: 'REF-2026-0411', spec: { format: '70×100', paper_type: 'Offset', paper_weight: '250', impression: 'Quadri R/V' } },
+    to:   { ref: 'REF-2026-0412', spec: { format: '21×29,7', paper_type: 'Offset', paper_weight: '300', impression: 'Quadri R/V' } },
+    tile2_display: { ref: 'REF-2026-0412', client: 'Imp. Moderne', meta: ['21×29,7', 'Offset 300g'] },
+  },
+  'all-match': {
+    from: { ref: 'REF-2026-0411', spec: { format: '21×29,7', paper_type: 'Offset', paper_weight: '300', impression: 'Quadri R/V' } },
+    to:   { ref: 'REF-2026-0412', spec: { format: '21×29,7', paper_type: 'Offset', paper_weight: '300', impression: 'Quadri R/V' } },
+    tile2_display: { ref: 'REF-2026-0412', client: 'Imp. Moderne', meta: ['21×29,7', 'Offset 300g'] },
+  },
+  'format-desc': {
+    from: { ref: 'REF-2026-0411', spec: { format: '70×100', paper_type: 'Offset', paper_weight: '250', impression: 'Quadri R°' } },
+    to:   { ref: 'REF-2026-0412', spec: { format: '50×70', paper_type: 'Bouffant', paper_weight: '100', impression: 'Quadri R/V' } },
+    tile2_display: { ref: 'REF-2026-0412', client: 'Imp. Moderne', meta: ['50×70', 'Bouffant 100g'] },
+  },
+  'no-match': {
+    from: { ref: 'REF-2026-0411', spec: { format: '70×100', paper_type: 'Offset', paper_weight: '250', impression: 'Pantone' } },
+    to:   { ref: 'REF-2026-0412', spec: { format: '21×29,7', paper_type: 'Bouffant', paper_weight: '100', impression: 'Quadri R/V' } },
+    tile2_display: { ref: 'REF-2026-0412', client: 'Imp. Moderne', meta: ['21×29,7', 'Bouffant 100g'] },
+  },
+  neutralized: {
+    from: { ref: 'REF-2026-0411', spec: { format: '70×100', paper_type: 'Offset', paper_weight: null, impression: null } },
+    to:   { ref: 'REF-2026-0412', spec: { format: '70×100', paper_type: 'Offset', paper_weight: '250', impression: 'Quadri R/V' } },
+    tile2_display: { ref: 'REF-2026-0412', client: 'Imp. Moderne', meta: ['70×100', 'Offset 250g'] },
+  },
+};
+
+// Transition 2→3 baseline (not scenario-dependent)
+const TILE_3_SPEC = { format: '21×29,7', paper_type: 'Offset', paper_weight: '300', impression: 'Quadri R/V' };
+const TILE_3_REF = 'REF-2026-0413';
+
+// ========== Similarity computation ==========
+function valueOf(spec, path) {
+  if (spec == null) return null;
+  const v = spec[path];
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+function resolveCriterion(criterion, prev, curr) {
+  const a = valueOf(prev, criterion.code);
+  const b = valueOf(curr, criterion.code);
+  if (a === null || b === null) return 'neutral';
+  return a === b ? 'ok' : 'no';
+}
+function isFormatDescending(prev, curr) {
+  const a = parseFormat(valueOf(prev, 'format'));
+  const b = parseFormat(valueOf(curr, 'format'));
+  if (a === null || b === null) return false;
+  return a > b;
+}
+function parseFormat(fmt) {
+  if (!fmt) return null;
+  const parts = fmt.replace(',', '.').split(/×|x|X/);
+  if (parts.length !== 2) return null;
+  const a = parseFloat(parts[0]);
+  const b = parseFloat(parts[1]);
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.max(a, b);
+}
+function computeScore(fromSpec, toSpec) {
+  const { rules, criteria } = STATION.category;
+  const matchByCode = {};
+  const neutralizedCodes = [];
+  for (const c of criteria) {
+    const m = resolveCriterion(c, fromSpec, toSpec);
+    if (m === 'neutral') neutralizedCodes.push(c.code);
+    else matchByCode[c.code] = m === 'ok';
+  }
+  const firedRules = [];
+  for (const r of rules) {
+    if (r.kind === 'format-descending') {
+      if (isFormatDescending(fromSpec, toSpec)) firedRules.push(r);
+      continue;
+    }
+    const allMatch = r.criteriaCodes.every(c => matchByCode[c] === true);
+    if (allMatch) firedRules.push(r);
+  }
+  const nonGrouped = [];
+  const bestInGroup = {};
+  for (const r of firedRules) {
+    if (r.group == null) { nonGrouped.push(r); continue; }
+    if (!bestInGroup[r.group] || bestInGroup[r.group].points < r.points) {
+      bestInGroup[r.group] = r;
+    }
+  }
+  const keptRules = [...nonGrouped, ...Object.values(bestInGroup)];
+  const points = keptRules.reduce((s, r) => s + r.points, 0);
+  const keptSet = new Set(keptRules.map(r => r.id));
+  const rulesDisplay = rules.map(r => ({ ...r, fired: keptSet.has(r.id) }));
+
+  return {
+    points,
+    maxPoints: MAX_POINTS,
+    criteriaResults: criteria.map(c => ({
+      code: c.code,
+      label: c.label,
+      state: neutralizedCodes.includes(c.code)
+        ? 'neutral'
+        : (matchByCode[c.code] ? 'ok' : 'no'),
+      from: valueOf(fromSpec, c.code),
+      to: valueOf(toSpec, c.code),
+    })),
+    rules: rulesDisplay,
+  };
+}
+
+// ========== Rendering ==========
+function linkIconSvg(filled) {
+  const color = filled ? '#34d399' : '#71717a';
+  if (filled) {
+    return `<svg class="chain-link" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+  }
+  return `<svg class="chain-link" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.71 1.71"/><path d="M5.17 11.75l-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="2" y1="8" x2="5" y2="8"/><line x1="16" y1="19" x2="16" y2="22"/><line x1="19" y1="16" x2="22" y2="16"/></svg>`;
+}
+function renderChain(points, max) {
+  let html = '';
+  for (let i = 1; i <= max; i++) {
+    html += linkIconSvg(points >= i);
+  }
+  return html;
+}
+function renderBadge(el, score) {
+  el.classList.toggle('zero-score', score.points === 0);
+  if (score.points === 0 && state.zeroScore === 'hidden' && el.id === 'badge-1-2') {
+    el.style.display = 'none';
+  } else {
+    el.style.display = '';
+  }
+  el.innerHTML = renderChain(score.points, score.maxPoints);
+}
+
+function matchGlyph(state_, style) {
+  // state_: 'ok' | 'no' | 'neutral'
+  const GLYPHS = {
+    glyph:  { ok: '✓', no: '✗', neutral: '⊘' },
+    equals: { ok: '=', no: '≠', neutral: '—' },
+    word:   { ok: 'OK', no: 'KO', neutral: 'n/a' },
+  };
+  return GLYPHS[style][state_] || '';
+}
+
+function renderMatrix(score, fromRef, toRef) {
+  const { criteriaResults } = score;
+  const nCols = criteriaResults.length;
+  const hasLabelCol = state.rowLabels !== 'none';
+
+  // Build grid template columns
+  const cols = hasLabelCol
+    ? `auto repeat(${nCols}, minmax(0, 1fr))`
+    : `repeat(${nCols}, minmax(0, 1fr))`;
+
+  const dens = state.density === 'compact' ? 'compact' : '';
+  const colored = state.coloredColumns ? 'colored' : '';
+  const matchStyle = state.matchStyle;
+  const matchStyleClass = matchStyle === 'word' ? 'word' : (matchStyle === 'equals' ? 'equals' : '');
+
+  const rowLabelA = state.rowLabels === 'ref' ? fromRef : (state.rowLabels === 'generic' ? 'Job A' : '');
+  const rowLabelB = state.rowLabels === 'ref' ? toRef   : (state.rowLabels === 'generic' ? 'Job B' : '');
+  const rowLabelM = state.rowLabels === 'generic' ? 'Match' : (state.rowLabels === 'ref' ? 'Match' : '');
+
+  const headerRow = hasLabelCol
+    ? `<div class="cell header"></div>` + criteriaResults.map(c => {
+        const label = state.labelStyle === 'code' ? c.code : c.label;
+        return `<div class="cell header">${escape(label)}</div>`;
+      }).join('')
+    : criteriaResults.map(c => {
+        const label = state.labelStyle === 'code' ? c.code : c.label;
+        return `<div class="cell header">${escape(label)}</div>`;
+      }).join('');
+
+  const rowA = (hasLabelCol ? `<div class="cell row-label ${state.rowLabels === 'ref' ? 'ref' : ''}" title="${escape(fromRef)}">${escape(rowLabelA)}</div>` : '')
+    + criteriaResults.map(c => `<div class="cell v-${c.state}" title="${escape(c.from ?? '—')}">${escape(c.from ?? '—')}</div>`).join('');
+
+  const rowB = (hasLabelCol ? `<div class="cell row-label ${state.rowLabels === 'ref' ? 'ref' : ''}" title="${escape(toRef)}">${escape(rowLabelB)}</div>` : '')
+    + criteriaResults.map(c => `<div class="cell v-${c.state}" title="${escape(c.to ?? '—')}">${escape(c.to ?? '—')}</div>`).join('');
+
+  const rowMatch = (hasLabelCol ? `<div class="cell row-label">${escape(rowLabelM)}</div>` : '')
+    + criteriaResults.map(c => `<div class="cell match ${c.state} ${matchStyleClass}">${matchGlyph(c.state, matchStyle)}</div>`).join('');
+
+  return `
+    <div class="tt-matrix ${dens} ${colored}" style="grid-template-columns: ${cols}">
+      ${headerRow}
+      ${rowA}
+      ${rowB}
+      ${rowMatch}
+    </div>
+  `;
+}
+
+function renderTooltip(score, fromRef, toRef) {
+  const tt = document.getElementById('tooltip');
+  const parts = [];
+
+  parts.push(`
+    <div class="tt-header">
+      <div class="tt-header-left">
+        <span class="tt-title">Calage</span>
+        <span class="tt-transition">
+          <span class="from">${escape(fromRef)}</span>
+          <span class="arrow">→</span>
+          <span class="to">${escape(toRef)}</span>
+        </span>
+      </div>
+      <div class="tt-header-right">
+        <span class="tt-chain">${renderChain(score.points, score.maxPoints)}</span>
+        <span class="tt-score-text"><strong>${score.points}</strong> / ${score.maxPoints}</span>
+      </div>
+    </div>
+    <div class="tt-station">${escape(STATION.name)}</div>
+  `);
+
+  parts.push(renderMatrix(score, fromRef, toRef));
+
+  // Rules block
+  if (state.showRules) {
+    const rulesToShow = state.showSilentRules
+      ? score.rules
+      : score.rules.filter(r => r.fired);
+    if (rulesToShow.length > 0) {
+      const chips = rulesToShow.map(r => {
+        const cls = r.fired ? '' : 'silent';
+        const pts = r.fired ? `+${r.points}` : `—`;
+        return `<span class="tt-rule-chip ${cls}"><span class="pts ${cls}">${pts}</span>${escape(r.name)}</span>`;
+      }).join('');
+      parts.push(`
+        <div class="tt-block">
+          <div class="tt-block-title">Règles appliquées</div>
+          <div class="tt-rules-chips">${chips}</div>
+        </div>
+      `);
+    } else {
+      parts.push(`
+        <div class="tt-block">
+          <div class="tt-block-title">Règles appliquées</div>
+          <div class="tt-no-rules">Aucune règle ne déclenche — setup complet.</div>
+        </div>
+      `);
+    }
+  }
+
+  // Hint
+  if (state.showHint) {
+    const hint = computeHint(score);
+    if (hint) {
+      parts.push(`<div class="tt-hint">${hint}</div>`);
+    }
+  }
+
+  tt.innerHTML = parts.join('');
+
+  positionTooltip();
+}
+
+function computeHint(score) {
+  const silent = score.rules.filter(r => !r.fired && r.kind !== 'format-descending');
+  if (silent.length === 0) return null;
+  silent.sort((a, b) => a.criteriaCodes.length - b.criteriaCodes.length);
+  const r = silent[0];
+  const missing = r.criteriaCodes.filter(code => {
+    const c = score.criteriaResults.find(x => x.code === code);
+    return c && c.state !== 'ok';
+  });
+  if (missing.length === 0) return null;
+  const labels = missing.map(code => {
+    const c = STATION.category.criteria.find(x => x.code === code);
+    return c ? c.label : code;
+  });
+  return `Pour <strong>+${r.points} pt${r.points > 1 ? 's' : ''}</strong> : matcher ${labels.map(l => `« ${l} »`).join(' et ')}.`;
+}
+
+function positionTooltip() {
+  const tt = document.getElementById('tooltip');
+  const badge = document.getElementById(`badge-${state.selectedBadge}`);
+  if (!badge || badge.style.display === 'none') {
+    tt.style.display = 'none';
+    return;
+  }
+  const stage = document.querySelector('.preview-stage');
+  if (!stage) return;
+  // Reset visibility so offsetWidth returns real width
+  tt.style.display = '';
+  const bRect = badge.getBoundingClientRect();
+  const sRect = stage.getBoundingClientRect();
+  const tWidth = tt.offsetWidth || 440;
+  let left = bRect.left - sRect.left + badge.offsetWidth + 16;
+  let top  = bRect.top  - sRect.top  + stage.scrollTop - 8;
+  const maxLeft = stage.scrollLeft + stage.clientWidth - tWidth - 20;
+  if (left > maxLeft) left = maxLeft;
+  tt.style.left = left + 'px';
+  tt.style.top = top + 'px';
+}
+
+// ========== Escape ==========
+function escape(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',
+  }[c]));
+}
+
+// ========== Main render ==========
+function render() {
+  const scen = SCENARIOS[state.scenario];
+  document.getElementById('tile2-ref').textContent = scen.tile2_display.ref;
+  document.getElementById('tile2-client').textContent = scen.tile2_display.client;
+  document.getElementById('tile2-meta').innerHTML = scen.tile2_display.meta.map((m, i) =>
+    i === 0 ? `<span>${m}</span>` : `<span>·</span><span>${m}</span>`
+  ).join('');
+
+  const s12 = computeScore(scen.from.spec, scen.to.spec);
+  const s23 = computeScore(scen.to.spec, TILE_3_SPEC);
+
+  renderBadge(document.getElementById('badge-1-2'), s12);
+  renderBadge(document.getElementById('badge-2-3'), s23);
+
+  const active = state.selectedBadge === '1-2'
+    ? { score: s12, from: scen.from.ref, to: scen.to.ref }
+    : { score: s23, from: scen.to.ref, to: TILE_3_REF };
+  renderTooltip(active.score, active.from, active.to);
+
+  document.getElementById('badge-1-2').classList.toggle('selected', state.selectedBadge === '1-2');
+  document.getElementById('badge-2-3').classList.toggle('selected', state.selectedBadge === '2-3');
+
+  updateMeta();
+}
+
+function updateMeta() {
+  const bits = [];
+  bits.push(`scenario=${state.scenario}`);
+  bits.push(`rows=${state.rowLabels}`);
+  bits.push(`match=${state.matchStyle}`);
+  bits.push(`colored=${state.coloredColumns ? 'on' : 'off'}`);
+  bits.push(`density=${state.density}`);
+  bits.push(`labels=${state.labelStyle}`);
+  if (state.showRules) bits.push(state.showSilentRules ? 'rules+silent' : 'rules');
+  if (state.showHint) bits.push('hint');
+  document.getElementById('config-meta').textContent = bits.join(' · ');
+}
+
+// ========== Wire ==========
+document.querySelectorAll('[data-radio]').forEach(group => {
+  const path = group.dataset.radio;
+  group.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      state[path] = b.dataset.v;
+      document.querySelectorAll(`[data-radio="${path}"] button`).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.v === state[path]);
+      });
+      render();
+    });
+  });
+});
+document.querySelectorAll('[data-toggle]').forEach(inp => {
+  inp.addEventListener('change', () => {
+    state[inp.dataset.toggle] = inp.checked;
+    render();
+  });
+});
+document.getElementById('badge-1-2').addEventListener('click', () => {
+  state.selectedBadge = '1-2';
+  render();
+});
+document.getElementById('badge-2-3').addEventListener('click', () => {
+  state.selectedBadge = '2-3';
+  render();
+});
+document.getElementById('reset').addEventListener('click', () => {
+  Object.entries(DEFAULTS).forEach(([k, v]) => { state[k] = v; });
+  document.querySelectorAll('[data-radio]').forEach(group => {
+    const path = group.dataset.radio;
+    group.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset.v === state[path]);
+    });
+  });
+  document.querySelectorAll('[data-toggle]').forEach(inp => {
+    inp.checked = !!state[inp.dataset.toggle];
+  });
+  render();
+});
+
+setTimeout(render, 50);
+window.addEventListener('resize', positionTooltip);
+</script>
+</body>
+</html>
