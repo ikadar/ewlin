@@ -185,9 +185,91 @@ pub fn run_with_fbi(
             // (b) pre-block forward-grid cells from `now_tick` until the
             // ALAP end, which forces competing tier 2/3 jobs to collide
             // elsewhere and creates visible double-occupation tiles.
+            //
+            // Element-cascade rollback: the naive filter kept downstream
+            // placements while dropping upstream ones, leaving the forward
+            // pass with a successor locked (`art = 0`, `start_tick = Some`)
+            // but its predecessor free. The forward scoring loop only
+            // enforces `pred.end + gap <= t` on the successor's side when
+            // scoring the successor — a successor that is already marked
+            // done is never scored, so the gap (drying time,
+            // finish-to-start between elements) stops being checked. The
+            // predecessor then places itself wherever it fits in the
+            // forward grid, violating intra-element drying and
+            // cross-element precedence (observed on Job 4419 Couverture
+            // and Job 4647 Finition in production).
+            //
+            // Fix: any element whose ALAP chain contains at least one past
+            // task is torn down entirely, and the tear-down cascades to
+            // every element that lists it as a prerequisite (because they
+            // were planned around the dropped one's last_tick). The whole
+            // subgraph falls back to the forward pass, which handles
+            // intra- and cross-element precedence uniformly.
+            let mut task_to_element: std::collections::HashMap<String, String> =
+                std::collections::HashMap::new();
+            for job in jobs_for_backward {
+                for element in &job.elements {
+                    for task in &element.tasks {
+                        task_to_element.insert(task.id.clone(), element.id.clone());
+                    }
+                }
+            }
+
+            let mut failed_elements: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+            for p in &placements {
+                if p.start_tick < now_tick {
+                    if let Some(eid) = task_to_element.get(&p.task_id) {
+                        failed_elements.insert(eid.clone());
+                    }
+                }
+            }
+
+            if !failed_elements.is_empty() {
+                let seeded: Vec<String> = failed_elements.iter().cloned().collect();
+                // Walk the prerequisite graph until the failure set
+                // stabilises. Each element that depends on a failed one is
+                // itself marked failed.
+                loop {
+                    let mut added_any = false;
+                    for job in jobs_for_backward {
+                        for element in &job.elements {
+                            if failed_elements.contains(&element.id) {
+                                continue;
+                            }
+                            let depends_on_failed = element
+                                .prerequisite_element_ids
+                                .iter()
+                                .any(|pid| failed_elements.contains(pid));
+                            if depends_on_failed {
+                                failed_elements.insert(element.id.clone());
+                                added_any = true;
+                            }
+                        }
+                    }
+                    if !added_any {
+                        break;
+                    }
+                }
+                eprintln!(
+                    "[ALAP-CASCADE] {} element(s) rolled back (seeds: {}). Elements: {:?}",
+                    failed_elements.len(),
+                    seeded.len(),
+                    failed_elements.iter().map(|s| &s[..8]).collect::<Vec<_>>(),
+                );
+            }
+
             alap_placements = placements
                 .into_iter()
-                .filter(|p| p.start_tick >= now_tick)
+                .filter(|p| {
+                    if p.start_tick < now_tick {
+                        return false;
+                    }
+                    match task_to_element.get(&p.task_id) {
+                        Some(eid) => !failed_elements.contains(eid),
+                        None => true,
+                    }
+                })
                 .collect();
             lv
         } else {

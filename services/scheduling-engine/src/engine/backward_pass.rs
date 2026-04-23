@@ -578,7 +578,40 @@ pub fn compute_last_values_with_placements(
     // at least one task that failed ALAP. These elements will go through the
     // forward_pass uniformly; their intra-element precedence is enforced
     // there via predecessor_idx.
+    //
+    // Consumer-cascade: keeping a consumer element's ALAP placement while
+    // its prerequisite element's placements have been torn down would let
+    // the forward pass see the consumer's first task as already done
+    // (art = 0, end_tick = Some(...)) but the prerequisite's tasks as
+    // still running. The forward pass's precedence gate only checks
+    // `pred.end + gap <= t` when scoring the CONSUMER; when the consumer
+    // is already marked done it is never scored, so the gap stops being
+    // enforced and the prerequisite is free to run wherever it fits,
+    // even after the consumer finished. Cascade the rollback up the
+    // prerequisite graph so the entire subtree falls back to the
+    // forward pass together.
     if !failed_elements.is_empty() {
+        loop {
+            let mut added_any = false;
+            for job in jobs {
+                for element in &job.elements {
+                    if failed_elements.contains(&element.id) {
+                        continue;
+                    }
+                    let depends_on_failed = element
+                        .prerequisite_element_ids
+                        .iter()
+                        .any(|pid| failed_elements.contains(pid));
+                    if depends_on_failed {
+                        failed_elements.insert(element.id.clone());
+                        added_any = true;
+                    }
+                }
+            }
+            if !added_any {
+                break;
+            }
+        }
         placements.retain(|p| {
             task_to_element
                 .get(&p.task_id)
