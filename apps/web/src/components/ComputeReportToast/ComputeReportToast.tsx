@@ -10,10 +10,11 @@
  * report toast is visible at a time. Re-triggering replaces it.
  */
 
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { CheckCircle2, Loader2, X, AlertCircle } from 'lucide-react';
 import type { ComputeReportState, ComputeReportLateJob } from '../../hooks/useComputeReportStream';
 import type { ScheduleSnapshot } from '@flux/types';
+import { getJobIdForTask } from '../../utils/taskHelpers';
 
 interface Props {
   state: ComputeReportState;
@@ -34,11 +35,37 @@ function formatLateness(minutes: number): string {
   return remHours > 0 ? `${days}j ${remHours}h` : `${days}j`;
 }
 
-function buildPriorityBreakdown(snapshot: ScheduleSnapshot, lateJobs: ComputeReportLateJob[]) {
+/**
+ * Build the set of job IDs that have at least one assignment in the
+ * current snapshot. A job with zero assignments is "unplaced" — it
+ * should not be counted as on-time (that would silently inflate the
+ * ratio) nor as late (the engine hasn't even attempted to schedule it).
+ */
+function buildPlacedJobIds(snapshot: ScheduleSnapshot): Set<string> {
+  const taskToJob = new Map<string, string>();
+  for (const task of snapshot.tasks) {
+    const jid = getJobIdForTask(task, snapshot.elements);
+    if (jid) taskToJob.set(task.id, jid);
+  }
+  const placed = new Set<string>();
+  for (const a of snapshot.assignments) {
+    const jid = taskToJob.get(a.taskId);
+    if (jid) placed.add(jid);
+  }
+  return placed;
+}
+
+function buildPriorityBreakdown(
+  snapshot: ScheduleSnapshot,
+  lateJobs: ComputeReportLateJob[],
+  placedJobIds: Set<string>,
+) {
   const lateByRef = new Map(lateJobs.map((l) => [l.ref, l]));
   return [0, 1, 2, 3]
     .map((tier) => {
-      const jobs = snapshot.jobs.filter((j) => (j.deadlinePriority ?? 2) === tier);
+      const jobs = snapshot.jobs
+        .filter((j) => (j.deadlinePriority ?? 2) === tier)
+        .filter((j) => placedJobIds.has(j.id));
       const total = jobs.length;
       const late = jobs.filter((j) => lateByRef.has(j.reference)).length;
       return { tier, total, onTime: total - late, late };
@@ -221,10 +248,14 @@ function FullSection({
   result: { stats: { scheduledTasks: number; totalTasks: number } };
   lateJobs: ComputeReportLateJob[];
 }) {
-  const totalJobs = snapshot.jobs.length;
+  // Denominator must be placed jobs only — counting unplaced jobs as
+  // "on time" silently inflates the ratio (an unscheduled job isn't
+  // on time, it just hasn't been attempted).
+  const placedJobIds = useMemo(() => buildPlacedJobIds(snapshot), [snapshot]);
+  const totalJobs = placedJobIds.size;
   const onTime = Math.max(0, totalJobs - lateJobs.length);
   const pct = totalJobs > 0 ? Math.round((onTime / totalJobs) * 100) : 100;
-  const tiers = buildPriorityBreakdown(snapshot, lateJobs);
+  const tiers = buildPriorityBreakdown(snapshot, lateJobs, placedJobIds);
 
   return (
     <>

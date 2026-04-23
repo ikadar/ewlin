@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import type { ScheduleSnapshot, Job } from '@flux/types';
 import type { ComputeScheduleResult } from '../../store';
 import { useAutoRecomputeCtx } from '../../contexts/AutoRecomputeContext';
+import { getJobIdForTask } from '../../utils/taskHelpers';
 
 // ─── Types ───
 
@@ -387,7 +388,24 @@ export const ComputeModal = memo(function ComputeModal({
     if (!result || !snapshotReady) return [];
     const engineLate = findLateJobs(snapshot, result);
     const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
+    // Build the set of placed jobs to drop snapshot.lateJobs entries
+    // that correspond to unplaced jobs — those are late by deadline-is-
+    // in-the-past (check 1 in validation service) but the engine hasn't
+    // scheduled them, so they shouldn't count toward the report.
+    const placedJobs = new Set<string>();
+    {
+      const taskToJob = new Map<string, string>();
+      for (const task of snapshot.tasks) {
+        const jid = getJobIdForTask(task, snapshot.elements);
+        if (jid) taskToJob.set(task.id, jid);
+      }
+      for (const a of snapshot.assignments) {
+        const jid = taskToJob.get(a.taskId);
+        if (jid) placedJobs.add(jid);
+      }
+    }
     return snapshot.lateJobs
+      .filter((lj) => placedJobs.has(lj.jobId))
       .map((lj) => {
         const job = snapshot.jobs.find((j) => j.id === lj.jobId);
         const ref = job?.reference ?? '?';
@@ -416,7 +434,23 @@ export const ComputeModal = memo(function ComputeModal({
   }, [mode, targetJob, lateJobs]);
 
   const isSelective = mode === 'selective' && targetJob != null;
-  const totalJobs = isSelective ? 1 : snapshot.jobs.length;
+  // Count only placed jobs (with assignments). An unplaced job isn't
+  // on time — the engine hasn't scheduled it — so including it in the
+  // denominator silently inflates the ratio.
+  const placedJobsCount = useMemo(() => {
+    const taskToJob = new Map<string, string>();
+    for (const task of snapshot.tasks) {
+      const jid = getJobIdForTask(task, snapshot.elements);
+      if (jid) taskToJob.set(task.id, jid);
+    }
+    const placed = new Set<string>();
+    for (const a of snapshot.assignments) {
+      const jid = taskToJob.get(a.taskId);
+      if (jid) placed.add(jid);
+    }
+    return placed.size;
+  }, [snapshot.assignments, snapshot.tasks, snapshot.elements]);
+  const totalJobs = isSelective ? 1 : placedJobsCount;
   const hasLate = scopedLateJobs.length > 0;
   const onTimePct = totalJobs > 0 ? Math.round(((totalJobs - scopedLateJobs.length) / totalJobs) * 100) : 100;
 
