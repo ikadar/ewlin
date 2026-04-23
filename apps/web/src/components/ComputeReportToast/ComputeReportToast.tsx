@@ -14,6 +14,7 @@ import { memo, useEffect } from 'react';
 import { CheckCircle2, Loader2, X, AlertCircle } from 'lucide-react';
 import type { ComputeReportState, ComputeReportLateJob } from '../../hooks/useComputeReportStream';
 import type { ScheduleSnapshot } from '@flux/types';
+import type { ComputeScheduleResult } from '../../store';
 import { getJobIdForTask } from '../../utils/taskHelpers';
 
 interface Props {
@@ -37,18 +38,25 @@ function formatLateness(minutes: number): string {
 
 /**
  * Build the set of job IDs that have at least one assignment in the
- * current snapshot. A job with zero assignments is "unplaced" — it
- * should not be counted as on-time (that would silently inflate the
- * ratio) nor as late (the engine hasn't even attempted to schedule it).
+ * engine RESULT (post-compute). A job with zero result assignments
+ * is "unplaced" — it should not be counted as on-time (that would
+ * silently inflate the ratio) nor as late (the engine hasn't even
+ * scheduled it). Uses `result.assignments`, not `snapshot.assignments`,
+ * because the snapshot is captured at compute START and can be empty
+ * (e.g. right after a clearAllAssignments), which would make totalJobs
+ * collapse to 0 and the pct math degenerate.
  */
-function buildPlacedJobIds(snapshot: ScheduleSnapshot): Set<string> {
+function buildPlacedJobIds(
+  snapshot: ScheduleSnapshot,
+  resultAssignments: ComputeScheduleResult['assignments'],
+): Set<string> {
   const taskToJob = new Map<string, string>();
   for (const task of snapshot.tasks) {
     const jid = getJobIdForTask(task, snapshot.elements);
     if (jid) taskToJob.set(task.id, jid);
   }
   const placed = new Set<string>();
-  for (const a of snapshot.assignments) {
+  for (const a of resultAssignments) {
     const jid = taskToJob.get(a.taskId);
     if (jid) placed.add(jid);
   }
@@ -245,15 +253,15 @@ function FullSection({
   lateJobs,
 }: {
   snapshot: ScheduleSnapshot;
-  result: { stats: { scheduledTasks: number; totalTasks: number } };
+  result: ComputeScheduleResult;
   lateJobs: ComputeReportLateJob[];
 }) {
   // Denominator must be placed jobs only — counting unplaced jobs as
-  // "on time" silently inflates the ratio (an unscheduled job isn't
-  // on time, it just hasn't been attempted). Inlined (no useMemo) to
-  // keep FullSection hook-free; the snapshot-sized scan is cheap and
-  // avoids adding a hook to an otherwise-pure sub-component.
-  const placedJobIds = buildPlacedJobIds(snapshot);
+  // "on time" silently inflates the ratio. Uses the engine's fresh
+  // result, not the compute-start snapshot (which can be empty right
+  // after a clearAllAssignments), so the number reflects the schedule
+  // that was just produced.
+  const placedJobIds = buildPlacedJobIds(snapshot, result.assignments);
   const totalJobs = placedJobIds.size;
   const onTime = Math.max(0, totalJobs - lateJobs.length);
   const pct = totalJobs > 0 ? Math.round((onTime / totalJobs) * 100) : 100;

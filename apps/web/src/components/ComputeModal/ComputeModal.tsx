@@ -388,10 +388,12 @@ export const ComputeModal = memo(function ComputeModal({
     if (!result || !snapshotReady) return [];
     const engineLate = findLateJobs(snapshot, result);
     const engineByRef = new Map(engineLate.map((lj) => [lj.ref, lj]));
-    // Build the set of placed jobs to drop snapshot.lateJobs entries
-    // that correspond to unplaced jobs — those are late by deadline-is-
-    // in-the-past (check 1 in validation service) but the engine hasn't
-    // scheduled them, so they shouldn't count toward the report.
+    // Build the set of placed jobs FROM THE ENGINE RESULT (not the
+    // pre-compute snapshot — see placedJobsCount comment above) so we
+    // can drop snapshot.lateJobs entries pointing at jobs the engine
+    // did not schedule. Check 1 in the validation service flags jobs
+    // with past workshopExitDate as late regardless of assignments —
+    // those entries must not surface in the post-compute report.
     const placedJobs = new Set<string>();
     {
       const taskToJob = new Map<string, string>();
@@ -399,7 +401,7 @@ export const ComputeModal = memo(function ComputeModal({
         const jid = getJobIdForTask(task, snapshot.elements);
         if (jid) taskToJob.set(task.id, jid);
       }
-      for (const a of snapshot.assignments) {
+      for (const a of result.assignments) {
         const jid = taskToJob.get(a.taskId);
         if (jid) placedJobs.add(jid);
       }
@@ -434,22 +436,25 @@ export const ComputeModal = memo(function ComputeModal({
   }, [mode, targetJob, lateJobs]);
 
   const isSelective = mode === 'selective' && targetJob != null;
-  // Count only placed jobs (with assignments). An unplaced job isn't
-  // on time — the engine hasn't scheduled it — so including it in the
-  // denominator silently inflates the ratio.
+  // Count only placed jobs (with assignments) from the ENGINE RESULT,
+  // not from the pre-compute snapshot — the latter can be empty if
+  // the user cleared assignments before triggering this compute,
+  // which would degenerate totalJobs to 0 and the pct math to 100%
+  // with 0 denominator.
   const placedJobsCount = useMemo(() => {
+    if (!result) return 0;
     const taskToJob = new Map<string, string>();
     for (const task of snapshot.tasks) {
       const jid = getJobIdForTask(task, snapshot.elements);
       if (jid) taskToJob.set(task.id, jid);
     }
     const placed = new Set<string>();
-    for (const a of snapshot.assignments) {
+    for (const a of result.assignments) {
       const jid = taskToJob.get(a.taskId);
       if (jid) placed.add(jid);
     }
     return placed.size;
-  }, [snapshot.assignments, snapshot.tasks, snapshot.elements]);
+  }, [result, snapshot.tasks, snapshot.elements]);
   const totalJobs = isSelective ? 1 : placedJobsCount;
   const hasLate = scopedLateJobs.length > 0;
   const onTimePct = totalJobs > 0 ? Math.round(((totalJobs - scopedLateJobs.length) / totalJobs) * 100) : 100;
