@@ -87,7 +87,7 @@ services:
       LOG_LEVEL: ${CONSOLE_SERVICE_LOG_LEVEL:-info}
       TZ: Europe/Paris
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3004/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -114,6 +114,7 @@ services:
       MERCURE_URL: http://mercure:3000/.well-known/mercure
       MERCURE_PUBLIC_URL: http://localhost:${MERCURE_PORT:-3000}/.well-known/mercure
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
+      TZ: Europe/Paris
     depends_on:
       mariadb:
         condition: service_healthy
@@ -161,6 +162,7 @@ services:
       MARIADB_DATABASE: ${MARIADB_DATABASE}
       MARIADB_USER: ${MARIADB_USER}
       MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      TZ: Europe/Paris
     ports:
       - "${MARIADB_PORT:-3306}:3306"
     volumes:

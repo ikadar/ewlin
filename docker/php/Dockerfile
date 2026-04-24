@@ -41,6 +41,9 @@ RUN echo "pm.status_path = /status" >> /usr/local/etc/php-fpm.d/zz-docker.conf
 # Configure PHP
 RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
+# Configure timezone (must match OS TZ + operating schedule times in station data)
+RUN echo "date.timezone = Europe/Paris" > "$PHP_INI_DIR/conf.d/zz-timezone.ini"
+
 # Configure OPcache for development
 RUN echo "opcache.enable=1" >> "$PHP_INI_DIR/conf.d/opcache.ini" && \
     echo "opcache.memory_consumption=256" >> "$PHP_INI_DIR/conf.d/opcache.ini" && \
