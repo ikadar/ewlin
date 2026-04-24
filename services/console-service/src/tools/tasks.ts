@@ -139,10 +139,27 @@ export const replaceTaskStationTool: ToolDefinition = {
   },
 };
 
+/**
+ * PUT /api/v1/tasks/{id}/pin is a TOGGLE server-side (see
+ * TaskController::togglePin). To keep our tools idempotent, we fetch
+ * the current isPinned state first and only toggle when needed.
+ *
+ * Returns null when the task has no assignment yet (pre-placement or
+ * unknown task) — callers decide what to do in that case.
+ */
+async function currentIsPinned(
+  ctx: Parameters<ToolDefinition['handler']>[1],
+  taskId: string,
+): Promise<boolean | null> {
+  const snap = await ctx.php.get<Snapshot>('/api/v1/schedule/snapshot');
+  const asn = snap.assignments.find((a) => a.taskId === taskId);
+  return asn ? asn.isPinned ?? false : null;
+}
+
 export const pinTaskAtTimeTool: ToolDefinition = {
   name: 'pin_task_at_time',
   description:
-    "Force une tâche à démarrer à un instant précis sur une station précise. Combine assign + pin : la tâche est replanifiée puis épinglée pour qu'aucune opération automatique ne la déplace. Exemple : 'le job 12345 doit passer à 15h le 15 avril sur la G40'.",
+    "Force une tâche à démarrer à un instant précis sur une station précise. Combine assign + pin : la tâche est replanifiée puis épinglée pour qu'aucune opération automatique ne la déplace. Exemple : 'le job 12345 doit passer à 15h le 15 avril sur la G40'. Idempotent : si la tâche est déjà épinglée, ne dé-épingle pas par erreur.",
   inputSchema: z.object({
     taskId: uuidField('resolve_task_in_job'),
     taskLabel: z.string().min(1),
@@ -163,23 +180,32 @@ export const pinTaskAtTimeTool: ToolDefinition = {
     if (ctx.dryRun) {
       return { ok: true, preview, data: { dryRun: true, scheduledStart, ...input } };
     }
-    // Step 1: reschedule (or assign) the task at the requested time/station
+    // Step 1: reschedule (or assign) the task at the requested time/station.
     await ctx.php.put<unknown>(`/api/v1/tasks/${input.taskId}/assign`, {
       targetId: input.stationId,
       scheduledStart,
       bypassPrecedence: false,
     });
-    // Step 2: toggle pin (assumes it was unpinned). If already pinned, this
-    // would unpin — fetching current state first would be safer; the LLM
-    // can call list_active_constraints first if it cares.
-    await ctx.php.put<unknown>(`/api/v1/tasks/${input.taskId}/pin`, {});
-    return { ok: true, preview, data: { taskId: input.taskId, scheduledStart } };
+    // Step 2: ensure pinned. /pin is a toggle, so only call it if the
+    // current state is unpinned; otherwise we would silently un-pin
+    // a previously-pinned task just because the user re-issued the
+    // command with a new time.
+    const alreadyPinned = await currentIsPinned(ctx, input.taskId);
+    if (alreadyPinned === false) {
+      await ctx.php.put<unknown>(`/api/v1/tasks/${input.taskId}/pin`, {});
+    }
+    return {
+      ok: true,
+      preview,
+      data: { taskId: input.taskId, scheduledStart, wasAlreadyPinned: alreadyPinned === true },
+    };
   },
 };
 
 export const unpinTaskTool: ToolDefinition = {
   name: 'unpin_task',
-  description: "Retire le pin d'une tâche, la rendant éligible aux opérations automatiques de replanification.",
+  description:
+    "Retire le pin d'une tâche, la rendant éligible aux opérations automatiques de replanification. Idempotent : si la tâche est déjà non-épinglée, ne l'épingle pas par erreur.",
   inputSchema: z.object({
     taskId: uuidField('resolve_task_in_job'),
     taskLabel: z.string().min(1),
@@ -189,8 +215,16 @@ export const unpinTaskTool: ToolDefinition = {
     if (ctx.dryRun) {
       return { ok: true, preview, data: { dryRun: true, ...input } };
     }
-    await ctx.php.put<unknown>(`/api/v1/tasks/${input.taskId}/pin`, {});
-    return { ok: true, preview, data: { taskId: input.taskId } };
+    // /pin is a toggle: only call it if currently pinned.
+    const alreadyPinned = await currentIsPinned(ctx, input.taskId);
+    if (alreadyPinned === true) {
+      await ctx.php.put<unknown>(`/api/v1/tasks/${input.taskId}/pin`, {});
+    }
+    return {
+      ok: true,
+      preview,
+      data: { taskId: input.taskId, wasAlreadyUnpinned: alreadyPinned !== true },
+    };
   },
 };
 
