@@ -1984,4 +1984,84 @@ mod integration_tests {
             a_s1.scheduled_start, b_s1.scheduled_start
         );
     }
+
+    /// Regression: two pinned tasks whose intervals overlap on a
+    /// capacity-1 station must NOT both be emitted at their pinned slots.
+    /// First-iteration-wins; the second pin is rejected and falls through
+    /// to the forward-pass placement loop.
+    ///
+    /// Reproduces the "multiple occupied slot" UI bug observed on Komori
+    /// G40 / Ryobi 528 after several Ctrl+Alt+P cycles. Cause: the
+    /// safety-zone-frozen pathway in PHP's buildJobs() sends both tasks
+    /// as `is_pinned: true` with overlapping `[pinned_start_tick,
+    /// pinned_start_tick + setup+run)` intervals, and the engine used to
+    /// silently overwrite the grid AND emit both ComputedAssignments,
+    /// producing two tiles on the same (station, tick) pair.
+    #[test]
+    fn overlapping_pinned_tasks_on_capacity_one_station_are_not_both_emitted() {
+        let stations = vec![make_station("press", "Press", false)];
+        let alice = make_always_on_operator("alice", "Alice", &[("press", 1.0)], vec![]);
+
+        // Two single-task jobs, both pinned, both 60-minute, both
+        // requesting tick 5 — head-on collision on the same cell.
+        let make_pinned_job = |id: &str, pin_tick: usize| JobInput {
+            id: id.into(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                tasks: vec![TaskInput {
+                    id: format!("{id}-task"),
+                    station_id: "press".into(),
+                    setup_minutes: 0,
+                    run_minutes: 60,
+                    sequence_order: 0,
+                    is_pinned: true,
+                    pinned_start_tick: Some(pin_tick),
+                    predecessor_gap_minutes: 0,
+                }],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![alice],
+            jobs: vec![make_pinned_job("J1", 5), make_pinned_job("J2", 5)],
+            options: options(),
+            station_groups: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+
+        let result = compute(&request);
+
+        // Both task assignments may be present — but they must NOT
+        // overlap on the same (station, tick).
+        let j1 = result.assignments.iter().find(|a| a.task_id == "J1-task");
+        let j2 = result.assignments.iter().find(|a| a.task_id == "J2-task");
+
+        // At least one must be present (the winner of the conflict).
+        assert!(
+            j1.is_some() || j2.is_some(),
+            "expected at least one of the conflicting pinned tasks to be placed"
+        );
+
+        // If both ended up scheduled (the loser via forward-pass fallback),
+        // their windows must be disjoint.
+        if let (Some(a), Some(b)) = (j1, j2) {
+            let (a_start, a_end) = assignment_minutes(a);
+            let (b_start, b_end) = assignment_minutes(b);
+            let overlap = a_start < b_end && b_start < a_end;
+            assert!(
+                !overlap,
+                "capacity-1 station hosts overlapping intervals: J1=[{}, {}) J2=[{}, {})",
+                a_start, a_end, b_start, b_end
+            );
+        }
+    }
 }

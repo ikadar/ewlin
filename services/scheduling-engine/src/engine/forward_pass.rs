@@ -1786,10 +1786,15 @@ fn advance_action_at_tick(
 ///   ignore the pin (treat as non-pinned). This is a config error and
 ///   would already be caught by validation upstream.
 /// - The pinned interval extends beyond the current grid → grow the grid.
-/// - The station is already occupied at one of the pinned ticks (e.g. by
-///   a maintenance constraint or another pinned task) → log and overwrite
-///   anyway. The user's pin decision wins; collisions are reported as
-///   warnings post-compute via the conflict validator.
+/// - The station is already occupied by a DIFFERENT pre-placed pinned
+///   action at one of the requested ticks → reject this pin (log and
+///   `continue`) and let the regular forward-pass loop place it elsewhere.
+///   First-iteration-wins on conflict — `actions` is iterated in stable
+///   order, so the resolution is deterministic across runs. Without this
+///   guard, two overlapping pins both write the grid (last-writer-wins)
+///   AND both emit a `ComputedAssignment`, producing a station-capacity
+///   violation visible as overlapping tiles in the UI on capacity-1
+///   stations like Komori G40 / Ryobi 528.
 fn pre_place_pinned_actions(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
@@ -1834,20 +1839,44 @@ fn pre_place_pinned_actions(
             grid.grow(grow_ticks);
         }
 
-        // Reserve the station for the whole interval. We overwrite any
-        // existing occupancy on these cells — the user's pin decision
-        // takes precedence over the engine's earlier choices (which
-        // shouldn't have happened anyway since pre-placement runs first).
+        // Reserve the station for the whole interval.
+        //
+        // Conflict policy: if any tick in [start_t, end_t) is already
+        // occupied by a DIFFERENT pre-placed pinned action, we reject
+        // this pin entirely (skip grid write, leave start_tick/end_tick
+        // unset, do not emit). The action falls through to the regular
+        // forward-pass loop which respects `is_station_free` and will
+        // place it on the next free slot.
+        //
+        // Why reject instead of overwrite: capacity-1 stations physically
+        // cannot host two tasks at once. Last-writer-wins on the grid
+        // combined with unconditional emission would produce two
+        // ComputedAssignments on the same (station, tick) — visible as
+        // overlapping tiles in the UI and persisted by PHP, where they
+        // accumulate across compute cycles via the safety-zone-frozen
+        // pin pathway (Option A in ScheduleComputeController.buildJobs).
         let station_idx = actions[i].station_idx;
+        let mut conflict_with: Option<usize> = None;
         for t in start_t..end_t {
             if let Some(prev) = grid.station_action_at(station_idx, t) {
                 if prev != i {
-                    eprintln!(
-                        "[PRE-PLACE] pinned task {} overwrites action {} on station_idx {} at tick {}",
-                        actions[i].task_id, prev, station_idx, t
-                    );
+                    conflict_with = Some(prev);
+                    break;
                 }
             }
+        }
+        if let Some(prev) = conflict_with {
+            let prev_task_id = actions
+                .get(prev)
+                .map(|a| a.task_id.as_str())
+                .unwrap_or("<unknown>");
+            eprintln!(
+                "[PRE-PLACE] rejecting pin for task {} on station_idx {} at tick {}: cell already occupied by pre-placed action {} (task {}). Falling through to forward-pass placement.",
+                actions[i].task_id, station_idx, start_t, prev, prev_task_id
+            );
+            continue;
+        }
+        for t in start_t..end_t {
             grid.assign_station(station_idx, t, i);
         }
 
