@@ -21,6 +21,7 @@ import {
   type ResolvedEntity,
   type ApplyResultEntry,
 } from '../../store/api/consoleApi';
+import { useAutoRecomputeCtx } from '../../contexts/AutoRecomputeContext';
 import { PlanCard } from './PlanCard';
 import { MessageBubble } from './MessageBubble';
 
@@ -53,6 +54,7 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
 
   const [executeCommand, executeState] = useExecuteCommandMutation();
   const [applyPlan, applyState] = useApplyPlanMutation();
+  const { trigger: triggerAutoRecompute } = useAutoRecomputeCtx();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -182,6 +184,14 @@ export function ConsolePanel({ isOpen, onClose }: ConsolePanelProps) {
       ]);
       setPendingPlan(null);
       setConversation([]);
+      // The console-service bypasses the RTK mutation layer, so the
+      // autoRecomputeMiddleware allow-list would never fire on its own.
+      // Any successful action here may have changed scheduling constraints
+      // (operator absence, station exception, task deadline, …), so trigger
+      // the same debounced compute the admin pages use.
+      if (response.results.some((r) => r.ok)) {
+        triggerAutoRecompute('console apply');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Échec de l’application';
       setMessages((prev) => [...prev, { id: newId(), role: 'result', text: `❌ ${message}` }]);
