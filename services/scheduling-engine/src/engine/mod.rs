@@ -714,6 +714,7 @@ pub fn build_actions(
                     chain_remaining_art: 0, // computed below
                     is_pinned: task.is_pinned,
                     pinned_start_tick: task.pinned_start_tick,
+                    pinned_end_tick: task.pinned_end_tick,
                     peremption_count: 0,
                     pending_recalage: false,
                     current_recalage_start: None,
@@ -1364,7 +1365,9 @@ mod integration_tests {
                     run_minutes,
                     sequence_order: 0,
                     is_pinned: false,
-                    pinned_start_tick: None, predecessor_gap_minutes: 0,
+                    pinned_start_tick: None,
+                    pinned_end_tick: None,
+                    predecessor_gap_minutes: 0,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1687,6 +1690,7 @@ mod integration_tests {
                         sequence_order: 0,
                         is_pinned: true,
                         pinned_start_tick: Some(pinned_tick),
+                        pinned_end_tick: None,
                         predecessor_gap_minutes: 0,
                     },
                     TaskInput {
@@ -1696,7 +1700,9 @@ mod integration_tests {
                         run_minutes: 60,
                         sequence_order: 1,
                         is_pinned: false,
-                        pinned_start_tick: None, predecessor_gap_minutes: 0,
+                        pinned_start_tick: None,
+                    pinned_end_tick: None,
+                    predecessor_gap_minutes: 0,
                     },
                 ],
                 spec: None,
@@ -1890,6 +1896,7 @@ mod integration_tests {
                     sequence_order: 0,
                     is_pinned: false,
                     pinned_start_tick: None,
+                    pinned_end_tick: None,
                     predecessor_gap_minutes: 0,
                 }],
                 spec: None,
@@ -1951,8 +1958,8 @@ mod integration_tests {
                 id: format!("{id}-elem"),
                 name: None,
                 tasks: vec![
-                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, pinned_start_tick: None, predecessor_gap_minutes: 0 },
-                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, pinned_start_tick: None, predecessor_gap_minutes: 0 },
+                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, pinned_start_tick: None, pinned_end_tick: None, predecessor_gap_minutes: 0 },
+                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, pinned_start_tick: None, pinned_end_tick: None, predecessor_gap_minutes: 0 },
                 ],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2022,6 +2029,7 @@ mod integration_tests {
                     sequence_order: 0,
                     is_pinned: true,
                     pinned_start_tick: Some(pin_tick),
+                    pinned_end_tick: None,
                     predecessor_gap_minutes: 0,
                 }],
                 spec: None,
@@ -2063,5 +2071,105 @@ mod integration_tests {
                 a_start, a_end, b_start, b_end
             );
         }
+    }
+
+    /// Regression: when PHP supplies `pinned_end_tick`, the engine must
+    /// honour it instead of recomputing `pinned_start_tick + setup_ticks
+    /// + run_ticks`. This eliminates the drift that, by accumulating
+    /// across compute cycles, caused two pinned tiles to claim the same
+    /// (station, tick) cell on capacity-1 stations.
+    ///
+    /// Setup: two adjacent pinned tasks on the same station. Task B
+    /// starts at the shortened end of Task A — exactly where PHP would
+    /// place it after task A ran faster than its config (productivity >
+    /// 1.0). Without `pinned_end_tick`, the engine would extend A to
+    /// its config-derived end, overlap B, and trigger the conflict
+    /// rejection (so B would move). With `pinned_end_tick`, A is exactly
+    /// 30 minutes long and B starts immediately after, with no conflict
+    /// and no movement.
+    #[test]
+    fn pinned_end_tick_overrides_config_duration() {
+        let stations = vec![make_station("press", "Press", false)];
+        let alice = make_always_on_operator("alice", "Alice", &[("press", 1.0)], vec![]);
+
+        // tick_minutes = 60. Config duration would be 60 minutes (1 tick)
+        // each, but we tell the engine A actually ran in 30 min via
+        // pinned_end_tick = pinned_start_tick + 0 (same tick — degenerate
+        // for tick=60min, so we use a longer duration to make it meaningful).
+        //
+        // Concretely:
+        //   A: config 120 min (2 ticks), pinned [tick 5, tick 6) — 1 tick actual
+        //   B: config 120 min (2 ticks), pinned [tick 6, tick 7) — 1 tick actual
+        // Without the fix, A's engine view = [5, 7) overlaps B's [6, 8).
+        // With the fix, A's engine view = [5, 6) and B's = [6, 7). Disjoint.
+        let a_pinned_start: usize = 5;
+        let a_pinned_end: usize = 6;
+        let b_pinned_start: usize = 6;
+        let b_pinned_end: usize = 7;
+
+        let make_pinned_job = |id: &str, start: usize, end: usize| JobInput {
+            id: id.into(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                tasks: vec![TaskInput {
+                    id: format!("{id}-task"),
+                    station_id: "press".into(),
+                    setup_minutes: 0,
+                    run_minutes: 120, // config = 2 ticks, but pinned interval = 1 tick
+                    sequence_order: 0,
+                    is_pinned: true,
+                    pinned_start_tick: Some(start),
+                    pinned_end_tick: Some(end),
+                    predecessor_gap_minutes: 0,
+                }],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let request = ComputeRequest {
+            stations,
+            operators: vec![alice],
+            jobs: vec![
+                make_pinned_job("A", a_pinned_start, a_pinned_end),
+                make_pinned_job("B", b_pinned_start, b_pinned_end),
+            ],
+            options: options(),
+            station_groups: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+
+        let result = compute(&request);
+
+        let a = result.assignments.iter().find(|a| a.task_id == "A-task")
+            .expect("A must be placed at its pinned interval");
+        let b = result.assignments.iter().find(|a| a.task_id == "B-task")
+            .expect("B must be placed at its pinned interval (NOT pushed back by drift)");
+
+        let (a_start, a_end) = assignment_minutes(a);
+        let (b_start, b_end) = assignment_minutes(b);
+
+        // A's emitted interval matches the pinned_end_tick (1 tick = 60 min),
+        // not the config-derived 120 min.
+        assert_eq!(
+            a_end - a_start, 60,
+            "A's emitted duration must follow pinned_end_tick (1 tick = 60 min), not config (120 min)"
+        );
+        // B starts exactly where A ends — no drift, no rejection.
+        assert_eq!(
+            b_start, a_end,
+            "B must start immediately after A ends (no drift): A ends {}, B starts {}",
+            a_end, b_start
+        );
+        assert_eq!(
+            b_end - b_start, 60,
+            "B's emitted duration must also follow pinned_end_tick (1 tick)"
+        );
     }
 }

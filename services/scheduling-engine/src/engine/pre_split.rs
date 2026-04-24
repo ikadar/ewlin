@@ -146,6 +146,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 // these chunked actions are by definition non-pinned.
                 is_pinned: false,
                 pinned_start_tick: None,
+                pinned_end_tick: None,
                 peremption_count: 0,
                 pending_recalage: false,
                 current_recalage_start: None,
@@ -228,6 +229,7 @@ mod tests {
             is_pinned: false,
             chain_remaining_art: setup_ticks + run_ticks,
             pinned_start_tick: None,
+            pinned_end_tick: None,
             peremption_count: 0,
             pending_recalage: false,
             current_recalage_start: None,
@@ -376,6 +378,7 @@ pub fn clone_action(a: &Action) -> Action {
         chain_remaining_art: a.chain_remaining_art,
         is_pinned: a.is_pinned,
         pinned_start_tick: a.pinned_start_tick,
+        pinned_end_tick: a.pinned_end_tick,
         peremption_count: a.peremption_count,
         pending_recalage: a.pending_recalage,
         current_recalage_start: a.current_recalage_start,

@@ -269,6 +269,7 @@ mod tests {
             sequence_order: seq,
             is_pinned: false,
             pinned_start_tick: None,
+            pinned_end_tick: None,
             predecessor_gap_minutes: 0,
         }
     }
@@ -486,6 +487,7 @@ mod tests {
                 sequence_order: seq,
                 is_pinned: false,
                 pinned_start_tick: None,
+                pinned_end_tick: None,
                 predecessor_gap_minutes: 0,
             }
         }
@@ -499,6 +501,7 @@ mod tests {
                 sequence_order: seq,
                 is_pinned: false,
                 pinned_start_tick: None,
+                pinned_end_tick: None,
                 predecessor_gap_minutes: 0,
             }
         }

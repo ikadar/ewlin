@@ -264,6 +264,13 @@ pub struct Action {
     /// if `is_pinned`). Used by `pre_place_pinned_actions` to set
     /// start_tick / end_tick before the main loop runs.
     pub pinned_start_tick: Option<usize>,
+    /// The tick at which the pinned action must end (exclusive; only
+    /// meaningful if `is_pinned`). When provided by PHP, takes priority
+    /// over the config-derived `pinned_start_tick + setup_ticks +
+    /// run_ticks`. Pre-placement uses this to honour the actual extent
+    /// of the existing DB assignment, preventing drift accumulation that
+    /// otherwise produces pin-pin overlaps after several compute cycles.
+    pub pinned_end_tick: Option<usize>,
     /// Number of times this action's setup has expired due to post-setup
     /// peremption (extended idle after setup completion). Each occurrence
     /// re-adds setup_ticks of work to art. Capped to prevent runaway loops.
@@ -1822,7 +1829,19 @@ fn pre_place_pinned_actions(
             }
         };
         let total_ticks = (actions[i].setup_ticks + actions[i].run_ticks) as usize;
-        if total_ticks == 0 {
+        // Honour PHP's explicit pinned_end_tick (derived from
+        // assignment.scheduledEnd) when provided. This eliminates the
+        // drift that arises from recomputing end as `start + config
+        // duration` while the DB stores `start + actual duration`
+        // (productivity ≠ 1.0). Drift was the upstream cause of pin-pin
+        // overlaps on capacity-1 stations after several Ctrl+Alt+P
+        // cycles via the safety-zone Option A pathway. Fallback to the
+        // config derivation when end is missing or malformed (≤ start).
+        let end_t = match actions[i].pinned_end_tick {
+            Some(et) if et > start_t => et,
+            _ => start_t + total_ticks,
+        };
+        if end_t == start_t {
             // Zero-duration pinned task — degenerate, skip but emit empty assignment
             actions[i].start_tick = Some(start_t);
             actions[i].end_tick = Some(start_t);
@@ -1830,7 +1849,7 @@ fn pre_place_pinned_actions(
             actions[i].eat = 0;
             continue;
         }
-        let end_t = start_t + total_ticks;
+        let actual_ticks = end_t - start_t;
 
         // Make sure the grid covers the pinned interval. Grow in chunks
         // until end_t fits, mirroring the dynamic-grow strategy used in
@@ -1949,10 +1968,13 @@ fn pre_place_pinned_actions(
         }
 
         // Mark the action as already-completed for the main loop.
+        // `eat` is the actual occupied tick count, which equals the
+        // pinned interval length when PHP supplied `pinned_end_tick`,
+        // and falls back to the config-derived total otherwise.
         actions[i].start_tick = Some(start_t);
         actions[i].end_tick = Some(end_t);
         actions[i].art = 0;
-        actions[i].eat = total_ticks as u32;
+        actions[i].eat = actual_ticks as u32;
 
         // Emit the ComputedAssignment. If `find_operators_for_station`
         // produced a roster above, `build_assignment_for` will include
@@ -2436,6 +2458,7 @@ mod peremption_tests {
             is_pinned: false,
             chain_remaining_art: setup_ticks + run_ticks,
             pinned_start_tick: None,
+            pinned_end_tick: None,
             peremption_count: 0,
             pending_recalage: false,
             current_recalage_start: None,

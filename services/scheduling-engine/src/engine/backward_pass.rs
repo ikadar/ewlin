@@ -906,6 +906,7 @@ mod tests {
                         sequence_order: 0,
                         is_pinned: false,
                         pinned_start_tick: None,
+                        pinned_end_tick: None,
                         predecessor_gap_minutes: 0,
                     },
                     TaskInput {
@@ -916,6 +917,7 @@ mod tests {
                         sequence_order: 1,
                         is_pinned: true,
                         pinned_start_tick: Some(pinned_tick),
+                        pinned_end_tick: None,
                         predecessor_gap_minutes: 0,
                     },
                     TaskInput {
@@ -926,6 +928,7 @@ mod tests {
                         sequence_order: 2,
                         is_pinned: false,
                         pinned_start_tick: None,
+                        pinned_end_tick: None,
                         predecessor_gap_minutes: 0,
                     },
                 ],

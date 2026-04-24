@@ -59,6 +59,19 @@ pub struct TaskInput {
     /// engine uses.
     #[serde(default)]
     pub pinned_start_tick: Option<usize>,
+    /// Tick at which the pinned interval ends (exclusive; only meaningful
+    /// if `is_pinned`). PHP computes this from the existing assignment's
+    /// scheduledEnd using the same epoch + tick_minutes as
+    /// `pinned_start_tick`. When present, the engine uses this value
+    /// instead of recomputing `pinned_start_tick + setup_ticks +
+    /// run_ticks` — eliminating drift between the engine's config-based
+    /// view and the DB's actual-productivity-based extent. Without it,
+    /// drift accumulates across compute cycles and produces pin-pin
+    /// overlaps on capacity-1 stations (Komori G40, Ryobi 528) via the
+    /// safety-zone Option A pathway. Falls back to config-derived end
+    /// when `None` (legacy clients, missing scheduledEnd).
+    #[serde(default)]
+    pub pinned_end_tick: Option<usize>,
     /// Extra gap (in minutes) to add after the predecessor before this task
     /// can start. Used for outsourced tasks: PHP skips the outsourced task
     /// but encodes its estimated duration as a gap on the next internal task.
