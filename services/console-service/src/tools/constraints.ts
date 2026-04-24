@@ -13,7 +13,7 @@
  */
 import { z } from 'zod';
 import type { ToolDefinition } from './types.js';
-import { isIsoDate, toIsoWithLocalOffset } from './dates.js';
+import { combineDateAndTime, isIsoDate } from './dates.js';
 import { uuidField } from './ids.js';
 
 interface AbsenceLike {
@@ -50,7 +50,7 @@ function stationExceptionKey(stationId: string, exception: AbsenceLike): string 
 export const addOperatorAbsenceTool: ToolDefinition = {
   name: 'add_operator_absence',
   description:
-    "Marque un opérateur comme absent sur un intervalle de dates (jours inclus). Utiliser resolve_operator d'abord pour obtenir l'ID. Voie canonique: Operator.absences.",
+    "Marque un opérateur comme absent sur une période. Pour une journée entière, passer fromDate = toDate et laisser startTime/endTime vides. Pour une plage horaire (ex: rendez-vous médical 14h-16h), passer fromDate = toDate avec startTime et endTime. Utiliser resolve_operator d'abord pour obtenir l'ID. Voie canonique: Operator.absences.",
   inputSchema: z.object({
     operatorId: uuidField('resolve_operator').describe(
       "UUID de l'opérateur, OBTENU EN APPELANT resolve_operator(name=...) D'ABORD.",
@@ -61,6 +61,14 @@ export const addOperatorAbsenceTool: ToolDefinition = {
       .describe("Nom lisible de l'opérateur, ex 'Frédéric Dupont'."),
     fromDate: z.string().describe("Premier jour d'absence inclus, YYYY-MM-DD."),
     toDate: z.string().describe("Dernier jour d'absence inclus, YYYY-MM-DD."),
+    startTime: z
+      .string()
+      .optional()
+      .describe("Heure HH:MM à laquelle commence l'absence le premier jour. Défaut: 00:00."),
+    endTime: z
+      .string()
+      .optional()
+      .describe("Heure HH:MM à laquelle finit l'absence le dernier jour. Défaut: 23:59."),
     reason: z.string().optional().describe('Motif optionnel.'),
   }),
   handler: async (input, ctx) => {
@@ -70,13 +78,23 @@ export const addOperatorAbsenceTool: ToolDefinition = {
     if (input.toDate < input.fromDate) {
       return { ok: false, error: 'toDate must be >= fromDate' };
     }
-    const startAt = toIsoWithLocalOffset(input.fromDate, '00:00');
-    const endAt = toIsoWithLocalOffset(input.toDate, '23:59');
+    const startTime = input.startTime ?? '00:00';
+    const endTime = input.endTime ?? '23:59';
+    const startAt = combineDateAndTime(input.fromDate, startTime);
+    const endAt = combineDateAndTime(input.toDate, endTime);
     const reasonText = input.reason ?? null;
 
     const newAbsence: AbsenceLike = { startAt, endAt, reason: reasonText };
 
-    const preview = `${input.operatorLabel} absent du ${input.fromDate} au ${input.toDate}${
+    const hasExplicitTime = input.startTime !== undefined || input.endTime !== undefined;
+    const rangeLabel = hasExplicitTime
+      ? input.fromDate === input.toDate
+        ? `le ${input.fromDate} ${startTime}–${endTime}`
+        : `du ${input.fromDate} ${startTime} au ${input.toDate} ${endTime}`
+      : input.fromDate === input.toDate
+      ? `le ${input.fromDate}`
+      : `du ${input.fromDate} au ${input.toDate}`;
+    const preview = `${input.operatorLabel} absent ${rangeLabel}${
       reasonText ? ` (${reasonText})` : ''
     }`;
 
@@ -143,8 +161,8 @@ export const addStationMaintenanceTool: ToolDefinition = {
     }
     const startTime = input.startTime ?? '00:00';
     const endTime = input.endTime ?? '23:59';
-    const startAt = toIsoWithLocalOffset(input.fromDate, startTime);
-    const endAt = toIsoWithLocalOffset(input.toDate, endTime);
+    const startAt = combineDateAndTime(input.fromDate, startTime);
+    const endAt = combineDateAndTime(input.toDate, endTime);
     const reasonText = input.reason ?? null;
 
     const exception: AbsenceLike = { startAt, endAt, reason: reasonText };
