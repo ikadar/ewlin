@@ -1,5 +1,5 @@
 import { getActiveScheduleForDate } from '@flux/types';
-import type { DaySchedule, Operator, TaskAssignment } from '@flux/types';
+import type { Absence, DaySchedule, Operator, TaskAssignment } from '@flux/types';
 
 const DAY_NAMES = [
   'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
@@ -19,18 +19,83 @@ export interface TileSlice {
   relayLabelBottom?: string;
 }
 
-/** Get the day schedule for an operator on a given date (rotating schedule only — absences are handled separately). */
+/**
+ * Get the effective day schedule for an operator on a given date: the rotating
+ * weekly schedule narrowed by any absence whose `[startAt, endAt]` overlaps the
+ * day. A day fully covered by absences returns `{isOperating: false, slots: []}`,
+ * which makes every downstream consumer (hachures overlay, tile sawtooth, collapse
+ * computation, timeline lens) honor the absence uniformly.
+ */
 export function getOperatorDaySchedule(operator: Operator, date: Date): DaySchedule {
   const activeSchedule = getActiveScheduleForDate(
     operator.operatingSchedules,
     operator.scheduleRotationReferenceWeek,
     date,
   );
-  if (!activeSchedule) {
-    return { isOperating: true, slots: [{ start: '00:00', end: '24:00' }] };
+  const base: DaySchedule = activeSchedule
+    ? activeSchedule[DAY_NAMES[date.getDay()]] ?? { isOperating: false, slots: [] }
+    : { isOperating: true, slots: [{ start: '00:00', end: '24:00' }] };
+
+  return narrowByAbsences(base, operator.absences, date);
+}
+
+function narrowByAbsences(
+  base: DaySchedule,
+  absences: Absence[] | null | undefined,
+  date: Date,
+): DaySchedule {
+  if (!absences?.length) return base;
+
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const dayStart = `${dateStr}T00:00:00`;
+  const dayEnd = `${dateStr}T23:59:59`;
+
+  const unavailable: Array<[number, number]> = [];
+  for (const ab of absences) {
+    if (ab.startAt > dayEnd || ab.endAt < dayStart) continue;
+    const startMin = ab.startAt < dayStart
+      ? 0
+      : parseInt(ab.startAt.slice(11, 13), 10) * 60 + parseInt(ab.startAt.slice(14, 16), 10);
+    const endMin = ab.endAt > dayEnd
+      ? 24 * 60
+      : parseInt(ab.endAt.slice(11, 13), 10) * 60 + parseInt(ab.endAt.slice(14, 16), 10) + 1;
+    unavailable.push([startMin, endMin]);
   }
-  const dayName = DAY_NAMES[date.getDay()];
-  return activeSchedule[dayName] ?? { isOperating: false, slots: [] };
+  if (unavailable.length === 0) return base;
+
+  unavailable.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const range of unavailable) {
+    const last = merged[merged.length - 1];
+    if (!last || last[1] < range[0]) merged.push([...range]);
+    else last[1] = Math.max(last[1], range[1]);
+  }
+  if (merged.length === 1 && merged[0][0] <= 0 && merged[0][1] >= 24 * 60) {
+    return { isOperating: false, slots: [] };
+  }
+
+  if (!base.isOperating || !base.slots?.length) return base;
+
+  const toHm = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const narrowedSlots: { start: string; end: string }[] = [];
+  for (const slot of base.slots) {
+    const slotStart = parseInt(slot.start.slice(0, 2), 10) * 60 + parseInt(slot.start.slice(3, 5), 10);
+    const slotEnd = slot.end === '24:00'
+      ? 24 * 60
+      : parseInt(slot.end.slice(0, 2), 10) * 60 + parseInt(slot.end.slice(3, 5), 10);
+    let cursor = slotStart;
+    for (const [uStart, uEnd] of merged) {
+      if (uEnd <= cursor || uStart >= slotEnd) continue;
+      if (uStart > cursor) narrowedSlots.push({ start: toHm(cursor), end: toHm(Math.min(uStart, slotEnd)) });
+      cursor = Math.max(cursor, uEnd);
+      if (cursor >= slotEnd) break;
+    }
+    if (cursor < slotEnd) narrowedSlots.push({ start: toHm(cursor), end: toHm(slotEnd) });
+  }
+
+  if (narrowedSlots.length === 0) return { isOperating: false, slots: [] };
+  return { isOperating: true, slots: narrowedSlots };
 }
 
 /** Parse "HH:MM" to minutes since midnight. */
