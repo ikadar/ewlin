@@ -193,3 +193,154 @@ export const unpinTaskTool: ToolDefinition = {
     return { ok: true, preview, data: { taskId: input.taskId } };
   },
 };
+
+interface ExtendAndReplanResult {
+  taskId: string;
+  previousRunMinutes: number;
+  newRunMinutes: number;
+  impactedTaskIds: string[];
+  unassignedCount: number;
+  replacedCount: number;
+  lateJobs: Array<{ jobId: string; reference: string }>;
+}
+
+interface SnapshotAssignment {
+  id: string;
+  taskId: string;
+  targetId: string;
+  isOutsourced?: boolean;
+  scheduledStart: string;
+  scheduledEnd: string;
+  isCompleted?: boolean;
+  isPinned?: boolean;
+}
+interface SnapshotTask {
+  id: string;
+  elementId?: string;
+  stationId?: string;
+  type?: string;
+  duration?: { setupMinutes?: number; runMinutes?: number };
+}
+interface SnapshotElement { id: string; jobId?: string; name?: string | null }
+interface SnapshotJob { id: string; reference?: string | null; client?: string | null }
+interface SnapshotStation { id: string; name: string; abbreviation?: string | null }
+interface Snapshot {
+  assignments: SnapshotAssignment[];
+  tasks: SnapshotTask[];
+  elements: SnapshotElement[];
+  jobs: SnapshotJob[];
+  stations: SnapshotStation[];
+}
+
+export const listRunningTasksTool: ToolDefinition = {
+  name: 'list_running_tasks',
+  description:
+    "Liste les tâches actuellement en cours d'exécution à l'instant présent (scheduledStart ≤ maintenant < scheduledEnd, non terminées). Optionnellement filtré sur une station pour répondre à 'qu'est-ce qui tourne sur la MBO XL ?'. Indispensable avant extend_running_task quand l'opérateur parle d'une machine sans citer la tâche.",
+  readOnly: true,
+  inputSchema: z.object({
+    stationId: uuidField('resolve_station')
+      .optional()
+      .describe(
+        "UUID de la station à filtrer (via resolve_station). Si omis, retourne toutes les tâches en cours sur toutes les stations.",
+      ),
+  }),
+  handler: async (input, ctx) => {
+    const snap = await ctx.php.get<Snapshot>('/api/v1/schedule/snapshot');
+    const now = new Date();
+    const nowMs = now.getTime();
+
+    const tasksById = new Map(snap.tasks.map((t) => [t.id, t]));
+    const elementsById = new Map(snap.elements.map((e) => [e.id, e]));
+    const jobsById = new Map(snap.jobs.map((j) => [j.id, j]));
+    const stationsById = new Map(snap.stations.map((s) => [s.id, s]));
+
+    const running: Array<{
+      taskId: string;
+      taskLabel: string;
+      stationId: string;
+      stationName: string | null;
+      jobId: string | null;
+      jobReference: string | null;
+      scheduledStart: string;
+      scheduledEnd: string;
+      elapsedMinutes: number;
+      remainingMinutes: number;
+      isPinned: boolean;
+    }> = [];
+
+    for (const asn of snap.assignments) {
+      if (asn.isCompleted) continue;
+      if (input.stationId && asn.targetId !== input.stationId) continue;
+
+      const startMs = new Date(asn.scheduledStart).getTime();
+      const endMs = new Date(asn.scheduledEnd).getTime();
+      if (Number.isNaN(startMs) || Number.isNaN(endMs)) continue;
+      if (startMs > nowMs || endMs <= nowMs) continue;
+
+      const task = tasksById.get(asn.taskId);
+      const element = task?.elementId ? elementsById.get(task.elementId) : undefined;
+      const job = element?.jobId ? jobsById.get(element.jobId) : undefined;
+      const station = stationsById.get(asn.targetId);
+
+      running.push({
+        taskId: asn.taskId,
+        taskLabel: `${station?.name ?? 'Station inconnue'} du ${job?.reference ? `dossier ${job.reference}` : 'job inconnu'}`,
+        stationId: asn.targetId,
+        stationName: station?.name ?? null,
+        jobId: job?.id ?? null,
+        jobReference: job?.reference ?? null,
+        scheduledStart: asn.scheduledStart,
+        scheduledEnd: asn.scheduledEnd,
+        elapsedMinutes: Math.round((nowMs - startMs) / 60000),
+        remainingMinutes: Math.round((endMs - nowMs) / 60000),
+        isPinned: asn.isPinned ?? false,
+      });
+    }
+
+    running.sort((a, b) => (a.stationName ?? '').localeCompare(b.stationName ?? ''));
+
+    return {
+      ok: true,
+      data: {
+        now: now.toISOString(),
+        tasks: running,
+        count: running.length,
+      },
+    };
+  },
+};
+
+export const extendRunningTaskTool: ToolDefinition = {
+  name: 'extend_running_task',
+  description:
+    "Pour une tâche en cours d'exécution qui va durer plus longtemps que prévu (ex: l'opérateur appelle et dit 'ce ne sera pas fini à 11h30 mais à 14h'). Met à jour la durée totale puis re-planifie automatiquement toutes les tâches aval impactées (même station + chaîne de précédence), en protégeant les tâches déjà en cours, terminées ou épinglées. Utiliser `update_task_duration` à la place pour une tâche pas encore démarrée.",
+  inputSchema: z.object({
+    taskId: uuidField('resolve_task_in_job').describe("UUID de la tâche en cours."),
+    taskLabel: z
+      .string()
+      .min(1)
+      .describe("Nom lisible (ex 'MBO XL du dossier 35202')."),
+    newRunMinutes: z
+      .number()
+      .int()
+      .positive()
+      .describe(
+        "Nouvelle durée de run TOTALE en minutes (pas la durée restante). Ex : si la task de 90min a démarré à 10h et l'opérateur dit 'fini à 14h', passer 240 (=4h total de run).",
+      ),
+  }),
+  handler: async (input, ctx) => {
+    const preview = `Étendre ${input.taskLabel} à ${input.newRunMinutes}min (replanifie les tâches aval)`;
+    if (ctx.dryRun) {
+      return { ok: true, preview, data: { dryRun: true, ...input } };
+    }
+    const result = await ctx.php.post<ExtendAndReplanResult>(
+      `/api/v1/tasks/${input.taskId}/extend-and-replan`,
+      { runMinutes: input.newRunMinutes },
+    );
+    const lateSummary = result.lateJobs.length > 0
+      ? ` — ${result.lateJobs.length} job(s) en retard : ${result.lateJobs.map((j) => j.reference).join(', ')}`
+      : '';
+    const fullPreview = `${preview} • ${result.replacedCount}/${result.impactedTaskIds.length} tâche(s) replacée(s)${lateSummary}`;
+    return { ok: true, preview: fullPreview, data: result };
+  },
+};

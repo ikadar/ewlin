@@ -30,6 +30,8 @@ import {
   replaceTaskStationTool,
   pinTaskAtTimeTool,
   unpinTaskTool,
+  extendRunningTaskTool,
+  listRunningTasksTool,
 } from './tasks.js';
 import { proposePlanTool, askUserTool } from './system.js';
 
@@ -54,8 +56,10 @@ export const allTools: readonly ToolDefinition[] = [
   // Jobs
   updateJobDeadlineTool,
   // Tasks
+  listRunningTasksTool,
   addOperatorOvertimeTool,
   updateTaskDurationTool,
+  extendRunningTaskTool,
   replaceTaskStationTool,
   pinTaskAtTimeTool,
   unpinTaskTool,
