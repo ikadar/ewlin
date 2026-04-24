@@ -159,7 +159,7 @@ async function currentIsPinned(
 export const pinTaskAtTimeTool: ToolDefinition = {
   name: 'pin_task_at_time',
   description:
-    "Force une tâche à démarrer à un instant précis sur une station précise. Combine assign + pin : la tâche est replanifiée puis épinglée pour qu'aucune opération automatique ne la déplace. Exemple : 'le job 12345 doit passer à 15h le 15 avril sur la G40'. Idempotent : si la tâche est déjà épinglée, ne dé-épingle pas par erreur.",
+    "Force une tâche à démarrer à un instant précis sur une station précise. Combine assign + pin : la tâche est replanifiée (éventuellement déplacée vers une autre station) puis épinglée pour qu'aucune opération automatique ne la bouge. Exemples : 'le job 12345 doit passer à 15h le 15 avril sur la G40' (la tâche peut être sur une autre presse aujourd'hui, le tool la déplace), 're-pin la tâche MBO XL du job 3 à mardi 14h'. Idempotent : si la tâche est déjà épinglée, ne dé-épingle pas par erreur. Pour un déplacement, bien résoudre la station cible via resolve_station AVANT, et la tâche via resolve_task_in_job(jobId) SANS stationName (car stationName filtre sur l'affectation actuelle, pas sur la cible).",
   inputSchema: z.object({
     taskId: uuidField('resolve_task_in_job'),
     taskLabel: z.string().min(1),

@@ -199,7 +199,7 @@ export const resolveJobTool: ToolDefinition = {
 export const resolveTaskInJobTool: ToolDefinition = {
   name: 'resolve_task_in_job',
   description:
-    "Trouve la (ou les) tâche(s) d'un job qui correspondent à une station donnée. Utile pour les ordres comme 'la tâche MBO XL du job 12345' ou 'remplace la tâche MBO XL'. Si stationName est omis, retourne TOUTES les tâches du job.",
+    "Trouve la (ou les) tâche(s) d'un job, filtrées sur la station **ACTUELLEMENT affectée** à la tâche. Utile quand l'utilisateur désigne une tâche par sa machine actuelle ('la tâche MBO XL du job 12345'). Si stationName est omis, retourne toutes les tâches du job. ATTENTION : pour un ordre de DÉPLACEMENT vers une autre machine ('le job 12345 doit passer sur la G40') où la tâche n'est PAS encore sur la station cible, ne pas passer stationName — appeler ce tool avec jobId seul et utiliser ask_user si plusieurs candidates.",
   readOnly: true,
   inputSchema: z.object({
     jobId: z.string().min(1).describe("L'UUID du job (obtenu via resolve_job)."),
@@ -207,7 +207,7 @@ export const resolveTaskInJobTool: ToolDefinition = {
       .string()
       .optional()
       .describe(
-        "Filtre optionnel : ne retourne que les tâches dont la station correspond à ce nom (insensible à la casse et aux accents).",
+        "Filtre optionnel sur la station ACTUELLEMENT affectée à la tâche (pas la station cible d'un futur déplacement). Insensible à la casse et aux accents.",
       ),
   }),
   handler: async (input, ctx) => {
