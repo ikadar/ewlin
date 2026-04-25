@@ -33,6 +33,9 @@ export interface TimelineLensProps {
   tileContent: ReactNode;
   /** Hatched unavailability bands for the active column, absolute ms. */
   unavailabilitySegments?: Array<{ startMs: number; endMs: number }>;
+  /** Yellow-hatched overtime bands for the active column, absolute ms. Tiles
+   *  render on top normally — these only mark "exceptional" availability. */
+  overtimeSegments?: Array<{ startMs: number; endMs: number }>;
   /** Absolute ms used as the Y=0 reference for tile positions inside the lens. */
   gridStartMs: number;
   /** Absolute ms of the farthest point the lens may need to show. */
@@ -66,6 +69,7 @@ function formatHHMM(ms: number): string {
  */
 export function TimelineLens({
   visible, activeColumnId, anchor, tileContent, unavailabilitySegments = [],
+  overtimeSegments = [],
   gridStartMs, gridEndMs, centerTimeMs,
   onMouseEnter, onMouseLeave,
 }: TimelineLensProps) {
@@ -311,6 +315,32 @@ export function TimelineLens({
           }}
         >
           {gridElements}
+          {/* Overtime hachures (yellow) — rendered BEFORE unavailability and
+              tiles so the natural DOM stacking puts: overtime → unavailability
+              (defensive — should never overlap) → tiles on top. The intended
+              user-facing reading is "yellow hachures = exceptional slot,
+              tiles sit on top normally". */}
+          {overtimeSegments.map((seg, idx) => {
+            const top = ((seg.startMs - gridStartMs) / 3_600_000) * lpx;
+            const height = Math.max(
+              1,
+              ((seg.endMs - seg.startMs) / 3_600_000) * lpx,
+            );
+            return (
+              <div
+                key={`ot-${idx}-${seg.startMs}`}
+                className="bg-stripes-amber"
+                style={{
+                  position: 'absolute',
+                  left: `${LENS_LEFT_GUTTER}px`,
+                  right: 0,
+                  top: `${top}px`,
+                  height: `${height}px`,
+                  pointerEvents: 'none',
+                }}
+              />
+            );
+          })}
           {unavailabilitySegments.map((seg, idx) => {
             const top = ((seg.startMs - gridStartMs) / 3_600_000) * lpx;
             const height = Math.max(

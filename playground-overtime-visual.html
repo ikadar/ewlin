@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Playground — Heures supplémentaires (traitement visuel)</title>
+<style>
+  :root {
+    --zinc-950: #09090b;
+    --zinc-900: #18181b;
+    --zinc-800: #27272a;
+    --zinc-700: #3f3f46;
+    --zinc-600: #52525b;
+    --zinc-500: #71717a;
+    --zinc-400: #a1a1aa;
+    --zinc-300: #d4d4d8;
+    --zinc-200: #e4e4e7;
+
+    --bg-base: var(--zinc-950);
+    --bg-surface: var(--zinc-900);
+    --bg-elevated: var(--zinc-800);
+    --border-subtle: var(--zinc-800);
+    --border-dim: rgba(63, 63, 70, 0.5);
+    --text-primary: var(--zinc-200);
+    --text-muted: var(--zinc-400);
+    --text-dim: var(--zinc-600);
+
+    --tile-bg: rgba(96, 165, 250, 0.22);
+    --tile-border: rgba(96, 165, 250, 0.55);
+
+    /* Existing absence visual — match apps/web bg-stripes-dark */
+    --absence-stripes: repeating-linear-gradient(
+      45deg,
+      rgba(120, 113, 108, 0.32) 0 4px,
+      transparent 4px 9px
+    );
+    --absence-overlay-bg: rgba(24, 24, 27, 0.55);
+
+    /* Overtime visual (validated): yellow 45° stripes — same angle as absences,
+       but bright/positive colour. Tiles render ON TOP normally. */
+    --ot-stripes: repeating-linear-gradient(
+      45deg,
+      rgba(250, 204, 21, 0.34) 0 4px,
+      transparent 4px 9px
+    );
+    --ot-overlay-bg: rgba(250, 204, 21, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: -apple-system, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  .page {
+    padding: 28px 32px 64px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+  }
+  .lead {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 0 0 28px 0;
+    max-width: 820px;
+  }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 28px 0 6px 0;
+    letter-spacing: 0.01em;
+  }
+  h2 .hint {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 10px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 22px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 22px;
+  }
+  .legend .swatch {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    vertical-align: middle;
+    border: 1px solid var(--border-dim);
+    border-radius: 2px;
+  }
+
+  .variants {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 10px;
+  }
+  .variant {
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    overflow: hidden;
+  }
+  .variant header {
+    padding: 10px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-dim);
+    background: var(--bg-elevated);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .variant header .badge {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border: 1px solid var(--border-dim);
+    border-radius: 3px;
+  }
+
+  /* ── Operator column mockup ──────────────────────────────────── */
+  .ops-row {
+    display: flex;
+    gap: 10px;
+    padding: 14px;
+  }
+  .op-col {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    background: var(--bg-base);
+    position: relative;
+  }
+  .op-col .op-name {
+    padding: 6px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border-dim);
+    background: var(--bg-surface);
+  }
+  .track {
+    position: relative;
+    height: 360px;
+    overflow: hidden;
+  }
+  .track .hour-labels {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-rows: repeat(16, 1fr); /* 06:00 → 22:00 */
+    pointer-events: none;
+  }
+  .track .hour-labels .hour {
+    border-top: 1px dashed var(--border-dim-2);
+    position: relative;
+    color: var(--text-dim);
+    font-size: 9px;
+    padding-left: 4px;
+  }
+  .track .hour-labels .hour:first-child { border-top: 0; }
+  .track .hour-labels .hour::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 1px;
+    left: 3px;
+  }
+
+  /* Unavailable overlay — identical to apps/web */
+  .unavail {
+    position: absolute;
+    left: 0; right: 0;
+    background: var(--absence-overlay-bg);
+    background-image: var(--absence-stripes);
+    pointer-events: none;
+  }
+
+  /* ── Overtime overlay (validated): yellow 45° stripes ─────────── */
+  .ot {
+    position: absolute;
+    left: 0; right: 0;
+    pointer-events: none;
+    background: var(--ot-overlay-bg);
+    background-image: var(--ot-stripes);
+    /* No border — relies on the same hatching motion as absences,
+       distinguished only by colour and the fact tiles cover it. */
+  }
+
+  /* ── Task tiles ───────────────────────────────────────────────── */
+  .tile {
+    position: absolute;
+    left: 4px; right: 4px;
+    background: var(--tile-bg);
+    border: 1px solid var(--tile-border);
+    border-radius: 3px;
+    padding: 4px 6px;
+    font-size: 10px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Sawtooth for crossing a hard boundary (absence). */
+  .tile.sawtooth-bottom {
+    clip-path: polygon(
+      0 0, 100% 0, 100% 100%,
+      95% 94%, 90% 100%, 85% 94%, 80% 100%, 75% 94%, 70% 100%,
+      65% 94%, 60% 100%, 55% 94%, 50% 100%, 45% 94%, 40% 100%,
+      35% 94%, 30% 100%, 25% 94%, 20% 100%, 15% 94%, 10% 100%,
+      5% 94%, 0 100%
+    );
+  }
+
+  /* ── Form-error preview ──────────────────────────────────────── */
+  .form-preview {
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    padding: 18px 20px;
+    max-width: 720px;
+  }
+  .form-section {
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+  .form-section:last-child { border-bottom: 0; }
+  .form-section h3 {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 14px 0 10px 0;
+  }
+  .form-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 11px;
+  }
+  .form-row .dt {
+    padding: 5px 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+  }
+  .error-text {
+    color: #f87171;
+    font-size: 11px;
+    margin-top: 6px;
+    padding-left: 42px;
+  }
+  .form-row.has-error .dt {
+    border-color: rgba(248, 113, 113, 0.6);
+  }
+
+  .save-btn {
+    margin-top: 14px;
+    padding: 6px 14px;
+    background: var(--zinc-700);
+    color: var(--text-muted);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /* ── Scenario caption ─────────────────────────────────────────── */
+  .cases {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    padding: 0 14px 14px;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .cases span {
+    flex: 1;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Heures supplémentaires — traitement visuel (validé)</h1>
+<p class="lead">
+  Le créneau d'heures supplémentaires est rendu par des hachures diagonales <strong>jaunes</strong>,
+  mêmes 45° que les hachures sombres des absences. Différence sémantique : les tuiles passent <em>par-dessus</em>
+  l'overtime (créneau de disponibilité exceptionnel mais normal pour le placement), alors qu'aucune tuile ne traverse
+  une absence. Quatre scénarios représentatifs :
+  (1) journée standard sans modificateur, (2) journée avec overtime 17–19h après la fermeture, (3) samedi normalement off avec overtime 10–16h,
+  (4) overtime adjacent à une absence (disjoints).
+</p>
+
+<div class="legend">
+  <div><span class="swatch" style="background: var(--tile-bg); border-color: var(--tile-border);"></span> Tâche planifiée</div>
+  <div><span class="swatch" style="background-image: var(--absence-stripes); background-color: var(--absence-overlay-bg);"></span> Absence (hachures sombres — pas de tuile)</div>
+  <div><span class="swatch" style="background-image: var(--ot-stripes); background-color: var(--ot-overlay-bg);"></span> Heure sup (hachures jaunes — tuiles par-dessus)</div>
+</div>
+
+<h2>Rendu retenu</h2>
+
+<div class="variants" style="grid-template-columns: 1fr;">
+
+  <!-- ── Variante retenue : hachures jaunes 45°, tuiles par-dessus ── -->
+  <div class="variant">
+    <header>Hachures jaunes 45° (tuiles par-dessus comme dispo normale) <span class="badge">retenu</span></header>
+    <div class="ops-row">
+
+      <div class="op-col">
+        <div class="op-name">Normal</div>
+        <div class="track">
+          <div class="hour-labels">
+            <div class="hour" data-label="06"></div><div class="hour" data-label="07"></div>
+            <div class="hour" data-label="08"></div><div class="hour" data-label="09"></div>
+            <div class="hour" data-label="10"></div><div class="hour" data-label="11"></div>
+            <div class="hour" data-label="12"></div><div class="hour" data-label="13"></div>
+            <div class="hour" data-label="14"></div><div class="hour" data-label="15"></div>
+            <div class="hour" data-label="16"></div><div class="hour" data-label="17"></div>
+            <div class="hour" data-label="18"></div><div class="hour" data-label="19"></div>
+            <div class="hour" data-label="20"></div><div class="hour" data-label="21"></div>
+          </div>
+          <!-- Unavailable before 8h and after 17h -->
+          <div class="unavail" style="top: 0; height: 12.5%;"></div>
+          <div class="unavail" style="top: 68.75%; height: 31.25%;"></div>
+          <!-- Tile 9-12 -->
+          <div class="tile" style="top: 18.75%; height: 18.75%;">Tâche #1</div>
+        </div>
+      </div>
+
+      <div class="op-col">
+        <div class="op-name">+OT soir</div>
+        <div class="track">
+          <div class="hour-labels">
+            <div class="hour" data-label="06"></div><div class="hour" data-label="07"></div>
+            <div class="hour" data-label="08"></div><div class="hour" data-label="09"></div>
+            <div class="hour" data-label="10"></div><div class="hour" data-label="11"></div>
+            <div class="hour" data-label="12"></div><div class="hour" data-label="13"></div>
+            <div class="hour" data-label="14"></div><div class="hour" data-label="15"></div>
+            <div class="hour" data-label="16"></div><div class="hour" data-label="17"></div>
+            <div class="hour" data-label="18"></div><div class="hour" data-label="19"></div>
+            <div class="hour" data-label="20"></div><div class="hour" data-label="21"></div>
+          </div>
+          <!-- Unavailable before 8h -->
+          <div class="unavail" style="top: 0; height: 12.5%;"></div>
+          <!-- Unavailable 19h+ (après overtime) -->
+          <div class="unavail" style="top: 81.25%; height: 18.75%;"></div>
+          <!-- Overtime 17-19 -->
+          <div class="ot" style="top: 68.75%; height: 12.5%;"></div>
+          <!-- Tile 15-18 (crosses 17h boundary — continuous because overtime extends) -->
+          <div class="tile" style="top: 56.25%; height: 18.75%;">Tâche #2</div>
+        </div>
+      </div>
+
+      <div class="op-col">
+        <div class="op-name">Samedi OT</div>
+        <div class="track">
+          <div class="hour-labels">
+            <div class="hour" data-label="06"></div><div class="hour" data-label="07"></div>
+            <div class="hour" data-label="08"></div><div class="hour" data-label="09"></div>
+            <div class="hour" data-label="10"></div><div class="hour" data-label="11"></div>
+            <div class="hour" data-label="12"></div><div class="hour" data-label="13"></div>
+            <div class="hour" data-label="14"></div><div class="hour" data-label="15"></div>
+            <div class="hour" data-label="16"></div><div class="hour" data-label="17"></div>
+            <div class="hour" data-label="18"></div><div class="hour" data-label="19"></div>
+            <div class="hour" data-label="20"></div><div class="hour" data-label="21"></div>
+          </div>
+          <!-- All day unavailable (Saturday base) -->
+          <div class="unavail" style="top: 0; height: 25%;"></div>
+          <div class="unavail" style="top: 62.5%; height: 37.5%;"></div>
+          <!-- Overtime 10-16 -->
+          <div class="ot" style="top: 25%; height: 37.5%;"></div>
+          <!-- Tile 11-15 -->
+          <div class="tile" style="top: 31.25%; height: 25%;">Tâche WE</div>
+        </div>
+      </div>
+
+      <div class="op-col">
+        <div class="op-name">OT+Abs</div>
+        <div class="track">
+          <div class="hour-labels">
+            <div class="hour" data-label="06"></div><div class="hour" data-label="07"></div>
+            <div class="hour" data-label="08"></div><div class="hour" data-label="09"></div>
+            <div class="hour" data-label="10"></div><div class="hour" data-label="11"></div>
+            <div class="hour" data-label="12"></div><div class="hour" data-label="13"></div>
+            <div class="hour" data-label="14"></div><div class="hour" data-label="15"></div>
+            <div class="hour" data-label="16"></div><div class="hour" data-label="17"></div>
+            <div class="hour" data-label="18"></div><div class="hour" data-label="19"></div>
+            <div class="hour" data-label="20"></div><div class="hour" data-label="21"></div>
+          </div>
+          <!-- Morning unavailable (before 8h) -->
+          <div class="unavail" style="top: 0; height: 12.5%;"></div>
+          <!-- Absence 14-17 -->
+          <div class="unavail" style="top: 50%; height: 18.75%;"></div>
+          <!-- Overtime 17-19 -->
+          <div class="ot" style="top: 68.75%; height: 12.5%;"></div>
+          <!-- End-of-day unavailable (after 19h) -->
+          <div class="unavail" style="top: 81.25%; height: 18.75%;"></div>
+          <!-- Tile 9-13 before absence -->
+          <div class="tile" style="top: 18.75%; height: 25%;">Matin</div>
+          <!-- Tile 17-19 in overtime -->
+          <div class="tile" style="top: 68.75%; height: 12.5%;">OT&nbsp;soir</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="cases"><span>Normal</span><span>+OT soir</span><span>Samedi OT</span><span>OT + Absence</span></div>
+  </div>
+
+</div>
+
+<h2>Sawtooth — tâche traversant une frontière absence/heure-sup <span class="hint">(cas critique)</span></h2>
+<p class="lead" style="margin-bottom: 16px;">
+  Rappel fonctionnel&nbsp;: le sawtooth marque le bas d'une tuile qui traverse une frontière d'absence pour signaler la discontinuité.
+  Une tuile traversant une frontière d'heure sup <em>ne porte pas</em> de sawtooth — la disponibilité reste continue, l'overtime fusionne avec le créneau de base.
+</p>
+<div class="variants" style="grid-template-columns: repeat(3, 1fr);">
+  <div class="variant">
+    <header>Frontière absence</header>
+    <div class="ops-row">
+      <div class="op-col" style="flex: 1;">
+        <div class="op-name">Tuile traverse 14h absence</div>
+        <div class="track">
+          <div class="unavail" style="top: 0; height: 12.5%;"></div>
+          <!-- Absence 14-17 -->
+          <div class="unavail" style="top: 50%; height: 18.75%;"></div>
+          <div class="unavail" style="top: 68.75%; height: 31.25%;"></div>
+          <!-- Tile 12-14 with sawtooth -->
+          <div class="tile sawtooth-bottom" style="top: 37.5%; height: 12.5%;">Tâche matin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="variant">
+    <header>Frontière heure sup (pas de sawtooth)</header>
+    <div class="ops-row">
+      <div class="op-col" style="flex: 1;">
+        <div class="op-name">Tuile traverse 17h overtime</div>
+        <div class="track">
+          <div class="unavail" style="top: 0; height: 12.5%;"></div>
+          <div class="unavail" style="top: 81.25%; height: 18.75%;"></div>
+          <!-- Overtime 17-19 -->
+          <div class="ot" style="top: 68.75%; height: 12.5%;"></div>
+          <!-- Tile 15-18 continuous — no sawtooth -->
+          <div class="tile" style="top: 56.25%; height: 18.75%;">Tâche soir</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="variant">
+    <header>Frontière abs + overtime adjacents</header>
+    <div class="ops-row">
+      <div class="op-col" style="flex: 1;">
+        <div class="op-name">Abs 14-17 / OT 17-19 (disjoints)</div>
+        <div class="track">
+          <div class="unavail" style="top: 0; height: 12.5%;"></div>
+          <!-- Absence 14-17 -->
+          <div class="unavail" style="top: 50%; height: 18.75%;"></div>
+          <!-- Overtime 17-19 -->
+          <div class="ot" style="top: 68.75%; height: 12.5%;"></div>
+          <div class="unavail" style="top: 81.25%; height: 18.75%;"></div>
+          <!-- Tile 12-14 with sawtooth (ends at absence) -->
+          <div class="tile sawtooth-bottom" style="top: 37.5%; height: 12.5%;">Avant absence</div>
+          <!-- Tile 17-19 in overtime — no sawtooth -->
+          <div class="tile" style="top: 68.75%; height: 12.5%;">Dans OT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>État d'erreur — chevauchement refusé au formulaire</h2>
+<div class="form-preview">
+  <div class="form-section">
+    <h3>Absences</h3>
+    <div class="form-row">
+      <span style="width: 28px; color: var(--text-muted); font-size: 11px;">Du</span>
+      <span class="dt">2026-04-20 14:00</span>
+      <span style="width: 28px; text-align: center; color: var(--text-muted); font-size: 11px;">au</span>
+      <span class="dt">2026-04-20 17:00</span>
+      <span style="color: var(--text-muted);">×</span>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Heures supplémentaires</h3>
+    <div class="form-row has-error">
+      <span style="width: 28px; color: var(--text-muted); font-size: 11px;">Du</span>
+      <span class="dt">2026-04-20 15:00</span>
+      <span style="width: 28px; text-align: center; color: var(--text-muted); font-size: 11px;">au</span>
+      <span class="dt">2026-04-20 17:00</span>
+      <span style="color: var(--text-muted);">×</span>
+    </div>
+    <p class="error-text">
+      Chevauche l'absence du 2026-04-20 14:00 au 2026-04-20 17:00 — modifiez l'absence ou ajustez les horaires.
+    </p>
+    <button class="save-btn" disabled>Enregistrer (bloqué)</button>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

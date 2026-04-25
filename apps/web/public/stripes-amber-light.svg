@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" shape-rendering="crispEdges">
+  <!-- Operator overtime overlay, light mode.
+       Same plus-sign geometry as the dark-mode variant (13×13 tile, single
+       centred cross, 1px square-cap stroke). Cyan-700 at ~0.50 opacity instead
+       of bright cyan-300 at 0.25 — the colour pivots dark + density rises so
+       the marker stays visible on a light background. -->
+  <line x1="3.25" y1="6.5" x2="9.75" y2="6.5" stroke="rgba(14,116,144,0.50)" stroke-width="1" stroke-linecap="square"/>
+  <line x1="6.5" y1="3.25" x2="6.5" y2="9.75" stroke="rgba(14,116,144,0.50)" stroke-width="1" stroke-linecap="square"/>
+</svg>

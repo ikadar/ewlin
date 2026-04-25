@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" shape-rendering="crispEdges">
+  <!-- Operator overtime overlay, dark mode.
+       Small cyan plus-sign cross centered in a 13×13 tile (one cross per tile,
+       repeats horizontally and vertically). Stroke 1px square-cap, opacity 0.25
+       — reads as a discreet positive marker that doesn't compete with tile
+       colours (cyan is unused by any tile state in colorUtils.ts). -->
+  <line x1="3.25" y1="6.5" x2="9.75" y2="6.5" stroke="rgba(0,253,255,0.25)" stroke-width="1" stroke-linecap="square"/>
+  <line x1="6.5" y1="3.25" x2="6.5" y2="9.75" stroke="rgba(0,253,255,0.25)" stroke-width="1" stroke-linecap="square"/>
+</svg>

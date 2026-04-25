@@ -40,6 +40,18 @@ export interface AbsencePayload {
   reason: string | null;
 }
 
+/**
+ * A datetime-range overtime slot (heures supplémentaires).
+ * Same shape as `AbsencePayload`, opposite semantic: additive availability.
+ * Must be disjoint from any absence of the same operator — the backend
+ * rejects overlapping payloads with HTTP 400.
+ */
+export interface OvertimePayload {
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+}
+
 export interface OperatorResponse {
   id: string;
   firstName: string;
@@ -49,6 +61,7 @@ export interface OperatorResponse {
   scheduleRotationReferenceWeek: number | null;
   scheduleNames: string[] | null;
   absences: AbsencePayload[] | null;
+  overtimes: OvertimePayload[] | null;
   skills: OperatorSkillResponse[];
   concurrentGroups: ConcurrentGroupResponse[];
   createdAt: string;
@@ -63,6 +76,7 @@ export interface OperatorInput {
   scheduleRotationReferenceWeek?: number | null;
   scheduleNames?: string[] | null;
   absences?: AbsencePayload[] | null;
+  overtimes?: OvertimePayload[] | null;
   skills?: OperatorSkillResponse[] | null;
 }
 

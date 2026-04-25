@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Overtime visual playground v2</title>
+<style>
+  :root {
+    --zinc-950: #09090b;
+    --zinc-900: #18181b;
+    --zinc-800: #27272a;
+    --zinc-700: #3f3f46;
+    --zinc-600: #52525b;
+    --zinc-500: #71717a;
+    --zinc-400: #a1a1aa;
+    --zinc-300: #d4d4d8;
+    --zinc-200: #e4e4e7;
+    --zinc-100: #f4f4f5;
+
+    --bg-base: var(--zinc-950);
+    --bg-surface: #111114;
+    --bg-elevated: var(--zinc-900);
+    --border-subtle: #1f1f23;
+    --border-dim: rgba(63, 63, 70, 0.55);
+    --border-bright: rgba(82, 82, 91, 0.8);
+    --text-primary: var(--zinc-200);
+    --text-muted: var(--zinc-400);
+    --text-dim: var(--zinc-600);
+
+    --tile-default-border: #3b82f6;
+    --tile-default-bg: rgba(59, 130, 246, 0.12);
+    --tile-default-text: #93c5fd;
+    --tile-late-border: #ef4444;
+    --tile-late-bg: rgba(239, 68, 68, 0.09);
+    --tile-late-text: #fca5a5;
+
+    --absence-tile-bg: rgba(255, 255, 255, 0.02);
+
+    --hour-px: 22;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: -apple-system, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; }
+
+  /* ── Layout shell ────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "header header"
+      "sidebar main";
+    min-height: 100vh;
+  }
+
+  header.app-header {
+    grid-area: header;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-base);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 18px;
+  }
+  header.app-header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+  header.app-header h1 .sub {
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 8px;
+  }
+  header.app-header .toolbar {
+    display: flex;
+    gap: 8px;
+  }
+  header.app-header .toolbar button {
+    padding: 5px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    color: var(--text-primary);
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  header.app-header .toolbar button:hover {
+    border-color: var(--border-bright);
+    background: var(--zinc-800);
+  }
+  header.app-header .toolbar button.primary {
+    background: #1d4ed8;
+    border-color: #2563eb;
+    color: white;
+  }
+  header.app-header .toolbar button.primary:hover {
+    background: #2563eb;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────────── */
+  aside.sidebar {
+    grid-area: sidebar;
+    width: 280px;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--bg-base);
+    padding: 14px 14px 80px;
+    overflow-y: auto;
+    max-height: calc(100vh - 56px);
+    position: sticky;
+    top: 56px;
+  }
+  .sidebar h2 {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 18px 0 8px 0;
+  }
+  .sidebar h2:first-of-type { margin-top: 0; }
+
+  .field {
+    margin-bottom: 10px;
+  }
+  .field-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .field-label .value {
+    color: var(--text-primary);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10px;
+  }
+
+  .field input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--zinc-800);
+    border-radius: 2px;
+    outline: none;
+  }
+  .field input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px; height: 12px;
+    background: var(--zinc-300);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+  }
+  .field input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px;
+    background: var(--zinc-300);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+  }
+
+  .field input[type="color"] {
+    width: 100%;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--border-dim);
+    border-radius: 3px;
+    background: var(--bg-elevated);
+    cursor: pointer;
+  }
+
+  .field select {
+    width: 100%;
+    padding: 5px 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    color: var(--text-primary);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+  }
+  .field select:focus {
+    border-color: var(--border-bright);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+  .toggle input[type="checkbox"] {
+    accent-color: #3b82f6;
+    cursor: pointer;
+  }
+
+  .group {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 12px;
+    margin-top: 12px;
+  }
+  .group:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+    margin-top: 0;
+  }
+
+  .disabled-block {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* ── Main panel ─────────────────────────────────────────────── */
+  main.main {
+    grid-area: main;
+    padding: 22px 26px 60px;
+    overflow-y: auto;
+    max-height: calc(100vh - 56px);
+  }
+
+  .lead {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 0 0 22px 0;
+    max-width: 760px;
+  }
+  .lead code {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    background: var(--bg-elevated);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--zinc-300);
+  }
+
+  /* ── Preview row (3 columns) ───────────────────────────────── */
+  .preview-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 18px 18px 14px;
+    margin-bottom: 24px;
+  }
+  .preview-section h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .preview-section h3 .badge {
+    font-size: 10px;
+    font-weight: 400;
+    padding: 1px 6px;
+    border: 1px solid var(--border-dim);
+    border-radius: 3px;
+    color: var(--text-muted);
+  }
+
+  .preview-row {
+    display: flex;
+    gap: 18px;
+    justify-content: flex-start;
+  }
+  .preview-col {
+    width: 150px;
+    display: flex;
+    flex-direction: column;
+  }
+  .preview-col .col-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .op-track-wrap {
+    display: flex;
+    gap: 6px;
+  }
+  .hour-axis {
+    width: 22px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .hour-axis .tick {
+    position: absolute;
+    right: 0;
+    transform: translateY(-50%);
+    font-size: 9px;
+    color: var(--text-dim);
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .op-col {
+    flex: 1;
+    background: var(--bg-base);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .op-col .grid-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 0;
+    border-top: 1px dashed rgba(63, 63, 70, 0.5);
+    pointer-events: none;
+  }
+  .op-col .ot-zone {
+    position: absolute;
+    left: 0; right: 0;
+    pointer-events: none;
+  }
+  .op-col .absence-zone {
+    position: absolute;
+    left: 0; right: 0;
+    background-color: rgba(24, 24, 27, 0.55);
+    pointer-events: none;
+  }
+  .op-col .tile {
+    position: absolute;
+    left: 4px; right: 4px;
+    background: var(--tile-default-bg);
+    border-left: 3px solid var(--tile-default-border);
+    border-radius: 2px;
+    padding: 4px 6px;
+    font-size: 11px;
+    color: var(--tile-default-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  .op-col .tile.late {
+    background: var(--tile-late-bg);
+    border-left-color: var(--tile-late-border);
+    color: var(--tile-late-text);
+  }
+  .preview-col .col-caption {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* ── Compare strip ──────────────────────────────────────────── */
+  .compare-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .compare-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 12px 12px;
+  }
+  .compare-card h4 {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 8px 0;
+  }
+  .compare-card .swatch-block {
+    height: 70px;
+    border-radius: 3px;
+    border: 1px solid var(--border-dim);
+    background-color: var(--bg-base);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Presets gallery ───────────────────────────────────────── */
+  .presets-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 16px 18px 18px;
+  }
+  .presets-section h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: var(--text-primary);
+  }
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    gap: 10px;
+  }
+  .preset {
+    cursor: pointer;
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    background: var(--bg-base);
+    padding: 4px;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .preset:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-1px);
+  }
+  .preset.active {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+  }
+  .preset .preset-thumb {
+    width: 100%;
+    height: 70px;
+    border-radius: 2px;
+    background-color: var(--bg-base);
+    position: relative;
+    overflow: hidden;
+  }
+  .preset .preset-label {
+    margin-top: 5px;
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.25;
+    padding: 0 2px 2px;
+  }
+
+  /* ── Toast ─────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 22px;
+    right: 22px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    color: var(--zinc-100);
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.18s, transform 0.18s;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Mini info text under sidebar field group ──────────────── */
+  .field-help {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+
+  /* ── CSS dump modal-ish (uses native textarea below) ──────── */
+  .css-dump {
+    margin-top: 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .css-dump-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .css-dump pre {
+    margin: 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--zinc-300);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <h1>Overtime visual playground v2 <span class="sub">— traitement visuel d'un créneau d'heures sup</span></h1>
+    <div class="toolbar">
+      <button id="btn-reset">Reset to default</button>
+      <button id="btn-copy" class="primary">Copier le CSS</button>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <h2>Pattern</h2>
+
+    <div class="group">
+      <div class="field">
+        <div class="field-label"><span>Type</span></div>
+        <select id="patternType">
+          <option value="hatching">Hachures (rayures 45°)</option>
+          <option value="dots">Points</option>
+          <option value="diamonds">Diamants</option>
+          <option value="crosshatch">Croisillons (45° + -45°)</option>
+          <option value="crosses-plus">Petites croix +</option>
+          <option value="crosses-x">Petites croix ×</option>
+          <option value="crosses-staggered">Petites croix + en quinconce</option>
+          <option value="dashes">Tirets</option>
+          <option value="wavy">Onde</option>
+          <option value="bands">Bandes solides</option>
+          <option value="chevrons">Chevrons</option>
+          <option value="gradient-vertical">Gradient vertical</option>
+          <option value="gradient-radial">Gradient radial</option>
+          <option value="halo">Glow / halo (pas de pattern)</option>
+          <option value="border-only">Bordure seule (sans pattern)</option>
+          <option value="ribbon">Bandeau accent (haut + bas)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>Couleur primaire</span></div>
+        <input type="color" id="primaryColor" value="#22c55e" />
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>Opacité</span><span class="value" id="patternOpacityValue">100%</span></div>
+        <input type="range" id="patternOpacity" min="0" max="100" step="1" value="100" />
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>Taille / espacement</span><span class="value" id="patternSizeValue">16px</span></div>
+        <input type="range" id="patternSize" min="4" max="48" step="1" value="16" />
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>Épaisseur</span><span class="value" id="strokeWidthValue">1px</span></div>
+        <input type="range" id="strokeWidth" min="0.5" max="8" step="0.5" value="1" />
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span>Angle</span><span class="value" id="angleValue">45°</span></div>
+        <input type="range" id="angle" min="-90" max="90" step="1" value="45" />
+      </div>
+    </div>
+
+    <h2>Fond du créneau</h2>
+    <div class="group">
+      <div class="field">
+        <div class="field-label"><span>Couleur de fond</span></div>
+        <input type="color" id="bgColor" value="#22c55e" />
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Opacité fond</span><span class="value" id="bgOpacityValue">0%</span></div>
+        <input type="range" id="bgOpacity" min="0" max="100" step="1" value="0" />
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Coin arrondi</span><span class="value" id="radiusValue">0px</span></div>
+        <input type="range" id="radius" min="0" max="8" step="1" value="0" />
+      </div>
+    </div>
+
+    <h2>Bordure</h2>
+    <div class="group">
+      <label class="toggle">
+        <input type="checkbox" id="borderEnabled" /> Activer la bordure
+      </label>
+      <div id="borderGroup" class="disabled-block">
+        <div class="field">
+          <div class="field-label"><span>Couleur</span></div>
+          <input type="color" id="borderColor" value="#22c55e" />
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Épaisseur</span><span class="value" id="borderWidthValue">1px</span></div>
+          <input type="range" id="borderWidth" min="0.5" max="6" step="0.5" value="1" />
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Position</span></div>
+          <select id="borderSide">
+            <option value="all">Toutes</option>
+            <option value="top">Haut</option>
+            <option value="bottom">Bas</option>
+            <option value="left">Gauche</option>
+            <option value="right">Droite</option>
+            <option value="top-bottom">Haut + bas</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <h2>Glow extérieur</h2>
+    <div class="group">
+      <label class="toggle">
+        <input type="checkbox" id="glowEnabled" /> Activer le glow
+      </label>
+      <div id="glowGroup" class="disabled-block">
+        <div class="field">
+          <div class="field-label"><span>Couleur</span></div>
+          <input type="color" id="glowColor" value="#22c55e" />
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Intensité</span><span class="value" id="glowValue">0px</span></div>
+          <input type="range" id="glowSpread" min="0" max="20" step="1" value="6" />
+        </div>
+      </div>
+    </div>
+
+    <h2>Inset shadow</h2>
+    <div class="group">
+      <label class="toggle">
+        <input type="checkbox" id="insetEnabled" /> Activer inset
+      </label>
+      <div id="insetGroup" class="disabled-block">
+        <div class="field">
+          <div class="field-label"><span>Couleur</span></div>
+          <input type="color" id="insetColor" value="#22c55e" />
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Intensité</span><span class="value" id="insetValue">0px</span></div>
+          <input type="range" id="insetSpread" min="0" max="14" step="1" value="4" />
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <p class="lead">
+      Itérations sur le traitement visuel d'un créneau d'<strong>heures supplémentaires</strong>.
+      Les 3 colonnes ci-dessous montrent le créneau (1) <em>seul</em>, (2) avec une <em>tuile normale</em> par-dessus,
+      (3) avec une <em>tuile late</em>. Les hachures d'absence (référence) restent visibles dans la zone <code>18h–21h</code>
+      pour vérifier que l'overtime se distingue clairement. Itère via les contrôles à gauche ou clique une vignette de preset.
+    </p>
+
+    <section class="preview-section">
+      <h3>Aperçu sur colonne d'opérateur <span class="badge">overtime 12h–18h • absence 18h–21h</span></h3>
+      <div class="preview-row" id="previewRow">
+        <div class="preview-col">
+          <div class="col-title">1. Créneau seul</div>
+          <div class="op-track-wrap">
+            <div class="hour-axis" data-axis></div>
+            <div class="op-col" data-col="empty"></div>
+          </div>
+          <div class="col-caption">Lecture pure du marqueur — aucune tuile.</div>
+        </div>
+
+        <div class="preview-col">
+          <div class="col-title">2. + tuile normale</div>
+          <div class="op-track-wrap">
+            <div class="hour-axis" data-axis></div>
+            <div class="op-col" data-col="normal"></div>
+          </div>
+          <div class="col-caption">Tuile par-dessus (état default, bleu).</div>
+        </div>
+
+        <div class="preview-col">
+          <div class="col-title">3. + tuile late</div>
+          <div class="op-track-wrap">
+            <div class="hour-axis" data-axis></div>
+            <div class="op-col" data-col="late"></div>
+          </div>
+          <div class="col-caption">Tuile par-dessus (état late, rouge).</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="compare-strip">
+        <div class="compare-card">
+          <h4>Overtime (variante courante)</h4>
+          <div class="swatch-block" id="swatchOT"></div>
+        </div>
+        <div class="compare-card">
+          <h4>Absence (référence — inchangée)</h4>
+          <div class="swatch-block" id="swatchAbs"></div>
+        </div>
+        <div class="compare-card">
+          <h4>Disponibilité standard</h4>
+          <div class="swatch-block" id="swatchAvail"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="presets-section">
+      <h3>Presets — cliquer pour charger</h3>
+      <div class="presets-grid" id="presetsGrid"></div>
+    </section>
+
+    <section class="css-dump">
+      <div class="css-dump-title">
+        <span>CSS de la variante courante</span>
+        <span class="value" id="copyHint" style="font-family:'SF Mono',Menlo,monospace;color:var(--text-dim);font-size:10px;">cliquer "Copier le CSS"</span>
+      </div>
+      <pre id="cssDump"></pre>
+    </section>
+  </main>
+
+</div>
+
+<div class="toast" id="toast">CSS copié dans le presse-papier</div>
+
+<!-- ── SVG defs holder (used to build patterns dynamically) ── -->
+<svg width="0" height="0" style="position:absolute;"><defs id="svgDefs"></defs></svg>
+
+<script>
+  // ── State ─────────────────────────────────────────────────────
+  const DEFAULTS = {
+    patternType: "hatching",
+    primaryColor: "#22c55e",
+    patternOpacity: 100,
+    patternSize: 16,
+    strokeWidth: 1,
+    angle: 45,
+    bgColor: "#22c55e",
+    bgOpacity: 0,
+    radius: 0,
+    borderEnabled: false,
+    borderColor: "#22c55e",
+    borderWidth: 1,
+    borderSide: "all",
+    glowEnabled: false,
+    glowColor: "#22c55e",
+    glowSpread: 6,
+    insetEnabled: false,
+    insetColor: "#22c55e",
+    insetSpread: 4,
+  };
+
+  let state = { ...DEFAULTS };
+
+  // ── Preset definitions ──────────────────────────────────────
+  // Each preset is a partial state override + label.
+  const PRESETS = [
+    {
+      id: "hatch-fine-green",
+      label: "Hachures fines vertes (actuel)",
+      state: {
+        patternType: "hatching",
+        primaryColor: "#4ade80",
+        patternOpacity: 100,
+        patternSize: 16,
+        strokeWidth: 1,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "hatch-thick-mat",
+      label: "Hachures épaisses mat",
+      state: {
+        patternType: "hatching",
+        primaryColor: "#16a34a",
+        patternOpacity: 60,
+        patternSize: 14,
+        strokeWidth: 4,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "solid-bands",
+      label: "Bandes solides alternées",
+      state: {
+        patternType: "bands",
+        primaryColor: "#22c55e",
+        patternOpacity: 22,
+        patternSize: 20,
+        strokeWidth: 1,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "dots-discreet",
+      label: "Points discrets",
+      state: {
+        patternType: "dots",
+        primaryColor: "#4ade80",
+        patternOpacity: 80,
+        patternSize: 10,
+        strokeWidth: 1.5,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "border-top",
+      label: "Bordure haute uniquement",
+      state: {
+        patternType: "border-only",
+        primaryColor: "#22c55e",
+        patternOpacity: 0,
+        bgColor: "#22c55e",
+        bgOpacity: 4,
+        borderEnabled: true,
+        borderColor: "#22c55e",
+        borderWidth: 2,
+        borderSide: "top-bottom",
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "halo-subtle",
+      label: "Glow subtil sur fond transparent",
+      state: {
+        patternType: "halo",
+        primaryColor: "#22c55e",
+        patternOpacity: 0,
+        bgOpacity: 0,
+        borderEnabled: true,
+        borderColor: "#22c55e",
+        borderWidth: 1,
+        borderSide: "all",
+        glowEnabled: true,
+        glowColor: "#22c55e",
+        glowSpread: 10,
+        insetEnabled: true,
+        insetColor: "#22c55e",
+        insetSpread: 8,
+        radius: 0,
+      },
+    },
+    {
+      id: "crosshatch",
+      label: "Croisillons fins",
+      state: {
+        patternType: "crosshatch",
+        primaryColor: "#22c55e",
+        patternOpacity: 70,
+        patternSize: 14,
+        strokeWidth: 0.8,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "crosses-plus-cyan",
+      label: "Petites croix +",
+      state: {
+        patternType: "crosses-plus",
+        primaryColor: "#00fdff",
+        patternOpacity: 25,
+        patternSize: 13,
+        strokeWidth: 1,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "crosses-x-discreet",
+      label: "Petites × discrètes",
+      state: {
+        patternType: "crosses-x",
+        primaryColor: "#86efac",
+        patternOpacity: 30,
+        patternSize: 11,
+        strokeWidth: 1,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "crosses-staggered-graphic",
+      label: "Croix + en quinconce",
+      state: {
+        patternType: "crosses-staggered",
+        primaryColor: "#22c55e",
+        patternOpacity: 45,
+        patternSize: 14,
+        strokeWidth: 1,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "chevrons",
+      label: "Chevrons",
+      state: {
+        patternType: "chevrons",
+        primaryColor: "#22c55e",
+        patternOpacity: 80,
+        patternSize: 16,
+        strokeWidth: 1.2,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "gradient-vertical",
+      label: "Gradient vertical pâle",
+      state: {
+        patternType: "gradient-vertical",
+        primaryColor: "#22c55e",
+        patternOpacity: 30,
+        patternSize: 16,
+        strokeWidth: 1,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "diamonds",
+      label: "Diamants serrés",
+      state: {
+        patternType: "diamonds",
+        primaryColor: "#22c55e",
+        patternOpacity: 75,
+        patternSize: 10,
+        strokeWidth: 1,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "ribbon-gold",
+      label: "Bandeau or haut+bas",
+      state: {
+        patternType: "ribbon",
+        primaryColor: "#facc15",
+        patternOpacity: 80,
+        patternSize: 5,
+        strokeWidth: 3,
+        angle: 0,
+        bgOpacity: 4,
+        bgColor: "#facc15",
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "dashes-amber",
+      label: "Tirets ambre",
+      state: {
+        patternType: "dashes",
+        primaryColor: "#f59e0b",
+        patternOpacity: 80,
+        patternSize: 14,
+        strokeWidth: 1.5,
+        angle: 45,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "wavy",
+      label: "Onde douce",
+      state: {
+        patternType: "wavy",
+        primaryColor: "#22c55e",
+        patternOpacity: 70,
+        patternSize: 18,
+        strokeWidth: 1.2,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+    {
+      id: "radial-glow-bg",
+      label: "Gradient radial",
+      state: {
+        patternType: "gradient-radial",
+        primaryColor: "#22c55e",
+        patternOpacity: 50,
+        patternSize: 16,
+        strokeWidth: 1,
+        angle: 0,
+        bgOpacity: 0,
+        borderEnabled: false,
+        glowEnabled: false,
+        insetEnabled: false,
+        radius: 0,
+      },
+    },
+  ];
+
+  // ── Helpers ────────────────────────────────────────────────
+  function hexToRgb(hex) {
+    const cleaned = hex.replace("#", "");
+    const v = cleaned.length === 3
+      ? cleaned.split("").map(c => c + c).join("")
+      : cleaned;
+    const num = parseInt(v, 16);
+    return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+  }
+  function rgba(hex, alpha) {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  // Build absence pattern (reference, never changes)
+  function buildAbsencePattern() {
+    const svg = `
+      <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'>
+        <line x1='0' y1='16' x2='16' y2='0' stroke='rgba(255,255,255,0.17)' stroke-width='5'/>
+        <line x1='-8' y1='8' x2='8' y2='-8' stroke='rgba(255,255,255,0.17)' stroke-width='5'/>
+        <line x1='8' y1='24' x2='24' y2='8' stroke='rgba(255,255,255,0.17)' stroke-width='5'/>
+      </svg>`;
+    return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+  }
+  const ABSENCE_PATTERN_URL = buildAbsencePattern();
+
+  // ── Pattern builder (returns CSS background-image string) ──
+  function buildPattern(s) {
+    const opacity = s.patternOpacity / 100;
+    const color = s.primaryColor;
+    const colorWithAlpha = rgba(color, opacity);
+    const size = s.patternSize;
+    const sw = s.strokeWidth;
+    const angle = s.angle;
+
+    switch (s.patternType) {
+      case "hatching": {
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
+            <g transform='rotate(${angle - 45} ${size / 2} ${size / 2})'>
+              <line x1='0' y1='${size}' x2='${size}' y2='0' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+              <line x1='${-size / 2}' y1='${size / 2}' x2='${size / 2}' y2='${-size / 2}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+              <line x1='${size / 2}' y1='${size * 1.5}' x2='${size * 1.5}' y2='${size / 2}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+            </g>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "dots": {
+        const r = Math.max(0.5, sw);
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
+            <circle cx='${size / 2}' cy='${size / 2}' r='${r}' fill='${colorWithAlpha}'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "diamonds": {
+        const half = size / 2;
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
+            <polygon points='${half},${sw} ${size - sw},${half} ${half},${size - sw} ${sw},${half}'
+                     fill='none' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "crosshatch": {
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
+            <line x1='0' y1='${size}' x2='${size}' y2='0' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+            <line x1='${-size / 2}' y1='${size / 2}' x2='${size / 2}' y2='${-size / 2}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+            <line x1='${size / 2}' y1='${size * 1.5}' x2='${size * 1.5}' y2='${size / 2}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+            <line x1='0' y1='0' x2='${size}' y2='${size}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+            <line x1='${-size / 2}' y1='${size / 2}' x2='${size / 2}' y2='${size * 1.5}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+            <line x1='${size / 2}' y1='${-size / 2}' x2='${size * 1.5}' y2='${size / 2}' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "crosses-plus": {
+        // Plus-shaped crosses on a regular grid.
+        // Cross arm length is derived as ~50% of cell size for clean visual rhythm.
+        const cx = size / 2;
+        const cy = size / 2;
+        const armLen = size * 0.5;
+        const half = armLen / 2;
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' shape-rendering='crispEdges'>
+            <line x1='${cx - half}' y1='${cy}' x2='${cx + half}' y2='${cy}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+            <line x1='${cx}' y1='${cy - half}' x2='${cx}' y2='${cy + half}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "crosses-x": {
+        // X-shaped crosses on a regular grid (two diagonals at +/-45°).
+        const cx = size / 2;
+        const cy = size / 2;
+        const armLen = size * 0.5;
+        const halfDiag = (armLen / 2) / Math.SQRT2;
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
+            <line x1='${cx - halfDiag}' y1='${cy - halfDiag}' x2='${cx + halfDiag}' y2='${cy + halfDiag}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='round'/>
+            <line x1='${cx - halfDiag}' y1='${cy + halfDiag}' x2='${cx + halfDiag}' y2='${cy - halfDiag}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='round'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "crosses-staggered": {
+        // Plus-shaped crosses staggered like brickwork.
+        // The pattern tile is one full cell wide, two cells tall; the second row is offset by half a cell.
+        const w = size;
+        const h = size * 2;
+        const cx1 = size / 2;            // row 1: aligned
+        const cx2 = 0;                   // row 2: offset by half — drawn at x=0 and x=size for tiling continuity
+        const cy1 = size / 2;
+        const cy2 = size + size / 2;
+        const armLen = size * 0.5;
+        const half = armLen / 2;
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' shape-rendering='crispEdges'>
+            <line x1='${cx1 - half}' y1='${cy1}' x2='${cx1 + half}' y2='${cy1}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+            <line x1='${cx1}' y1='${cy1 - half}' x2='${cx1}' y2='${cy1 + half}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+            <line x1='${cx2 - half}' y1='${cy2}' x2='${cx2 + half}' y2='${cy2}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+            <line x1='${cx2}' y1='${cy2 - half}' x2='${cx2}' y2='${cy2 + half}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+            <line x1='${size - half}' y1='${cy2}' x2='${size + half}' y2='${cy2}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+            <line x1='${size}' y1='${cy2 - half}' x2='${size}' y2='${cy2 + half}' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='square'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "dashes": {
+        const dashLen = size * 0.5;
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
+            <g transform='rotate(${angle} ${size / 2} ${size / 2})'>
+              <line x1='${size / 2 - dashLen / 2}' y1='${size / 2}' x2='${size / 2 + dashLen / 2}' y2='${size / 2}'
+                    stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linecap='round'/>
+            </g>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "wavy": {
+        const w = size;
+        const h = Math.max(4, sw * 4);
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h * 2}'>
+            <path d='M0 ${h} Q${w / 4} 0 ${w / 2} ${h} T${w} ${h}'
+                  fill='none' stroke='${colorWithAlpha}' stroke-width='${sw}'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "bands": {
+        // Horizontal solid bands alternating opaque/transparent
+        return `repeating-linear-gradient(
+          ${angle}deg,
+          ${colorWithAlpha} 0 ${size / 2}px,
+          transparent ${size / 2}px ${size}px
+        )`;
+      }
+      case "chevrons": {
+        const h = size;
+        const svg = `
+          <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${h}'>
+            <polyline points='0,${h * 0.7} ${size / 2},${h * 0.3} ${size},${h * 0.7}'
+                      fill='none' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linejoin='round' stroke-linecap='round'/>
+            <polyline points='0,${h * 1.3} ${size / 2},${h * 0.95} ${size},${h * 1.3}'
+                      fill='none' stroke='${colorWithAlpha}' stroke-width='${sw}' stroke-linejoin='round' stroke-linecap='round'/>
+          </svg>`;
+        return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+      }
+      case "gradient-vertical": {
+        return `linear-gradient(180deg, ${rgba(color, opacity)} 0%, transparent 100%)`;
+      }
+      case "gradient-radial": {
+        return `radial-gradient(ellipse at center, ${rgba(color, opacity)} 0%, transparent 75%)`;
+      }
+      case "halo":
+      case "border-only":
+        return "none";
+      case "ribbon": {
+        // Top + bottom accent strips, transparent middle
+        const stripPx = Math.max(2, sw);
+        return `linear-gradient(180deg,
+          ${colorWithAlpha} 0 ${stripPx}px,
+          transparent ${stripPx}px calc(100% - ${stripPx}px),
+          ${colorWithAlpha} calc(100% - ${stripPx}px) 100%)`;
+      }
+    }
+    return "none";
+  }
+
+  // ── Apply state to a slot's "ot zone" element ──────────────
+  function styleOTZone(el, s) {
+    el.style.backgroundImage = buildPattern(s);
+    el.style.backgroundColor = s.bgOpacity > 0 ? rgba(s.bgColor, s.bgOpacity / 100) : "transparent";
+    el.style.borderRadius = `${s.radius}px`;
+
+    // Border
+    el.style.border = "0";
+    el.style.borderTop = "0";
+    el.style.borderBottom = "0";
+    el.style.borderLeft = "0";
+    el.style.borderRight = "0";
+    if (s.borderEnabled) {
+      const bcss = `${s.borderWidth}px solid ${s.borderColor}`;
+      switch (s.borderSide) {
+        case "all": el.style.border = bcss; break;
+        case "top": el.style.borderTop = bcss; break;
+        case "bottom": el.style.borderBottom = bcss; break;
+        case "left": el.style.borderLeft = bcss; break;
+        case "right": el.style.borderRight = bcss; break;
+        case "top-bottom":
+          el.style.borderTop = bcss;
+          el.style.borderBottom = bcss;
+          break;
+      }
+    }
+
+    // Box shadow (glow + inset)
+    const shadows = [];
+    if (s.glowEnabled) {
+      shadows.push(`0 0 ${s.glowSpread}px ${rgba(s.glowColor, 0.55)}`);
+    }
+    if (s.insetEnabled) {
+      shadows.push(`inset 0 0 ${s.insetSpread}px ${rgba(s.insetColor, 0.7)}`);
+    }
+    el.style.boxShadow = shadows.length ? shadows.join(", ") : "none";
+  }
+
+  // ── Build column structure (axis + grid lines + zones + tiles) ──
+  function buildColumns() {
+    const axes = document.querySelectorAll("[data-axis]");
+    const trackHeightHours = 16; // 06h - 22h
+    const hourPx = 22;
+    const totalH = trackHeightHours * hourPx;
+
+    // Axis ticks (every hour)
+    axes.forEach((ax) => {
+      ax.style.height = `${totalH}px`;
+      ax.innerHTML = "";
+      for (let h = 6; h <= 21; h++) {
+        const tick = document.createElement("div");
+        tick.className = "tick";
+        tick.style.top = `${(h - 6) * hourPx}px`;
+        tick.textContent = h.toString().padStart(2, "0");
+        ax.appendChild(tick);
+      }
+    });
+
+    // For each preview column, build its content
+    document.querySelectorAll(".op-col").forEach((col) => {
+      col.style.height = `${totalH}px`;
+      col.innerHTML = "";
+
+      // Hour grid lines
+      for (let h = 1; h < trackHeightHours; h++) {
+        const line = document.createElement("div");
+        line.className = "grid-line";
+        line.style.top = `${h * hourPx}px`;
+        col.appendChild(line);
+      }
+
+      // Overtime zone: 12h - 18h (rows 6 to 12)
+      const otTop = (12 - 6) * hourPx;
+      const otHeight = (18 - 12) * hourPx;
+      const otZone = document.createElement("div");
+      otZone.className = "ot-zone";
+      otZone.style.top = `${otTop}px`;
+      otZone.style.height = `${otHeight}px`;
+      col.appendChild(otZone);
+
+      // Absence zone: 18h - 21h (reference, unchanged)
+      const absTop = (18 - 6) * hourPx;
+      const absHeight = (21 - 18) * hourPx;
+      const absZone = document.createElement("div");
+      absZone.className = "absence-zone";
+      absZone.style.top = `${absTop}px`;
+      absZone.style.height = `${absHeight}px`;
+      absZone.style.backgroundImage = ABSENCE_PATTERN_URL;
+      col.appendChild(absZone);
+
+      // Tile for "normal" / "late" columns
+      const colKind = col.getAttribute("data-col");
+      if (colKind === "normal" || colKind === "late") {
+        const tileTop = (12.5 - 6) * hourPx; // 12h30
+        const tileHeight = (17 - 12.5) * hourPx;
+        const tile = document.createElement("div");
+        tile.className = "tile" + (colKind === "late" ? " late" : "");
+        tile.style.top = `${tileTop}px`;
+        tile.style.height = `${tileHeight}px`;
+        tile.textContent = colKind === "late" ? "Tâche #2 (late)" : "Tâche #1";
+        col.appendChild(tile);
+      }
+    });
+  }
+
+  // ── Render: apply current state to all OT zones + swatches ──
+  function render() {
+    // Style each ot-zone
+    document.querySelectorAll(".ot-zone").forEach((z) => styleOTZone(z, state));
+
+    // Compare swatches (top of section)
+    const swOT = document.getElementById("swatchOT");
+    swOT.innerHTML = "";
+    const overlay = document.createElement("div");
+    overlay.style.position = "absolute";
+    overlay.style.inset = "0";
+    styleOTZone(overlay, state);
+    swOT.appendChild(overlay);
+
+    const swAbs = document.getElementById("swatchAbs");
+    swAbs.innerHTML = "";
+    const absInner = document.createElement("div");
+    absInner.style.position = "absolute";
+    absInner.style.inset = "0";
+    absInner.style.backgroundImage = ABSENCE_PATTERN_URL;
+    absInner.style.backgroundColor = "rgba(24, 24, 27, 0.55)";
+    swAbs.appendChild(absInner);
+
+    // The "available" swatch is just the column bg
+    const swAv = document.getElementById("swatchAvail");
+    swAv.innerHTML = "";
+
+    // Update CSS dump
+    document.getElementById("cssDump").textContent = generateCSS();
+
+    // Highlight active preset (if any matches current state)
+    document.querySelectorAll(".preset").forEach((p) => p.classList.remove("active"));
+    const matching = PRESETS.find((preset) => statesEqualForPreset(state, preset.state));
+    if (matching) {
+      const el = document.querySelector(`[data-preset="${matching.id}"]`);
+      if (el) el.classList.add("active");
+    }
+  }
+
+  function statesEqualForPreset(current, presetPartial) {
+    return Object.keys(presetPartial).every((k) => current[k] === presetPartial[k]);
+  }
+
+  // ── Generate CSS snippet of current state ──────────────────
+  function generateCSS() {
+    const bgImage = buildPattern(state);
+    const bgColor = state.bgOpacity > 0 ? rgba(state.bgColor, state.bgOpacity / 100) : "transparent";
+    const lines = [
+      `.overtime-zone {`,
+      `  background-image: ${bgImage};`,
+      `  background-color: ${bgColor};`,
+      `  border-radius: ${state.radius}px;`,
+    ];
+    if (state.borderEnabled) {
+      const b = `${state.borderWidth}px solid ${state.borderColor}`;
+      switch (state.borderSide) {
+        case "all": lines.push(`  border: ${b};`); break;
+        case "top": lines.push(`  border-top: ${b};`); break;
+        case "bottom": lines.push(`  border-bottom: ${b};`); break;
+        case "left": lines.push(`  border-left: ${b};`); break;
+        case "right": lines.push(`  border-right: ${b};`); break;
+        case "top-bottom":
+          lines.push(`  border-top: ${b};`);
+          lines.push(`  border-bottom: ${b};`);
+          break;
+      }
+    }
+    const shadows = [];
+    if (state.glowEnabled) shadows.push(`0 0 ${state.glowSpread}px ${rgba(state.glowColor, 0.55)}`);
+    if (state.insetEnabled) shadows.push(`inset 0 0 ${state.insetSpread}px ${rgba(state.insetColor, 0.7)}`);
+    if (shadows.length) lines.push(`  box-shadow: ${shadows.join(", ")};`);
+    lines.push(`}`);
+    return lines.join("\n");
+  }
+
+  // ── Build presets gallery ─────────────────────────────────
+  function buildPresetsGrid() {
+    const grid = document.getElementById("presetsGrid");
+    grid.innerHTML = "";
+    PRESETS.forEach((preset) => {
+      const wrap = document.createElement("div");
+      wrap.className = "preset";
+      wrap.setAttribute("data-preset", preset.id);
+      wrap.title = preset.label;
+
+      const thumb = document.createElement("div");
+      thumb.className = "preset-thumb";
+
+      const inner = document.createElement("div");
+      inner.style.position = "absolute";
+      inner.style.inset = "0";
+
+      // Thumbnail uses the preset's own state (filled in with defaults)
+      const thumbState = { ...DEFAULTS, ...preset.state };
+      styleOTZone(inner, thumbState);
+      thumb.appendChild(inner);
+
+      const label = document.createElement("div");
+      label.className = "preset-label";
+      label.textContent = preset.label;
+
+      wrap.appendChild(thumb);
+      wrap.appendChild(label);
+
+      wrap.addEventListener("click", () => {
+        loadPreset(preset);
+      });
+
+      grid.appendChild(wrap);
+    });
+  }
+
+  function loadPreset(preset) {
+    state = { ...DEFAULTS, ...preset.state };
+    applyStateToControls();
+    render();
+  }
+
+  // ── Sync controls to state ────────────────────────────────
+  function applyStateToControls() {
+    document.getElementById("patternType").value = state.patternType;
+    document.getElementById("primaryColor").value = state.primaryColor;
+    document.getElementById("patternOpacity").value = state.patternOpacity;
+    document.getElementById("patternOpacityValue").textContent = `${state.patternOpacity}%`;
+    document.getElementById("patternSize").value = state.patternSize;
+    document.getElementById("patternSizeValue").textContent = `${state.patternSize}px`;
+    document.getElementById("strokeWidth").value = state.strokeWidth;
+    document.getElementById("strokeWidthValue").textContent = `${state.strokeWidth}px`;
+    document.getElementById("angle").value = state.angle;
+    document.getElementById("angleValue").textContent = `${state.angle}°`;
+
+    document.getElementById("bgColor").value = state.bgColor;
+    document.getElementById("bgOpacity").value = state.bgOpacity;
+    document.getElementById("bgOpacityValue").textContent = `${state.bgOpacity}%`;
+    document.getElementById("radius").value = state.radius;
+    document.getElementById("radiusValue").textContent = `${state.radius}px`;
+
+    document.getElementById("borderEnabled").checked = state.borderEnabled;
+    document.getElementById("borderColor").value = state.borderColor;
+    document.getElementById("borderWidth").value = state.borderWidth;
+    document.getElementById("borderWidthValue").textContent = `${state.borderWidth}px`;
+    document.getElementById("borderSide").value = state.borderSide;
+    document.getElementById("borderGroup").classList.toggle("disabled-block", !state.borderEnabled);
+
+    document.getElementById("glowEnabled").checked = state.glowEnabled;
+    document.getElementById("glowColor").value = state.glowColor;
+    document.getElementById("glowSpread").value = state.glowSpread;
+    document.getElementById("glowValue").textContent = `${state.glowSpread}px`;
+    document.getElementById("glowGroup").classList.toggle("disabled-block", !state.glowEnabled);
+
+    document.getElementById("insetEnabled").checked = state.insetEnabled;
+    document.getElementById("insetColor").value = state.insetColor;
+    document.getElementById("insetSpread").value = state.insetSpread;
+    document.getElementById("insetValue").textContent = `${state.insetSpread}px`;
+    document.getElementById("insetGroup").classList.toggle("disabled-block", !state.insetEnabled);
+  }
+
+  // ── Wire up controls ───────────────────────────────────────
+  function bind() {
+    function bindRange(id, key, fmt, valueId) {
+      const el = document.getElementById(id);
+      const labelId = valueId || `${id}Value`;
+      el.addEventListener("input", () => {
+        state[key] = parseFloat(el.value);
+        document.getElementById(labelId).textContent = fmt(state[key]);
+        render();
+      });
+    }
+    function bindColor(id, key) {
+      const el = document.getElementById(id);
+      el.addEventListener("input", () => {
+        state[key] = el.value;
+        render();
+      });
+    }
+    function bindSelect(id, key) {
+      const el = document.getElementById(id);
+      el.addEventListener("change", () => {
+        state[key] = el.value;
+        render();
+      });
+    }
+    function bindToggle(id, key, dependentGroupId) {
+      const el = document.getElementById(id);
+      el.addEventListener("change", () => {
+        state[key] = el.checked;
+        if (dependentGroupId) {
+          document.getElementById(dependentGroupId).classList.toggle("disabled-block", !el.checked);
+        }
+        render();
+      });
+    }
+
+    bindSelect("patternType", "patternType");
+    bindColor("primaryColor", "primaryColor");
+    bindRange("patternOpacity", "patternOpacity", v => `${v}%`);
+    bindRange("patternSize", "patternSize", v => `${v}px`);
+    bindRange("strokeWidth", "strokeWidth", v => `${v}px`);
+    bindRange("angle", "angle", v => `${v}°`);
+
+    bindColor("bgColor", "bgColor");
+    bindRange("bgOpacity", "bgOpacity", v => `${v}%`);
+    bindRange("radius", "radius", v => `${v}px`);
+
+    bindToggle("borderEnabled", "borderEnabled", "borderGroup");
+    bindColor("borderColor", "borderColor");
+    bindRange("borderWidth", "borderWidth", v => `${v}px`);
+    bindSelect("borderSide", "borderSide");
+
+    bindToggle("glowEnabled", "glowEnabled", "glowGroup");
+    bindColor("glowColor", "glowColor");
+    bindRange("glowSpread", "glowSpread", v => `${v}px`, "glowValue");
+
+    bindToggle("insetEnabled", "insetEnabled", "insetGroup");
+    bindColor("insetColor", "insetColor");
+    bindRange("insetSpread", "insetSpread", v => `${v}px`, "insetValue");
+
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      state = { ...DEFAULTS };
+      applyStateToControls();
+      render();
+      showToast("Reset to default");
+    });
+
+    document.getElementById("btn-copy").addEventListener("click", () => {
+      const css = generateCSS();
+      navigator.clipboard.writeText(css).then(() => {
+        showToast("CSS copié");
+      }).catch(() => {
+        showToast("Impossible de copier — voir CSS sous l'aperçu");
+      });
+    });
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 1400);
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  buildColumns();
+  buildPresetsGrid();
+  applyStateToControls();
+  bind();
+  // Start with the "current" baseline = preset 0
+  loadPreset(PRESETS[0]);
+</script>
+</body>
+</html>

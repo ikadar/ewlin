@@ -331,6 +331,14 @@ body {
   background-repeat: repeat;
 }
 
+/* Striped pattern for operator overtime overlay — same 45° angle as
+   .bg-stripes-dark, but yellow. Tiles render on top normally (overtime
+   is a regular availability slot, the hachures just mark "exceptional"). */
+.bg-stripes-amber {
+  background-image: url('/stripes-amber.svg');
+  background-repeat: repeat;
+}
+
 
 /* ── Tile visual separation (borders, shadow, alternating shade, gradient) ── */
 
@@ -486,6 +494,12 @@ html.light .st-done     { color: #16a34a; }
 /* Light mode stripes overlay — dark purple hatching */
 html.light .bg-stripes-dark {
   background-image: url('/stripes-light.svg');
+  opacity: 1;
+}
+
+/* Light mode amber stripes — yellow-700 hatching for overtime */
+html.light .bg-stripes-amber {
+  background-image: url('/stripes-amber-light.svg');
   opacity: 1;
 }
 

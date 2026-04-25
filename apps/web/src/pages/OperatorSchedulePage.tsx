@@ -37,14 +37,22 @@ import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
 import { getTasksForJob } from '../utils';
 import { getErrorMessage } from '../store/api/errorNormalization';
 import { ZOOM_LEVELS } from '../utils/zoom';
-import { computeTileSlices, getOperatorDaySchedule, type TileSlice } from '../utils/operatorTileSlices';
+import {
+  computeTileSlices,
+  getOperatorDaySchedule,
+  getOperatorOvertimePeriodsForDay,
+  type TileSlice,
+} from '../utils/operatorTileSlices';
 import { computeCollapses } from '../utils/computeCollapses';
 import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { CollapseBand } from '../components/SchedulingGrid/CollapseBand';
 import { yPositionToTime } from '../components/DragPreview/snapUtils';
 import { isInternalTask } from '@flux/types';
 import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../components/TimelineLens';
-import { computeOperatorUnavailabilitySegments } from '../components/TimelineLens/unavailability';
+import {
+  computeOperatorUnavailabilitySegments,
+  computeOperatorOvertimeSegments,
+} from '../components/TimelineLens/unavailability';
 import type {
   Operator,
   TaskAssignment,
@@ -65,6 +73,7 @@ import {
 } from '../components';
 import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
+import { OvertimeOverlay } from '../components/StationColumns/OvertimeOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
 import { SafetyBand } from '../components/SafetyBand';
 import { buildSequenceIndexLookup, isInSafetyZone, makeSafetyKey } from '../utils/safetyZone';
@@ -834,6 +843,15 @@ export default function OperatorSchedulePage() {
     );
   }, [lens.state.activeColumnId, operators, lensRange.gridStartMs, lensRange.gridEndMs]);
 
+  const lensOvertimeSegments = useMemo(() => {
+    if (!lens.state.activeColumnId) return [];
+    const op = operators.find(o => o.id === lens.state.activeColumnId);
+    if (!op) return [];
+    return computeOperatorOvertimeSegments(
+      op, lensRange.gridStartMs, lensRange.gridEndMs,
+    );
+  }, [lens.state.activeColumnId, operators, lensRange.gridStartMs, lensRange.gridEndMs]);
+
   // Pre-render the actual <TileSegment> components at LENS_PIXELS_PER_HOUR,
   // using the same logic as `renderSlice` — identical visuals, just a
   // magnified time/pixel ratio. Built inside the memo so re-renders of the
@@ -876,16 +894,17 @@ export default function OperatorSchedulePage() {
         ((slice.to.getTime() - originMs) / 3_600_000) * LENS_PIXELS_PER_HOUR;
       const segHeight = Math.max(segBottom - segTop, 8);
 
-      // In the lens we force full-width placement (the gutter is handled
-      // by `overrideLeft`), regardless of slice.position — we're not
-      // rendering adjacent paired operators in the lens, so a split-column
-      // layout would just look cramped.
+      // Mirror `renderSlice`'s left/right split so two MT tasks running in
+      // parallel on the same operator render side-by-side inside the lens.
+      // The 40px gutter hosts the hour labels, so the split is applied to the
+      // post-gutter area `(100% - 44px)` instead of the whole lens width.
       const colWidth = LENS_COL_WIDTH - 8;
-      const positionProps = {
-        overrideLeft: '40px',
-        overrideWidth: 'calc(100% - 44px)',
-      };
-      const svgWidth = colWidth;
+      const positionProps = slice.position === 'left'
+        ? { overrideLeft: '40px', overrideWidth: 'calc((100% - 44px) * 0.49)' }
+        : slice.position === 'right'
+          ? { overrideLeft: 'calc(40px + (100% - 44px) * 0.51)', overrideWidth: 'calc((100% - 44px) * 0.49)' }
+          : { overrideLeft: '40px', overrideWidth: 'calc(100% - 44px)' };
+      const svgWidth = slice.position === 'full' ? colWidth : Math.floor(colWidth * 0.48);
 
       const label = `${job.reference} · ${job.client}`;
       const setupMinutes = task.duration?.setupMinutes ?? 0;
@@ -1335,6 +1354,7 @@ export default function OperatorSchedulePage() {
         anchor={lens.state.anchor}
         tileContent={lensTileContent}
         unavailabilitySegments={lensUnavailabilitySegments}
+        overtimeSegments={lensOvertimeSegments}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}
         centerTimeMs={lens.state.centerTimeMs}
@@ -1406,7 +1426,10 @@ function OperatorColumn({
     return lines;
   }, [visibleDayRange, pixelsPerHour, effectiveCollapses, gridStartDate]);
 
-  // Unavailability overlays (only visible range)
+  // Unavailability + overtime overlays (only visible range).
+  // Overtime overlays are rendered FIRST so DOM order puts: overtime hachures →
+  // unavailability hachures → tiles on top. The intended visual reading is
+  // "yellow hachures = exceptional availability, tiles sit on top normally".
   const overlays = useMemo(() => {
     const startDay = visibleDayRange.start;
     const endDay = visibleDayRange.end;
@@ -1415,9 +1438,26 @@ function OperatorColumn({
     for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
       const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
       const daySchedule = getOperatorDaySchedule(operator, currentDate);
+      const overtimePeriods = getOperatorOvertimePeriodsForDay(operator, currentDate);
       const dayYOffset = effectiveCollapses.length === 0
         ? dayIndex * 24 * pixelsPerHour
         : timeToYPosition(currentDate, 0, pixelsPerHour, gridStartDate, effectiveCollapses);
+
+      if (overtimePeriods.length > 0) {
+        elements.push(
+          <OvertimeOverlay
+            key={`ot-overlay-day-${dayIndex}`}
+            periods={overtimePeriods}
+            startHour={0}
+            hoursToDisplay={24}
+            pixelsPerHour={pixelsPerHour}
+            yOffset={dayYOffset}
+            collapses={effectiveCollapses}
+            dayDate={currentDate}
+            gridStartDate={gridStartDate}
+          />,
+        );
+      }
 
       elements.push(
         <UnavailabilityOverlay

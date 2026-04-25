@@ -17,7 +17,7 @@ import {
   useReplaceSkillsMutation,
   useReplaceConcurrentGroupsMutation,
 } from '../store/api/operatorApi';
-import type { OperatorResponse, OperatorSkillResponse, ConcurrentGroupPayload, AbsencePayload } from '../store/api/operatorApi';
+import type { OperatorResponse, OperatorSkillResponse, ConcurrentGroupPayload, AbsencePayload, OvertimePayload } from '../store/api/operatorApi';
 import { useGetStationsQuery } from '../store/api/stationApi';
 import type { StationResponse } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
@@ -521,6 +521,7 @@ interface OperatorFormModalProps {
     scheduleRotationReferenceWeek: number | null;
     scheduleNames: string[];
     absences: AbsencePayload[];
+    overtimes: OvertimePayload[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
   }) => Promise<void>;
@@ -580,6 +581,18 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
     return [];
   });
 
+  const [overtimes, setOvertimes] = useState<{ id: string; startAt: string; endAt: string; reason: string }[]>(() => {
+    if (initial?.overtimes) {
+      return initial.overtimes.map((ot, i) => ({
+        id: `ot-${i}`,
+        startAt: ot.startAt.slice(0, 16),
+        endAt: ot.endAt.slice(0, 16),
+        reason: ot.reason ?? '',
+      }));
+    }
+    return [];
+  });
+
   // Schedule view toggle
   const [scheduleView, setScheduleView] = useState<'visual' | 'json'>('visual');
 
@@ -632,7 +645,42 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
     return true;
   }, [absences]);
 
-  const canSave = firstName.trim() !== '' && lastName.trim() !== '' && concurrentGroupsValid && absencesValid;
+  const overtimesValid = useMemo(() => {
+    for (const o of overtimes) {
+      if (!o.startAt && !o.endAt) continue;
+      if (!o.startAt || !o.endAt) return false;
+      if (o.startAt > o.endAt) return false;
+    }
+    return true;
+  }, [overtimes]);
+
+  // Cross-section invariant: no overtime range may intersect any absence range.
+  // Ranges are inclusive on both endpoints (matches PHP/Rust covers() semantics),
+  // so touching endpoints (abs 14-17, ot 17-19) count as overlapping.
+  // Returns null when disjoint, or the index of the first offending overtime row.
+  const firstOverlappingOvertimeIdx = useMemo(() => {
+    for (let i = 0; i < overtimes.length; i++) {
+      const o = overtimes[i];
+      if (!o.startAt || !o.endAt || o.startAt > o.endAt) continue;
+      for (const a of absences) {
+        if (!a.startAt || !a.endAt || a.startAt > a.endAt) continue;
+        // Intervals overlap iff !(o.end < a.start || o.start > a.end).
+        // String compare is safe because both use the same ISO format.
+        if (o.startAt <= a.endAt && o.endAt >= a.startAt) {
+          return { index: i, absence: a };
+        }
+      }
+    }
+    return null;
+  }, [absences, overtimes]);
+
+  const canSave =
+    firstName.trim() !== '' &&
+    lastName.trim() !== '' &&
+    concurrentGroupsValid &&
+    absencesValid &&
+    overtimesValid &&
+    firstOverlappingOvertimeIdx === null;
 
   const handleProficiencyCommit = useCallback((stationId: string, value: number) => {
     setSkillMap((prev) => {
@@ -693,6 +741,13 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
           startAt: a.startAt,
           endAt: a.endAt,
           reason: a.reason.trim() || null,
+        })),
+      overtimes: overtimes
+        .filter(o => o.startAt && o.endAt && o.startAt <= o.endAt)
+        .map(o => ({
+          startAt: o.startAt,
+          endAt: o.endAt,
+          reason: o.reason.trim() || null,
         })),
       skills,
       concurrentGroups: concurrentGroupsPayload,
@@ -924,6 +979,91 @@ function OperatorFormModal({ initial, stations, categories, onSave, onCancel, is
             </button>
           </div>
 
+          {/* Section 5: Overtime (heures supplémentaires) */}
+          <div className="pt-2 border-t border-flux-border">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">
+              Heures supplémentaires
+            </p>
+            {overtimes.length > 0 && (
+              <div className="flex flex-col gap-3 mb-3">
+                {overtimes.map((overtime, idx) => {
+                  const isInvalid = !!overtime.startAt && !!overtime.endAt && overtime.startAt > overtime.endAt;
+                  const overlap =
+                    firstOverlappingOvertimeIdx !== null && firstOverlappingOvertimeIdx.index === idx
+                      ? firstOverlappingOvertimeIdx.absence
+                      : null;
+                  return (
+                    <div key={overtime.id} className="flex flex-col gap-1.5 p-3 bg-flux-base rounded border border-flux-border">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-flux-text-muted w-8">Du</label>
+                        <input
+                          type="datetime-local"
+                          value={overtime.startAt}
+                          onChange={(e) => {
+                            const next = [...overtimes];
+                            next[idx] = { ...next[idx], startAt: e.target.value };
+                            setOvertimes(next);
+                          }}
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        />
+                        <label className="text-xs text-flux-text-muted w-8 text-center">au</label>
+                        <input
+                          type="datetime-local"
+                          value={overtime.endAt}
+                          onChange={(e) => {
+                            const next = [...overtimes];
+                            next[idx] = { ...next[idx], endAt: e.target.value };
+                            setOvertimes(next);
+                          }}
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary focus:outline-none focus:border-flux-text-secondary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setOvertimes(overtimes.filter((_, i) => i !== idx))}
+                          className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none px-1"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-flux-text-muted w-8">Motif</label>
+                        <input
+                          type="text"
+                          value={overtime.reason}
+                          onChange={(e) => {
+                            const next = [...overtimes];
+                            next[idx] = { ...next[idx], reason: e.target.value };
+                            setOvertimes(next);
+                          }}
+                          placeholder="Optionnel"
+                          className="flex-1 px-3 py-[5px] text-sm bg-flux-elevated border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                        />
+                      </div>
+                      {isInvalid && (
+                        <p className="text-[11px] text-red-400 pl-10">La date de début doit être antérieure ou égale à la date de fin.</p>
+                      )}
+                      {overlap && (
+                        <p className="text-[11px] text-red-400 pl-10">
+                          Chevauche l'absence du {overlap.startAt.replace('T', ' ')} au {overlap.endAt.replace('T', ' ')} — modifiez l'absence ou ajustez les horaires.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const range = todayFullDayRange();
+                setOvertimes([...overtimes, { id: `ot-${Date.now()}`, startAt: range.startAt, endAt: range.endAt, reason: '' }]);
+              }}
+              className="w-full py-2 text-xs text-flux-text-muted border border-dashed border-flux-border-light rounded hover:border-blue-500 hover:text-blue-500 transition-colors"
+            >
+              + Ajouter des heures supplémentaires
+            </button>
+          </div>
+
           </div>{/* end scrollable body */}
 
           {/* Footer — fixed at bottom */}
@@ -1032,6 +1172,7 @@ export default function OperatorsPage() {
     scheduleRotationReferenceWeek: number | null;
     scheduleNames: string[];
     absences: AbsencePayload[];
+    overtimes: OvertimePayload[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
   }) => {
@@ -1043,6 +1184,7 @@ export default function OperatorsPage() {
       scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
       scheduleNames: data.scheduleNames.length > 0 ? data.scheduleNames : null,
       absences: data.absences,
+      overtimes: data.overtimes,
       skills: data.skills,
     }).unwrap();
     if (data.concurrentGroups.length > 0) {
@@ -1060,6 +1202,7 @@ export default function OperatorsPage() {
     scheduleRotationReferenceWeek: number | null;
     scheduleNames: string[];
     absences: AbsencePayload[];
+    overtimes: OvertimePayload[];
     skills: OperatorSkillResponse[];
     concurrentGroups: ConcurrentGroupPayload[];
   }) => {
@@ -1074,6 +1217,7 @@ export default function OperatorsPage() {
         scheduleRotationReferenceWeek: data.scheduleRotationReferenceWeek,
         scheduleNames: data.scheduleNames.length > 0 ? data.scheduleNames : null,
         absences: data.absences,
+        overtimes: data.overtimes,
       },
     }).unwrap();
     // Skills must be saved BEFORE concurrent groups: the backend cascade
