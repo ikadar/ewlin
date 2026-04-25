@@ -12,7 +12,10 @@ import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
 import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../TimelineLens';
-import { computeStationUnavailabilitySegments } from '../TimelineLens/unavailability';
+import {
+  computeStationUnavailabilitySegments,
+  computeAggregatedOperatorOvertimeSegments,
+} from '../TimelineLens/unavailability';
 import { COLLAPSED_BAND_PX, type Collapse } from './collapseConfig';
 import { CollapseBand } from './CollapseBand';
 import { yPositionToTime } from '../DragPreview/snapUtils';
@@ -571,9 +574,16 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     const station = stationMap.get(lens.state.activeColumnId);
     if (!station) return [];
     return computeStationUnavailabilitySegments(
-      station, lensRange.gridStartMs, lensRange.gridEndMs,
+      station, lensRange.gridStartMs, lensRange.gridEndMs, operators ?? [],
     );
-  }, [lens.state.activeColumnId, stationMap, lensRange.gridStartMs, lensRange.gridEndMs]);
+  }, [lens.state.activeColumnId, stationMap, lensRange.gridStartMs, lensRange.gridEndMs, operators]);
+
+  const lensOvertimeSegments = useMemo(() => {
+    if (!lens.state.activeColumnId) return [];
+    return computeAggregatedOperatorOvertimeSegments(
+      operators ?? [], lensRange.gridStartMs, lensRange.gridEndMs,
+    );
+  }, [lens.state.activeColumnId, operators, lensRange.gridStartMs, lensRange.gridEndMs]);
 
   // Event delegation: a single mouseover on the columns wrapper covers every
   // tile + every non-tile area (hatched unavailability overlay, hour-grid
@@ -811,6 +821,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   category={category}
                   onDeselect={onDeselect}
                   collapses={effectiveCollapses}
+                  operators={operators}
                 >
                   {stationAssignments.map((assignment) => {
                     const cached = tileDataCache.get(assignment.id);
@@ -873,6 +884,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         anchor={lens.state.anchor}
         tileContent={lensTileContent}
         unavailabilitySegments={lensUnavailabilitySegments}
+        overtimeSegments={lensOvertimeSegments}
         gridStartMs={lensRange.gridStartMs}
         gridEndMs={lensRange.gridEndMs}
         centerTimeMs={lens.state.centerTimeMs}

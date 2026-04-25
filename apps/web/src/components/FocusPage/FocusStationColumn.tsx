@@ -8,7 +8,12 @@ import type {
 import { DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
 import { Tile } from '../Tile';
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
+import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
+import {
+  aggregateOperatorOvertimePeriodsForDay,
+  mergeDayScheduleWithOvertimePeriods,
+} from '../../utils/operatorTileSlices';
 import {
   computeTileDataCache,
   type ElementBlockingInfo,
@@ -256,9 +261,29 @@ export function FocusStationColumn({
     const nodes: React.ReactNode[] = [];
     const startDay = visibleDayRange.start;
     const endDay = Math.min(visibleDayRange.end, dayCount - 1);
+    const operators = snapshot.operators;
     for (let d = startDay; d <= endDay; d++) {
       const currentDate = new Date(gridStartDate.getTime() + d * 24 * 60 * 60 * 1000);
-      const daySchedule = getStationDaySchedule(station, currentDate);
+      const baseSchedule = getStationDaySchedule(station, currentDate);
+      const overtimePeriods = aggregateOperatorOvertimePeriodsForDay(operators, currentDate);
+      const daySchedule = overtimePeriods.length === 0
+        ? baseSchedule
+        : mergeDayScheduleWithOvertimePeriods(baseSchedule, overtimePeriods);
+      const yOffset = d * 24 * pixelsPerHour;
+
+      if (overtimePeriods.length > 0) {
+        nodes.push(
+          <OvertimeOverlay
+            key={`ot-${d}`}
+            periods={overtimePeriods}
+            startHour={0}
+            hoursToDisplay={24}
+            pixelsPerHour={pixelsPerHour}
+            yOffset={yOffset}
+          />,
+        );
+      }
+
       nodes.push(
         <UnavailabilityOverlay
           key={`unavail-${d}`}
@@ -266,12 +291,12 @@ export function FocusStationColumn({
           startHour={0}
           hoursToDisplay={24}
           pixelsPerHour={pixelsPerHour}
-          yOffset={d * 24 * pixelsPerHour}
+          yOffset={yOffset}
         />,
       );
     }
     return nodes;
-  }, [station, gridStartDate, pixelsPerHour, visibleDayRange, dayCount]);
+  }, [station, gridStartDate, pixelsPerHour, visibleDayRange, dayCount, snapshot.operators]);
 
   return (
     <div

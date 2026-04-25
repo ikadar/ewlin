@@ -1,5 +1,5 @@
 import { getActiveScheduleForDate } from '@flux/types';
-import type { Absence, DaySchedule, Operator, TaskAssignment } from '@flux/types';
+import type { Absence, DaySchedule, Operator, Overtime, TaskAssignment } from '@flux/types';
 
 const DAY_NAMES = [
   'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
@@ -20,11 +20,20 @@ export interface TileSlice {
 }
 
 /**
- * Get the effective day schedule for an operator on a given date: the rotating
- * weekly schedule narrowed by any absence whose `[startAt, endAt]` overlaps the
- * day. A day fully covered by absences returns `{isOperating: false, slots: []}`,
+ * Get the effective day schedule for an operator on a given date.
+ *
+ * Three-step model (mirrors the Rust engine's `OperatorAvailability::compute_availability`):
+ *   1. Base = the rotating weekly schedule for the date's weekday.
+ *   2. Union with overtime slots intersecting the day (additive — extends availability).
+ *   3. Narrow by absences (subtractive — the only way to remove availability).
+ *
+ * A day fully covered by absences returns `{isOperating: false, slots: []}`,
  * which makes every downstream consumer (hachures overlay, tile sawtooth, collapse
- * computation, timeline lens) honor the absence uniformly.
+ * computation, timeline lens) honor the absence uniformly. Overtime ranges that
+ * extend past base hours produce continuous merged slots — no internal sawtooth.
+ *
+ * Overtime and absence ranges are guaranteed disjoint by the PHP API (HTTP 400
+ * on overlap), so the union and narrowing steps cannot contradict each other.
  */
 export function getOperatorDaySchedule(operator: Operator, date: Date): DaySchedule {
   const activeSchedule = getActiveScheduleForDate(
@@ -36,7 +45,184 @@ export function getOperatorDaySchedule(operator: Operator, date: Date): DaySched
     ? activeSchedule[DAY_NAMES[date.getDay()]] ?? { isOperating: false, slots: [] }
     : { isOperating: true, slots: [{ start: '00:00', end: '24:00' }] };
 
-  return narrowByAbsences(base, operator.absences, date);
+  const extended = unionWithOvertimes(base, operator.overtimes, date);
+  return narrowByAbsences(extended, operator.absences, date);
+}
+
+function unionWithOvertimes(
+  base: DaySchedule,
+  overtimes: Overtime[] | null | undefined,
+  date: Date,
+): DaySchedule {
+  if (!overtimes?.length) return base;
+
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const dayStart = `${dateStr}T00:00:00`;
+  const dayEnd = `${dateStr}T23:59:59`;
+
+  const otRanges: Array<[number, number]> = [];
+  for (const ot of overtimes) {
+    if (ot.startAt > dayEnd || ot.endAt < dayStart) continue;
+    const startMin = ot.startAt < dayStart
+      ? 0
+      : parseInt(ot.startAt.slice(11, 13), 10) * 60 + parseInt(ot.startAt.slice(14, 16), 10);
+    const endMin = ot.endAt > dayEnd
+      ? 24 * 60
+      : parseInt(ot.endAt.slice(11, 13), 10) * 60 + parseInt(ot.endAt.slice(14, 16), 10) + 1;
+    if (endMin > startMin) otRanges.push([startMin, endMin]);
+  }
+  if (otRanges.length === 0) return base;
+
+  const baseRanges: Array<[number, number]> = base.isOperating
+    ? base.slots.map((slot) => {
+        const startMin =
+          parseInt(slot.start.slice(0, 2), 10) * 60 + parseInt(slot.start.slice(3, 5), 10);
+        const endMin = slot.end === '24:00'
+          ? 24 * 60
+          : parseInt(slot.end.slice(0, 2), 10) * 60 + parseInt(slot.end.slice(3, 5), 10);
+        return [startMin, endMin] as [number, number];
+      })
+    : [];
+
+  const all = [...baseRanges, ...otRanges].sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const r of all) {
+    const last = merged[merged.length - 1];
+    if (!last || last[1] < r[0]) merged.push([...r]);
+    else last[1] = Math.max(last[1], r[1]);
+  }
+
+  const toHm = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return {
+    isOperating: true,
+    slots: merged.map(([s, e]) => ({
+      start: toHm(s),
+      end: e === 24 * 60 ? '24:00' : toHm(e),
+    })),
+  };
+}
+
+/**
+ * Compute overtime periods for a given day, in minutes-since-midnight, for
+ * use by the OvertimeOverlay (yellow hachures rendered ABOVE base column,
+ * BELOW tiles). Returns merged, sorted ranges. Empty when the operator has
+ * no overtime intersecting the day.
+ *
+ * Note: this returns the raw declared overtime ranges (clipped to the day),
+ * not the diff-with-base. So an overtime entry that happens to sit inside
+ * base hours still renders as overtime — the user's intent ("this is
+ * overtime time") is preserved verbatim.
+ */
+export function getOperatorOvertimePeriodsForDay(
+  operator: Operator,
+  date: Date,
+): Array<{ startMinutes: number; endMinutes: number }> {
+  if (!operator.overtimes?.length) return [];
+
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const dayStart = `${dateStr}T00:00:00`;
+  const dayEnd = `${dateStr}T23:59:59`;
+
+  const ranges: Array<[number, number]> = [];
+  for (const ot of operator.overtimes) {
+    if (ot.startAt > dayEnd || ot.endAt < dayStart) continue;
+    const startMin = ot.startAt < dayStart
+      ? 0
+      : parseInt(ot.startAt.slice(11, 13), 10) * 60 + parseInt(ot.startAt.slice(14, 16), 10);
+    const endMin = ot.endAt > dayEnd
+      ? 24 * 60
+      : parseInt(ot.endAt.slice(11, 13), 10) * 60 + parseInt(ot.endAt.slice(14, 16), 10) + 1;
+    if (endMin > startMin) ranges.push([startMin, endMin]);
+  }
+  if (ranges.length === 0) return [];
+
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (!last || last[1] < r[0]) merged.push([...r]);
+    else last[1] = Math.max(last[1], r[1]);
+  }
+  return merged.map(([s, e]) => ({ startMinutes: s, endMinutes: e }));
+}
+
+/**
+ * Aggregate overtime periods across multiple operators for a given day.
+ * Used by station planning hachures: by symmetry with the shop-closure
+ * model (closures = absences on every operator), shop-wide overtime =
+ * any single operator working overtime. So if at least one operator has
+ * overtime intersecting `date`, every station shows extended availability
+ * (dark hachures shrink) plus amber stripes for the overtime window.
+ */
+export function aggregateOperatorOvertimePeriodsForDay(
+  operators: readonly Operator[],
+  date: Date,
+): Array<{ startMinutes: number; endMinutes: number }> {
+  if (operators.length === 0) return [];
+  const all: Array<[number, number]> = [];
+  for (const op of operators) {
+    for (const p of getOperatorOvertimePeriodsForDay(op, date)) {
+      all.push([p.startMinutes, p.endMinutes]);
+    }
+  }
+  if (all.length === 0) return [];
+  all.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const r of all) {
+    const last = merged[merged.length - 1];
+    if (!last || last[1] < r[0]) merged.push([...r]);
+    else last[1] = Math.max(last[1], r[1]);
+  }
+  return merged.map(([s, e]) => ({ startMinutes: s, endMinutes: e }));
+}
+
+/**
+ * Union a base day schedule with already-computed overtime periods (in
+ * minutes-since-midnight). Mirrors the internal `unionWithOvertimes` but
+ * accepts pre-merged ranges, letting the caller compute periods once and
+ * use them both for the OvertimeOverlay and for narrowing the dark
+ * unavailability hachures (dark = "no operator at all", amber = "at least
+ * one operator in overtime").
+ */
+export function mergeDayScheduleWithOvertimePeriods(
+  base: DaySchedule,
+  periods: ReadonlyArray<{ startMinutes: number; endMinutes: number }>,
+): DaySchedule {
+  if (periods.length === 0) return base;
+
+  const baseRanges: Array<[number, number]> = base.isOperating
+    ? base.slots.map((slot) => {
+        const startMin =
+          parseInt(slot.start.slice(0, 2), 10) * 60 + parseInt(slot.start.slice(3, 5), 10);
+        const endMin = slot.end === '24:00'
+          ? 24 * 60
+          : parseInt(slot.end.slice(0, 2), 10) * 60 + parseInt(slot.end.slice(3, 5), 10);
+        return [startMin, endMin] as [number, number];
+      })
+    : [];
+
+  const all: Array<[number, number]> = [
+    ...baseRanges,
+    ...periods.map((p) => [p.startMinutes, p.endMinutes] as [number, number]),
+  ].sort((a, b) => a[0] - b[0]);
+
+  const merged: Array<[number, number]> = [];
+  for (const r of all) {
+    const last = merged[merged.length - 1];
+    if (!last || last[1] < r[0]) merged.push([...r]);
+    else last[1] = Math.max(last[1], r[1]);
+  }
+
+  const toHm = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return {
+    isOperating: true,
+    slots: merged.map(([s, e]) => ({
+      start: toHm(s),
+      end: e === 24 * 60 ? '24:00' : toHm(e),
+    })),
+  };
 }
 
 function narrowByAbsences(

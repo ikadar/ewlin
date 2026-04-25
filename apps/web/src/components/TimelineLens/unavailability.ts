@@ -1,5 +1,10 @@
 import type { DaySchedule, Station, Operator } from '@flux/types';
-import { getOperatorDaySchedule } from '../../utils/operatorTileSlices';
+import {
+  getOperatorDaySchedule,
+  getOperatorOvertimePeriodsForDay,
+  aggregateOperatorOvertimePeriodsForDay,
+  mergeDayScheduleWithOvertimePeriods,
+} from '../../utils/operatorTileSlices';
 
 export interface UnavailabilitySegment {
   startMs: number;
@@ -100,8 +105,14 @@ export function computeStationUnavailabilitySegments(
   station: Station,
   rangeStartMs: number,
   rangeEndMs: number,
+  operators: readonly Operator[] = [],
 ): UnavailabilitySegment[] {
-  return iterateDays(rangeStartMs, rangeEndMs, (d) => getStationDaySchedule(station, d));
+  return iterateDays(rangeStartMs, rangeEndMs, (d) => {
+    const base = getStationDaySchedule(station, d);
+    if (operators.length === 0) return base;
+    const overtime = aggregateOperatorOvertimePeriodsForDay(operators, d);
+    return overtime.length === 0 ? base : mergeDayScheduleWithOvertimePeriods(base, overtime);
+  });
 }
 
 export function computeOperatorUnavailabilitySegments(
@@ -110,4 +121,81 @@ export function computeOperatorUnavailabilitySegments(
   rangeEndMs: number,
 ): UnavailabilitySegment[] {
   return iterateDays(rangeStartMs, rangeEndMs, (d) => getOperatorDaySchedule(operator, d));
+}
+
+/**
+ * Same shape as `UnavailabilitySegment` but represents *overtime* periods
+ * (positive availability). Caller renders these with yellow hachures
+ * (bg-stripes-amber) instead of the dark hachures used for unavailability.
+ */
+export type OvertimeSegment = UnavailabilitySegment;
+
+/**
+ * Compute overtime segments for an operator within a range of absolute ms.
+ * Mirrors `computeOperatorUnavailabilitySegments` but returns the *positive*
+ * overtime periods (heures supplémentaires) per day, in absolute ms ranges,
+ * for the TimelineLens to render with yellow hachures.
+ */
+export function computeOperatorOvertimeSegments(
+  operator: Operator,
+  rangeStartMs: number,
+  rangeEndMs: number,
+): OvertimeSegment[] {
+  if (!operator.overtimes?.length) return [];
+
+  const segments: OvertimeSegment[] = [];
+  const first = new Date(rangeStartMs);
+  first.setHours(0, 0, 0, 0);
+  const last = new Date(rangeEndMs);
+  last.setHours(0, 0, 0, 0);
+
+  for (
+    const d = new Date(first);
+    d.getTime() <= last.getTime();
+    d.setDate(d.getDate() + 1)
+  ) {
+    const dayBaseMs = d.getTime();
+    const periods = getOperatorOvertimePeriodsForDay(operator, d);
+    for (const p of periods) {
+      const s = Math.max(dayBaseMs + p.startMinutes * 60_000, rangeStartMs);
+      const e = Math.min(dayBaseMs + p.endMinutes * 60_000, rangeEndMs);
+      if (e > s) segments.push({ startMs: s, endMs: e });
+    }
+  }
+  return segments;
+}
+
+/**
+ * Aggregate overtime across multiple operators into absolute-ms segments
+ * within a range. Used when the timeline lens magnifies a station: by
+ * symmetry with the shop-closure model, any operator's overtime extends
+ * the station's availability, so the lens should show the same amber
+ * stripes that the StationColumn renders.
+ */
+export function computeAggregatedOperatorOvertimeSegments(
+  operators: readonly Operator[],
+  rangeStartMs: number,
+  rangeEndMs: number,
+): OvertimeSegment[] {
+  if (operators.length === 0) return [];
+  const segments: OvertimeSegment[] = [];
+  const first = new Date(rangeStartMs);
+  first.setHours(0, 0, 0, 0);
+  const last = new Date(rangeEndMs);
+  last.setHours(0, 0, 0, 0);
+
+  for (
+    const d = new Date(first);
+    d.getTime() <= last.getTime();
+    d.setDate(d.getDate() + 1)
+  ) {
+    const dayBaseMs = d.getTime();
+    const periods = aggregateOperatorOvertimePeriodsForDay(operators, d);
+    for (const p of periods) {
+      const s = Math.max(dayBaseMs + p.startMinutes * 60_000, rangeStartMs);
+      const e = Math.min(dayBaseMs + p.endMinutes * 60_000, rangeEndMs);
+      if (e > s) segments.push({ startMs: s, endMs: e });
+    }
+  }
+  return segments;
 }

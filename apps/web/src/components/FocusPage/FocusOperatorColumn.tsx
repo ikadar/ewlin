@@ -8,8 +8,13 @@ import type {
 import { TileSegment } from '../Tile/TileSegment';
 import { computeTileState } from '../Tile';
 import { timeToYPosition } from '../TimelineColumn';
-import { computeTileSlices, getOperatorDaySchedule } from '../../utils/operatorTileSlices';
+import {
+  computeTileSlices,
+  getOperatorDaySchedule,
+  getOperatorOvertimePeriodsForDay,
+} from '../../utils/operatorTileSlices';
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
+import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 
 export interface FocusOperatorColumnProps {
   operator: Operator;
@@ -96,6 +101,22 @@ export function FocusOperatorColumn({
     for (let d = startDay; d <= endDay; d++) {
       const currentDate = new Date(gridStartDate.getTime() + d * 24 * 60 * 60 * 1000);
       const daySchedule = getOperatorDaySchedule(operator, currentDate);
+      const overtimePeriods = getOperatorOvertimePeriodsForDay(operator, currentDate);
+      const yOffset = d * 24 * pixelsPerHour;
+
+      if (overtimePeriods.length > 0) {
+        nodes.push(
+          <OvertimeOverlay
+            key={`ot-${d}`}
+            periods={overtimePeriods}
+            startHour={0}
+            hoursToDisplay={24}
+            pixelsPerHour={pixelsPerHour}
+            yOffset={yOffset}
+          />,
+        );
+      }
+
       nodes.push(
         <UnavailabilityOverlay
           key={`unavail-${d}`}
@@ -103,7 +124,7 @@ export function FocusOperatorColumn({
           startHour={0}
           hoursToDisplay={24}
           pixelsPerHour={pixelsPerHour}
-          yOffset={d * 24 * pixelsPerHour}
+          yOffset={yOffset}
         />,
       );
     }

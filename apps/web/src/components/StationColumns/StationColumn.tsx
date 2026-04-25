@@ -1,10 +1,15 @@
 import { type ReactNode, type MouseEvent, useRef, useMemo, memo } from 'react';
-import type { Station, DaySchedule, StationCategory } from '@flux/types';
+import type { Station, DaySchedule, StationCategory, Operator } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { timeToYPosition } from '../TimelineColumn/utils';
 import { UnavailabilityOverlay } from './UnavailabilityOverlay';
+import { OvertimeOverlay } from './OvertimeOverlay';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
+import {
+  aggregateOperatorOvertimePeriodsForDay,
+  mergeDayScheduleWithOvertimePeriods,
+} from '../../utils/operatorTileSlices';
 import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface StationColumnProps {
@@ -34,6 +39,12 @@ export interface StationColumnProps {
   onDeselect?: () => void;
   /** Optional collapse bands — grid lines inside bands are skipped, totalHeight collapses. */
   collapses?: readonly Collapse[];
+  /** All operators (for shop-wide overtime aggregation). When any operator
+   *  has overtime intersecting a day, the dark unavailability hachures shrink
+   *  for that period and amber overtime stripes are rendered in their place
+   *  — mirroring the operator-planning behavior. Omit → station behaves like
+   *  it always did (overtime invisible). */
+  operators?: readonly Operator[];
 }
 
 const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
@@ -47,15 +58,29 @@ const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
 ];
 
 /**
- * Get the effective day schedule for a specific date, narrowed by any exception
- * periods whose `[startAt, endAt]` range overlaps this date.
+ * Get the effective day schedule for a specific date, after:
+ *   1. Union with shop-wide operator overtime (extends availability — by
+ *      symmetry with the closure model where shop-wide closure = absences
+ *      on every operator).
+ *   2. Narrow by station exceptions (machine-specific events, e.g. maintenance —
+ *      take precedence over overtime).
  *
- * Returns the weekly schedule minus the time-of-day ranges covered by exceptions.
- * A day fully covered by exceptions returns `{isOperating: false, slots: []}`.
+ * `overtimePeriods` is the already-aggregated set of overtime ranges across
+ * every operator for `date`, in minutes-since-midnight. Caller computes it
+ * once per day and reuses for the OvertimeOverlay so stripes line up with
+ * the receded dark hachures.
  */
-function getDaySchedule(station: Station, dayOfWeek: number, date?: Date): DaySchedule {
+function getDaySchedule(
+  station: Station,
+  dayOfWeek: number,
+  date?: Date,
+  overtimePeriods: ReadonlyArray<{ startMinutes: number; endMinutes: number }> = [],
+): DaySchedule {
   const dayName = DAY_NAMES[dayOfWeek];
-  const base = station.operatingSchedule[dayName];
+  const baseRaw = station.operatingSchedule[dayName];
+  const base = overtimePeriods.length === 0
+    ? baseRaw
+    : mergeDayScheduleWithOvertimePeriods(baseRaw, overtimePeriods);
   if (!date || !station.exceptions?.length) return base;
 
   const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -124,11 +149,13 @@ export const StationColumn = memo(function StationColumn({
   category,
   onDeselect,
   collapses,
+  operators,
 }: StationColumnProps) {
   // Ref for the column element
   const columnRef = useRef<HTMLDivElement>(null);
 
   const effectiveCollapses = collapses ?? [];
+  const effectiveOperators = operators ?? [];
 
   // REQ-04: Calculate number of days for multi-day grid
   // When gridStartDate is provided, render overlays for each day
@@ -138,7 +165,11 @@ export const StationColumn = memo(function StationColumn({
   // Use current day if not specified (for single-day mode)
   const today = gridStartDate ?? new Date();
   const effectiveDayOfWeek = dayOfWeek ?? today.getDay();
-  const daySchedule = getDaySchedule(station, effectiveDayOfWeek, today);
+  const todayOvertimePeriods = useMemo(
+    () => aggregateOperatorOvertimePeriodsForDay(effectiveOperators, today),
+    [effectiveOperators, today],
+  );
+  const daySchedule = getDaySchedule(station, effectiveDayOfWeek, today, todayOvertimePeriods);
 
   // Calculate total height — collapse-aware: each band trades real height for its heightPx
   const totalHeight = useMemo(() => {
@@ -204,7 +235,12 @@ export const StationColumn = memo(function StationColumn({
       }}
       aria-label={`Station ${station.name}`}
     >
-      {/* Unavailability overlay - REQ-04: Multi-day support, v0.3.46: virtual scroll optimization */}
+      {/* Unavailability + overtime overlays.
+          DOM order: OvertimeOverlay (amber) → UnavailabilityOverlay (dark) → tiles.
+          Tiles render last so they sit on top normally. The amber/dark stripes
+          are guaranteed disjoint (overtime is unioned into the daySchedule
+          before computing dark hachures), so render order only matters for
+          tiles-on-top — not for hachure layering against each other. */}
       {isMultiDayGrid ? (
         // Multi-day mode: render overlay for each visible day only
         (() => {
@@ -217,10 +253,35 @@ export const StationColumn = memo(function StationColumn({
             // Calculate the date for this day
             const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
             const dayOfWeekForDay = currentDate.getDay();
-            const dayScheduleForDay = getDaySchedule(station, dayOfWeekForDay, currentDate);
+            const overtimePeriods = aggregateOperatorOvertimePeriodsForDay(
+              effectiveOperators,
+              currentDate,
+            );
+            const dayScheduleForDay = getDaySchedule(
+              station,
+              dayOfWeekForDay,
+              currentDate,
+              overtimePeriods,
+            );
             const dayYOffset = effectiveCollapses.length === 0
               ? dayIndex * 24 * pixelsPerHour
               : timeToYPosition(currentDate, startHour, pixelsPerHour, gridStartDate, effectiveCollapses);
+
+            if (overtimePeriods.length > 0) {
+              visibleDays.push(
+                <OvertimeOverlay
+                  key={`ot-overlay-day-${dayIndex}`}
+                  periods={overtimePeriods}
+                  startHour={0}
+                  hoursToDisplay={24}
+                  pixelsPerHour={pixelsPerHour}
+                  yOffset={dayYOffset}
+                  collapses={effectiveCollapses}
+                  dayDate={currentDate}
+                  gridStartDate={gridStartDate}
+                />
+              );
+            }
 
             visibleDays.push(
               <UnavailabilityOverlay
@@ -241,12 +302,22 @@ export const StationColumn = memo(function StationColumn({
         })()
       ) : (
         // Single-day mode: original behavior
-        <UnavailabilityOverlay
-          daySchedule={daySchedule}
-          startHour={startHour}
-          hoursToDisplay={hoursToDisplay}
-          pixelsPerHour={pixelsPerHour}
-        />
+        <>
+          {todayOvertimePeriods.length > 0 && (
+            <OvertimeOverlay
+              periods={todayOvertimePeriods}
+              startHour={startHour}
+              hoursToDisplay={hoursToDisplay}
+              pixelsPerHour={pixelsPerHour}
+            />
+          )}
+          <UnavailabilityOverlay
+            daySchedule={daySchedule}
+            startHour={startHour}
+            hoursToDisplay={hoursToDisplay}
+            pixelsPerHour={pixelsPerHour}
+          />
+        </>
       )}
 
       {/* Hour grid lines */}
