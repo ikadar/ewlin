@@ -17,7 +17,7 @@
 
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Cpu } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import {
   useGetSnapshotQuery,
   useComputeScheduleMutation,
@@ -1299,18 +1299,6 @@ export default function OperatorSchedulePage() {
       {selectedJobId && (
         <style>{`[data-job-id="${selectedJobId}"]::after { content: ''; position: absolute; inset: 0; border: 2px solid rgba(255,255,255,0.7); z-index: 5; pointer-events: none; }`}</style>
       )}
-
-      {/* ---- Compute Schedule FAB ---- */}
-      <button
-        onClick={handleComputeSchedule}
-        disabled={computeModalMode !== null}
-        className="fixed bottom-24 right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
-        aria-label="Calculer le planning"
-        title="Calculer le planning (recalcul complet)"
-        data-testid="compute-schedule-fab-operator"
-      >
-        <Cpu size={20} />
-      </button>
 
       {/* ---- Mass unschedule confirmation dialog ---- */}
       {massUnschedule.confirmState && (

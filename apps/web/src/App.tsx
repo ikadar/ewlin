@@ -3,8 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { ZOOM_LEVELS } from './utils/zoom';
-import { Save, ClipboardCopy, Cpu } from 'lucide-react';
-import { buildDebugPayload } from './utils/debugExport';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -1079,29 +1077,6 @@ function AppContent() {
       showToast(getErrorMessage(error));
     }
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
-
-  // Debug export: copy full snapshot to clipboard
-  const handleDebugExport = useCallback(async () => {
-    try {
-      const text = JSON.stringify(buildDebugPayload(snapshot), null, 2);
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        // Fallback for non-HTTPS contexts
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      showToast('Debug snapshot copied to clipboard', 'success');
-    } catch {
-      showToast('Failed to copy to clipboard', 'error');
-    }
-  }, [snapshot, showToast]);
 
   // Handle compute schedule (full recalculation via ComputeModal)
   const handleComputeSchedule = useCallback(() => {
@@ -2193,38 +2168,6 @@ function AppContent() {
 
       {/* v0.5.7: Global toast for API errors */}
       <GlobalToast />
-
-      {/* Compute Schedule FAB */}
-      <button
-        onClick={handleComputeSchedule}
-        disabled={computeModalMode !== null}
-        className="fixed bottom-[184px] right-6 z-40 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white shadow-lg transition-all flex items-center justify-center"
-        aria-label="Calculer le planning"
-        title="Calculer le planning (recalcul complet)"
-        data-testid="compute-schedule-fab"
-      >
-        <Cpu size={20} />
-      </button>
-
-      {/* Debug Export FAB — copy snapshot to clipboard */}
-      <button
-        onClick={handleDebugExport}
-        className="fixed bottom-[136px] right-6 z-40 w-10 h-10 rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 shadow-lg transition-all flex items-center justify-center opacity-50 hover:opacity-100"
-        aria-label="Copy debug snapshot to clipboard"
-        title="Copy debug snapshot to clipboard"
-      >
-        <ClipboardCopy size={16} />
-      </button>
-
-      {/* Save/Load FAB — stacked above Command Center FAB */}
-      <button
-        onClick={() => setIsSaveLoadOpen(true)}
-        className="fixed bottom-[88px] right-6 z-40 w-12 h-12 rounded-full bg-zinc-700 hover:bg-zinc-600 text-zinc-300 shadow-lg transition-all flex items-center justify-center"
-        aria-label="Sauvegardes"
-        data-testid="save-load-fab"
-      >
-        <Save size={20} />
-      </button>
 
       {/* Mass unschedule confirmation dialog */}
       {massUnschedule.confirmState && (
