@@ -472,6 +472,7 @@ mod tests {
                     .collect(),
                 concurrent_groups: Vec::<ConcurrentGroupInput>::new(),
                 absences: Vec::new(),
+                overtimes: Vec::new(),
             }
         }
 
@@ -651,6 +652,7 @@ mod tests {
                     end_at: absent_end,
                     reason: None,
                 }],
+                overtimes: vec![],
             };
 
             let j1 = JobInput {

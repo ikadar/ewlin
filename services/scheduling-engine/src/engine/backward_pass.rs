@@ -239,6 +239,7 @@ pub fn compute_last_values(
             schedules: op.operating_schedules.clone(),
             reference_week: op.schedule_rotation_reference_week,
             absences: op.absences.clone(),
+            overtimes: op.overtimes.clone(),
         })
         .collect();
 
@@ -874,6 +875,7 @@ mod tests {
                 .collect(),
             concurrent_groups: vec![],
             absences: vec![],
+            overtimes: vec![],
         }
     }
 

@@ -1305,6 +1305,7 @@ mod integration_tests {
                 .collect(),
             concurrent_groups: groups,
             absences: Vec::new(),
+            overtimes: Vec::new(),
         }
     }
 
@@ -1344,6 +1345,7 @@ mod integration_tests {
                 .collect(),
             concurrent_groups: groups,
             absences: Vec::new(),
+            overtimes: Vec::new(),
         }
     }
 

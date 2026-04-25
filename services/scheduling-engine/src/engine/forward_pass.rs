@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{Datelike, NaiveDate};
 
-use crate::model::operator::{Absence, OperatingSchedule};
+use crate::model::operator::{Absence, OperatingSchedule, Overtime};
 use crate::model::schedule::{ComputedAssignment, OperatorAssignment};
 
 use super::grid::ScheduleGrid;
@@ -15,6 +15,11 @@ pub struct OperatorScheduleData {
     /// Datetime-range absences. A tick falling within any range is marked
     /// unavailable regardless of what the weekly schedule says.
     pub absences: Vec<Absence>,
+    /// Datetime-range overtime slots. A tick falling within any range is
+    /// marked available even when the weekly schedule says otherwise. The
+    /// upstream PHP service guarantees `overtimes` and `absences` are
+    /// disjoint, so conflict resolution is unnecessary here.
+    pub overtimes: Vec<Overtime>,
 }
 
 /// Station attributes needed during forward pass
@@ -357,11 +362,15 @@ impl OperatorAvailability {
 
     /// Compute availability for a range of ticks.
     ///
-    /// Two-step model:
+    /// Three-step model:
     /// 1. Base availability from operating schedules (rotating, ISO-week-resolved,
     ///    or default M-F 8:00–17:00 when no schedule is defined).
-    /// 2. Override: if any absence covers the tick's naive local datetime, the
-    ///    tick is marked unavailable regardless of step 1.
+    /// 2. Overtime extension: if any overtime slot covers the tick's naive local
+    ///    datetime, the tick is marked available even if step 1 said false.
+    /// 3. Absence override: if any absence covers the tick, it is unavailable
+    ///    regardless of steps 1 and 2. Overtime and absence ranges are
+    ///    guaranteed disjoint by the upstream PHP service; if that invariant
+    ///    ever breaks, absence still wins.
     fn compute_availability(
         &self,
         op_idx: usize,
@@ -422,20 +431,26 @@ impl OperatorAvailability {
                     }
                 };
 
-                if !base_available {
-                    return false;
+                // Fast path: no overtime and no absence → base is the answer.
+                if sched_data.overtimes.is_empty() && sched_data.absences.is_empty() {
+                    return base_available;
                 }
 
-                // Step 2: absence override.
-                if sched_data.absences.is_empty() {
-                    return true;
-                }
                 let hour = day_minutes / 60;
                 let minute = day_minutes % 60;
                 let tick_dt = match date.and_hms_opt(hour, minute, 0) {
                     Some(dt) => dt,
                     None => return base_available,
                 };
+
+                // Step 2: overtime extension.
+                let extended = base_available
+                    || sched_data.overtimes.iter().any(|ot| ot.covers(tick_dt));
+                if !extended {
+                    return false;
+                }
+
+                // Step 3: absence override (absence always wins).
                 !sched_data.absences.iter().any(|abs| abs.covers(tick_dt))
             })
             .collect()
@@ -1693,6 +1708,12 @@ fn assign_action_at_tick(
         grid.increment_group(g, t);
     }
     for &op_idx in &operators {
+        if !operator_availability.is_available(op_idx, t) {
+            eprintln!(
+                "[GHOST-OP-DIAG] assign_action_at_tick: op_idx={} action={} task={} tick={} station={}: assigned but is_available=false",
+                op_idx, action_idx, actions[action_idx].task_id, t, station_idx
+            );
+        }
         grid.assign_operator(op_idx, t, station_idx, 0.0);
     }
     // Update the action's "current operators" so the next tick's
@@ -1926,17 +1947,27 @@ fn pre_place_pinned_actions(
                 max_ops,
                 !in_run_phase,
             );
-            // Availability fallback: if no operator can be found within
-            // their scheduled hours (pin is in the middle of the night,
-            // on a holiday, etc.), pick any qualified operator anyway.
-            // The user's pin is authoritative — they've said the task
-            // runs at this time, so we treat the operator assignment as
-            // an implicit overtime/exception rather than leaving the
-            // tile orphaned.
+            // Availability fallback: if `find_operators_for_station` came
+            // back empty (no idle qualified op), broaden the search to
+            // qualified ops who may be busy on another station — but
+            // STILL respect `is_available()`. Picking an unavailable op
+            // (off-day, on holiday, no overtime declared) silently
+            // ghost-assigns work to someone who isn't there, which is
+            // worse than leaving the tile operator-less.
+            //
+            // If no qualified-and-available op exists either, leave `ops`
+            // empty: the tile renders without an operator for those ticks,
+            // surfacing the gap so the user can add overtime / unpin /
+            // shift the task. This was the root cause of "Halim works
+            // during his Saturday off / annual leave" tickets — the old
+            // fallback ignored availability entirely under the rationale
+            // "user-pinned, honour it"; that rationale predates the
+            // overtime channel and no longer applies.
             if ops.is_empty() {
                 let mut fallback: Vec<(usize, f64)> = operator_skills
                     .iter()
                     .enumerate()
+                    .filter(|(op, _)| operator_availability.is_available(*op, t))
                     .filter_map(|(op, skills)| {
                         skills
                             .iter()
@@ -1952,6 +1983,12 @@ fn pre_place_pinned_actions(
                     .collect();
             }
             for &op_idx in &ops {
+                if !operator_availability.is_available(op_idx, t) {
+                    eprintln!(
+                        "[GHOST-OP-DIAG] pre_place_pinned_actions: op_idx={} action={} task={} tick={} station={}: assigned but is_available=false",
+                        op_idx, i, actions[i].task_id, t, station_idx
+                    );
+                }
                 grid.assign_operator(op_idx, t, station_idx, 0.0);
                 if !actions[i].assigned_operators.contains(&op_idx) {
                     actions[i].assigned_operators.push(op_idx);
@@ -2175,6 +2212,7 @@ mod selection_tests {
                 schedules: None,
                 reference_week: None,
                 absences: Vec::new(),
+                overtimes: Vec::new(),
             })
             .collect();
         let mut avail = OperatorAvailability::new(
@@ -2597,7 +2635,11 @@ mod availability_tests {
         NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").unwrap()
     }
 
-    fn build_availability(absences: Vec<Absence>, num_ticks: usize) -> OperatorAvailability {
+    fn build_availability(
+        absences: Vec<Absence>,
+        overtimes: Vec<Overtime>,
+        num_ticks: usize,
+    ) -> OperatorAvailability {
         OperatorAvailability::new(
             1,
             num_ticks,
@@ -2607,13 +2649,14 @@ mod availability_tests {
                 schedules: Some(vec![mf_8_to_17()]),
                 reference_week: None,
                 absences,
+                overtimes,
             }],
         )
     }
 
     #[test]
     fn no_absence_matches_schedule() {
-        let a = build_availability(vec![], 100);
+        let a = build_availability(vec![], vec![], 100);
         assert!(!a.is_available(0, 31), "Monday 07:45 outside schedule");
         assert!(a.is_available(0, 32), "Monday 08:00 in schedule");
         assert!(a.is_available(0, 56), "Monday 14:00 in schedule");
@@ -2628,7 +2671,7 @@ mod availability_tests {
             end_at: dt("2026-04-20T17:00:00"),
             reason: Some("RDV".into()),
         }];
-        let a = build_availability(absences, 100);
+        let a = build_availability(absences, vec![], 100);
 
         assert!(a.is_available(0, 32), "Monday 08:00 — before absence, still available");
         assert!(a.is_available(0, 55), "Monday 13:45 — 15 min before absence");
@@ -2648,7 +2691,7 @@ mod availability_tests {
             end_at: dt("2026-04-20T20:00:00"),
             reason: None,
         }];
-        let a = build_availability(absences, 100);
+        let a = build_availability(absences, vec![], 100);
         assert!(!a.is_available(0, 72), "Monday 18:00 — outside schedule");
     }
 
@@ -2661,7 +2704,7 @@ mod availability_tests {
             reason: Some("Congés".into()),
         }];
         // Horizon long enough to span Thursday too.
-        let a = build_availability(absences, 400);
+        let a = build_availability(absences, vec![], 400);
 
         assert!(!a.is_available(0, 32), "Monday 08:00 — covered");
         assert!(!a.is_available(0, 128), "Tuesday 08:00 — covered");
@@ -2683,11 +2726,81 @@ mod availability_tests {
                 reason: None,
             },
         ];
-        let a = build_availability(absences, 100);
+        let a = build_availability(absences, vec![], 100);
 
         assert!(!a.is_available(0, 40), "Monday 10:00 — first absence");
         assert!(a.is_available(0, 48), "Monday 12:00 — between absences");
         assert!(!a.is_available(0, 56), "Monday 14:00 — second absence");
         assert!(a.is_available(0, 64), "Monday 16:00 — after both absences");
+    }
+
+    #[test]
+    fn overtime_extends_availability_outside_base_schedule() {
+        // Schedule is M-F 8:00–17:00. Overtime Monday 17:00–19:00 extends
+        // availability past close. Saturday 10:00–16:00 extends a normally-off day.
+        let overtimes = vec![
+            Overtime {
+                start_at: dt("2026-04-20T17:00:00"),
+                end_at: dt("2026-04-20T19:00:00"),
+                reason: Some("rush".into()),
+            },
+            Overtime {
+                start_at: dt("2026-04-25T10:00:00"),
+                end_at: dt("2026-04-25T16:00:00"),
+                reason: None,
+            },
+        ];
+        // Horizon long enough to span Saturday (day 5).
+        let a = build_availability(vec![], overtimes, 700);
+
+        // Monday: base 8-17 still green, overtime adds 17-19.
+        assert!(a.is_available(0, 56), "Monday 14:00 — base schedule");
+        assert!(a.is_available(0, 68), "Monday 17:00 — overtime start (inclusive)");
+        assert!(a.is_available(0, 75), "Monday 18:45 — inside overtime");
+        assert!(!a.is_available(0, 77), "Monday 19:15 — past overtime end");
+        // Saturday: base says off, overtime reopens 10-16.
+        // Day 5 starts at tick 5*96 = 480; 10:00 is tick 480+40 = 520.
+        assert!(!a.is_available(0, 519), "Saturday 09:45 — before overtime");
+        assert!(a.is_available(0, 520), "Saturday 10:00 — overtime start");
+        assert!(a.is_available(0, 544), "Saturday 16:00 — overtime end (inclusive)");
+        assert!(!a.is_available(0, 545), "Saturday 16:15 — past overtime");
+    }
+
+    #[test]
+    fn overtime_inside_base_schedule_is_noop() {
+        // Overtime Monday 10:00–11:00 sits inside base 8:00–17:00; nothing changes.
+        let overtimes = vec![Overtime {
+            start_at: dt("2026-04-20T10:00:00"),
+            end_at: dt("2026-04-20T11:00:00"),
+            reason: None,
+        }];
+        let a = build_availability(vec![], overtimes, 100);
+
+        assert!(a.is_available(0, 32), "Monday 08:00 — base schedule");
+        assert!(a.is_available(0, 40), "Monday 10:00 — was already available");
+        assert!(a.is_available(0, 44), "Monday 11:00 — still available");
+        assert!(!a.is_available(0, 31), "Monday 07:45 — still before base");
+        assert!(!a.is_available(0, 68), "Monday 17:00 — still at base end");
+    }
+
+    #[test]
+    fn multi_day_overtime_spans_whole_range() {
+        // Saturday 00:00 through Sunday 23:59:59 — opens the whole weekend.
+        let overtimes = vec![Overtime {
+            start_at: dt("2026-04-25T00:00:00"),
+            end_at: dt("2026-04-26T23:59:59"),
+            reason: Some("weekend rush".into()),
+        }];
+        let a = build_availability(vec![], overtimes, 700);
+
+        // Saturday: day 5. Any tick in day is covered.
+        assert!(a.is_available(0, 480), "Saturday 00:00 — covered");
+        assert!(a.is_available(0, 512), "Saturday 08:00 — covered");
+        // Sunday: day 6.
+        assert!(a.is_available(0, 576), "Sunday 00:00 — covered");
+        assert!(a.is_available(0, 671), "Sunday 23:45 — last tick of day, covered");
+        // Monday following: back to base schedule only (Monday 00:00 = tick 672).
+        assert!(!a.is_available(0, 672), "Monday 00:00 — outside overtime, outside base");
+        assert!(!a.is_available(0, 673), "Monday 00:15 — outside overtime, outside base");
     }
 }

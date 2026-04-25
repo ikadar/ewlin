@@ -32,6 +32,15 @@ pub struct OperatorInput {
     /// null, so we need the explicit null-tolerant deserializer.
     #[serde(default, deserialize_with = "deserialize_vec_null_as_empty")]
     pub absences: Vec<Absence>,
+    /// Datetime-range overtime slots. The scheduler marks any tick falling
+    /// within any of these ranges as available, even if the base weekly
+    /// schedule would have it closed. Endpoints are inclusive.
+    ///
+    /// Overtime ranges are guaranteed by the upstream PHP service to be
+    /// disjoint from `absences`; if that invariant ever breaks, absence
+    /// wins (the final AND-NOT step still subtracts absence ticks).
+    #[serde(default, deserialize_with = "deserialize_vec_null_as_empty")]
+    pub overtimes: Vec<Overtime>,
 }
 
 fn deserialize_vec_null_as_empty<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
@@ -60,6 +69,30 @@ pub struct Absence {
 
 impl Absence {
     /// True when `moment` is within this absence (endpoints inclusive).
+    pub fn covers(&self, moment: NaiveDateTime) -> bool {
+        moment >= self.start_at && moment <= self.end_at
+    }
+}
+
+/// Naive local datetime range during which the operator is exceptionally
+/// available beyond their weekly schedule (heures supplémentaires).
+///
+/// Symmetric to `Absence` structurally but opposite in semantics: overtime
+/// extends availability, absence removes it. The two sets are disjoint by
+/// upstream invariant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Overtime {
+    #[serde(deserialize_with = "deserialize_naive_datetime")]
+    pub start_at: NaiveDateTime,
+    #[serde(deserialize_with = "deserialize_naive_datetime")]
+    pub end_at: NaiveDateTime,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+impl Overtime {
+    /// True when `moment` is within this overtime slot (endpoints inclusive).
     pub fn covers(&self, moment: NaiveDateTime) -> bool {
         moment >= self.start_at && moment <= self.end_at
     }

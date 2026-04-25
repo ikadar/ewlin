@@ -99,6 +99,7 @@ pub fn run_with_fbi(
             schedules: op.operating_schedules.clone(),
             reference_week: op.schedule_rotation_reference_week,
             absences: op.absences.clone(),
+            overtimes: op.overtimes.clone(),
         })
         .collect();
 
