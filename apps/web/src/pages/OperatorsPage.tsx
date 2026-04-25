@@ -508,7 +508,7 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
 // Operator Form Modal
 // ============================================================================
 
-interface OperatorFormModalProps {
+export interface OperatorFormModalProps {
   initial?: OperatorResponse | null;
   stations: StationResponse[];
   categories: StationCategoryResponse[];
@@ -529,7 +529,7 @@ interface OperatorFormModalProps {
   isSaving: boolean;
 }
 
-function OperatorFormModal({ initial, stations, categories, onSave, onCancel, isSaving }: OperatorFormModalProps) {
+export function OperatorFormModal({ initial, stations, categories, onSave, onCancel, isSaving }: OperatorFormModalProps) {
   const [firstName, setFirstName] = useState(initial?.firstName ?? '');
   const [lastName, setLastName] = useState(initial?.lastName ?? '');
   const [role, setRole] = useState(initial?.role ?? '');

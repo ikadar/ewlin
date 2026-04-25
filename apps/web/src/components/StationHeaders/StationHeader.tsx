@@ -3,6 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import type { Station, StationCategory } from '@flux/types';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import { OffScreenIndicator } from './OffScreenIndicator';
+import { StationSettingsButton } from './StationSettingsButton';
 
 export interface OffScreenInfo {
   /** Count of tiles above viewport */
@@ -79,6 +80,7 @@ export function StationHeader({
             onClick={() => onOffScreenClick?.('down')}
           />
         )}
+        <StationSettingsButton stationId={station.id} stationLabel={station.name} />
         <Link
           to={`/focus/station/${station.id}`}
           aria-label={`Ouvrir la vue focus de ${station.name}`}

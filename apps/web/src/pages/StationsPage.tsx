@@ -63,7 +63,7 @@ function todayFullDayRange(): { startAt: string; endAt: string } {
 // Station Form Modal
 // ============================================================================
 
-interface StationFormModalProps {
+export interface StationFormModalProps {
   initial?: StationResponse | null;
   categories: { id: string; name: string }[];
   groups: { id: string; name: string }[];
@@ -72,7 +72,7 @@ interface StationFormModalProps {
   isSaving: boolean;
 }
 
-function StationFormModal({ initial, categories, groups, onSave, onCancel, isSaving }: StationFormModalProps) {
+export function StationFormModal({ initial, categories, groups, onSave, onCancel, isSaving }: StationFormModalProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [status, setStatus] = useState<string>(initial?.status ?? 'Available');
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? categories[0]?.id ?? '');
