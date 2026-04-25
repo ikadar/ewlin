@@ -6,23 +6,24 @@
  */
 import { z } from 'zod';
 import type { ToolDefinition } from './types.js';
-import { isIsoDate, toIsoWithLocalOffset } from './dates.js';
+import { combineDateAndTime, isIsoDate, toIsoWithLocalOffset } from './dates.js';
 import { uuidField } from './ids.js';
 
-interface OperatorRow {
+interface OvertimeEntry {
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+}
+
+interface OperatorOvertimesRow {
   id: string;
-  scheduleExceptions?: Array<{
-    date: string;
-    type?: string | null;
-    schedule?: { isOperating: boolean; slots: Array<{ start: string; end: string }> } | null;
-    reason?: string | null;
-  }>;
+  overtimes?: OvertimeEntry[] | null;
 }
 
 export const addOperatorOvertimeTool: ToolDefinition = {
   name: 'add_operator_overtime',
   description:
-    "Ajoute une heure supplémentaire (extension d'horaire) pour un opérateur sur une date donnée. Crée ou étend une exception d'horaire 'MODIFIED'. Si l'opérateur a déjà une exception ce jour-là, l'extension fusionne avec.",
+    "Ajoute des heures supplémentaires (heures sup, extension d'horaire) pour un opérateur sur une date donnée. Crée une nouvelle plage [startAt, endAt] dans son champ `overtimes`. Le moteur de planification l'utilise comme une plage de disponibilité supplémentaire qui s'ajoute à l'horaire de base de l'opérateur. Le serveur rejette (HTTP 400) tout chevauchement avec une absence existante de l'opérateur — dans ce cas, prévenir l'utilisateur et lui suggérer d'éditer l'absence ou d'ajuster les horaires.",
   inputSchema: z.object({
     operatorId: uuidField('resolve_operator'),
     operatorLabel: z.string().min(1),
@@ -35,37 +36,35 @@ export const addOperatorOvertimeTool: ToolDefinition = {
     if (!isIsoDate(input.date)) {
       return { ok: false, error: 'date must be YYYY-MM-DD' };
     }
+    let startAt: string;
+    let endAt: string;
+    try {
+      startAt = combineDateAndTime(input.date, input.fromTime);
+      endAt = combineDateAndTime(input.date, input.toTime);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+    if (startAt > endAt) {
+      return { ok: false, error: 'fromTime must be <= toTime' };
+    }
     const preview = `Heure sup pour ${input.operatorLabel} le ${input.date} de ${input.fromTime} à ${input.toTime}${
       input.reason ? ` (${input.reason})` : ''
     }`;
     if (ctx.dryRun) {
-      return { ok: true, preview, data: { dryRun: true, ...input } };
+      return { ok: true, preview, data: { dryRun: true, ...input, startAt, endAt } };
     }
-    // Fetch current schedule exceptions and merge
-    const op = await ctx.php.get<OperatorRow>(`/api/v1/operators/${input.operatorId}`);
-    const exceptions = [...(op.scheduleExceptions ?? [])];
-    const existingIdx = exceptions.findIndex((e) => e.date === input.date);
-    const newSlot = { start: input.fromTime, end: input.toTime };
-    if (existingIdx >= 0) {
-      const existing = exceptions[existingIdx]!;
-      const slots = existing.schedule?.slots ? [...existing.schedule.slots, newSlot] : [newSlot];
-      exceptions[existingIdx] = {
-        date: input.date,
-        type: 'MODIFIED',
-        schedule: { isOperating: true, slots },
-        reason: input.reason ?? existing.reason ?? null,
-      };
-    } else {
-      exceptions.push({
-        date: input.date,
-        type: 'MODIFIED',
-        schedule: { isOperating: true, slots: [newSlot] },
-        reason: input.reason ?? null,
-      });
-    }
-    const updated = await ctx.php.put<OperatorRow>(`/api/v1/operators/${input.operatorId}`, {
-      scheduleExceptions: exceptions,
-    });
+    // Fetch existing overtimes, append the new range, PUT back the full list.
+    // The PHP service enforces disjointness against absences and returns 400
+    // on overlap — that error message bubbles up to the LLM via ctx.php.put.
+    const op = await ctx.php.get<OperatorOvertimesRow>(`/api/v1/operators/${input.operatorId}`);
+    const overtimes: OvertimeEntry[] = [
+      ...(op.overtimes ?? []),
+      { startAt, endAt, reason: input.reason ?? null },
+    ];
+    const updated = await ctx.php.put<OperatorOvertimesRow>(
+      `/api/v1/operators/${input.operatorId}`,
+      { overtimes },
+    );
     return { ok: true, preview, data: { operator: updated } };
   },
 };

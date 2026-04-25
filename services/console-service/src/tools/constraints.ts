@@ -27,6 +27,7 @@ interface OperatorResponse {
   firstName: string;
   lastName: string;
   absences?: AbsenceLike[] | null;
+  overtimes?: AbsenceLike[] | null;
   [key: string]: unknown;
 }
 
@@ -41,6 +42,10 @@ interface StationResponse {
 // can round-trip between listing and deletion without a real DB id.
 function operatorAbsenceKey(operatorId: string, absence: AbsenceLike): string {
   return `op:${operatorId}:${absence.startAt}:${absence.endAt}`;
+}
+
+function operatorOvertimeKey(operatorId: string, overtime: AbsenceLike): string {
+  return `ot:${operatorId}:${overtime.startAt}:${overtime.endAt}`;
 }
 
 function stationExceptionKey(stationId: string, exception: AbsenceLike): string {
@@ -209,7 +214,7 @@ export const addStationMaintenanceTool: ToolDefinition = {
 export const cancelConstraintTool: ToolDefinition = {
   name: 'cancel_constraint',
   description:
-    "Supprime une absence d'opérateur ou une indispo de station. L'ID est fourni par list_active_constraints (`op:{operatorId}:{startAt}:{endAt}` ou `st:{stationId}:{startAt}:{endAt}`).",
+    "Supprime une absence d'opérateur, une heure sup d'opérateur, ou une indispo de station. L'ID est fourni par list_active_constraints (`op:{operatorId}:{startAt}:{endAt}` pour absence, `ot:{operatorId}:{startAt}:{endAt}` pour heure sup, `st:{stationId}:{startAt}:{endAt}` pour station).",
   inputSchema: z.object({
     constraintId: z
       .string()
@@ -245,6 +250,21 @@ export const cancelConstraintTool: ToolDefinition = {
         data: { deleted: input.constraintId, kind: 'operator-absence' },
       };
     }
+    if (parts[0] === 'ot' && parts.length === 4) {
+      const [, operatorId, startAt, endAt] = parts;
+      const current = await ctx.php.get<OperatorResponse>(
+        `/api/v1/operators/${operatorId}`,
+      );
+      const overtimes = (current.overtimes ?? []).filter(
+        (o) => o.startAt !== startAt || o.endAt !== endAt,
+      );
+      await ctx.php.put(`/api/v1/operators/${operatorId}`, { overtimes });
+      return {
+        ok: true,
+        preview,
+        data: { deleted: input.constraintId, kind: 'operator-overtime' },
+      };
+    }
     if (parts[0] === 'st' && parts.length === 4) {
       const [, stationId, startAt, endAt] = parts;
       const current = await ctx.php.get<StationResponse>(
@@ -270,7 +290,7 @@ export const cancelConstraintTool: ToolDefinition = {
 export const listActiveConstraintsTool: ToolDefinition = {
   name: 'list_active_constraints',
   description:
-    "Liste les absences opérateur et indispos station actives ou à venir. Filtrer par date optionnelle. Agrège Operator.absences + Station.scheduleExceptions (même shape).",
+    "Liste les directives qui modifient la disponibilité opérateur/station, actives ou à venir : absences opérateur, heures sup opérateur, indispos station. Filtrer par date optionnelle. Agrège Operator.absences + Operator.overtimes + Station.scheduleExceptions (même shape de plage temporelle).",
   readOnly: true,
   inputSchema: z.object({
     fromDate: z
@@ -290,7 +310,7 @@ export const listActiveConstraintsTool: ToolDefinition = {
 
     const entries: Array<{
       id: string;
-      kind: 'operator-absence' | 'station-exception';
+      kind: 'operator-absence' | 'operator-overtime' | 'station-exception';
       targetId: string;
       targetLabel: string;
       startDate: string;
@@ -310,6 +330,19 @@ export const listActiveConstraintsTool: ToolDefinition = {
           startDate: abs.startAt.slice(0, 10),
           endDate,
           description: abs.reason ?? null,
+        });
+      }
+      for (const ot of op.overtimes ?? []) {
+        const endDate = ot.endAt.slice(0, 10);
+        if (endDate < cutoff) continue;
+        entries.push({
+          id: operatorOvertimeKey(op.id, ot),
+          kind: 'operator-overtime',
+          targetId: op.id,
+          targetLabel: `${op.firstName} ${op.lastName}`,
+          startDate: ot.startAt.slice(0, 10),
+          endDate,
+          description: ot.reason ?? null,
         });
       }
     }
