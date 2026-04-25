@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flux Command Center — Console intégrée (Alt+K)</title>
+  <style>
+    /* ============================================================
+       THEME TOKENS
+       ============================================================ */
+    :root[data-theme="dark"] {
+      --bg-canvas: #0f0f12;
+      --bg-surface: #18181b;
+      --bg-elevated: #1f1f23;
+      --bg-subtle: #27272a;
+      --bg-hover: #2a2a2f;
+      --border: #2f2f35;
+      --border-strong: #3f3f46;
+      --text-primary: #fafafa;
+      --text-secondary: #d4d4d8;
+      --text-muted: #71717a;
+      --text-faint: #52525b;
+      --accent: #3b82f6;
+      --accent-strong: #2563eb;
+      --accent-hover: #60a5fa;
+      --accent-soft: rgba(59, 130, 246, 0.12);
+      --accent-border: rgba(59, 130, 246, 0.4);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.6);
+      --success: #22c55e;
+      --success-soft: rgba(34, 197, 94, 0.12);
+      --warning: #f59e0b;
+      --warning-soft: rgba(245, 158, 11, 0.12);
+      --danger: #ef4444;
+      --danger-soft: rgba(239, 68, 68, 0.12);
+      --kbd-bg-from: #3f3f46;
+      --kbd-bg-to:   #27272a;
+      --kbd-border:  #52525b;
+      --kbd-shadow:  0 1px 0 0 rgba(0,0,0,0.4), inset 0 1px 0 0 rgba(255,255,255,0.05);
+      --kbd-fg: #d4d4d8;
+    }
+
+    :root[data-theme="light"] {
+      --bg-canvas: #ecddf0;
+      --bg-surface: #f5e9f9;
+      --bg-elevated: #ffffff;
+      --bg-subtle: #e5d2eb;
+      --bg-hover: #dec5e7;
+      --border: #c9b3d0;
+      --border-strong: #b094bb;
+      --text-primary: #1e0e2a;
+      --text-secondary: #4a3458;
+      --text-muted: #8b6e9a;
+      --text-faint: #b094bb;
+      --accent: #6366f1;
+      --accent-strong: #4f46e5;
+      --accent-hover: #4338ca;
+      --accent-soft: rgba(99, 102, 241, 0.1);
+      --accent-border: rgba(99, 102, 241, 0.35);
+      --shadow-sm: 0 1px 2px rgba(60, 30, 80, 0.08);
+      --shadow-md: 0 6px 18px rgba(60, 30, 80, 0.16);
+      --shadow-lg: 0 24px 80px rgba(60, 30, 80, 0.22);
+      --success: #16a34a;
+      --success-soft: rgba(22, 163, 74, 0.1);
+      --warning: #d97706;
+      --warning-soft: rgba(217, 119, 6, 0.1);
+      --danger: #dc2626;
+      --danger-soft: rgba(220, 38, 38, 0.1);
+      --kbd-bg-from: #ffffff;
+      --kbd-bg-to:   #efe6f3;
+      --kbd-border:  #b094bb;
+      --kbd-shadow:  0 1px 0 0 rgba(60,30,80,0.15), inset 0 1px 0 0 rgba(255,255,255,0.6);
+      --kbd-fg: #4a3458;
+    }
+
+    * { box-sizing: border-box; }
+    html { font-size: 13px; }
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.5;
+      transition: background 0.3s ease, color 0.3s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .app { max-width: 1320px; margin: 0 auto; padding: 24px 32px 140px; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+    .brand-mark {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar h1 {
+      margin: 0; font-size: 1.4rem; font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    .breadcrumb {
+      color: var(--text-muted); font-size: 0.78rem;
+      margin-top: 3px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb .sep { opacity: 0.4; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .theme-toggle {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .theme-toggle button {
+      background: transparent; border: 0;
+      padding: 6px 14px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.8rem; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .theme-toggle button.active {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .section { margin-bottom: 36px; }
+    .section-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-head h2 {
+      font-size: 0.95rem; font-weight: 600; margin: 0;
+      letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-head h2 .num {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      background: var(--accent-soft); color: var(--accent);
+      font-size: 0.75rem;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--accent-border);
+    }
+    .section-head .hint { color: var(--text-muted); font-size: 0.78rem; }
+
+    /* ============================================================
+       INTRO BANNER
+       ============================================================ */
+    .intro-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      display: flex; gap: 18px; align-items: flex-start;
+    }
+    .intro-banner-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+    .intro-banner h3 {
+      margin: 0 0 6px;
+      font-size: 1rem; font-weight: 600; letter-spacing: -0.01em;
+    }
+    .intro-banner p {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.86rem; line-height: 1.55;
+    }
+    .intro-banner p .kbd-group { display: inline-flex; gap: 2px; vertical-align: middle; }
+
+    /* ============================================================
+       SPEC CARD
+       ============================================================ */
+    .spec-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+    }
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .spec-item { display: flex; gap: 12px; align-items: flex-start; }
+    .spec-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: var(--accent-soft); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid var(--accent-border);
+    }
+    .spec-label {
+      font-size: 0.7rem; color: var(--text-muted);
+      letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600;
+    }
+    .spec-value { font-size: 0.86rem; font-weight: 500; margin-top: 2px; }
+    .spec-detail { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ============================================================
+       DEMO STAGE
+       ============================================================ */
+    .stage-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .stage-toolbar {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 8px; align-items: center;
+      background: var(--bg-elevated);
+      flex-wrap: wrap;
+    }
+    .stage-toolbar-label {
+      font-size: 0.72rem; color: var(--text-muted);
+      margin-right: 4px;
+      letter-spacing: 0.02em; text-transform: uppercase; font-weight: 600;
+    }
+    .scenario-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 5px 12px; border-radius: 7px;
+      font-size: 0.78rem; font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .scenario-btn:hover {
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+    .scenario-btn.active {
+      background: var(--accent); border-color: var(--accent);
+      color: white;
+    }
+    .stage-toolbar-right {
+      margin-left: auto;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .stage-toolbar-right .btn-ghost {
+      background: transparent; border: 0;
+      color: var(--text-muted);
+      padding: 5px 10px; border-radius: 6px;
+      cursor: pointer; font-size: 0.75rem;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .stage-toolbar-right .btn-ghost:hover {
+      background: var(--bg-hover); color: var(--text-primary);
+    }
+
+    .stage {
+      position: relative;
+      height: 720px;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.02), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255,255,255,0.02), transparent 40%),
+        var(--bg-canvas);
+      overflow: hidden;
+    }
+
+    .faux-app {
+      position: absolute; inset: 0;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .faux-sidebar {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      gap: 10px; padding: 10px 0;
+      align-items: center;
+    }
+    .faux-sidebar-icon {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      background: var(--bg-subtle);
+    }
+    .faux-sidebar-icon.active {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+    }
+    .faux-main {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .faux-title {
+      height: 18px; width: 30%;
+      background: var(--bg-subtle);
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .faux-grid {
+      display: grid; grid-template-columns: repeat(8, 1fr);
+      gap: 6px; margin-top: 6px; flex: 1;
+    }
+    .faux-cell { background: var(--bg-subtle); border-radius: 4px; height: 32px; }
+    .faux-cell.accent { background: var(--accent-soft); border: 1px solid var(--accent-border); }
+    .faux-cell.warn { background: var(--warning-soft); border: 1px solid var(--warning); }
+    .faux-cell.muted { background: var(--bg-subtle); opacity: 0.5; }
+
+    /* ============================================================
+       COMMAND PANEL
+       ============================================================ */
+    .panel-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 70px;
+      animation: overlay-in 0.25s ease;
+    }
+    :root[data-theme="light"] .panel-overlay {
+      background: rgba(50, 30, 70, 0.32);
+    }
+    @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+
+    .panel {
+      width: 760px; max-width: 92%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      max-height: 600px;
+      animation: panel-in 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ----- INPUT ROW ----- */
+    .panel-input-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-input-icon {
+      color: var(--accent);
+      flex-shrink: 0; display: flex; align-items: center;
+    }
+    .panel-input {
+      flex: 1;
+      background: transparent; border: 0; outline: 0;
+      color: var(--text-primary);
+      font-size: 0.95rem; font-family: inherit;
+      letter-spacing: -0.005em;
+    }
+    .panel-input::placeholder { color: var(--text-faint); }
+    .panel-input-busy {
+      color: var(--text-muted); font-size: 0.75rem;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .panel-input-busy svg { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ----- BODY / RESULTS ----- */
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 240px;
+    }
+
+    /* ----- ZONE GRID (idle state — preserves existing CommandPalette layout) ----- */
+    .zones-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 10px;
+    }
+    .zone {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+    }
+    .zone-name {
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .zone-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 0;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      gap: 10px;
+    }
+    .zone-row + .zone-row {
+      border-top: 1px dashed var(--border);
+    }
+    .zone-row-title {
+      flex: 1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .zone-row-kbd {
+      display: flex; gap: 2px; align-items: center;
+      flex-shrink: 0;
+    }
+    .zones-hint {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 8px 12px 10px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+
+    /* ----- DROPDOWN (search state) ----- */
+    .panel-section-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 12px 16px 4px;
+      font-weight: 700;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .panel-list { padding: 4px 6px; }
+    .panel-item {
+      display: flex; align-items: center;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.08s;
+    }
+    .panel-item:hover { background: var(--bg-hover); }
+    .panel-item.selected {
+      background: var(--accent-soft);
+      box-shadow: inset 2px 0 0 var(--accent);
+    }
+    .panel-item-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: var(--bg-subtle); color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+    .panel-item.selected .panel-item-icon {
+      background: var(--bg-elevated);
+      color: var(--accent);
+      border-color: var(--accent-border);
+    }
+    .panel-item-meta { flex: 1; line-height: 1.25; min-width: 0; }
+    .panel-item-title {
+      font-weight: 500; color: var(--text-primary);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .panel-item-title .ai-prefix { color: var(--text-muted); font-weight: 400; margin-right: 4px; }
+    .panel-item-title .ai-query { color: var(--text-primary); font-weight: 500; }
+    .panel-item-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+    .panel-item-zone {
+      font-size: 0.65rem; color: var(--text-faint);
+      margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .panel-item-action {
+      color: var(--text-faint);
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    .panel-empty {
+      padding: 20px 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    /* ----- PANEL FOOTER ----- */
+    .panel-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-subtle);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .panel-footer-shortcuts { display: flex; gap: 14px; align-items: center; }
+    .shortcut { display: flex; align-items: center; gap: 4px; }
+    .panel-brand {
+      display: flex; align-items: center; gap: 5px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ----- KBD (matching real CommandPalette gradient style) ----- */
+    .kbd {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; min-height: 18px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      line-height: 1;
+      color: var(--kbd-fg);
+      background: linear-gradient(180deg, var(--kbd-bg-from), var(--kbd-bg-to));
+      border: 1px solid var(--kbd-border);
+      box-shadow: var(--kbd-shadow);
+    }
+    .kbd-then {
+      display: inline-flex; align-items: center;
+      font-size: 0.65rem;
+      color: var(--text-faint);
+      margin: 0 2px;
+    }
+
+    /* ----- PLAN CARD ----- */
+    .panel-plan { padding: 12px; }
+    .plan-card {
+      border: 1px solid var(--accent-border);
+      background: var(--accent-soft);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .plan-head { display: flex; gap: 10px; align-items: flex-start; }
+    .plan-head-icon {
+      width: 32px; height: 32px;
+      border-radius: 7px;
+      background: var(--bg-elevated); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid var(--accent-border);
+    }
+    .plan-narration { font-size: 0.88rem; font-weight: 500; line-height: 1.45; }
+    .plan-narration .sub {
+      font-size: 0.7rem; color: var(--text-muted);
+      margin-top: 4px; letter-spacing: 0.02em; text-transform: uppercase;
+      font-weight: 600;
+    }
+    .plan-entities { display: flex; flex-wrap: wrap; gap: 6px; }
+    .plan-entity {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+    }
+    .plan-entity-icon { color: var(--text-muted); display: flex; align-items: center; }
+    .plan-entity .lbl { color: var(--text-muted); }
+    .plan-entity .val { font-weight: 600; }
+    .plan-actions-list {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 5px;
+      font-size: 0.8rem;
+    }
+    .plan-actions-list li {
+      display: flex; gap: 8px; align-items: flex-start;
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+    }
+    .plan-actions-list li svg { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+    .plan-buttons {
+      display: flex; gap: 6px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 4px;
+    }
+
+    .btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 7px 13px;
+      border-radius: 7px;
+      font-size: 0.78rem; font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+    .btn-primary {
+      background: var(--accent); border-color: var(--accent); color: white;
+    }
+    .btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+    .btn-primary:disabled { opacity: 0.6; cursor: wait; }
+    .btn-ghost {
+      background: transparent; border-color: transparent; color: var(--text-muted);
+    }
+    .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .btn .kbd-inline {
+      margin-left: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      opacity: 0.7;
+    }
+
+    .result-strip {
+      margin: 12px;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 0.85rem;
+    }
+    .result-strip.ok {
+      background: var(--success-soft); border: 1px solid var(--success); color: var(--success);
+    }
+    .result-strip.err {
+      background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger);
+    }
+    .result-strip-title { font-weight: 600; color: var(--text-primary); }
+    .result-strip-body { color: var(--text-secondary); margin-top: 2px; font-size: 0.78rem; }
+
+    /* ============================================================
+       ANATOMY
+       ============================================================ */
+    .anatomy-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    }
+    .anatomy-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .anatomy-card-head {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px;
+    }
+    .anatomy-num {
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      background: var(--accent); color: white;
+      font-weight: 700; font-size: 0.75rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .anatomy-title { font-weight: 600; font-size: 0.86rem; }
+    .anatomy-body { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.55; }
+    .anatomy-body code {
+      background: var(--bg-subtle);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+
+    /* ============================================================
+       PROMPT BAR
+       ============================================================ */
+    .prompt-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex; gap: 16px; align-items: center;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      z-index: 50;
+    }
+    .prompt-bar-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--accent-soft); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid var(--accent-border);
+    }
+    .prompt-text {
+      flex: 1; font-size: 0.82rem;
+      color: var(--text-secondary); line-height: 1.5;
+    }
+    .prompt-text b { color: var(--text-primary); font-weight: 600; }
+    .copy-btn {
+      background: var(--accent); color: white;
+      border: 0;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 0.82rem; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .copy-btn:hover { background: var(--accent-strong); }
+    .copy-btn.copied { background: var(--success); }
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="app">
+    <!-- ============================================================
+         TOP BAR
+         ============================================================ -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="brand-mark" id="brandMark"></div>
+        <div>
+          <h1>Command Center — Console intégrée (Alt+K)</h1>
+          <div class="breadcrumb">
+            <a href="./console-redesign.html">Explorateur initial</a>
+            <span class="sep" id="bcSep1"></span>
+            <span>v4 — préserve l'existant</span>
+            <span class="sep" id="bcSep2"></span>
+            <span class="mono">CommandPalette + IA</span>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="theme-toggle">
+          <button data-theme-btn="dark" class="active"><span data-icon="moon"></span>Dark zinc</button>
+          <button data-theme-btn="light"><span data-icon="sun"></span>Mauve clair</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         INTRO BANNER
+         ============================================================ -->
+    <section class="section">
+      <div class="intro-banner">
+        <div class="intro-banner-icon" data-icon="command" data-size="22"></div>
+        <div>
+          <h3>On préserve le panneau existant — on ajoute juste l'IA</h3>
+          <p>
+            Le composant <span class="mono">CommandPalette</span> ouvre déjà à <span class="kbd-group"><span class="kbd">Alt</span><span class="kbd">K</span></span>
+            une grille de référence à <b>7 zones</b> de raccourcis (Navigation, Actions, Affichage, Grille, Job sélectionné, Compaction, Système). On garde
+            ce comportement intégralement. La seule nouveauté : dès que l'utilisateur tape quelque chose, le panneau bascule en mode dropdown et un item
+            <i>« Demander à l'IA : … »</i> apparaît au sommet — <span class="kbd-group"><span class="kbd">↵</span></span> envoie la requête, l'IA renvoie un plan inline.
+            L'ancien <span class="mono">ConsolePanel</span> et son <span class="mono">Alt+I</span> sont retirés.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SPEC
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <h2><span class="num">1</span> Spécification</h2>
+        <div class="hint">Ce qu'on garde, ce qu'on ajoute, ce qu'on retire</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-grid">
+          <div class="spec-item">
+            <div class="spec-icon" data-icon="check" data-size="18"></div>
+            <div>
+              <div class="spec-label">On garde</div>
+              <div class="spec-value">Grid des 7 zones · Alt+K · style kbd</div>
+              <div class="spec-detail">Aucun raccourci existant n'est modifié. Le rendu visuel des touches (gradient zinc, ombres) est conservé.</div>
+            </div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-icon" data-icon="sparkles" data-size="18"></div>
+            <div>
+              <div class="spec-label">On ajoute</div>
+              <div class="spec-value">Item « Demander à l'IA » en tête du dropdown</div>
+              <div class="spec-detail">Visible uniquement quand la barre n'est pas vide. Plan-card inline + Appliquer/Modifier/Annuler.</div>
+            </div>
+          </div>
+          <div class="spec-item">
+            <div class="spec-icon" data-icon="x" data-size="18"></div>
+            <div>
+              <div class="spec-label">On retire</div>
+              <div class="spec-value">ConsolePanel + Alt+I</div>
+              <div class="spec-detail">Toute la logique migre dans <span class="mono">CommandPalette</span>. Plus d'ALT+I.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DEMO
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <h2><span class="num">2</span> Démo interactive</h2>
+        <div class="hint">Au repos = grid des zones. Tapez = dropdown avec IA en tête</div>
+      </div>
+      <div class="stage-card">
+        <div class="stage-toolbar">
+          <span class="stage-toolbar-label">Scénario</span>
+          <button class="scenario-btn active" data-scenario="menu">Repos (grid)</button>
+          <button class="scenario-btn" data-scenario="search-cmd">Recherche raccourci</button>
+          <button class="scenario-btn" data-scenario="search-ai">Requête IA</button>
+          <button class="scenario-btn" data-scenario="plan">Plan à confirmer</button>
+          <button class="scenario-btn" data-scenario="applied">Action appliquée</button>
+          <button class="scenario-btn" data-scenario="error">Erreur</button>
+          <div class="stage-toolbar-right">
+            <button class="btn-ghost" id="autoplayBtn"><span data-icon="play"></span>Auto-play</button>
+            <button class="btn-ghost" id="resetBtn"><span data-icon="rotate-ccw"></span>Réinit</button>
+          </div>
+        </div>
+        <div class="stage" id="stage">
+          <div class="faux-app">
+            <div class="faux-sidebar">
+              <div class="faux-sidebar-icon active"></div>
+              <div class="faux-sidebar-icon"></div>
+              <div class="faux-sidebar-icon"></div>
+              <div class="faux-sidebar-icon"></div>
+            </div>
+            <div class="faux-main">
+              <div class="faux-title"></div>
+              <div class="faux-grid" id="fauxGrid"></div>
+            </div>
+          </div>
+          <div id="panelHost"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ANATOMY
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <h2><span class="num">3</span> Anatomie</h2>
+        <div class="hint">Trois rôles, un seul conteneur</div>
+      </div>
+      <div class="anatomy-grid">
+        <div class="anatomy-card">
+          <div class="anatomy-card-head">
+            <span class="anatomy-num">1</span>
+            <span class="anatomy-title">Grid des zones (au repos)</span>
+          </div>
+          <div class="anatomy-body">
+            Quand la barre est vide, le panneau affiche les <b>7 zones existantes</b> en 2 colonnes (Navigation, Actions, Affichage, Grille, Job sélectionné, Compaction, Système). Les libellés et les touches sont prises depuis <code>useCommands.ts</code> — aucune duplication.
+          </div>
+        </div>
+        <div class="anatomy-card">
+          <div class="anatomy-card-head">
+            <span class="anatomy-num">2</span>
+            <span class="anatomy-title">Dropdown (en frappe)</span>
+          </div>
+          <div class="anatomy-body">
+            Dès qu'un caractère est tapé, on bascule en dropdown vertical. L'item <i>« Demander à l'IA : … »</i> est <b>toujours en tête</b> (sélectionné par défaut), suivi des commandes filtrées. L'utilisateur ne peut pas oublier l'IA.
+          </div>
+        </div>
+        <div class="anatomy-card">
+          <div class="anatomy-card-head">
+            <span class="anatomy-num">3</span>
+            <span class="anatomy-title">Plan inline</span>
+          </div>
+          <div class="anatomy-body">
+            La réponse de l'IA s'affiche dans le même panneau — plan-card avec entités résolues et actions. <b>Appliquer</b> exécute, <b>Modifier</b> remet la requête dans la barre, <b>Annuler</b> revient à la grid.
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================================================
+       PROMPT BAR
+       ============================================================ -->
+  <div class="prompt-bar">
+    <div class="prompt-bar-icon" data-icon="sparkles" data-size="18"></div>
+    <div class="prompt-text" id="promptText"></div>
+    <button class="copy-btn" id="copyBtn"><span data-icon="copy"></span>Copier le prompt</button>
+  </div>
+
+  <script>
+    // ============================================================
+    // LUCIDE-STYLE INLINE ICONS
+    // ============================================================
+    const ICONS = {
+      search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+      command: '<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>',
+      x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      'pencil-line': '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/><path d="M13 21h8"/>',
+      'user-round': '<path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/>',
+      sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
+      'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+      'circle-check-big': '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+      'triangle-alert': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+      'rotate-ccw': '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+      play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+      copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+      keyboard: '<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
+      'loader-circle': '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+      'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+      navigation: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+      eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+      grid: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
+      target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+      shrink: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="8" x="7" y="8" rx="1"/>',
+      cog: '<path d="M11 10.27 7 3.34"/><path d="m11 13.73-4 6.93"/><path d="M12 22v-2"/><path d="M12 2v2"/><path d="M14 12h8"/><path d="m17 20.66-1-1.73"/><path d="m17 3.34-1 1.73"/><path d="M2 12h2"/><path d="m20.66 17-1.73-1"/><path d="m20.66 7-1.73 1"/><path d="m3.34 17 1.73-1"/><path d="m3.34 7 1.73 1"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="8"/>',
+      zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    };
+    function icon(name, size = 16) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
+    }
+    function inflateIcons(scope) {
+      (scope || document).querySelectorAll('[data-icon]').forEach((el) => {
+        const name = el.dataset.icon;
+        const size = el.dataset.size ? Number(el.dataset.size) : 16;
+        el.innerHTML = icon(name, size);
+        delete el.dataset.icon;
+      });
+    }
+
+    document.getElementById('brandMark').innerHTML = icon('command', 18);
+    document.getElementById('bcSep1').innerHTML = icon('chevron-right', 12);
+    document.getElementById('bcSep2').innerHTML = icon('chevron-right', 12);
+
+    const fauxGrid = document.getElementById('fauxGrid');
+    const cellTypes = ['', '', 'accent', '', 'muted', '', '', 'warn', '', '', '', 'accent', '', '', 'muted', '', '', '', 'accent', '', '', 'warn', 'muted', ''];
+    cellTypes.forEach((c) => {
+      const cell = document.createElement('div');
+      cell.className = `faux-cell ${c}`;
+      fauxGrid.appendChild(cell);
+    });
+
+    // ============================================================
+    // REAL SHORTCUT ZONES — verbatim from useCommands.ts SHORTCUT_ZONES
+    // (kbd may include '→' as chord separator)
+    // ============================================================
+    const SHORTCUT_ZONES = [
+      {
+        name: 'Navigation', icon: 'navigation',
+        items: [
+          { label: 'Aller à aujourd\'hui',  kbd: ['Home'] },
+          { label: 'Aller au départ',       kbd: ['Alt', 'D'] },
+          { label: 'Job précédent',         kbd: ['Alt', '↑'] },
+          { label: 'Job suivant',           kbd: ['Alt', '↓'] },
+          { label: 'Aller au Planning',     kbd: ['Alt', 'P'] },
+          { label: 'Aller au Flux',         kbd: ['Alt', 'X'] },
+        ],
+      },
+      {
+        name: 'Actions', icon: 'zap',
+        items: [
+          { label: 'Modifier le job',       kbd: ['Alt', 'E'] },
+          { label: 'Nouveau job',           kbd: ['Alt', 'N'] },
+          { label: 'Rechercher des jobs',   kbd: ['Alt', 'F'] },
+        ],
+      },
+      {
+        name: 'Affichage', icon: 'eye',
+        items: [
+          { label: 'PRODUIT / TIRAGE',      kbd: ['Alt', 'A'] },
+          { label: 'Panneau latéral',       kbd: ['Alt', 'B'] },
+          { label: 'Minimap',               kbd: ['Alt', 'M'] },
+        ],
+      },
+      {
+        name: 'Grille', icon: 'grid',
+        items: [
+          { label: 'Jour suivant',          kbd: ['PgDn'] },
+          { label: 'Jour précédent',        kbd: ['PgUp'] },
+          { label: 'Zoom +',                kbd: ['Ctrl', '+'] },
+          { label: 'Zoom -',                kbd: ['Ctrl', '-'] },
+        ],
+      },
+      {
+        name: 'Job sélectionné', icon: 'target',
+        items: [
+          { label: 'Voir le départ',                       kbd: ['Alt', 'D'] },
+          { label: 'Modifier ce job',                      kbd: ['Alt', 'E'] },
+          { label: 'Tâche terminée',                       kbd: ['Space'] },
+          { label: 'Auto-place ASAP',                      kbd: ['Alt', 'P', '→', 'S'] },
+          { label: 'Auto-place ALAP',                      kbd: ['Alt', 'P', '→', 'L'] },
+          { label: 'Effacer toutes les tuiles',            kbd: ['Alt', 'Z'] },
+          { label: 'Effacer toutes les tuiles (global)',   kbd: ['Ctrl', 'Alt', 'Z'] },
+        ],
+      },
+      {
+        name: 'Compaction', icon: 'shrink',
+        items: [
+          { label: 'Smart Compaction',      kbd: ['Ctrl', 'Alt', 'C'] },
+        ],
+      },
+      {
+        name: 'Système', icon: 'cog',
+        items: [
+          { label: 'Command Center',        kbd: ['Alt', 'K'] },
+        ],
+      },
+    ];
+
+    const SCRIPTED_PLAN = {
+      narration: 'Je vais marquer Frédéric Martin absent du 13 au 15 avril 2026.',
+      entities: [{ kind: 'Opérateur', label: 'Frédéric Martin', icon: 'user-round' }],
+      actions: ['Ajouter une absence opérateur du 13/04/2026 au 15/04/2026'],
+    };
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    const state = {
+      theme: 'dark',
+      view: 'menu',     // menu | plan | applied | error
+      query: '',
+      busy: false,
+      planApplying: false,
+      lastQuery: '',
+    };
+
+    // ============================================================
+    // EVENTS
+    // ============================================================
+    document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.theme = btn.dataset.themeBtn;
+        document.documentElement.setAttribute('data-theme', state.theme);
+        document.querySelectorAll('[data-theme-btn]').forEach((b) => b.classList.toggle('active', b === btn));
+        updatePrompt();
+      });
+    });
+
+    document.querySelectorAll('.scenario-btn').forEach((btn) => {
+      btn.addEventListener('click', () => applyScenario(btn.dataset.scenario));
+    });
+
+    function applyScenario(name) {
+      state.busy = false;
+      state.planApplying = false;
+      if (name === 'menu') {
+        state.view = 'menu';
+        state.query = '';
+      } else if (name === 'search-cmd') {
+        state.view = 'menu';
+        state.query = 'job';
+      } else if (name === 'search-ai') {
+        state.view = 'menu';
+        state.query = 'Frédéric absent du 13 au 15 avril';
+      } else if (name === 'plan') {
+        state.view = 'plan';
+        state.lastQuery = state.lastQuery || 'Frédéric absent du 13 au 15 avril';
+      } else if (name === 'applied') {
+        state.view = 'applied';
+      } else if (name === 'error') {
+        state.view = 'error';
+      }
+      document.querySelectorAll('.scenario-btn').forEach((b) => b.classList.toggle('active', b.dataset.scenario === name));
+      renderPanel();
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', () => applyScenario('menu'));
+    document.getElementById('autoplayBtn').addEventListener('click', runAutoPlay);
+    document.getElementById('copyBtn').addEventListener('click', copyPrompt);
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    function renderPanel() {
+      const host = document.getElementById('panelHost');
+      host.innerHTML = `
+        <div class="panel-overlay">
+          <div class="panel" role="dialog" aria-label="Command Center Alt+K">
+            ${renderInputRow()}
+            ${renderBody()}
+            ${renderFooter()}
+          </div>
+        </div>
+      `;
+      inflateIcons(host);
+      bindHandlers();
+      const inp = document.getElementById('panelInput');
+      if (inp) { inp.focus(); inp.setSelectionRange(state.query.length, state.query.length); }
+    }
+
+    function renderInputRow() {
+      return `
+        <div class="panel-input-row">
+          <span class="panel-input-icon" data-icon="search" data-size="18"></span>
+          <input class="panel-input" id="panelInput" placeholder="Rechercher une commande, ou demander à l'IA…" value="${escapeHtml(state.query)}" autofocus />
+          ${state.busy
+            ? `<span class="panel-input-busy"><span data-icon="loader-circle" data-size="14"></span> Réflexion…</span>`
+            : `<span class="kbd">↵</span>`}
+        </div>
+      `;
+    }
+
+    function renderBody() {
+      if (state.view === 'plan') return renderPlan();
+      if (state.view === 'applied') return renderApplied();
+      if (state.view === 'error') return renderError();
+      return renderMenu();
+    }
+
+    function renderMenu() {
+      const q = state.query.trim();
+      if (!q) {
+        return renderZoneGrid();
+      }
+      return renderSearchDropdown(q);
+    }
+
+    function renderZoneGrid() {
+      return `
+        <div class="panel-body">
+          <div class="zones-grid">
+            ${SHORTCUT_ZONES.map(zone => `
+              <div class="zone">
+                <div class="zone-name">${escapeHtml(zone.name)}</div>
+                ${zone.items.map(it => `
+                  <div class="zone-row">
+                    <span class="zone-row-title">${escapeHtml(it.label)}</span>
+                    <span class="zone-row-kbd">${renderKbd(it.kbd)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `).join('')}
+            <div class="zones-hint">
+              <span data-icon="sparkles" data-size="13"></span>
+              Tapez pour rechercher une commande ou demander à l'IA en langage naturel
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSearchDropdown(q) {
+      const ql = q.toLowerCase();
+      // Flatten and filter shortcuts
+      const matched = [];
+      for (const zone of SHORTCUT_ZONES) {
+        for (const it of zone.items) {
+          if (it.label.toLowerCase().includes(ql)) {
+            matched.push({ ...it, zone: zone.name, zoneIcon: zone.icon });
+          }
+        }
+      }
+
+      return `
+        <div class="panel-body">
+          <div class="panel-section-label">
+            <span data-icon="sparkles" data-size="11"></span>
+            Demander à l'IA
+          </div>
+          <div class="panel-list">
+            <div class="panel-item selected" data-action="ask-ai">
+              <div class="panel-item-icon"><span data-icon="sparkles" data-size="14"></span></div>
+              <div class="panel-item-meta">
+                <div class="panel-item-title">
+                  <span class="ai-prefix">Demander à l'IA :</span>
+                  <span class="ai-query">${escapeHtml(q)}</span>
+                </div>
+                <div class="panel-item-sub">L'IA proposera un plan que vous validerez avant exécution</div>
+              </div>
+              <div class="panel-item-action"><span class="kbd">↵</span></div>
+            </div>
+          </div>
+          ${matched.length > 0 ? `
+            <div class="panel-section-label">
+              <span data-icon="keyboard" data-size="11"></span>
+              Commandes <span style="color: var(--text-faint); font-weight: 500;">· ${matched.length}</span>
+            </div>
+            <div class="panel-list">
+              ${matched.map(m => `
+                <div class="panel-item" data-shortcut="${escapeHtml(m.label)}">
+                  <div class="panel-item-icon"><span data-icon="${m.zoneIcon}" data-size="14"></span></div>
+                  <div class="panel-item-meta">
+                    <div class="panel-item-title">${escapeHtml(m.label)}</div>
+                    <div class="panel-item-zone">${escapeHtml(m.zone)}</div>
+                  </div>
+                  <div class="panel-item-action">${renderKbd(m.kbd)}</div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div class="panel-empty">
+              Aucune commande ne correspond à « ${escapeHtml(q)} ». <span class="kbd">↵</span> envoie la requête à l'IA.
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderKbd(kbd) {
+      return kbd.map(k => k === '→'
+        ? '<span class="kbd-then">→</span>'
+        : `<span class="kbd">${escapeHtml(k)}</span>`
+      ).join('');
+    }
+
+    function renderPlan() {
+      const plan = SCRIPTED_PLAN;
+      return `
+        <div class="panel-plan">
+          <div class="plan-card">
+            <div class="plan-head">
+              <div class="plan-head-icon"><span data-icon="sparkles" data-size="16"></span></div>
+              <div class="plan-narration">
+                ${escapeHtml(plan.narration)}
+                <div class="sub">Plan à confirmer</div>
+              </div>
+            </div>
+            <div class="plan-entities">
+              ${plan.entities.map((e) => `
+                <span class="plan-entity">
+                  <span class="plan-entity-icon"><span data-icon="${e.icon}" data-size="13"></span></span>
+                  <span class="lbl">${e.kind}</span>
+                  <span class="val">${escapeHtml(e.label)}</span>
+                </span>
+              `).join('')}
+            </div>
+            <ul class="plan-actions-list">
+              ${plan.actions.map((a) => `
+                <li><span data-icon="chevron-right" data-size="13"></span><span>${escapeHtml(a)}</span></li>
+              `).join('')}
+            </ul>
+            <div class="plan-buttons">
+              <button class="btn btn-primary" data-plan="apply" ${state.planApplying ? 'disabled' : ''}>
+                ${state.planApplying
+                  ? `<span data-icon="loader-circle" data-size="13"></span> Application…`
+                  : `<span data-icon="check" data-size="13"></span> Appliquer <span class="kbd-inline">↵</span>`}
+              </button>
+              <button class="btn" data-plan="edit">
+                <span data-icon="pencil-line" data-size="13"></span> Modifier
+              </button>
+              <button class="btn btn-ghost" data-plan="cancel">
+                <span data-icon="x" data-size="13"></span> Annuler <span class="kbd-inline">esc</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderApplied() {
+      return `
+        <div class="result-strip ok">
+          <span data-icon="circle-check-big" data-size="20"></span>
+          <div>
+            <div class="result-strip-title">Action appliquée</div>
+            <div class="result-strip-body">Frédéric Martin marqué absent du 13/04 au 15/04. Le planning recalcule (12 tâches déplacées).</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderError() {
+      return `
+        <div class="result-strip err">
+          <span data-icon="triangle-alert" data-size="20"></span>
+          <div>
+            <div class="result-strip-title">Aucun opérateur trouvé</div>
+            <div class="result-strip-body">Je ne reconnais pas « Toto » dans la liste. Voulais-tu dire <b>Tom Berger</b> ou <b>Tony Reglin</b> ?</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFooter() {
+      return `
+        <div class="panel-footer">
+          <div class="panel-footer-shortcuts">
+            <span class="shortcut"><span class="kbd">↑</span><span class="kbd">↓</span> naviguer</span>
+            <span class="shortcut"><span class="kbd">↵</span> valider</span>
+            <span class="shortcut"><span class="kbd">esc</span> fermer</span>
+          </div>
+          <div class="panel-brand">
+            <span data-icon="command" data-size="12"></span> Flux · Alt+K
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
+    // ============================================================
+    // INTERACTIONS
+    // ============================================================
+    function bindHandlers() {
+      const inp = document.getElementById('panelInput');
+      if (inp) {
+        inp.addEventListener('input', (e) => {
+          state.query = e.target.value;
+          renderPanel();
+        });
+        inp.addEventListener('keydown', async (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            if (state.query.trim()) {
+              state.lastQuery = state.query;
+              await fakeBusyThenView('plan');
+            }
+          }
+        });
+      }
+
+      document.querySelectorAll('[data-action="ask-ai"]').forEach((el) => {
+        el.addEventListener('click', async () => {
+          state.lastQuery = state.query;
+          await fakeBusyThenView('plan');
+        });
+      });
+
+      document.querySelectorAll('[data-shortcut]').forEach((el) => {
+        el.addEventListener('click', () => flashShortcutFeedback(el));
+      });
+
+      document.querySelectorAll('[data-plan]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const action = btn.dataset.plan;
+          if (action === 'apply') {
+            state.planApplying = true;
+            renderPanel();
+            await sleep(800);
+            state.planApplying = false;
+            applyScenario('applied');
+          } else if (action === 'edit') {
+            state.view = 'menu';
+            state.query = state.lastQuery;
+            document.querySelectorAll('.scenario-btn').forEach((b) => b.classList.toggle('active', b.dataset.scenario === 'search-ai'));
+            renderPanel();
+          } else if (action === 'cancel') {
+            applyScenario('menu');
+          }
+        });
+      });
+    }
+
+    function flashShortcutFeedback(el) {
+      el.style.background = 'var(--success-soft)';
+      el.style.boxShadow = 'inset 2px 0 0 var(--success)';
+      setTimeout(() => { el.style.background = ''; el.style.boxShadow = ''; }, 700);
+    }
+
+    async function fakeBusyThenView(target) {
+      state.busy = true;
+      renderPanel();
+      await sleep(900);
+      state.busy = false;
+      applyScenario(target);
+    }
+
+    async function runAutoPlay() {
+      applyScenario('menu');
+      await sleep(700);
+      const target = 'Frédéric absent du 13 au 15 avril';
+      for (let i = 1; i <= target.length; i++) {
+        state.query = target.slice(0, i);
+        renderPanel();
+        await sleep(38);
+      }
+      await sleep(400);
+      state.lastQuery = state.query;
+      await fakeBusyThenView('plan');
+      await sleep(1200);
+      state.planApplying = true;
+      renderPanel();
+      await sleep(800);
+      state.planApplying = false;
+      applyScenario('applied');
+    }
+
+    function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+    // ============================================================
+    // PROMPT OUTPUT
+    // ============================================================
+    function updatePrompt() {
+      const themeLabel = state.theme === 'dark' ? 'mode sombre (zinc)' : 'mode clair (mauve)';
+      const txt = `Augmente le composant existant <b>CommandPalette</b> de <span class="mono">apps/web/src/components/CommandPalette/</span> pour intégrer la console IA en texte libre. <b>Préserve intégralement</b> la grille des 7 zones de raccourcis (Navigation, Actions, Affichage, Grille, Job sélectionné, Compaction, Système) issue de <span class="mono">useCommands.ts</span> ainsi que le rendu kbd à gradient zinc. <b>Ajoute</b> uniquement : dès que la barre de recherche n'est pas vide, le panneau bascule en dropdown vertical avec un item <i>« Demander à l'IA : <query> »</i> en tête (sélectionné par défaut, icône <span class="mono">sparkles</span>) suivi des commandes filtrées. <span class="kbd">↵</span> sur l'item IA → POST <span class="mono">/console/execute</span>, la réponse s'affiche inline en plan-card (entités résolues, actions, Appliquer/Modifier/Annuler). <b>Modifier</b> remet le texte de la requête dans la barre. <b>Retire</b> l'ancien <span class="mono">ConsolePanel</span> et son raccourci <span class="mono">Alt+I</span> — toute la logique migre dans <span class="mono">CommandPalette</span>. Conserve les API <span class="mono">/console/execute</span> et <span class="mono">/console/apply</span>. Utilise <span class="mono">lucide-react</span> pour les icônes (search, sparkles, command, keyboard, navigation, zap, eye, grid, target, shrink, cog, user-round, check, pencil-line, x, circle-check-big, triangle-alert). Largeur 760px, max-height 600px, ${themeLabel} primaire, Inter 13px.`;
+      document.getElementById('promptText').innerHTML = txt;
+    }
+
+    function copyPrompt() {
+      const text = document.getElementById('promptText').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.classList.add('copied');
+        btn.innerHTML = `<span data-icon="check" data-size="14"></span>Copié !`;
+        inflateIcons(btn);
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = `<span data-icon="copy" data-size="14"></span>Copier le prompt`;
+          inflateIcons(btn);
+        }, 1700);
+      });
+    }
+
+    inflateIcons();
+    renderPanel();
+    updatePrompt();
+  </script>
+</body>
+</html>

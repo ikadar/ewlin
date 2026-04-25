@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flux Console — Redesign Explorer</title>
+  <style>
+    /* ============================================================
+       THEME TOKENS — mirror apps/web design language
+       Dark = zinc-900 industrial. Light = mauve t3.chat-inspired.
+       ============================================================ */
+    :root[data-theme="dark"] {
+      --bg-canvas: #0f0f12;
+      --bg-surface: #18181b;
+      --bg-elevated: #1f1f23;
+      --bg-subtle: #27272a;
+      --bg-hover: #2a2a2f;
+      --border: #2f2f35;
+      --border-strong: #3f3f46;
+      --text-primary: #fafafa;
+      --text-secondary: #d4d4d8;
+      --text-muted: #71717a;
+      --text-faint: #52525b;
+      --accent: #2563eb;
+      --accent-hover: #3b82f6;
+      --accent-soft: rgba(37, 99, 235, 0.12);
+      --accent-border: rgba(59, 130, 246, 0.4);
+      --user-bubble-bg: #2563eb;
+      --user-bubble-fg: #ffffff;
+      --assistant-bubble-bg: #27272a;
+      --assistant-bubble-fg: #fafafa;
+      --whatsapp-canvas: #0d1418;
+      --whatsapp-pattern: #111c22;
+      --whatsapp-out: #1f4d3a;
+      --whatsapp-in: #1f2c33;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    :root[data-theme="light"] {
+      --bg-canvas: #ecddf0;
+      --bg-surface: #f5e9f9;
+      --bg-elevated: #ffffff;
+      --bg-subtle: #e5d2eb;
+      --bg-hover: #dec5e7;
+      --border: #c9b3d0;
+      --border-strong: #b094bb;
+      --text-primary: #1e0e2a;
+      --text-secondary: #4a3458;
+      --text-muted: #8b6e9a;
+      --text-faint: #b094bb;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-soft: rgba(99, 102, 241, 0.1);
+      --accent-border: rgba(99, 102, 241, 0.35);
+      --user-bubble-bg: #6366f1;
+      --user-bubble-fg: #ffffff;
+      --assistant-bubble-bg: #ffffff;
+      --assistant-bubble-fg: #1e0e2a;
+      --whatsapp-canvas: #d9c5dd;
+      --whatsapp-pattern: #cdb5d3;
+      --whatsapp-out: #c8b3e8;
+      --whatsapp-in: #ffffff;
+      --shadow-sm: 0 1px 2px rgba(60, 30, 80, 0.08);
+      --shadow-md: 0 4px 12px rgba(60, 30, 80, 0.12);
+      --shadow-lg: 0 20px 60px rgba(60, 30, 80, 0.18);
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+    }
+
+    /* ============================================================
+       BASE
+       ============================================================ */
+    * { box-sizing: border-box; }
+    html { font-size: 13px; } /* match apps/web base */
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.5;
+      transition: background 0.3s ease, color 0.3s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 32px 120px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .topbar .subtitle {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .theme-toggle {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .theme-toggle button {
+      background: transparent;
+      border: 0;
+      padding: 6px 14px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+    .theme-toggle button.active {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ============================================================
+       SECTION TITLES
+       ============================================================ */
+    .section {
+      margin-bottom: 36px;
+    }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-head h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.005em;
+    }
+    .section-head .hint {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    /* ============================================================
+       PERSONAS
+       ============================================================ */
+    .personas {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .persona {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .persona:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .persona-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .persona-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600;
+      font-size: 0.78rem;
+      color: white;
+      flex-shrink: 0;
+    }
+    .persona-name { font-weight: 600; font-size: 0.82rem; line-height: 1.1; }
+    .persona-role {
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      margin-top: 1px;
+    }
+    .persona-quote {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      font-style: italic;
+    }
+    .persona-quote::before { content: "« "; color: var(--text-faint); }
+    .persona-quote::after { content: " »"; color: var(--text-faint); }
+    .persona-takeaway {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+    .persona-takeaway b { color: var(--text-secondary); font-weight: 600; }
+
+    /* ============================================================
+       VARIANT PICKER (mini tiles)
+       ============================================================ */
+    .variants-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .variant-tile {
+      background: var(--bg-surface);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      position: relative;
+    }
+    .variant-tile:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .variant-tile.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-md);
+    }
+    .variant-tile.active::after {
+      content: "✓ Sélectionné";
+      position: absolute;
+      top: 10px; right: 10px;
+      background: var(--accent);
+      color: white;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .variant-tile-mini {
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    .variant-tile-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+    .variant-tile-tag {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .variant-tile-personality {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent-border);
+    }
+
+    /* ----- Mini-preview schematics for each tile ----- */
+    .mini-window {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-surface);
+    }
+    .mini-window-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 12%;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+    .mini-content { position: absolute; inset: 0; }
+
+    /* tile 1 — dock bottom */
+    .mini-dock {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 38%;
+      background: #18181b;
+      border-top: 2px solid #2563eb;
+    }
+    .mini-dock::before {
+      content: "";
+      position: absolute;
+      top: 8px; left: 8px; right: 8px;
+      height: 8px;
+      background: #2f2f35; border-radius: 2px;
+    }
+    .mini-dock::after {
+      content: "";
+      position: absolute;
+      bottom: 8px; left: 8px; right: 60px;
+      height: 14px;
+      background: #27272a; border-radius: 4px;
+    }
+
+    /* tile 2 — chat bubble FAB */
+    .mini-fab {
+      position: absolute;
+      bottom: 8px; right: 8px;
+      width: 22px; height: 22px;
+      background: #2563eb;
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+    }
+    .mini-bubble-pop {
+      position: absolute;
+      bottom: 36px; right: 6px;
+      width: 60%; height: 50%;
+      background: #18181b;
+      border: 1px solid #2f2f35;
+      border-radius: 10px;
+    }
+    .mini-bubble-pop::before {
+      content: "";
+      position: absolute;
+      top: 6px; left: 6px; right: 30%;
+      height: 8px;
+      background: #27272a; border-radius: 999px;
+    }
+    .mini-bubble-pop::after {
+      content: "";
+      position: absolute;
+      top: 18px; left: 30%; right: 6px;
+      height: 8px;
+      background: #2563eb; border-radius: 999px;
+    }
+
+    /* tile 3 — whatsapp */
+    .mini-wa {
+      position: absolute;
+      inset: 0;
+      background: var(--whatsapp-pattern);
+      background-image:
+        radial-gradient(circle at 25% 25%, rgba(255,255,255,0.02) 1px, transparent 1px),
+        radial-gradient(circle at 75% 75%, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 12px 12px;
+    }
+    .mini-wa-header {
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 18%;
+      background: #1f2c33;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .mini-wa-bub-out {
+      position: absolute;
+      top: 28%; right: 6px;
+      width: 55%; height: 18%;
+      background: #1f4d3a; border-radius: 6px 6px 1px 6px;
+    }
+    .mini-wa-bub-in {
+      position: absolute;
+      top: 52%; left: 6px;
+      width: 60%; height: 22%;
+      background: #1f2c33; border-radius: 6px 6px 6px 1px;
+    }
+
+    /* tile 4 — command palette */
+    .mini-cmd-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.4);
+    }
+    .mini-cmd {
+      position: absolute;
+      top: 18%; left: 12%; right: 12%;
+      bottom: 22%;
+      background: #1f1f23;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    }
+    .mini-cmd::before {
+      content: "";
+      position: absolute;
+      top: 7px; left: 7px; right: 7px;
+      height: 12px;
+      background: #27272a; border-radius: 4px;
+      border: 1px solid #2563eb;
+    }
+    .mini-cmd::after {
+      content: "";
+      position: absolute;
+      top: 28px; left: 7px; right: 7px; bottom: 7px;
+      background: linear-gradient(180deg, #27272a 33%, transparent 33%, transparent 66%, #27272a 66%);
+      background-size: 100% 30%;
+      border-radius: 2px;
+    }
+
+    /* tile 5 — sidebar drawer right */
+    .mini-side {
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 38%;
+      background: #18181b;
+      border-left: 2px solid #2563eb;
+    }
+    .mini-side-tabs {
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 14%;
+      background: #1f1f23;
+      border-bottom: 1px solid #2f2f35;
+    }
+    .mini-side::before {
+      content: "";
+      position: absolute;
+      top: 18%; left: 6px; right: 6px;
+      height: 30%;
+      background: #27272a; border-radius: 6px;
+    }
+    .mini-side::after {
+      content: "";
+      position: absolute;
+      bottom: 18%; left: 6px; right: 6px;
+      height: 14%;
+      background: #2563eb; border-radius: 6px;
+      opacity: 0.3;
+    }
+
+    /* tile 6 — ambient ribbon */
+    .mini-ribbon {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 16%;
+      background: linear-gradient(90deg, rgba(37,99,235,0.15), rgba(37,99,235,0.05));
+      border-top: 1px solid #2563eb;
+      display: flex; align-items: center; gap: 4px; padding: 0 6px;
+    }
+    .mini-ribbon::before, .mini-ribbon::after, .mini-ribbon-chip {
+      content: "";
+      height: 60%;
+      width: 14%;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 999px;
+    }
+    .mini-ribbon-chip { width: 22%; }
+    .mini-ribbon-input {
+      flex: 1;
+      height: 60%;
+      background: #18181b;
+      border: 1px solid #2f2f35;
+      border-radius: 4px;
+    }
+
+    /* ============================================================
+       ACTIVE VARIANT VIEWPORT
+       ============================================================ */
+    .stage {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 0;
+      min-height: 560px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stage-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elevated);
+    }
+    .stage-toolbar-title { display: flex; gap: 10px; align-items: center; font-weight: 600; font-size: 0.85rem; }
+    .stage-toolbar-title .badge {
+      padding: 2px 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent-border);
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .stage-actions { display: flex; gap: 8px; }
+    .btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+    .btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    .stage-canvas {
+      position: relative;
+      height: 560px;
+      background:
+        repeating-linear-gradient(45deg, transparent, transparent 12px, var(--bg-canvas) 12px, var(--bg-canvas) 13px),
+        var(--bg-surface);
+      overflow: hidden;
+    }
+    /* Faux app behind the variant overlay */
+    .faux-app {
+      position: absolute; inset: 0;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 50px 1fr;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .faux-sidebar {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .faux-main {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex; flex-direction: column;
+      padding: 10px;
+      gap: 6px;
+    }
+    .faux-row {
+      height: 22px;
+      background: var(--bg-subtle);
+      border-radius: 4px;
+    }
+    .faux-row:nth-child(odd) { width: 70%; }
+    .faux-row:nth-child(even) { width: 90%; }
+
+    /* ============================================================
+       VARIANT 1 — DOCK BOTTOM
+       ============================================================ */
+    .v-dock {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 56%;
+      background: var(--bg-canvas);
+      border-top: 1px solid var(--border-strong);
+      display: flex; flex-direction: column;
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+    }
+    .v-dock-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem; font-weight: 500;
+    }
+    .v-dock-stream {
+      flex: 1; overflow-y: auto;
+      padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .v-dock-input-bar {
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex; gap: 8px;
+    }
+
+    /* ============================================================
+       VARIANT 2 — CHAT BUBBLE FAB
+       ============================================================ */
+    .v-fab {
+      position: absolute;
+      bottom: 24px; right: 24px;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.4);
+      transition: transform 0.15s;
+      font-size: 1.4rem;
+    }
+    .v-fab:hover { transform: scale(1.05); }
+    .v-fab-popup {
+      position: absolute;
+      bottom: 88px; right: 24px;
+      width: 380px; height: 480px;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      transform-origin: bottom right;
+    }
+    .v-fab-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+      color: white;
+    }
+    .v-fab-head-title { font-weight: 600; font-size: 0.9rem; }
+    .v-fab-head-subtitle { font-size: 0.7rem; opacity: 0.85; margin-top: 1px; }
+    .v-fab-stream {
+      flex: 1; overflow-y: auto;
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      background: var(--bg-surface);
+    }
+    .v-fab-input-bar {
+      padding: 10px;
+      background: var(--bg-canvas);
+      border-top: 1px solid var(--border);
+      display: flex; gap: 6px;
+      align-items: center;
+    }
+
+    /* ============================================================
+       VARIANT 3 — WHATSAPP
+       ============================================================ */
+    .v-wa {
+      position: absolute;
+      inset: 12px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      display: flex; flex-direction: column;
+      background: var(--whatsapp-canvas);
+    }
+    .v-wa-head {
+      background: #1f2c33;
+      color: #e9edef;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.3);
+    }
+    :root[data-theme="light"] .v-wa-head {
+      background: #6b4e84;
+      color: white;
+    }
+    .v-wa-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: white;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem;
+    }
+    .v-wa-meta { line-height: 1.15; }
+    .v-wa-name { font-weight: 600; font-size: 0.85rem; }
+    .v-wa-status { font-size: 0.7rem; opacity: 0.7; }
+    .v-wa-stream {
+      flex: 1; overflow-y: auto;
+      padding: 16px;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.015) 1px, transparent 1px),
+        radial-gradient(circle at 80% 70%, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 16px 16px;
+      background-color: var(--whatsapp-pattern);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .v-wa-bubble {
+      max-width: 70%;
+      padding: 7px 11px;
+      border-radius: 7px;
+      position: relative;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+    }
+    .v-wa-bubble.in {
+      background: var(--whatsapp-in);
+      color: var(--text-primary);
+      align-self: flex-start;
+      border-top-left-radius: 1px;
+    }
+    .v-wa-bubble.out {
+      background: var(--whatsapp-out);
+      color: var(--text-primary);
+      align-self: flex-end;
+      border-top-right-radius: 1px;
+    }
+    :root[data-theme="dark"] .v-wa-bubble.in { color: #e9edef; }
+    :root[data-theme="dark"] .v-wa-bubble.out { color: #e9edef; }
+    .v-wa-bubble .ts {
+      font-size: 0.65rem;
+      opacity: 0.55;
+      margin-left: 8px;
+      float: right;
+      margin-top: 4px;
+    }
+    .v-wa-bubble .check {
+      display: inline-block;
+      margin-left: 4px;
+      color: #53bdeb;
+      font-size: 0.7rem;
+    }
+    .v-wa-input {
+      background: var(--bg-elevated);
+      padding: 8px 10px;
+      display: flex; gap: 8px; align-items: center;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ============================================================
+       VARIANT 4 — COMMAND PALETTE (LINEAR/RAYCAST)
+       ============================================================ */
+    .v-cmd-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 70px;
+    }
+    .v-cmd-modal {
+      width: 580px; max-width: 90%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .v-cmd-input-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .v-cmd-prompt {
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .v-cmd-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+    .v-cmd-kbd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .v-cmd-results {
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .v-cmd-section-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 8px 10px 4px;
+      font-weight: 600;
+    }
+    .v-cmd-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .v-cmd-item:hover, .v-cmd-item.selected {
+      background: var(--bg-hover);
+    }
+    .v-cmd-item-icon {
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+    }
+    .v-cmd-item-meta { flex: 1; line-height: 1.2; }
+    .v-cmd-item-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; }
+    .v-cmd-footer {
+      display: flex; justify-content: space-between;
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-subtle);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* ============================================================
+       VARIANT 5 — SIDEBAR DRAWER (RIGHT)
+       ============================================================ */
+    .v-side {
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 420px;
+      background: var(--bg-canvas);
+      border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      box-shadow: -10px 0 30px rgba(0,0,0,0.2);
+    }
+    .v-side-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .v-side-tabs {
+      display: flex; gap: 4px;
+      margin-top: 10px;
+    }
+    .v-side-tab {
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .v-side-tab.active {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .v-side-stream {
+      flex: 1; overflow-y: auto;
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .v-side-thread-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.78rem;
+      cursor: pointer;
+      background: var(--bg-surface);
+    }
+    .v-side-thread-item.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .v-side-thread-title { font-weight: 600; margin-bottom: 2px; }
+    .v-side-thread-sub { color: var(--text-muted); font-size: 0.7rem; }
+    .v-side-input {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+    }
+
+    /* ============================================================
+       VARIANT 6 — AMBIENT RIBBON
+       ============================================================ */
+    .v-ribbon {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(180deg, transparent, var(--bg-canvas) 30%);
+      padding: 12px;
+    }
+    .v-ribbon-bar {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 8px 6px 14px;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: var(--shadow-md);
+    }
+    .v-ribbon-icon {
+      color: var(--accent);
+      font-size: 1rem;
+    }
+    .v-ribbon-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: inherit;
+      padding: 4px 0;
+    }
+    .v-ribbon-chips {
+      display: flex; gap: 6px;
+      margin-bottom: 8px;
+      padding: 0 4px;
+      overflow-x: auto;
+    }
+    .v-ribbon-chip {
+      padding: 4px 11px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .v-ribbon-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .v-ribbon-overlay {
+      position: absolute;
+      bottom: 70px; left: 12px; right: 12px;
+      max-height: 380px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      overflow-y: auto;
+    }
+
+    /* ============================================================
+       SHARED MESSAGE STYLES (reused across variants where natural)
+       ============================================================ */
+    .msg {
+      display: flex;
+      max-width: 100%;
+    }
+    .msg.user { justify-content: flex-end; }
+    .msg.assistant { justify-content: flex-start; }
+    .msg-bubble {
+      max-width: 78%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .msg.user .msg-bubble {
+      background: var(--user-bubble-bg);
+      color: var(--user-bubble-fg);
+      border-bottom-right-radius: 4px;
+    }
+    .msg.assistant .msg-bubble {
+      background: var(--assistant-bubble-bg);
+      color: var(--assistant-bubble-fg);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .typing-dots {
+      display: inline-flex; gap: 3px;
+      padding: 2px 0;
+    }
+    .typing-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      animation: typing-bounce 1.2s infinite ease-in-out;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* Plan card */
+    .plan-card {
+      border: 1px solid var(--accent-border);
+      background: var(--accent-soft);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 9px;
+      animation: plan-fade 0.3s ease-out;
+    }
+    @keyframes plan-fade {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .plan-narration { font-size: 0.85rem; font-weight: 500; }
+    .plan-entities { display: flex; flex-wrap: wrap; gap: 5px; }
+    .plan-entity-chip {
+      display: inline-flex; gap: 4px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+    }
+    .plan-entity-chip .lbl { color: var(--text-muted); }
+    .plan-entity-chip .val { font-weight: 600; }
+    .plan-actions-list {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 0.78rem;
+    }
+    .plan-actions-list li::before {
+      content: "›";
+      color: var(--accent);
+      margin-right: 6px;
+      font-weight: 700;
+    }
+    .plan-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* Result strip */
+    .result-strip {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      display: flex; gap: 8px; align-items: center;
+    }
+    .result-strip.ok { border-color: var(--success); color: var(--success); }
+    .result-strip.err { border-color: var(--danger); color: var(--danger); }
+
+    /* Suggestion chips row (used by several variants) */
+    .suggestion-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding-top: 6px;
+    }
+    .suggestion-chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Input variants */
+    .input-shell {
+      display: flex; gap: 6px; align-items: center;
+      flex: 1;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 4px 4px 12px;
+    }
+    .input-shell input, .input-shell textarea {
+      flex: 1;
+      background: transparent;
+      border: 0; outline: 0;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: inherit;
+      padding: 6px 0;
+      resize: none;
+    }
+    .input-shell input::placeholder, .input-shell textarea::placeholder {
+      color: var(--text-faint);
+    }
+    .input-send {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.95rem;
+    }
+    .input-send:hover { background: var(--accent-hover); }
+    .input-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      padding: 24px 12px;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    /* ============================================================
+       PROMPT OUTPUT
+       ============================================================ */
+    .prompt-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex; gap: 14px; align-items: center;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+      z-index: 50;
+    }
+    .prompt-text {
+      flex: 1;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .prompt-text b { color: var(--text-primary); font-weight: 600; }
+    .prompt-actions { display: flex; gap: 8px; }
+    .copy-btn {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      padding: 8px 16px;
+      border-radius: 7px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .copy-btn:hover { background: var(--accent-hover); }
+    .copy-btn.copied { background: var(--success); }
+
+    .footnote {
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-align: center;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="app">
+    <!-- ============================================================
+         TOP BAR
+         ============================================================ -->
+    <div class="topbar">
+      <div>
+        <h1>Console / IA — Explorateur de redesign</h1>
+        <div class="subtitle">Six modes d'interaction conversationnelle pour <span class="mono">Flux</span> · Mock data réelle</div>
+      </div>
+      <div class="topbar-right">
+        <div class="theme-toggle" role="tablist" aria-label="Thème">
+          <button data-theme-btn="dark" class="active">Dark zinc</button>
+          <button data-theme-btn="light">Mauve clair</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         PERSONAS
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Avis des spécialistes</h2>
+        <div class="hint">Quatre angles, quatre voix — relisez avant de choisir.</div>
+      </div>
+      <div class="personas">
+        <div class="persona">
+          <div class="persona-head">
+            <div class="persona-avatar" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">CL</div>
+            <div>
+              <div class="persona-name">Claire Larue</div>
+              <div class="persona-role">Spécialiste UX</div>
+            </div>
+          </div>
+          <div class="persona-quote">Le panneau actuel coupe la moitié du planning quand l'utilisateur veut juste poser une question rapide. Je préfère les modes qui n'occupent que l'espace strictement nécessaire — la palette de commandes ou le ruban ambiant. Plus la friction d'invocation est faible, plus l'IA sera adoptée. Garder ALT+I pour ouvrir, ⌃K pour la palette, et ne jamais voler le focus du planning.</div>
+          <div class="persona-takeaway"><b>Recommande :</b> Variantes 4 (palette) et 6 (ruban).</div>
+        </div>
+
+        <div class="persona">
+          <div class="persona-head">
+            <div class="persona-avatar" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">MV</div>
+            <div>
+              <div class="persona-name">Marcus Vannier</div>
+              <div class="persona-role">Designer produit</div>
+            </div>
+          </div>
+          <div class="persona-quote">Une console de planning n'est pas Messenger. Le mimétisme WhatsApp ajoute du bruit visuel (avatars, double-checks, fond texturé) qui n'apporte rien à un manager qui veut décaler une deadline. Je vise la sobriété — mais avec une typographie soignée, des transitions douces et des bulles qui respirent. La FAB chat-bubble est un compromis honorable : familière sans être enfantine.</div>
+          <div class="persona-takeaway"><b>Recommande :</b> Variantes 2 (bulle FAB) et 4 (palette).</div>
+        </div>
+
+        <div class="persona">
+          <div class="persona-head">
+            <div class="persona-avatar" style="background: linear-gradient(135deg, #f59e0b, #d97706);">SO</div>
+            <div>
+              <div class="persona-name">Sofia Ortiz</div>
+              <div class="persona-role">Avocate de l'utilisateur</div>
+            </div>
+          </div>
+          <div class="persona-quote">Julien et son équipe ne tapent pas dix messages par minute — ils déclenchent une action (« Frédéric absent », « décale la deadline ») et veulent revoir le planning recalculé tout de suite. La métaphore conversationnelle est secondaire ; ce qui compte c'est la lisibilité du plan-card avant d'appliquer. La sidebar drawer permet de garder la trace des conversations passées, utile pour défaire ou ré-appliquer.</div>
+          <div class="persona-takeaway"><b>Recommande :</b> Variantes 5 (drawer) et 1 (dock conservé mais affiné).</div>
+        </div>
+
+        <div class="persona">
+          <div class="persona-head">
+            <div class="persona-avatar" style="background: linear-gradient(135deg, #ec4899, #be185d);">HM</div>
+            <div>
+              <div class="persona-name">Henri Marceau</div>
+              <div class="persona-role">Directeur artistique</div>
+            </div>
+          </div>
+          <div class="persona-quote">L'app utilise un vocabulaire visuel précis : zinc-900, accent bleu-600, Inter 13px, coins arrondis 8px, ombres discrètes. Toute proposition doit s'inscrire dans cette grammaire — pas de néon, pas de skeuomorphisme WhatsApp. Le ruban ambiant est le plus respectueux de l'existant ; la palette de commandes flatte les habitudes Linear/Raycast déjà familières des utilisateurs power. WhatsApp à exclure ou à dépouiller à l'extrême.</div>
+          <div class="persona-takeaway"><b>Recommande :</b> Variantes 6 (ruban) et 4 (palette). <b>Réserve :</b> 3 (WhatsApp).</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         VARIANT PICKER
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Six pistes de redesign</h2>
+        <div class="hint">Cliquez pour activer la variante dans le viewport ci-dessous.</div>
+      </div>
+      <div class="variants-grid" id="variantsGrid"></div>
+    </section>
+
+    <!-- ============================================================
+         ACTIVE VARIANT STAGE
+         ============================================================ -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Démo interactive</h2>
+        <div class="hint">Tapez ou choisissez une suggestion — l'IA répond et affiche un plan.</div>
+      </div>
+      <div class="stage">
+        <div class="stage-toolbar">
+          <div class="stage-toolbar-title">
+            <span id="stageTitle">Variante 1</span>
+            <span class="badge" id="stageBadge">DOCK BAS</span>
+          </div>
+          <div class="stage-actions">
+            <button class="btn btn-ghost" id="resetBtn">↻ Réinitialiser la démo</button>
+            <button class="btn" id="autoplayBtn">▶ Auto-play</button>
+          </div>
+        </div>
+        <div class="stage-canvas" id="stageCanvas">
+          <!-- Faux app behind -->
+          <div class="faux-app">
+            <div class="faux-sidebar"></div>
+            <div class="faux-main">
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+              <div class="faux-row"></div>
+            </div>
+          </div>
+          <!-- Variant overlay -->
+          <div id="variantHost"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footnote">
+      Toutes les variantes consomment la même API <span class="mono">/console/execute</span> et <span class="mono">/console/apply</span> — seule la couche présentationnelle change.
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PROMPT OUTPUT BAR
+       ============================================================ -->
+  <div class="prompt-bar">
+    <div class="prompt-text" id="promptText"></div>
+    <div class="prompt-actions">
+      <button class="copy-btn" id="copyBtn">Copier le prompt</button>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // VARIANT METADATA
+    // ============================================================
+    const VARIANTS = [
+      {
+        id: 'dock',
+        name: 'Dock bas',
+        tag: 'L\'existant — refondu',
+        personality: 'baseline',
+        miniHTML: `
+          <div class="mini-window">
+            <div class="mini-window-bar"></div>
+            <div class="mini-content"><div class="mini-dock"></div></div>
+          </div>`,
+        promptHint: 'Conserver le dock bas mais en affinant la typographie, l\'espacement et la transition d\'apparition.',
+      },
+      {
+        id: 'fab',
+        name: 'Bulle flottante (FAB)',
+        tag: 'Familière — Intercom-like',
+        personality: 'friendly',
+        miniHTML: `
+          <div class="mini-window">
+            <div class="mini-window-bar"></div>
+            <div class="mini-content">
+              <div class="mini-bubble-pop"></div>
+              <div class="mini-fab"></div>
+            </div>
+          </div>`,
+        promptHint: 'Une FAB ronde bleue en bas-droite ouvre une bulle de chat compacte 380×480 ancrée à la même position.',
+      },
+      {
+        id: 'wa',
+        name: 'WhatsApp-like',
+        tag: 'Conversationnel — saturé',
+        personality: 'casual',
+        miniHTML: `
+          <div class="mini-wa">
+            <div class="mini-wa-header"></div>
+            <div class="mini-wa-bub-out"></div>
+            <div class="mini-wa-bub-in"></div>
+          </div>`,
+        promptHint: 'Pleine fenêtre style messagerie : avatar IA, bulles avec queue, fond texturé, double-check à l\'apply.',
+      },
+      {
+        id: 'cmd',
+        name: 'Palette de commandes',
+        tag: 'Linear / Raycast',
+        personality: 'power-user',
+        miniHTML: `
+          <div class="mini-window">
+            <div class="mini-window-bar"></div>
+            <div class="mini-cmd-overlay"></div>
+            <div class="mini-cmd"></div>
+          </div>`,
+        promptHint: 'Modal centrée déclenchée au ⌘K avec un input proéminent et des suggestions classées par section.',
+      },
+      {
+        id: 'side',
+        name: 'Drawer latéral',
+        tag: 'Slack / Notion AI',
+        personality: 'persistent',
+        miniHTML: `
+          <div class="mini-window">
+            <div class="mini-window-bar"></div>
+            <div class="mini-side-tabs"></div>
+            <div class="mini-side"></div>
+          </div>`,
+        promptHint: 'Drawer 420px à droite avec onglets (conversation actuelle, historique) et input persistant.',
+      },
+      {
+        id: 'ribbon',
+        name: 'Ruban ambiant',
+        tag: 'Discret — toujours là',
+        personality: 'ambient',
+        miniHTML: `
+          <div class="mini-window">
+            <div class="mini-window-bar"></div>
+            <div class="mini-ribbon">
+              <div class="mini-ribbon-chip"></div>
+              <div class="mini-ribbon-chip"></div>
+              <div class="mini-ribbon-input"></div>
+            </div>
+          </div>`,
+        promptHint: 'Ruban arrondi en bas avec chips de raccourcis et input inline. Conversation en overlay flottant au-dessus.',
+      },
+    ];
+
+    // ============================================================
+    // MOCK DATA
+    // ============================================================
+    const SUGGESTIONS = [
+      'Frédéric absent du 13 au 15 avril',
+      'Décale la deadline du dossier 35202 de 4 jours',
+      'Maintenance MBO XL le 14 avril de 10h à 13h',
+    ];
+
+    const SCRIPTED_REPLY = {
+      userText: 'Frédéric absent du 13 au 15 avril',
+      assistantText: 'Je vais marquer Frédéric Martin absent du 13 au 15 avril 2026.',
+      entities: [
+        { kind: 'Opérateur', label: 'Frédéric Martin' },
+      ],
+      actions: [
+        'Ajouter une absence opérateur du 13/04/2026 au 15/04/2026',
+      ],
+    };
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    const state = {
+      theme: 'dark',
+      variantId: 'dock',
+      // Per-variant local state, keyed by variant id
+      session: createEmptySession(),
+      typing: false,
+      pending: null, // pending plan if any
+      autoplay: false,
+    };
+
+    function createEmptySession() {
+      return {
+        messages: [], // {id, role, text, kind?}
+      };
+    }
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.theme = btn.dataset.themeBtn;
+        document.documentElement.setAttribute('data-theme', state.theme);
+        document.querySelectorAll('[data-theme-btn]').forEach((b) => b.classList.toggle('active', b === btn));
+        updatePrompt();
+      });
+    });
+
+    // Render variant picker
+    const grid = document.getElementById('variantsGrid');
+    VARIANTS.forEach((v, i) => {
+      const tile = document.createElement('div');
+      tile.className = 'variant-tile' + (v.id === state.variantId ? ' active' : '');
+      tile.dataset.variant = v.id;
+      tile.innerHTML = `
+        <div class="variant-tile-mini">${v.miniHTML}</div>
+        <div class="variant-tile-name">${i + 1}. ${v.name}</div>
+        <div class="variant-tile-tag">${v.tag}</div>
+        <span class="variant-tile-personality">${v.personality}</span>
+      `;
+      tile.addEventListener('click', () => {
+        state.variantId = v.id;
+        document.querySelectorAll('.variant-tile').forEach((t) => t.classList.toggle('active', t.dataset.variant === v.id));
+        resetSession();
+        renderStage();
+        updatePrompt();
+      });
+      grid.appendChild(tile);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      resetSession();
+      renderStage();
+    });
+    document.getElementById('autoplayBtn').addEventListener('click', () => {
+      resetSession();
+      renderStage();
+      setTimeout(() => runScriptedDemo(), 300);
+    });
+
+    document.getElementById('copyBtn').addEventListener('click', copyPrompt);
+
+    function resetSession() {
+      state.session = createEmptySession();
+      state.typing = false;
+      state.pending = null;
+    }
+
+    // ============================================================
+    // STAGE RENDER (delegates to variant renderers)
+    // ============================================================
+    function renderStage() {
+      const variant = VARIANTS.find((v) => v.id === state.variantId);
+      document.getElementById('stageTitle').textContent = `Variante ${VARIANTS.indexOf(variant) + 1}`;
+      document.getElementById('stageBadge').textContent = variant.name.toUpperCase();
+      const host = document.getElementById('variantHost');
+      host.innerHTML = '';
+      const renderer = RENDERERS[state.variantId];
+      if (renderer) renderer(host);
+      // Scroll any stream into view
+      requestAnimationFrame(() => {
+        document.querySelectorAll('[data-autoscroll]').forEach((el) => {
+          el.scrollTop = el.scrollHeight;
+        });
+      });
+    }
+
+    // ============================================================
+    // SHARED RENDER HELPERS
+    // ============================================================
+    function renderEmptyState(label) {
+      return `<div class="empty-state">
+        ${label || `Tapez une commande en français. Exemples : « Frédéric absent du 13 au 15 avril », « Décale la deadline du dossier 35202 de 4 jours », « Maintenance MBO XL le 14 avril de 10h à 13h ».`}
+        <div class="suggestion-row" style="justify-content:center; margin-top:10px;">
+          ${SUGGESTIONS.map((s) => `<button class="suggestion-chip" data-suggestion="${s}">${s}</button>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    function renderMessages() {
+      let html = '';
+      for (const m of state.session.messages) {
+        if (m.role === 'user') {
+          html += `<div class="msg user"><div class="msg-bubble">${escapeHtml(m.text)}</div></div>`;
+        } else if (m.role === 'assistant') {
+          html += `<div class="msg assistant"><div class="msg-bubble">${escapeHtml(m.text)}</div></div>`;
+        } else if (m.role === 'result') {
+          html += `<div class="result-strip ${m.ok ? 'ok' : 'err'}">${m.ok ? '✓' : '✕'} ${escapeHtml(m.text)}</div>`;
+        }
+      }
+      if (state.typing) {
+        html += `<div class="msg assistant"><div class="msg-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div></div>`;
+      }
+      if (state.pending) {
+        html += renderPlanCardHTML(state.pending);
+      }
+      return html;
+    }
+
+    function renderPlanCardHTML(plan) {
+      return `
+        <div class="plan-card">
+          <div class="plan-narration">${escapeHtml(plan.narration)}</div>
+          <div class="plan-entities">
+            ${plan.entities.map((e) => `
+              <span class="plan-entity-chip">
+                <span class="lbl">${e.kind} :</span>
+                <span class="val">${escapeHtml(e.label)}</span>
+              </span>`).join('')}
+          </div>
+          <ul class="plan-actions-list">
+            ${plan.actions.map((a) => `<li>${escapeHtml(a)}</li>`).join('')}
+          </ul>
+          <div class="plan-buttons">
+            <button class="btn btn-primary" data-plan="apply">Appliquer</button>
+            <button class="btn" data-plan="edit">Modifier</button>
+            <button class="btn btn-ghost" data-plan="cancel">Annuler</button>
+          </div>
+        </div>`;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
+    // Wire up shared event listeners after each render — done after each renderer.
+    function wireCommonHandlers(scope) {
+      scope.querySelectorAll('[data-suggestion]').forEach((b) => {
+        b.addEventListener('click', () => submitUser(b.dataset.suggestion));
+      });
+      scope.querySelectorAll('[data-plan]').forEach((b) => {
+        b.addEventListener('click', () => handlePlanAction(b.dataset.plan));
+      });
+      scope.querySelectorAll('[data-input]').forEach((inp) => {
+        inp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const val = inp.value.trim();
+            if (val) submitUser(val);
+            inp.value = '';
+          }
+        });
+      });
+      scope.querySelectorAll('[data-send]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const inp = scope.querySelector('[data-input]');
+          if (!inp) return;
+          const val = inp.value.trim();
+          if (val) submitUser(val);
+          inp.value = '';
+        });
+      });
+    }
+
+    // ============================================================
+    // SCRIPTED DEMO ENGINE
+    // ============================================================
+    async function submitUser(text) {
+      if (state.typing) return;
+      state.session.messages.push({ id: Date.now(), role: 'user', text });
+      state.pending = null;
+      renderStage();
+      // Wait briefly then assistant typing
+      await sleep(400);
+      state.typing = true;
+      renderStage();
+      await sleep(1100);
+      state.typing = false;
+      // Reply: if matches scripted, use it. Else generic.
+      const matchedScripted = /frédéric|frederic/i.test(text);
+      let reply, plan;
+      if (matchedScripted) {
+        reply = SCRIPTED_REPLY.assistantText;
+        plan = {
+          narration: SCRIPTED_REPLY.assistantText,
+          entities: SCRIPTED_REPLY.entities,
+          actions: SCRIPTED_REPLY.actions,
+        };
+      } else if (/deadline|dossier/i.test(text)) {
+        reply = 'Je vais décaler la deadline du dossier 35202 de 4 jours, du 22/04/2026 au 26/04/2026.';
+        plan = {
+          narration: reply,
+          entities: [{ kind: 'Dossier', label: '35202 — Brochure ACME' }],
+          actions: ['Repousser la date limite atelier de 4 jours'],
+        };
+      } else if (/maintenance|mbo/i.test(text)) {
+        reply = 'Je vais bloquer la MBO XL le 14 avril 2026 de 10h00 à 13h00 pour maintenance.';
+        plan = {
+          narration: reply,
+          entities: [{ kind: 'Machine', label: 'MBO XL' }],
+          actions: ['Ajouter une exception machine 14/04/2026 10:00 → 13:00 (Maintenance)'],
+        };
+      } else {
+        reply = `Je peux t'aider avec ça, mais peux-tu préciser ce que tu attends ?`;
+        plan = null;
+      }
+      state.session.messages.push({ id: Date.now() + 1, role: 'assistant', text: reply });
+      if (plan) state.pending = plan;
+      renderStage();
+    }
+
+    function handlePlanAction(action) {
+      if (action === 'apply') {
+        state.pending = null;
+        state.session.messages.push({ id: Date.now(), role: 'result', ok: true, text: '1 action appliquée — recompute du planning lancé.' });
+      } else if (action === 'edit') {
+        const last = [...state.session.messages].reverse().find((m) => m.role === 'user');
+        state.pending = null;
+        renderStage();
+        // Refill the active input
+        const inp = document.querySelector('[data-input]');
+        if (inp && last) {
+          inp.value = last.text;
+          inp.focus();
+        }
+        return;
+      } else if (action === 'cancel') {
+        state.pending = null;
+      }
+      renderStage();
+    }
+
+    async function runScriptedDemo() {
+      await submitUser(SCRIPTED_REPLY.userText);
+    }
+
+    function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+    // ============================================================
+    // VARIANT RENDERERS
+    // ============================================================
+    const RENDERERS = {};
+
+    // ----- 1. DOCK BOTTOM -----
+    RENDERERS.dock = (host) => {
+      host.innerHTML = `
+        <div class="v-dock">
+          <div class="v-dock-head">
+            <span><span style="margin-right:6px;">⚡</span>Console (ALT+I)</span>
+            <span class="btn btn-ghost" style="padding:2px 8px;">Nouvelle conversation</span>
+          </div>
+          <div class="v-dock-stream" data-autoscroll>
+            ${state.session.messages.length === 0 && !state.pending && !state.typing
+              ? renderEmptyState()
+              : renderMessages()}
+          </div>
+          <div class="v-dock-input-bar">
+            <div class="input-shell">
+              <textarea data-input rows="1" placeholder="Que voulez-vous faire ?"></textarea>
+            </div>
+            <button class="input-send" data-send>↑</button>
+          </div>
+        </div>`;
+      wireCommonHandlers(host);
+    };
+
+    // ----- 2. CHAT BUBBLE FAB -----
+    RENDERERS.fab = (host) => {
+      host.innerHTML = `
+        <div class="v-fab-popup">
+          <div class="v-fab-head">
+            <div>
+              <div class="v-fab-head-title">Flux Assistant</div>
+              <div class="v-fab-head-subtitle">Disponible — répond en français</div>
+            </div>
+            <button class="btn btn-ghost" style="color:white;">×</button>
+          </div>
+          <div class="v-fab-stream" data-autoscroll>
+            ${state.session.messages.length === 0 && !state.pending && !state.typing
+              ? renderEmptyState('Bonjour ! Que puis-je faire pour toi ?')
+              : renderMessages()}
+          </div>
+          <div class="v-fab-input-bar">
+            <div class="input-shell">
+              <input data-input placeholder="Écris ton message…" />
+            </div>
+            <button class="input-send" data-send>↑</button>
+          </div>
+        </div>
+        <div class="v-fab" title="Ouvrir l'assistant">⚡</div>`;
+      wireCommonHandlers(host);
+    };
+
+    // ----- 3. WHATSAPP -----
+    RENDERERS.wa = (host) => {
+      host.innerHTML = `
+        <div class="v-wa">
+          <div class="v-wa-head">
+            <div class="v-wa-avatar">FA</div>
+            <div class="v-wa-meta">
+              <div class="v-wa-name">Flux Assistant</div>
+              <div class="v-wa-status">en ligne</div>
+            </div>
+          </div>
+          <div class="v-wa-stream" data-autoscroll>
+            ${renderWhatsappMessages()}
+          </div>
+          <div class="v-wa-input">
+            <div class="input-shell" style="border-radius:999px;">
+              <input data-input placeholder="Écris un message…" />
+            </div>
+            <button class="input-send" data-send style="border-radius:50%;">➤</button>
+          </div>
+        </div>`;
+      wireCommonHandlers(host);
+    };
+
+    function renderWhatsappMessages() {
+      if (state.session.messages.length === 0 && !state.typing && !state.pending) {
+        return `<div class="empty-state" style="color: rgba(255,255,255,0.6);">
+          Démarre une conversation. Quelques exemples :
+          <div class="suggestion-row" style="justify-content:center; margin-top:10px;">
+            ${SUGGESTIONS.map((s) => `<button class="suggestion-chip" data-suggestion="${s}">${s}</button>`).join('')}
+          </div>
+        </div>`;
+      }
+      let html = '';
+      for (const m of state.session.messages) {
+        const t = new Date(m.id).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        if (m.role === 'user') {
+          html += `<div class="v-wa-bubble out">${escapeHtml(m.text)}<span class="ts">${t}<span class="check">✓✓</span></span></div>`;
+        } else if (m.role === 'assistant') {
+          html += `<div class="v-wa-bubble in">${escapeHtml(m.text)}<span class="ts">${t}</span></div>`;
+        } else if (m.role === 'result') {
+          html += `<div class="result-strip ${m.ok ? 'ok' : 'err'}" style="align-self:center;">${m.ok ? '✓' : '✕'} ${escapeHtml(m.text)}</div>`;
+        }
+      }
+      if (state.typing) {
+        html += `<div class="v-wa-bubble in"><span class="typing-dots"><span></span><span></span><span></span></span></div>`;
+      }
+      if (state.pending) {
+        html += `<div style="align-self:flex-start; max-width:90%;">${renderPlanCardHTML(state.pending)}</div>`;
+      }
+      return html;
+    }
+
+    // ----- 4. COMMAND PALETTE -----
+    RENDERERS.cmd = (host) => {
+      const hasContent = state.session.messages.length > 0 || state.typing || state.pending;
+      host.innerHTML = `
+        <div class="v-cmd-backdrop">
+          <div class="v-cmd-modal">
+            <div class="v-cmd-input-row">
+              <span class="v-cmd-prompt">⚡</span>
+              <input class="v-cmd-input" data-input placeholder="Décris une action ou pose une question…" autofocus />
+              <span class="v-cmd-kbd">↵</span>
+            </div>
+            <div class="v-cmd-results">
+              ${hasContent
+                ? renderMessages()
+                : `<div class="v-cmd-section-label">Suggestions</div>
+                   ${SUGGESTIONS.map((s, i) => `
+                    <div class="v-cmd-item ${i === 0 ? 'selected' : ''}" data-suggestion="${s}">
+                      <div class="v-cmd-item-icon">⚡</div>
+                      <div class="v-cmd-item-meta">
+                        <div>${s}</div>
+                        <div class="v-cmd-item-sub">${i === 0 ? 'Absence opérateur' : i === 1 ? 'Décalage deadline' : 'Maintenance machine'}</div>
+                      </div>
+                      <span class="v-cmd-kbd">↵</span>
+                    </div>`).join('')}
+                  `}
+            </div>
+            <div class="v-cmd-footer">
+              <span><span class="v-cmd-kbd">↑↓</span> naviguer · <span class="v-cmd-kbd">↵</span> envoyer · <span class="v-cmd-kbd">esc</span> fermer</span>
+              <span>Flux Console</span>
+            </div>
+          </div>
+        </div>`;
+      wireCommonHandlers(host);
+    };
+
+    // ----- 5. SIDEBAR DRAWER -----
+    RENDERERS.side = (host) => {
+      host.innerHTML = `
+        <div class="v-side">
+          <div class="v-side-head">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-weight:600; font-size:0.9rem;"><span style="margin-right:6px;">⚡</span> Assistant Flux</div>
+              <button class="btn btn-ghost">×</button>
+            </div>
+            <div class="v-side-tabs">
+              <div class="v-side-tab active">Conversation</div>
+              <div class="v-side-tab">Historique</div>
+              <div class="v-side-tab">Aide</div>
+            </div>
+          </div>
+          <div class="v-side-stream" data-autoscroll>
+            <div class="v-side-thread-item active">
+              <div class="v-side-thread-title">Session actuelle</div>
+              <div class="v-side-thread-sub">Démarrée il y a quelques secondes</div>
+            </div>
+            ${state.session.messages.length === 0 && !state.pending && !state.typing
+              ? `<div class="empty-state">Que souhaites-tu faire ?
+                  <div class="suggestion-row" style="justify-content:flex-start; margin-top:10px;">
+                    ${SUGGESTIONS.map((s) => `<button class="suggestion-chip" data-suggestion="${s}">${s}</button>`).join('')}
+                  </div>
+                </div>`
+              : renderMessages()}
+          </div>
+          <div class="v-side-input">
+            <div style="display:flex; gap:6px;">
+              <div class="input-shell">
+                <textarea data-input rows="1" placeholder="Écris ta requête…"></textarea>
+              </div>
+              <button class="input-send" data-send>↑</button>
+            </div>
+            <div style="margin-top:8px; font-size:0.7rem; color: var(--text-muted);">⏎ envoyer · ⇧⏎ retour ligne</div>
+          </div>
+        </div>`;
+      wireCommonHandlers(host);
+    };
+
+    // ----- 6. AMBIENT RIBBON -----
+    RENDERERS.ribbon = (host) => {
+      const hasContent = state.session.messages.length > 0 || state.typing || state.pending;
+      host.innerHTML = `
+        ${hasContent ? `
+          <div class="v-ribbon-overlay" data-autoscroll>
+            ${renderMessages()}
+          </div>` : ''}
+        <div class="v-ribbon">
+          ${!hasContent ? `
+            <div class="v-ribbon-chips">
+              ${SUGGESTIONS.map((s) => `<div class="v-ribbon-chip" data-suggestion="${s}">${s}</div>`).join('')}
+            </div>` : ''}
+          <div class="v-ribbon-bar">
+            <span class="v-ribbon-icon">⚡</span>
+            <input class="v-ribbon-input" data-input placeholder="Demande quelque chose à Flux…" />
+            <button class="input-send" data-send>↑</button>
+          </div>
+        </div>`;
+      wireCommonHandlers(host);
+    };
+
+    // ============================================================
+    // PROMPT OUTPUT
+    // ============================================================
+    function updatePrompt() {
+      const variant = VARIANTS.find((v) => v.id === state.variantId);
+      const themeLabel = state.theme === 'dark' ? 'mode sombre (zinc)' : 'mode clair (mauve)';
+      const idx = VARIANTS.indexOf(variant) + 1;
+      const txt = `Refonds le composant <b>ConsolePanel</b> de <span class="mono">apps/web/src/components/ConsolePanel/</span> en suivant la <b>variante ${idx} — ${variant.name}</b> du playground (<span class="mono">apps/web/public/playgrounds/console-redesign.html</span>). ${variant.promptHint} Garde la conversation, les plan-cards (entités résolues + actions + Appliquer/Modifier/Annuler) et l'API <span class="mono">/console/execute</span> + <span class="mono">/console/apply</span> intactes — ne touche que la couche UI. Respecte la grammaire visuelle de l'app (Inter 13px, JetBrains Mono pour le code, accent <span class="mono">blue-600</span>, bordures et fonds zinc) et reste cohérent avec le ${themeLabel} primaire.`;
+      document.getElementById('promptText').innerHTML = txt;
+    }
+
+    function copyPrompt() {
+      const text = document.getElementById('promptText').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.classList.add('copied');
+        btn.textContent = '✓ Copié !';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.textContent = 'Copier le prompt';
+        }, 1600);
+      });
+    }
+
+    // ============================================================
+    // BOOT
+    // ============================================================
+    renderStage();
+    updatePrompt();
+  </script>
+</body>
+</html>
