@@ -14,7 +14,7 @@ import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } f
 import { TimelineLens, useTimelineLens, LENS_PIXELS_PER_HOUR } from '../TimelineLens';
 import {
   computeStationUnavailabilitySegments,
-  computeAggregatedOperatorOvertimeSegments,
+  computeStationOvertimeSegments,
 } from '../TimelineLens/unavailability';
 import { COLLAPSED_BAND_PX, type Collapse } from './collapseConfig';
 import { CollapseBand } from './CollapseBand';
@@ -580,8 +580,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
 
   const lensOvertimeSegments = useMemo(() => {
     if (!lens.state.activeColumnId) return [];
-    return computeAggregatedOperatorOvertimeSegments(
-      operators ?? [], lensRange.gridStartMs, lensRange.gridEndMs,
+    return computeStationOvertimeSegments(
+      operators ?? [], lens.state.activeColumnId, lensRange.gridStartMs, lensRange.gridEndMs,
     );
   }, [lens.state.activeColumnId, operators, lensRange.gridStartMs, lensRange.gridEndMs]);
 

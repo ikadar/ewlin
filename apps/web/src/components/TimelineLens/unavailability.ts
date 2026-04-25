@@ -2,7 +2,7 @@ import type { DaySchedule, Station, Operator } from '@flux/types';
 import {
   getOperatorDaySchedule,
   getOperatorOvertimePeriodsForDay,
-  aggregateOperatorOvertimePeriodsForDay,
+  aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
 } from '../../utils/operatorTileSlices';
 
@@ -110,7 +110,7 @@ export function computeStationUnavailabilitySegments(
   return iterateDays(rangeStartMs, rangeEndMs, (d) => {
     const base = getStationDaySchedule(station, d);
     if (operators.length === 0) return base;
-    const overtime = aggregateOperatorOvertimePeriodsForDay(operators, d);
+    const overtime = aggregateOperatorOvertimePeriodsForStationDay(operators, station.id, d);
     return overtime.length === 0 ? base : mergeDayScheduleWithOvertimePeriods(base, overtime);
   });
 }
@@ -166,14 +166,15 @@ export function computeOperatorOvertimeSegments(
 }
 
 /**
- * Aggregate overtime across multiple operators into absolute-ms segments
- * within a range. Used when the timeline lens magnifies a station: by
- * symmetry with the shop-closure model, any operator's overtime extends
- * the station's availability, so the lens should show the same amber
- * stripes that the StationColumn renders.
+ * Aggregate overtime across qualified operators into absolute-ms segments,
+ * for a specific station. Used when the timeline lens magnifies a station:
+ * the lens should show the same amber stripes as the underlying StationColumn,
+ * which means the same per-station qualification filter (only operators with
+ * a skill entry on this station contribute their overtime).
  */
-export function computeAggregatedOperatorOvertimeSegments(
+export function computeStationOvertimeSegments(
   operators: readonly Operator[],
+  stationId: string,
   rangeStartMs: number,
   rangeEndMs: number,
 ): OvertimeSegment[] {
@@ -190,7 +191,7 @@ export function computeAggregatedOperatorOvertimeSegments(
     d.setDate(d.getDate() + 1)
   ) {
     const dayBaseMs = d.getTime();
-    const periods = aggregateOperatorOvertimePeriodsForDay(operators, d);
+    const periods = aggregateOperatorOvertimePeriodsForStationDay(operators, stationId, d);
     for (const p of periods) {
       const s = Math.max(dayBaseMs + p.startMinutes * 60_000, rangeStartMs);
       const e = Math.min(dayBaseMs + p.endMinutes * 60_000, rangeEndMs);

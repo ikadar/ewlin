@@ -11,7 +11,7 @@ import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import {
-  aggregateOperatorOvertimePeriodsForDay,
+  aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
 } from '../../utils/operatorTileSlices';
 import {
@@ -265,7 +265,11 @@ export function FocusStationColumn({
     for (let d = startDay; d <= endDay; d++) {
       const currentDate = new Date(gridStartDate.getTime() + d * 24 * 60 * 60 * 1000);
       const baseSchedule = getStationDaySchedule(station, currentDate);
-      const overtimePeriods = aggregateOperatorOvertimePeriodsForDay(operators, currentDate);
+      const overtimePeriods = aggregateOperatorOvertimePeriodsForStationDay(
+        operators,
+        station.id,
+        currentDate,
+      );
       const daySchedule = overtimePeriods.length === 0
         ? baseSchedule
         : mergeDayScheduleWithOvertimePeriods(baseSchedule, overtimePeriods);

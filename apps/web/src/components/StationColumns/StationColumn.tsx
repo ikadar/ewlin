@@ -7,7 +7,7 @@ import { OvertimeOverlay } from './OvertimeOverlay';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import {
-  aggregateOperatorOvertimePeriodsForDay,
+  aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
 } from '../../utils/operatorTileSlices';
 import type { Collapse } from '../SchedulingGrid/collapseConfig';
@@ -39,11 +39,10 @@ export interface StationColumnProps {
   onDeselect?: () => void;
   /** Optional collapse bands — grid lines inside bands are skipped, totalHeight collapses. */
   collapses?: readonly Collapse[];
-  /** All operators (for shop-wide overtime aggregation). When any operator
-   *  has overtime intersecting a day, the dark unavailability hachures shrink
-   *  for that period and amber overtime stripes are rendered in their place
-   *  — mirroring the operator-planning behavior. Omit → station behaves like
-   *  it always did (overtime invisible). */
+  /** All operators. The dark hachures shrink and amber overtime stripes
+   *  appear only when at least one *qualified* operator (has a skill entry
+   *  for this station) has overtime intersecting the day. Omit → station
+   *  behaves like it always did (overtime invisible). */
   operators?: readonly Operator[];
 }
 
@@ -166,8 +165,8 @@ export const StationColumn = memo(function StationColumn({
   const today = gridStartDate ?? new Date();
   const effectiveDayOfWeek = dayOfWeek ?? today.getDay();
   const todayOvertimePeriods = useMemo(
-    () => aggregateOperatorOvertimePeriodsForDay(effectiveOperators, today),
-    [effectiveOperators, today],
+    () => aggregateOperatorOvertimePeriodsForStationDay(effectiveOperators, station.id, today),
+    [effectiveOperators, station.id, today],
   );
   const daySchedule = getDaySchedule(station, effectiveDayOfWeek, today, todayOvertimePeriods);
 
@@ -253,8 +252,9 @@ export const StationColumn = memo(function StationColumn({
             // Calculate the date for this day
             const currentDate = new Date(gridStartDate.getTime() + dayIndex * 24 * 60 * 60 * 1000);
             const dayOfWeekForDay = currentDate.getDay();
-            const overtimePeriods = aggregateOperatorOvertimePeriodsForDay(
+            const overtimePeriods = aggregateOperatorOvertimePeriodsForStationDay(
               effectiveOperators,
+              station.id,
               currentDate,
             );
             const dayScheduleForDay = getDaySchedule(

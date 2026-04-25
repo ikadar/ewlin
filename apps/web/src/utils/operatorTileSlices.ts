@@ -148,20 +148,28 @@ export function getOperatorOvertimePeriodsForDay(
 }
 
 /**
- * Aggregate overtime periods across multiple operators for a given day.
- * Used by station planning hachures: by symmetry with the shop-closure
- * model (closures = absences on every operator), shop-wide overtime =
- * any single operator working overtime. So if at least one operator has
- * overtime intersecting `date`, every station shows extended availability
- * (dark hachures shrink) plus amber stripes for the overtime window.
+ * Aggregate overtime periods on a *given station's day*, restricted to
+ * operators who are qualified to run that station (i.e. who carry a
+ * skill entry for it — proficiency > 0 is enforced upstream when skills
+ * are persisted, so any entry in `operator.skills` means "can operate").
+ *
+ * Why this is per-station and not shop-wide: an operator in overtime can
+ * only make the stations they're qualified for available. A bookbinding
+ * operator working overtime does NOT make the Ryobi 528 (offset press)
+ * available — only stations they can run gain availability.
+ *
+ * Mirrors the engine's qualification check in `forward_pass.rs` (qualified
+ * = skill entry exists for the station).
  */
-export function aggregateOperatorOvertimePeriodsForDay(
+export function aggregateOperatorOvertimePeriodsForStationDay(
   operators: readonly Operator[],
+  stationId: string,
   date: Date,
 ): Array<{ startMinutes: number; endMinutes: number }> {
   if (operators.length === 0) return [];
   const all: Array<[number, number]> = [];
   for (const op of operators) {
+    if (!op.skills.some((s) => s.stationId === stationId)) continue;
     for (const p of getOperatorOvertimePeriodsForDay(op, date)) {
       all.push([p.startMinutes, p.endMinutes]);
     }
