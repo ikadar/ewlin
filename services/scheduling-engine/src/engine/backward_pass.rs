@@ -243,6 +243,9 @@ pub fn compute_last_values(
         .collect();
 
     let mut grid = ScheduleGrid::new(num_stations, num_operators, effective_horizon, tick_minutes);
+    let station_capacities: Vec<u32> =
+        stations.iter().map(|s| s.effective_capacity()).collect();
+    grid.init_station_capacities(&station_capacities);
     let operator_availability = OperatorAvailability::new(
         num_operators, effective_horizon, tick_minutes, start_date, schedules,
     );

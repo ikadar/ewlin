@@ -202,6 +202,9 @@ pub fn run_with_fbi(
         }
         let initial_ticks = required_ticks;
         let mut grid = ScheduleGrid::new(num_stations, num_operators, initial_ticks, tick_minutes);
+        let station_capacities: Vec<u32> =
+            stations.iter().map(|s| s.effective_capacity()).collect();
+        grid.init_station_capacities(&station_capacities);
 
         // Pre-block station ticks for machine unavailability constraints.
         // Uses a sentinel action index (usize::MAX) that no real action has.
