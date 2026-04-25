@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { SquareSlash } from 'lucide-react';
 import { Sidebar } from './Sidebar/Sidebar';
@@ -6,7 +6,6 @@ import { Toast } from './Toast/Toast';
 import { CommandPalette } from './CommandPalette/CommandPalette';
 import { CommandCenterProvider, useCommandCenter } from './CommandPalette/CommandCenterContext';
 import { useCommands } from './CommandPalette/useCommands';
-import { ConsolePanel } from './ConsolePanel/ConsolePanel';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AutoRecomputeProvider } from '../contexts/AutoRecomputeContext';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
@@ -21,9 +20,6 @@ function RootLayoutInner() {
 
   const chordPendingRef = useRef<'compact' | 'placement' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Natural-language console (ALT+I) — global so it works on every page.
-  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
 
   // Shared commands available on all pages
   const sharedCommands = useCommands({
@@ -89,17 +85,10 @@ function RootLayoutInner() {
         return;
       }
 
-      // Alt+K: open command palette
+      // Alt+K: open command palette (also hosts the natural-language AI console)
       if (isAltLetter(e, 'k')) {
         e.preventDefault();
         setIsOpen(true);
-        return;
-      }
-
-      // Alt+I: toggle natural-language console
-      if (isAltLetter(e, 'i')) {
-        e.preventDefault();
-        setIsConsoleOpen(prev => !prev);
         return;
       }
 
@@ -166,12 +155,6 @@ function RootLayoutInner() {
         message={toastMessage ?? ''}
         isVisible={!!toastMessage}
         onDismiss={dismissToast}
-      />
-
-      {/* Natural-language console (ALT+I) — global to all pages */}
-      <ConsolePanel
-        isOpen={isConsoleOpen}
-        onClose={() => setIsConsoleOpen(false)}
       />
     </div>
   );

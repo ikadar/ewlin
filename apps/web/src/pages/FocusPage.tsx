@@ -6,7 +6,6 @@ import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { DateStrip } from '../components/DateStrip/DateStrip';
 import {
   FocusTopBar,
-  NowFab,
   FocusOperatorColumn,
   FocusStationColumn,
 } from '../components/FocusPage';
@@ -283,7 +282,6 @@ export default function FocusPage({ mode }: FocusPageProps) {
           </div>
         </div>
       </div>
-      <NowFab onClick={scrollToNow} />
     </div>
   );
 }
