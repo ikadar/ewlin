@@ -720,6 +720,8 @@ pub fn build_actions(
                     current_recalage_start: None,
                     recalage_segments: Vec::new(),
                     spec_snapshot: spec_snapshot.clone(),
+                    setup_progress: 0.0,
+                    setup_end_tick: None,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

@@ -299,6 +299,21 @@ pub struct Action {
     /// so the scoring hot path doesn't re-parse JSON per tick. See
     /// `crate::engine::similarity::SpecSnapshot`.
     pub spec_snapshot: super::similarity::SpecSnapshot,
+    /// Setup work done so far, in units of "config setup ticks". Phase is
+    /// `setup` while `setup_progress < setup_ticks as f64`, then `run`.
+    /// Tracked separately from `eat` (real ticks elapsed) because the two
+    /// diverge whenever the per-tick setup rate isn't exactly 1.0 — e.g.
+    /// an under-skilled operator (`prof < attention_full`) makes setup
+    /// progress slower than wall clock, and an over-staffed station
+    /// (`sum_prof > attention_full`) caps it back to 1.0. Only
+    /// `setup_progress` is authoritative for phase membership.
+    pub setup_progress: f64,
+    /// Tick at which `setup_progress` first reached `setup_ticks`. `None`
+    /// while still in setup phase or for actions that bypass the main
+    /// loop (e.g. pre-placed pinned tasks). Drives `setupEnd` in the
+    /// emitted ComputedAssignment so the UI sees the actual setup/run
+    /// boundary instead of the config-derived approximation.
+    pub setup_end_tick: Option<u32>,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -1375,6 +1390,7 @@ pub fn run_forward_pass(
                         grid,
                         operator_groups,
                         operator_skills,
+                        station_attrs,
                         &ops,
                     );
                     if done {
@@ -1739,15 +1755,16 @@ fn advance_action_at_tick(
     grid: &ScheduleGrid,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_skills: &[Vec<(usize, f64)>],
+    station_attrs: &[StationAttrs],
     operators_this_tick: &[usize],
 ) -> bool {
     let station_idx = actions[action_idx].station_idx;
+    let attrs = &station_attrs[station_idx];
 
-    // Productivity is the sum across operators currently on this station.
-    // For solo: each operator contributes their proficiency.
-    // For paired: each operator contributes their group's productivity for
-    // this station.
-    let productivity: f64 = operators_this_tick
+    // Raw productivity = sum across operators currently on this station.
+    // For solo: each operator contributes their proficiency. For paired:
+    // each contributes their group's productivity for this station.
+    let raw_productivity: f64 = operators_this_tick
         .iter()
         .map(|&op| productivity_at_tick(op, station_idx, t, grid, operator_groups, operator_skills))
         .sum();
@@ -1755,6 +1772,7 @@ fn advance_action_at_tick(
     actions[action_idx].tick_operator_log.push((t, operators_this_tick.to_vec()));
 
     let setup_ticks = actions[action_idx].setup_ticks;
+    let setup_ticks_f = setup_ticks as f64;
     let eat_before = actions[action_idx].eat;
 
     // First productive tick after a pending peremption: record the re-calage
@@ -1765,17 +1783,68 @@ fn advance_action_at_tick(
         actions[action_idx].pending_recalage = false;
     }
 
-    actions[action_idx].work_accumulator += productivity;
+    // Phase-aware effective rate.
+    //
+    // Setup phase (setup_progress < setup_ticks): the machine needs
+    // `attention_full` op-units of attention to reach baseline setup
+    // speed (1 setup-tick per real tick). Extra operators don't help —
+    // a second op can't physically speed up "the conducteur threading
+    // paper". Cap raw at attention_full, normalise to baseline.
+    //   rate ∈ [0, 1]; equals 1 when fully staffed (sum_prof ≥ attention_full),
+    //   strictly less when an under-skilled op is alone.
+    //
+    // Run phase (setup_progress ≥ setup_ticks): productivity divides by
+    // `attention_run` — the "operator-units required for baseline speed".
+    // Capped at `max_run_attention` so over-staffing past the machine's
+    // useful ceiling doesn't keep accelerating linearly.
+    //   For Hohner (attention_run=2, max_run_attention=2 implicit): two
+    //   ops at proficiency 1 → rate = min(2, 2)/2 = 1 (baseline 60 min,
+    //   not the buggy 30 min that the unified-art model produced).
+    //   One op solo on the same machine → rate = min(1, 2)/2 = 0.5
+    //   (run takes 2× longer, which is the correct under-staffing penalty).
+    let setup_progress_before = actions[action_idx].setup_progress;
+    let in_setup = setup_progress_before < setup_ticks_f;
+    let effective_rate = if in_setup {
+        let cap = attrs.attention_full.max(f64::MIN_POSITIVE);
+        raw_productivity.min(cap) / cap
+    } else {
+        let cap = attrs.max_run_attention.max(attrs.attention_run);
+        let need = attrs.attention_run.max(f64::MIN_POSITIVE);
+        raw_productivity.min(cap) / need
+    };
+
+    actions[action_idx].work_accumulator += effective_rate;
     let work_done = actions[action_idx].work_accumulator.floor() as u32;
     actions[action_idx].work_accumulator -= work_done as f64;
     actions[action_idx].art = actions[action_idx].art.saturating_sub(work_done);
     actions[action_idx].eat += 1;
-    actions[action_idx].total_productivity += productivity;
+    actions[action_idx].total_productivity += effective_rate;
     actions[action_idx].ticks_counted += 1;
+
+    // Advance setup_progress when in setup phase. Use the same
+    // effective_rate that drained art so the two stay synchronised:
+    // one tick of "art" decremented == one tick of setup_progress
+    // accumulated, in unit terms. Saturate at setup_ticks so an
+    // accumulator overshoot at the boundary doesn't bleed into the
+    // run-phase counter.
+    if in_setup {
+        let new_progress = (setup_progress_before + effective_rate).min(setup_ticks_f);
+        actions[action_idx].setup_progress = new_progress;
+        // Mark the setup→run boundary the first time we cross it. Use
+        // `t + 1` (exclusive end of the last setup tick) to mirror
+        // `end_tick`'s convention — both are "first tick where the
+        // phase no longer applies".
+        if new_progress >= setup_ticks_f && actions[action_idx].setup_end_tick.is_none() {
+            actions[action_idx].setup_end_tick = Some((t + 1) as u32);
+        }
+    }
 
     // Finalize an in-flight re-calage segment when setup re-completes.
     // Detected by eat crossing the setup_ticks threshold while a recalage
-    // window is open.
+    // window is open. Kept on `eat` (not setup_progress) because recalage
+    // tracks the real-tick window the user sees, and the existing
+    // peremption logic re-adds setup_ticks of art when it fires —
+    // setup_progress doesn't need to retrocede in that path.
     if actions[action_idx].current_recalage_start.is_some()
         && eat_before < setup_ticks
         && actions[action_idx].eat >= setup_ticks
@@ -2051,10 +2120,22 @@ fn build_assignment_for(
 
     let start_minutes = start_t as u64 * tick_minutes as u64;
     let end_minutes = end_t as u64 * tick_minutes as u64;
-    let setup_end_minutes = if setup_ticks > 0 {
-        Some((start_t as u64 + setup_ticks as u64) * tick_minutes as u64)
-    } else {
+    // Prefer `setup_end_tick` recorded by `advance_action_at_tick` —
+    // that's the actual real-tick boundary where setup_progress hit
+    // setup_ticks (which can lag the config-derived boundary when an
+    // under-skilled solo op makes setup progress slower than baseline).
+    // Fallback paths:
+    //   * setup_ticks == 0 → no setup phase → None
+    //   * pre-placed pinned task whose work bypassed `advance` → use
+    //     the config-derived approximation (start + setup_ticks),
+    //     same as before. Pinned tasks are user-locked so the slight
+    //     under/over-shoot of the boundary in the output is harmless.
+    let setup_end_minutes = if setup_ticks == 0 {
         None
+    } else if let Some(et) = action.setup_end_tick {
+        Some(et as u64 * tick_minutes as u64)
+    } else {
+        Some((start_t as u64 + setup_ticks as u64) * tick_minutes as u64)
     };
 
     let recalages = action
@@ -2502,6 +2583,8 @@ mod peremption_tests {
             current_recalage_start: None,
             recalage_segments: Vec::new(),
             spec_snapshot: crate::engine::similarity::SpecSnapshot::default(),
+            setup_progress: 0.0,
+            setup_end_tick: None,
         }
     }
 
@@ -2600,6 +2683,245 @@ mod peremption_tests {
         assert!(triggered);
         assert_eq!(a.eat, 0, "re-setup needed after weekend");
         assert_eq!(a.art, 6 + 1, "run progress preserved, setup_ticks re-added");
+    }
+}
+
+#[cfg(test)]
+mod attention_capacity_tests {
+    //! Regression tests for the phase-aware productivity model. The
+    //! pre-fix engine summed per-operator productivity into a unified
+    //! `art` counter regardless of phase, and ignored `attention_run`
+    //! / `attention_full` entirely. That collapsed FIN-on-Hohner from
+    //! its physical 60 min (30 setup + 30 run with 2 ops) down to 30 min
+    //! (effective_productivity = 2 applied to setup AND run alike).
+    //!
+    //! Post-fix model:
+    //!   * setup phase: rate = min(sum_prof, attention_full) / attention_full
+    //!     → ≤ 1.0; fixed real-time when fully staffed (extra ops can't
+    //!     speed setup).
+    //!   * run phase: rate = min(sum_prof, max_run_attention) / attention_run
+    //!     → 1.0 baseline at exactly attention_run op-units, > 1 when
+    //!     over-staffed up to max, < 1 when under-staffed.
+    //! Phase transition keyed on `setup_progress`, not `eat`.
+    use super::*;
+
+    /// Build a minimal Hohner-shaped StationAttrs: capacity-1 station that
+    /// requires 2 op-units for run-phase baseline (one op alone runs at
+    /// half speed; two ops at baseline).
+    fn hohner_attrs() -> StationAttrs {
+        StationAttrs {
+            attention_full: 1.0,
+            attention_run: 2.0,
+            max_run_attention: 2.0,
+            masked_time_enabled: false,
+            peremption_ticks: 0,
+            max_operators: 2,
+            max_chunk_ticks: 96,
+            chunk_mini_setup_multiplier: 0.0,
+            chunk_mini_task_percentage: 0.0,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        }
+    }
+
+    /// Reuse the make_action helper from the sibling peremption_tests
+    /// module, but inlined since modules can't import each other's
+    /// private items. Same shape, different default fields adjusted
+    /// for the advance path (idle_ticks=0 always; we don't trigger
+    /// peremption in these tests).
+    fn make_advance_action(setup_ticks: u32, run_ticks: u32) -> Action {
+        let total = setup_ticks + run_ticks;
+        Action {
+            idx: 0,
+            task_id: "t".into(),
+            job_id: "j".into(),
+            station_idx: 0,
+            setup_ticks,
+            run_ticks,
+            art: total,
+            eat: 0,
+            last: u64::MAX,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: Vec::new(),
+            start_tick: Some(0),
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks: 0,
+            tick_operator_log: Vec::new(),
+            original_art: total,
+            task_total_ticks: total,
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            is_pinned: false,
+            chain_remaining_art: total,
+            pinned_start_tick: None,
+            pinned_end_tick: None,
+            peremption_count: 0,
+            pending_recalage: false,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
+            spec_snapshot: crate::engine::similarity::SpecSnapshot::default(),
+            setup_progress: 0.0,
+            setup_end_tick: None,
+        }
+    }
+
+    /// FIN regression: Hohner station, attention_run=2, two ops (Frédéric
+    /// + Ludovic), task = setup_ticks=6 + run_ticks=6 (= 30 min + 30 min
+    /// at 5-min ticks). Pre-fix engine completed in 6 ticks (productivity
+    /// summed to 2.0 → both phases halved). Post-fix: setup runs at the
+    /// fixed 6-tick rate (capped at attention_full=1), run runs at
+    /// 2.0/2.0 = 1.0 baseline → 6 ticks → 12 ticks total.
+    #[test]
+    fn fin_with_two_ops_takes_full_60min_not_30min() {
+        let attrs = vec![hohner_attrs()];
+        let mut grid = ScheduleGrid::new(1, 2, 30, 5);
+        // Two operators with proficiency 1.0 on station 0, no concurrent
+        // groups (Hohner is solo-station, not paired with anything).
+        let operator_skills = vec![vec![(0_usize, 1.0)], vec![(0_usize, 1.0)]];
+        let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new(), Vec::new()];
+
+        let mut actions = vec![make_advance_action(6, 6)];
+        // Both ops are present at every tick of the planned interval.
+        for t in 0..12 {
+            grid.assign_operator(0, t, 0, 1.0);
+            grid.assign_operator(1, t, 0, 1.0);
+        }
+
+        // Drive the loop manually, mirroring what `run_forward_pass` does
+        // once the action is assigned each tick.
+        let mut completed_at: Option<usize> = None;
+        for t in 0..30 {
+            let done = advance_action_at_tick(
+                &mut actions,
+                0,
+                t,
+                &grid,
+                &operator_groups,
+                &operator_skills,
+                &attrs,
+                &[0, 1],
+            );
+            if done {
+                completed_at = Some(t);
+                break;
+            }
+        }
+
+        assert_eq!(
+            completed_at,
+            Some(11),
+            "FIN must complete at the END of tick 11 (12 ticks elapsed = 60 min). \
+             Pre-fix bug: completed at tick 5 (6 ticks = 30 min) because productivity \
+             summed to 2.0 was applied to a unified setup+run art counter."
+        );
+        assert_eq!(
+            actions[0].setup_end_tick,
+            Some(6),
+            "Setup must end at tick 6 (= 30 min into the task). The output's \
+             setupEnd field reads from this and surfaces the actual setup/run \
+             boundary instead of collapsing to scheduledEnd."
+        );
+        assert_eq!(actions[0].art, 0, "art fully drained");
+        assert_eq!(actions[0].eat, 12, "12 real ticks elapsed");
+    }
+
+    /// Same Hohner station, but only ONE op present (Frédéric solo —
+    /// say Ludovic is unavailable). Pre-fix: completed in 12 ticks
+    /// (productivity 1.0 unified, setup_ticks + run_ticks = 12 art at
+    /// 1.0/tick). Post-fix: setup is fixed at 6 ticks (one op suffices
+    /// for setup, attention_full=1 satisfied), but run phase scales
+    /// as 1.0/2.0 = 0.5/tick → run takes 12 ticks → 18 ticks total.
+    /// This is the correct under-staffing penalty: a station that wants
+    /// 2 ops for run-baseline runs at half speed with only 1.
+    #[test]
+    fn fin_with_one_op_takes_90min_under_staffing_penalty() {
+        let attrs = vec![hohner_attrs()];
+        let mut grid = ScheduleGrid::new(1, 1, 30, 5);
+        let operator_skills = vec![vec![(0_usize, 1.0)]];
+        let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new()];
+
+        let mut actions = vec![make_advance_action(6, 6)];
+        for t in 0..20 {
+            grid.assign_operator(0, t, 0, 1.0);
+        }
+
+        let mut completed_at: Option<usize> = None;
+        for t in 0..30 {
+            let done = advance_action_at_tick(
+                &mut actions,
+                0,
+                t,
+                &grid,
+                &operator_groups,
+                &operator_skills,
+                &attrs,
+                &[0],
+            );
+            if done {
+                completed_at = Some(t);
+                break;
+            }
+        }
+
+        assert_eq!(
+            completed_at,
+            Some(17),
+            "Solo run on a 2-op-baseline station must take 18 real ticks \
+             (= 6 setup + 12 run at half speed)."
+        );
+        assert_eq!(
+            actions[0].setup_end_tick,
+            Some(6),
+            "Setup still completes in 6 ticks — under-staffing only \
+             penalises the run phase (one op is enough to set up)."
+        );
+    }
+
+    /// Sanity: a station with attention_run=1 (typical solo-op press)
+    /// behaves the same way it always did. Ensures the new model is a
+    /// no-op for the common case and doesn't regress existing
+    /// placements.
+    #[test]
+    fn solo_station_attention_run_one_unchanged_baseline() {
+        let attrs = vec![StationAttrs {
+            attention_full: 1.0,
+            attention_run: 1.0,
+            max_run_attention: 1.0,
+            masked_time_enabled: false,
+            peremption_ticks: 0,
+            max_operators: 1,
+            max_chunk_ticks: 96,
+            chunk_mini_setup_multiplier: 0.0,
+            chunk_mini_task_percentage: 0.0,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        }];
+        let mut grid = ScheduleGrid::new(1, 1, 20, 5);
+        let operator_skills = vec![vec![(0_usize, 1.0)]];
+        let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new()];
+        let mut actions = vec![make_advance_action(4, 6)];
+        for t in 0..15 {
+            grid.assign_operator(0, t, 0, 1.0);
+        }
+        let mut completed_at: Option<usize> = None;
+        for t in 0..30 {
+            if advance_action_at_tick(
+                &mut actions, 0, t, &grid,
+                &operator_groups, &operator_skills, &attrs, &[0],
+            ) {
+                completed_at = Some(t);
+                break;
+            }
+        }
+        assert_eq!(completed_at, Some(9), "10 ticks total = 4 setup + 6 run");
+        assert_eq!(actions[0].setup_end_tick, Some(4));
     }
 }
 
