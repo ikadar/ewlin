@@ -44,6 +44,7 @@ pub fn lns_improve(
     time_budget_ms: u64,
     progress: &super::ProgressSender,
     cancel: Option<Arc<AtomicBool>>,
+    precedence_min_gap_ticks: u32,
 ) -> Option<(Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32)> {
     // Kept the original "no late jobs" guard because destroy/repair has
     // nothing to destroy. However the caller may now want LNS to run even
@@ -187,6 +188,7 @@ pub fn lns_improve(
             start_date, BackwardOrdering::TierFirst,
             station_groups, station_blocked_ranges, occupied_slots,
             &None, now_tick, &default_weights,
+            precedence_min_gap_ticks,
         );
         total_iters += new_i;
 

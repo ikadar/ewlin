@@ -725,6 +725,11 @@ pub fn run_forward_pass(
     now_tick: usize,
     station_urgency_boost: &HashMap<usize, f64>,
     score_weights: &[f64; 7],
+    // Minimum tick gap enforced between predecessor end and successor
+    // start (chunk continuations exempted). Sourced from
+    // ComputeOptions.precedence_min_gap_ticks. 0 = legacy behaviour
+    // (touching boundaries allowed).
+    precedence_min_gap_ticks: u32,
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
@@ -954,7 +959,11 @@ pub fn run_forward_pass(
             // the boundary.
             if let Some(pred_idx) = action.predecessor_idx {
                 let gap = actions[i].predecessor_gap_ticks as usize;
-                let strict_gap = if is_same_task_chunk_continuation(action, &actions[pred_idx]) { 0 } else { 1 };
+                let strict_gap = if is_same_task_chunk_continuation(action, &actions[pred_idx]) {
+                    0
+                } else {
+                    precedence_min_gap_ticks as usize
+                };
                 match actions[pred_idx].end_tick {
                     Some(pred_end) if pred_end + gap + strict_gap <= t => {}
                     _ => continue,
@@ -965,9 +974,10 @@ pub fn run_forward_pass(
                 // cross-job edges (set in mod.rs's element/job wiring).
                 // None of those are chunk-internal, so the strict gap
                 // applies unconditionally here.
+                let strict_gap = precedence_min_gap_ticks as usize;
                 let all_done = action.additional_predecessors.iter().all(|&(pred_idx, gap)| {
                     match actions[pred_idx].end_tick {
-                        Some(pred_end) => pred_end + gap as usize + 1 <= t,
+                        Some(pred_end) => pred_end + gap as usize + strict_gap <= t,
                         None => false,
                     }
                 });

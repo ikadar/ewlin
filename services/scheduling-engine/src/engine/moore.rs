@@ -38,6 +38,7 @@ pub fn moore_escape(
     max_attempts: u32,
     station_groups: &[StationGroupInput],
     now_tick: usize,
+    precedence_min_gap_ticks: u32,
 ) -> Option<(Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32)> {
     if stats.late_job_count == 0 {
         return None;
@@ -191,6 +192,7 @@ pub fn moore_escape(
             tick_minutes, horizon_days, fbi_max_iterations, start_date,
             BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
             now_tick, &default_weights,
+            precedence_min_gap_ticks,
         );
 
         let new_score = (new_stats.late_job_count, new_stats.weighted_lateness_minutes, new_stats.makespan_minutes);

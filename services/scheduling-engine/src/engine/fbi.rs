@@ -41,6 +41,7 @@ pub fn run_with_fbi(
     progress: &super::ProgressSender,
     now_tick: usize,
     score_weights: &[f64; 7],
+    precedence_min_gap_ticks: u32,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -259,6 +260,7 @@ pub fn run_with_fbi(
             now_tick,
             &station_urgency_boost,
             &score_weights,
+            precedence_min_gap_ticks,
         );
 
         // Remap and compute stats
@@ -356,8 +358,9 @@ pub fn run_with_fbi_ordering(
     progress: &super::ProgressSender,
     now_tick: usize,
     score_weights: &[f64; 7],
+    precedence_min_gap_ticks: u32,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights, precedence_min_gap_ticks)
 }
 
 /// Multi-start FBI with perturbed scoring weights.
@@ -388,6 +391,7 @@ pub fn run_with_multi_start_fbi(
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     progress: &super::ProgressSender,
     now_tick: usize,
+    precedence_min_gap_ticks: u32,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     use rand::Rng;
     use rand::rngs::StdRng;
@@ -402,6 +406,7 @@ pub fn run_with_multi_start_fbi(
         tick_minutes, horizon_days, max_iterations, start_date,
         BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
         now_tick, &default_weights,
+        precedence_min_gap_ticks,
     );
     total_iters += i1;
     let mut best_score = (best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
@@ -416,6 +421,7 @@ pub fn run_with_multi_start_fbi(
             tick_minutes, horizon_days, max_iterations, start_date,
             BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
             now_tick, &default_weights,
+            precedence_min_gap_ticks,
         );
         total_iters += i2;
         let score2 = (s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
@@ -440,6 +446,7 @@ pub fn run_with_multi_start_fbi(
             tick_minutes, horizon_days, max_iterations, start_date,
             BackwardOrdering::SlackFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
             now_tick, &default_weights,
+            precedence_min_gap_ticks,
         );
         total_iters += i3;
         let score3 = (s3.weighted_late_job_count, s3.weighted_lateness_minutes, s3.makespan_minutes);
@@ -478,6 +485,7 @@ pub fn run_with_multi_start_fbi(
                 tick_minutes, horizon_days, max_iterations, start_date,
                 ordering, station_groups, station_blocked_ranges, occupied_slots, progress,
                 now_tick, &weights,
+                precedence_min_gap_ticks,
             );
             total_iters += ip;
             let score_p = (sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);

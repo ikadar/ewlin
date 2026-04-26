@@ -157,6 +157,8 @@ export {
   useGetSafetyZoneQuery,
   useUpdateSafetyZoneMutation,
   useSetSafetyOverrideMutation,
+  useGetPrecedenceGapQuery,
+  useUpdatePrecedenceGapMutation,
   scheduleApi,
 } from './api/scheduleApi';
 export type { SavedScheduleItem, ComputeScheduleResult } from './api/scheduleApi';

@@ -73,6 +73,18 @@ pub struct ComputeOptions {
     /// engine derives it from the remaining 60s compute wall clock.
     #[serde(default)]
     pub lns_budget_ms: Option<u64>,
+    /// Minimum number of ticks separating any predecessor's `end_tick`
+    /// from its successor's `start_tick`, on top of any explicit
+    /// `predecessor_gap_ticks` (drying time / outsourcing). Default 1
+    /// — the strict gap that eliminates the "kissing boundary" case
+    /// (`pred.end == succ.start` in wall-clock terms). Setting to 0
+    /// restores the pre-fix half-open semantics where touching
+    /// boundaries are treated as legal contiguity. Same-task chunk
+    /// continuations are exempt from this gap regardless of value.
+    /// Sourced from PHP's PrecedenceGapConfig (admin UI under
+    /// /settings/precedence-gap).
+    #[serde(default = "default_precedence_min_gap_ticks")]
+    pub precedence_min_gap_ticks: u32,
 }
 
 impl Default for ComputeOptions {
@@ -85,6 +97,7 @@ impl Default for ComputeOptions {
             perturbed_starts: default_perturbed_starts(),
             skip_lns: None,
             lns_budget_ms: None,
+            precedence_min_gap_ticks: default_precedence_min_gap_ticks(),
         }
     }
 }
@@ -103,6 +116,10 @@ fn default_fbi_max_iterations() -> u32 {
 
 fn default_perturbed_starts() -> u32 {
     0 // Disabled: SA uses the freed compute budget instead
+}
+
+fn default_precedence_min_gap_ticks() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

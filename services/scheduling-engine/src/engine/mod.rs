@@ -172,6 +172,7 @@ fn compute_inner(
         &occupied_slots_parsed,
         progress,
         now_tick,
+        options.precedence_min_gap_ticks,
     );
 
     // Moore escape hatch: if late imperative/important jobs remain after FBI,
@@ -193,6 +194,7 @@ fn compute_inner(
             2, // max_attempts (reduced to leave budget for SA)
             &request.station_groups,
             now_tick,
+            options.precedence_min_gap_ticks,
         ) {
             assignments = moore_assignments;
             actions = moore_actions;
@@ -229,6 +231,7 @@ fn compute_inner(
             lns_budget,
             progress,
             cancel.clone(),
+            options.precedence_min_gap_ticks,
         ) {
             assignments = lns_a;
             actions = lns_act;
@@ -1388,6 +1391,7 @@ mod integration_tests {
             perturbed_starts: 0,
             skip_lns: None,
             lns_budget_ms: None,
+            precedence_min_gap_ticks: 1,
         })
     }
 
@@ -1919,7 +1923,7 @@ mod integration_tests {
             stations: vec![station],
             operators: vec![alice],
             jobs,
-            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None }),
+            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         };
@@ -1978,7 +1982,7 @@ mod integration_tests {
                 make_2step_job("B", fmt(48)), // listed first, loose
                 make_2step_job("A", fmt(5)),  // listed second, tight
             ],
-            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None }),
+            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         };

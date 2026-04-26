@@ -52,6 +52,16 @@ pub enum ViolationKind {
 /// P=cross-element/job edges. String timestamps are compared lexicographically,
 /// which is chronologically correct for the ISO 8601 local format the engine
 /// emits.
+///
+/// Convention: this validator hardcodes the "≥ 1 tick gap" rule (`pred.end ==
+/// succ.start` is a violation). It matches the engine's default
+/// `precedence_min_gap_ticks = 1`. Schedules computed with the option set to 0
+/// will produce assignments that this validator flags as kissing-boundary
+/// violations — that's a deliberate audit signal, not a false positive: it
+/// means the engine is operating in legacy half-open mode and any UI/external
+/// consumer using closed intervals will see them as conflicts. Callers who
+/// genuinely want to validate gap=0 schedules should compare timestamps
+/// themselves with the inequality flipped to strict `>`.
 pub fn validate_precedence(
     jobs: &[JobInput],
     assignments: &[ComputedAssignment],

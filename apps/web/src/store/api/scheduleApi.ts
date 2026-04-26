@@ -39,6 +39,8 @@ import type {
   JobSafetyOverride,
   UpdateSafetyZoneRequest,
   SetSafetyOverrideRequest,
+  PrecedenceGapConfig,
+  UpdatePrecedenceGapRequest,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
@@ -864,6 +866,23 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Get the global precedence gap configuration (min ticks between
+     * predecessor end and successor start).
+     */
+    getPrecedenceGap: builder.query<PrecedenceGapConfig, void>({
+      query: () => '/precedence-gap',
+    }),
+
+    /**
+     * Update the global precedence gap (admin). Snapshot invalidation
+     * isn't needed — the value is read fresh by ScheduleComputeController
+     * on each compute, so the next recompute picks it up automatically.
+     */
+    updatePrecedenceGap: builder.mutation<PrecedenceGapConfig, UpdatePrecedenceGapRequest>({
+      query: (body) => ({ url: '/precedence-gap', method: 'PUT', body }),
+    }),
+
+    /**
      * Set (or clear) a safety override on a (jobId, sequenceIndex, stationId) tuple.
      * Optimistically mirrors the override into the snapshot so the tile
      * reflects the cyan-off state immediately.
@@ -1029,4 +1048,6 @@ export const {
   useGetSafetyZoneQuery,
   useUpdateSafetyZoneMutation,
   useSetSafetyOverrideMutation,
+  useGetPrecedenceGapQuery,
+  useUpdatePrecedenceGapMutation,
 } = scheduleApi;

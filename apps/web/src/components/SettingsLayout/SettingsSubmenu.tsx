@@ -20,6 +20,7 @@ const SETTINGS_ITEMS = [
   { label: 'Formats feuille (Impositions)', path: '/settings/feuille-formats' },
   { label: 'Templates',                   path: '/settings/templates' },
   { label: 'Safety Zone',                 path: '/settings/safety-zone' },
+  { label: 'Écart de précédence',         path: '/settings/precedence-gap' },
 ];
 
 /**
