@@ -503,9 +503,28 @@ export function computeTileSlices(
     const relayBeforeActive = !!(entry?.relayBefore && atEntryStart);
     const relayAfterActive = !!(entry?.relayAfter && atEntryEnd);
 
+    // Co-presence detection: another operator on the same assignment whose
+    // interval overlaps with mine. The "→" arrow on a relay label implies a
+    // handoff (other op left, I joined). When the other op stays alongside
+    // me, that arrow is misleading — we work in parallel, not in sequence.
+    // Sawtooth (the visual cue that I started mid-assignment) is still
+    // meaningful and is rendered regardless; only the label is suppressed.
+    const hasConcurrentOperator = (): boolean => {
+      if (!entry) return false;
+      for (const otherOp of (entry.assignment.operators ?? [])) {
+        if (otherOp.operatorId === operator.id) continue;
+        if (!otherOp.from || !otherOp.to) continue;
+        const oFrom = new Date(otherOp.from).getTime();
+        const oTo = new Date(otherOp.to).getTime();
+        if (oFrom < entry.endMs && oTo > entry.startMs) return true;
+      }
+      return false;
+    };
+
     const resolveRelayBeforeLabel = (): string | undefined => {
       if (!entry || !relayBeforeActive) return undefined;
       if (slice.isMasked) return 'reprise →';
+      if (hasConcurrentOperator()) return undefined;
       const syntheticGap = { gapStart: new Date(entry.assignStartMs), gapEnd: new Date(entry.startMs) };
       const otherOp = findRelayOperator(entries, slice.assignmentId, operator, syntheticGap, allOperators);
       return otherOp ? otherOp.replace('→ ', '') + ' →' : 'reprise →';
@@ -514,6 +533,7 @@ export function computeTileSlices(
     const resolveRelayAfterLabel = (): string | undefined => {
       if (!entry || !relayAfterActive) return undefined;
       if (slice.isMasked) return '→ pause';
+      if (hasConcurrentOperator()) return undefined;
       const syntheticGap = { gapStart: new Date(entry.endMs), gapEnd: new Date(entry.assignEndMs) };
       const otherOp = findRelayOperator(entries, slice.assignmentId, operator, syntheticGap, allOperators);
       return otherOp ?? '→ pause';
