@@ -523,8 +523,8 @@ export function computeTileSlices(
 
     const resolveRelayBeforeLabel = (): string | undefined => {
       if (!entry || !relayBeforeActive) return undefined;
-      if (slice.isMasked) return 'reprise →';
       if (hasConcurrentOperator()) return undefined;
+      if (slice.isMasked) return 'reprise →';
       const syntheticGap = { gapStart: new Date(entry.assignStartMs), gapEnd: new Date(entry.startMs) };
       const otherOp = findRelayOperator(entries, slice.assignmentId, operator, syntheticGap, allOperators);
       return otherOp ? otherOp.replace('→ ', '') + ' →' : 'reprise →';
@@ -532,8 +532,8 @@ export function computeTileSlices(
 
     const resolveRelayAfterLabel = (): string | undefined => {
       if (!entry || !relayAfterActive) return undefined;
-      if (slice.isMasked) return '→ pause';
       if (hasConcurrentOperator()) return undefined;
+      if (slice.isMasked) return '→ pause';
       const syntheticGap = { gapStart: new Date(entry.endMs), gapEnd: new Date(entry.assignEndMs) };
       const otherOp = findRelayOperator(entries, slice.assignmentId, operator, syntheticGap, allOperators);
       return otherOp ?? '→ pause';

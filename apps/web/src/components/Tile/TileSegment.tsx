@@ -281,7 +281,8 @@ export function TileSegment({
         className="absolute left-0 right-0 px-2 overflow-hidden pointer-events-none"
         style={{ top: `${contentTop}px`, bottom: `${contentBottom}px` }}
       >
-        <div className="text-[11px] font-medium leading-tight truncate" style={{ color: colors.text }}>
+        <div className="flex items-baseline gap-1.5">
+        <div className="text-[11px] font-medium leading-tight truncate flex-1 min-w-0" style={{ color: colors.text }}>
           {onTogglePin && assignmentId && (
             <span
               onClick={(e) => {
@@ -329,6 +330,16 @@ export function TileSegment({
           )}
           {label}
         </div>
+        {/* Relay-before label sits inline with the title in a flex row so
+            narrow tiles truncate the title rather than letting the absolute
+            label overlap the header text. The bottom relay label has no
+            equivalent collision risk and stays absolutely positioned. */}
+        {relayLabelTop && (
+          <span className="text-[10px] font-semibold text-zinc-400 shrink-0">
+            {relayLabelTop}
+          </span>
+        )}
+        </div>
         {stationName && (
           <div className="text-[9px] text-zinc-400 truncate leading-tight mt-0.5">
             {stationName}
@@ -343,14 +354,6 @@ export function TileSegment({
           style={{ bottom: `${(sawtoothBottom ? SAW_AMPLITUDE : 0) + 1}px` }}
         >
           {relayLabelBottom}
-        </div>
-      )}
-      {relayLabelTop && (
-        <div
-          className="absolute right-1.5 text-[10px] font-semibold text-zinc-400 pointer-events-none"
-          style={{ top: `${(sawtoothTop ? SAW_AMPLITUDE : 0) + 1}px` }}
-        >
-          {relayLabelTop}
         </div>
       )}
     </div>
