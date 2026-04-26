@@ -323,6 +323,20 @@ pub struct Action {
 /// re-pre-empted, the main loop must back off and re-plan.
 pub const MAX_PEREMPTION_RETRIES: u32 = 3;
 
+/// True when `succ` is the immediate next chunk of the same task as
+/// `pred` (i.e. an internal pre_split chunk continuation, not a
+/// user-visible task→task transition). Chunk continuations stay
+/// contiguous (gap=0) — to the user, chunks of one task are one
+/// continuous block; inserting a forced gap would visually fracture
+/// the task and starve the operator-magnetism path in Phase 1A.5
+/// (which keys on `pred.end_tick == t`).
+fn is_same_task_chunk_continuation(succ: &Action, pred: &Action) -> bool {
+    match (&succ.chunk_info, &pred.chunk_info) {
+        (Some((sn, _, so)), Some((pn, _, po))) => *sn > 1 && *sn == *pn + 1 && so == po,
+        _ => false,
+    }
+}
+
 /// Manages operator availability with dynamic extension
 pub struct OperatorAvailability {
     data: Vec<Vec<bool>>,
@@ -921,17 +935,39 @@ pub fn run_forward_pass(
             if let Some(retry_tick) = action.earliest_retry_tick {
                 if t < retry_tick { continue; }
             }
+            // Precedence guard: predecessor must finish strictly BEFORE the
+            // successor's first tick. The strict-gap requirement adds 1
+            // tick of mandatory separation on top of any explicit
+            // `predecessor_gap_ticks` (drying time / outsourcing). It
+            // exists to eliminate the "kissing boundary" case where
+            // pred.end == succ.start in wall-clock terms (Frédéric
+            // finishing COUV-cut at 10:15 and starting FIN at 10:15 in
+            // the same instant), which the half-open tick model accepted
+            // but reads as a precedence violation in any UI/validator
+            // using closed intervals.
+            //
+            // Same-task chunks are exempt: chunk N → chunk N+1 must stay
+            // contiguous (no gap), since chunks are an internal
+            // optimization for breaking long tasks — visually one
+            // continuous block to the user, and Phase 1A.5's magnetism
+            // keys on `pred.end_tick == t` to lock the operator across
+            // the boundary.
             if let Some(pred_idx) = action.predecessor_idx {
                 let gap = actions[i].predecessor_gap_ticks as usize;
+                let strict_gap = if is_same_task_chunk_continuation(action, &actions[pred_idx]) { 0 } else { 1 };
                 match actions[pred_idx].end_tick {
-                    Some(pred_end) if pred_end + gap <= t => {}
+                    Some(pred_end) if pred_end + gap + strict_gap <= t => {}
                     _ => continue,
                 }
             }
             if !action.additional_predecessors.is_empty() {
+                // additional_predecessors only carries cross-element /
+                // cross-job edges (set in mod.rs's element/job wiring).
+                // None of those are chunk-internal, so the strict gap
+                // applies unconditionally here.
                 let all_done = action.additional_predecessors.iter().all(|&(pred_idx, gap)| {
                     match actions[pred_idx].end_tick {
-                        Some(pred_end) => pred_end + gap as usize <= t,
+                        Some(pred_end) => pred_end + gap as usize + 1 <= t,
                         None => false,
                     }
                 });

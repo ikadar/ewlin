@@ -3,11 +3,18 @@
 //! Given a request's job/element structure and the final assignments, detects
 //! every violation of the three precedence invariants:
 //!
-//! 1. **Intra-element** — within an element, task[i+1] must start ≥ task[i].end.
-//! 2. **Cross-element** — an element's first task must start ≥ the last task
-//!    end of each of its `prerequisite_element_ids`.
-//! 3. **Cross-job** — a job's first task must start ≥ the last task end of
-//!    each of its `required_job_ids`.
+//! 1. **Intra-element** — within an element, task[i+1] must start STRICTLY
+//!    AFTER task[i].end (no kissing boundary `pred.end == succ.start`).
+//! 2. **Cross-element** — an element's first task must start STRICTLY AFTER
+//!    the last-task end of each of its `prerequisite_element_ids`.
+//! 3. **Cross-job** — a job's first task must start STRICTLY AFTER the
+//!    last-task end of each of its `required_job_ids`.
+//!
+//! "Strictly after" is enforced via `>=` on the violation predicate (the
+//! pre-fix `>` accepted `pred.end == succ.start`, treating boundary touches
+//! as legal contiguity; the post-fix `>=` flags them). The forward pass
+//! carries the same convention via a `+1 tick` minimum gap on every
+//! predecessor relationship except same-task chunk continuations.
 //!
 //! The validator is pure: it reads `jobs` + `assignments`, returns violations,
 //! never mutates. Used both as a runtime invariant check (callable from
@@ -161,7 +168,7 @@ pub fn validate_precedence(
                 let a_end = asgn_by_task.get(a.id.as_str()).map(|(_, e)| *e);
                 let b_start = asgn_by_task.get(b.id.as_str()).map(|(s, _)| *s);
                 if let (Some(ae), Some(bs)) = (a_end, b_start) {
-                    if ae > bs {
+                    if ae >= bs {
                         violations.push(Violation {
                             kind: ViolationKind::IntraElement,
                             offender_task_id: b.id.clone(),
@@ -191,7 +198,7 @@ pub fn validate_precedence(
                 let (Some(p_last_end), Some(p_last_task)) = (pe.last_end, pe.last_task_id) else {
                     continue;
                 };
-                if p_last_end > first_start {
+                if p_last_end >= first_start {
                     violations.push(Violation {
                         kind: ViolationKind::CrossElement {
                             predecessor_element_id: prereq_id.clone(),
@@ -221,7 +228,7 @@ pub fn validate_precedence(
             let (Some(r_last_end), Some(r_last_task)) = (rj.last_end, rj.last_task_id) else {
                 continue;
             };
-            if r_last_end > first_start {
+            if r_last_end >= first_start {
                 violations.push(Violation {
                     kind: ViolationKind::CrossJob {
                         predecessor_job_id: req_id.clone(),
@@ -322,11 +329,63 @@ mod tests {
             )],
             vec![],
         )];
+        // t1 starts STRICTLY after t0 ends — `t1.start > t0.end` (one tick gap
+        // at the engine's 5-min resolution). Pre-fix the validator accepted
+        // `t1.start == t0.end` as clean (boundary-touching, half-open
+        // interval semantics); post-fix it flags it as IntraElement.
+        let asgn = vec![
+            asg("t0", "2026-04-22T08:00:00", "2026-04-22T09:00:00"),
+            asg("t1", "2026-04-22T09:05:00", "2026-04-22T10:05:00"),
+        ];
+        assert!(validate_precedence(&jobs, &asgn).is_empty());
+    }
+
+    #[test]
+    fn intra_element_kissing_boundary_is_violation() {
+        // Same shape as `clean_schedule_returns_no_violations` but t1 starts
+        // exactly when t0 ends — the post-fix convention treats this as a
+        // violation (Frédéric finishing at station A at 10:15 cannot also
+        // start at station B at 10:15 in the same instant).
+        let jobs = vec![job(
+            "j1",
+            vec![elem(
+                "e1",
+                vec![task("t0", 0, "s1"), task("t1", 1, "s2")],
+                vec![],
+            )],
+            vec![],
+        )];
         let asgn = vec![
             asg("t0", "2026-04-22T08:00:00", "2026-04-22T09:00:00"),
             asg("t1", "2026-04-22T09:00:00", "2026-04-22T10:00:00"),
         ];
-        assert!(validate_precedence(&jobs, &asgn).is_empty());
+        let v = validate_precedence(&jobs, &asgn);
+        assert_eq!(v.len(), 1, "kissing boundary must surface as one violation");
+        assert!(matches!(v[0].kind, ViolationKind::IntraElement));
+        assert_eq!(v[0].offender_task_id, "t1");
+        assert_eq!(v[0].predecessor_task_id, "t0");
+    }
+
+    #[test]
+    fn cross_element_kissing_boundary_is_violation() {
+        // FIN-on-Hohner regression: succ element starts at the exact
+        // wall-clock instant the prereq element's last task ends. Pre-fix
+        // accepted; post-fix flags as CrossElement.
+        let jobs = vec![job(
+            "j1",
+            vec![
+                elem("e1", vec![task("t_e1", 0, "s1")], vec![]),
+                elem("e2", vec![task("t_e2", 0, "s2")], vec!["e1".into()]),
+            ],
+            vec![],
+        )];
+        let asgn = vec![
+            asg("t_e1", "2026-04-22T10:00:00", "2026-04-22T12:00:00"),
+            asg("t_e2", "2026-04-22T12:00:00", "2026-04-22T13:00:00"),
+        ];
+        let v = validate_precedence(&jobs, &asgn);
+        assert_eq!(v.len(), 1);
+        assert!(matches!(v[0].kind, ViolationKind::CrossElement { .. }));
     }
 
     #[test]
