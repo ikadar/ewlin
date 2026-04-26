@@ -85,13 +85,16 @@ export const ComputeReportToast = memo(function ComputeReportToast({ state, onDi
   const { phase, mode, jobId, snapshot, steps, elapsedMs, result, error, lateJobs } = state;
 
   const hasLate = lateJobs.length > 0;
+  const hasWarnings = !!result?.warnings?.length;
 
-  // Auto-dismiss when done with no late jobs (mirrors ComputeModal behaviour).
+  // Auto-dismiss when done with no late jobs AND no warnings — keep the
+  // toast visible so the user notices a pin displacement / unplaced task /
+  // other engine warning that wouldn't otherwise surface.
   useEffect(() => {
-    if (phase !== 'done' || hasLate) return;
+    if (phase !== 'done' || hasLate || hasWarnings) return;
     const timer = setTimeout(onDismiss, AUTO_DISMISS_NO_LATE_MS);
     return () => clearTimeout(timer);
-  }, [phase, hasLate, onDismiss]);
+  }, [phase, hasLate, hasWarnings, onDismiss]);
 
   if (phase === 'idle') return null;
 
@@ -348,6 +351,38 @@ function FullSection({
               et {lateJobs.length - 5} autres…
             </div>
           )}
+        </>
+      )}
+
+      {/* Engine warnings (pin displacements, unplaced tasks, …) */}
+      {result.warnings && result.warnings.length > 0 && (
+        <>
+          <div className="my-2.5 h-px bg-flux-border" />
+          <div className="text-[9.5px] uppercase tracking-wider text-amber-500 font-semibold mb-1.5">
+            Avertissements ({result.warnings.length})
+          </div>
+          {result.warnings.map((w, i) => {
+            let jobRef: string | null = null;
+            if (w.taskId) {
+              const task = snapshot.tasks.find((t) => t.id === w.taskId);
+              if (task) {
+                const jobId = getJobIdForTask(task, snapshot.elements);
+                if (jobId) {
+                  const job = snapshot.jobs.find((j) => j.id === jobId);
+                  if (job) jobRef = job.reference;
+                }
+              }
+            }
+            return (
+              <div key={i} className="flex items-start gap-2 py-0.5 text-[11px]">
+                <span className="text-amber-500 shrink-0 mt-px">⚠</span>
+                <div className="flex-1 min-w-0 leading-snug">
+                  {jobRef && <span className="font-semibold text-flux-text-primary mr-1.5">{jobRef}</span>}
+                  <span className="text-flux-text-tertiary">{w.message}</span>
+                </div>
+              </div>
+            );
+          })}
         </>
       )}
     </>

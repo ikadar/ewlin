@@ -660,10 +660,13 @@ export const ComputeModal = memo(function ComputeModal({
                       {result.warnings.map((w, i) => {
                         let jobRef: string | null = null;
                         if (w.taskId) {
-                          const jobId = getJobIdForTask(snapshot, w.taskId);
-                          if (jobId) {
-                            const job = snapshot.jobs.find((j) => j.id === jobId);
-                            if (job) jobRef = job.reference;
+                          const task = snapshot.tasks.find((t) => t.id === w.taskId);
+                          if (task) {
+                            const jobId = getJobIdForTask(task, snapshot.elements);
+                            if (jobId) {
+                              const job = snapshot.jobs.find((j) => j.id === jobId);
+                              if (job) jobRef = job.reference;
+                            }
                           }
                         }
                         return (
