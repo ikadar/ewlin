@@ -49,22 +49,30 @@ pub enum ViolationKind {
 /// Detect every precedence violation in `assignments` given the DAG in `jobs`.
 ///
 /// Runs in O(J + E + T + P) where J=jobs, E=elements, T=tasks,
-/// P=cross-element/job edges. String timestamps are compared lexicographically,
-/// which is chronologically correct for the ISO 8601 local format the engine
-/// emits.
+/// P=cross-element/job edges.
 ///
-/// Convention: this validator hardcodes the "≥ 1 tick gap" rule (`pred.end ==
-/// succ.start` is a violation). It matches the engine's default
-/// `precedence_min_gap_ticks = 1`. Schedules computed with the option set to 0
-/// will produce assignments that this validator flags as kissing-boundary
-/// violations — that's a deliberate audit signal, not a false positive: it
-/// means the engine is operating in legacy half-open mode and any UI/external
-/// consumer using closed intervals will see them as conflicts. Callers who
-/// genuinely want to validate gap=0 schedules should compare timestamps
-/// themselves with the inequality flipped to strict `>`.
+/// `min_gap_minutes` is the minimum required separation between a
+/// predecessor's end and its successor's start. It MUST match the value
+/// the engine used to compute the schedule
+/// (`ComputeOptions.precedence_min_gap_ticks * tick_minutes`):
+///
+///   * `min_gap_minutes = 0` → kissing boundaries (`pred.end == succ.start`)
+///     are accepted as legal contiguity (matches the legacy half-open
+///     tick semantics). Use this when validating output from a compute
+///     run with `precedence_min_gap_ticks = 0`.
+///   * `min_gap_minutes >= 1` → kissing boundaries are flagged as
+///     violations. Use the engine-side product of ticks × tick_minutes;
+///     for the default 1 tick at 5 min that's `5`.
+///
+/// Timestamps are parsed from the ISO 8601 local format the engine emits
+/// (`%Y-%m-%dT%H:%M:%S`). Strings that fail to parse fall back to a
+/// lexicographic compare with the equality treated as a violation iff
+/// `min_gap_minutes > 0` — defensive, should never trigger on engine
+/// output but keeps the validator robust against hand-crafted test data.
 pub fn validate_precedence(
     jobs: &[JobInput],
     assignments: &[ComputedAssignment],
+    min_gap_minutes: u32,
 ) -> Vec<Violation> {
     // task_id -> (start, end)
     let asgn_by_task: HashMap<&str, (&str, &str)> = assignments
@@ -167,6 +175,34 @@ pub fn validate_precedence(
 
     let mut violations = Vec::new();
 
+    // Closure capturing `min_gap_minutes`. Returns true when the
+    // (pred_end, succ_start) pair is a precedence violation under the
+    // current gap rule. Both inputs are ISO 8601 local datetimes as
+    // emitted by the engine — we parse them to NaiveDateTime to do
+    // exact minute arithmetic instead of lexicographic compare.
+    let is_violation = |pred_end: &str, succ_start: &str| -> bool {
+        let p = chrono::NaiveDateTime::parse_from_str(pred_end, "%Y-%m-%dT%H:%M:%S");
+        let s = chrono::NaiveDateTime::parse_from_str(succ_start, "%Y-%m-%dT%H:%M:%S");
+        match (p, s) {
+            (Ok(pe), Ok(ss)) => {
+                let min_succ = pe + chrono::Duration::minutes(min_gap_minutes as i64);
+                ss < min_succ
+            }
+            // Defensive fallback: timestamps the engine emits always
+            // parse, so this branch only fires on hand-crafted test
+            // data with a malformed string. Treat unparsable as the
+            // strictest interpretation — kissing IS a violation when
+            // gap > 0, never when gap == 0.
+            _ => {
+                if min_gap_minutes == 0 {
+                    pred_end > succ_start
+                } else {
+                    pred_end >= succ_start
+                }
+            }
+        }
+    };
+
     // INTRA-ELEMENT
     for job in jobs {
         for element in &job.elements {
@@ -178,7 +214,7 @@ pub fn validate_precedence(
                 let a_end = asgn_by_task.get(a.id.as_str()).map(|(_, e)| *e);
                 let b_start = asgn_by_task.get(b.id.as_str()).map(|(s, _)| *s);
                 if let (Some(ae), Some(bs)) = (a_end, b_start) {
-                    if ae >= bs {
+                    if is_violation(ae, bs) {
                         violations.push(Violation {
                             kind: ViolationKind::IntraElement,
                             offender_task_id: b.id.clone(),
@@ -208,7 +244,7 @@ pub fn validate_precedence(
                 let (Some(p_last_end), Some(p_last_task)) = (pe.last_end, pe.last_task_id) else {
                     continue;
                 };
-                if p_last_end >= first_start {
+                if is_violation(p_last_end, first_start) {
                     violations.push(Violation {
                         kind: ViolationKind::CrossElement {
                             predecessor_element_id: prereq_id.clone(),
@@ -238,7 +274,7 @@ pub fn validate_precedence(
             let (Some(r_last_end), Some(r_last_task)) = (rj.last_end, rj.last_task_id) else {
                 continue;
             };
-            if r_last_end >= first_start {
+            if is_violation(r_last_end, first_start) {
                 violations.push(Violation {
                     kind: ViolationKind::CrossJob {
                         predecessor_job_id: req_id.clone(),
@@ -347,7 +383,9 @@ mod tests {
             asg("t0", "2026-04-22T08:00:00", "2026-04-22T09:00:00"),
             asg("t1", "2026-04-22T09:05:00", "2026-04-22T10:05:00"),
         ];
-        assert!(validate_precedence(&jobs, &asgn).is_empty());
+        // 5-min gap is exactly the minimum the engine emits at default
+        // settings (1 tick × 5 min). 09:05 ≥ 09:00 + 5 → no violation.
+        assert!(validate_precedence(&jobs, &asgn, 5).is_empty());
     }
 
     #[test]
@@ -369,11 +407,64 @@ mod tests {
             asg("t0", "2026-04-22T08:00:00", "2026-04-22T09:00:00"),
             asg("t1", "2026-04-22T09:00:00", "2026-04-22T10:00:00"),
         ];
-        let v = validate_precedence(&jobs, &asgn);
+        // Any positive gap detects the kissing case. Engine default is
+        // 5 min (1 tick × 5 min) — so 09:00 < 09:00 + 5 → violation.
+        let v = validate_precedence(&jobs, &asgn, 5);
         assert_eq!(v.len(), 1, "kissing boundary must surface as one violation");
         assert!(matches!(v[0].kind, ViolationKind::IntraElement));
         assert_eq!(v[0].offender_task_id, "t1");
         assert_eq!(v[0].predecessor_task_id, "t0");
+    }
+
+    #[test]
+    fn intra_element_kissing_boundary_is_clean_when_gap_zero() {
+        // Same kissing data as the previous test, but the engine was
+        // told `precedence_min_gap_ticks = 0`. The validator must
+        // accept the touching boundary as legal contiguity — otherwise
+        // operators tuning the knob to 0 would see false-positive
+        // violation noise on every touching tile pair. Real overlaps
+        // (handled by `gap_zero_still_flags_real_overlap`) are still
+        // flagged.
+        let jobs = vec![job(
+            "j1",
+            vec![elem(
+                "e1",
+                vec![task("t0", 0, "s1"), task("t1", 1, "s2")],
+                vec![],
+            )],
+            vec![],
+        )];
+        let asgn = vec![
+            asg("t0", "2026-04-22T08:00:00", "2026-04-22T09:00:00"),
+            asg("t1", "2026-04-22T09:00:00", "2026-04-22T10:00:00"),
+        ];
+        assert!(
+            validate_precedence(&jobs, &asgn, 0).is_empty(),
+            "with gap=0, kissing pred.end == succ.start is legal contiguity, not a violation"
+        );
+    }
+
+    #[test]
+    fn gap_zero_still_flags_real_overlap() {
+        // succ STARTS BEFORE pred ENDS — overlap of 30 min. This is a
+        // real conflict (operator on two stations simultaneously); the
+        // validator must flag it even with gap=0.
+        let jobs = vec![job(
+            "j1",
+            vec![elem(
+                "e1",
+                vec![task("t0", 0, "s1"), task("t1", 1, "s2")],
+                vec![],
+            )],
+            vec![],
+        )];
+        let asgn = vec![
+            asg("t0", "2026-04-22T08:00:00", "2026-04-22T09:00:00"),
+            asg("t1", "2026-04-22T08:30:00", "2026-04-22T09:30:00"),
+        ];
+        let v = validate_precedence(&jobs, &asgn, 0);
+        assert_eq!(v.len(), 1, "gap=0 must still flag genuine inversions");
+        assert!(matches!(v[0].kind, ViolationKind::IntraElement));
     }
 
     #[test]
@@ -393,7 +484,7 @@ mod tests {
             asg("t_e1", "2026-04-22T10:00:00", "2026-04-22T12:00:00"),
             asg("t_e2", "2026-04-22T12:00:00", "2026-04-22T13:00:00"),
         ];
-        let v = validate_precedence(&jobs, &asgn);
+        let v = validate_precedence(&jobs, &asgn, 5);
         assert_eq!(v.len(), 1);
         assert!(matches!(v[0].kind, ViolationKind::CrossElement { .. }));
     }
@@ -414,7 +505,7 @@ mod tests {
             asg("t0", "2026-06-05T10:00:00", "2026-06-05T12:00:00"),
             asg("t1", "2026-04-27T10:00:00", "2026-05-08T12:00:00"),
         ];
-        let v = validate_precedence(&jobs, &asgn);
+        let v = validate_precedence(&jobs, &asgn, 5);
         assert_eq!(v.len(), 1);
         assert!(matches!(v[0].kind, ViolationKind::IntraElement));
         assert_eq!(v[0].offender_task_id, "t1");
@@ -435,7 +526,7 @@ mod tests {
             asg("t_e1", "2026-04-22T10:00:00", "2026-04-22T12:00:00"),
             asg("t_e2", "2026-04-22T09:00:00", "2026-04-22T10:00:00"),
         ];
-        let v = validate_precedence(&jobs, &asgn);
+        let v = validate_precedence(&jobs, &asgn, 5);
         assert_eq!(v.len(), 1);
         assert!(matches!(v[0].kind, ViolationKind::CrossElement { .. }));
     }
@@ -458,7 +549,7 @@ mod tests {
             asg("t_j1", "2026-04-22T14:00:00", "2026-04-22T15:00:00"),
             asg("t_j2", "2026-04-22T13:00:00", "2026-04-22T14:00:00"),
         ];
-        let v = validate_precedence(&jobs, &asgn);
+        let v = validate_precedence(&jobs, &asgn, 5);
         assert_eq!(v.len(), 1);
         assert!(matches!(v[0].kind, ViolationKind::CrossJob { .. }));
     }
@@ -664,7 +755,10 @@ mod tests {
             };
 
             let result = compute(&req);
-            let violations = validate_precedence(&req.jobs, &result.assignments);
+            // Engine tick = 15 min (station S1 / S2 default), gap = default 1
+            // tick → 15 min minimum separation between any predecessor end
+            // and successor start.
+            let violations = validate_precedence(&req.jobs, &result.assignments, 15);
             let (intra, cross_elem, cross_job) = violation_summary(&violations);
             assert_eq!(
                 (intra, cross_elem, cross_job),
@@ -773,7 +867,9 @@ mod tests {
             };
 
             let result = compute(&req);
-            let violations = validate_precedence(&req.jobs, &result.assignments);
+            // Same gap convention as the sibling integration test: 15 min
+            // (1 default tick × 15 min station tick).
+            let violations = validate_precedence(&req.jobs, &result.assignments, 15);
             let (intra, cross_elem, cross_job) = violation_summary(&violations);
             assert_eq!(
                 (intra, cross_elem, cross_job),
