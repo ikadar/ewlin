@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{Datelike, NaiveDate};
 
 use crate::model::operator::{Absence, OperatingSchedule, Overtime};
-use crate::model::schedule::{ComputedAssignment, OperatorAssignment};
+use crate::model::schedule::{ComputedAssignment, OperatorAssignment, Warning};
 
 use super::grid::ScheduleGrid;
 
@@ -730,6 +730,7 @@ pub fn run_forward_pass(
     // ComputeOptions.precedence_min_gap_ticks. 0 = legacy behaviour
     // (touching boundaries allowed).
     precedence_min_gap_ticks: u32,
+    warnings: &mut Vec<Warning>,
 ) -> Vec<ComputedAssignment> {
     let mut assignments: Vec<ComputedAssignment> = Vec::new();
     let grow_ticks = 7 * 24 * 60 / tick_minutes as usize; // 7 days of ticks
@@ -750,6 +751,7 @@ pub fn run_forward_pass(
         operator_skills,
         operator_availability,
         operator_groups,
+        warnings,
     );
 
     // Start scheduling from now (rounded up to tick boundary), not midnight.
@@ -1938,6 +1940,47 @@ fn advance_action_at_tick(
 ///   AND both emit a `ComputedAssignment`, producing a station-capacity
 ///   violation visible as overlapping tiles in the UI on capacity-1
 ///   stations like Komori G40 / Ryobi 528.
+/// Returns true iff at least one qualified-and-available operator exists on
+/// `station_idx` for every tick in [start, end). Mirrors the fallback logic
+/// inside the placement loop without committing to the grid — used by
+/// pre_place to probe candidate windows before deciding where to drop a pin.
+fn is_window_operator_feasible(
+    start: usize,
+    end: usize,
+    station_idx: usize,
+    operator_skills: &[Vec<(usize, f64)>],
+    operator_availability: &OperatorAvailability,
+) -> bool {
+    for t in start..end {
+        let any_op_here = (0..operator_skills.len()).any(|op| {
+            if !operator_availability.is_available(op, t) { return false; }
+            operator_skills[op]
+                .iter()
+                .any(|(s, p)| *s == station_idx && *p > 0.0)
+        });
+        if !any_op_here { return false; }
+    }
+    true
+}
+
+/// Returns true iff `station_idx` has no commitments other than `self_action`
+/// for every tick in [start, end). Used to verify a candidate window is free
+/// before shifting a pin onto it.
+fn is_window_station_free(
+    grid: &ScheduleGrid,
+    start: usize,
+    end: usize,
+    station_idx: usize,
+    self_action: usize,
+) -> bool {
+    for t in start..end {
+        if let Some(prev) = grid.station_action_at(station_idx, t) {
+            if prev != self_action { return false; }
+        }
+    }
+    true
+}
+
 fn pre_place_pinned_actions(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
@@ -1949,6 +1992,7 @@ fn pre_place_pinned_actions(
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
+    warnings: &mut Vec<Warning>,
 ) {
     for i in 0..actions.len() {
         if !actions[i].is_pinned {
@@ -1973,11 +2017,11 @@ fn pre_place_pinned_actions(
         // overlaps on capacity-1 stations after several Ctrl+Alt+P
         // cycles via the safety-zone Option A pathway. Fallback to the
         // config derivation when end is missing or malformed (≤ start).
-        let end_t = match actions[i].pinned_end_tick {
+        let original_end_t = match actions[i].pinned_end_tick {
             Some(et) if et > start_t => et,
             _ => start_t + total_ticks,
         };
-        if end_t == start_t {
+        if original_end_t == start_t {
             // Zero-duration pinned task — degenerate, skip but emit empty assignment
             actions[i].start_tick = Some(start_t);
             actions[i].end_tick = Some(start_t);
@@ -1985,13 +2029,80 @@ fn pre_place_pinned_actions(
             actions[i].eat = 0;
             continue;
         }
-        let actual_ticks = end_t - start_t;
+        let actual_ticks = original_end_t - start_t;
+        let original_start_t = start_t;
+        let station_idx = actions[i].station_idx;
 
-        // Make sure the grid covers the pinned interval. Grow in chunks
-        // until end_t fits, mirroring the dynamic-grow strategy used in
-        // the main loop.
-        while end_t > grid.num_ticks {
+        // Make sure the grid covers the requested window before probing
+        // feasibility. Subsequent forward-scan iterations grow the grid
+        // again per candidate window as needed.
+        while original_end_t > grid.num_ticks {
             grid.grow(grow_ticks);
+        }
+
+        // Pin = start-time PREFERENCE, not a hard constraint. If the
+        // requested window has no qualified-and-available operator OR the
+        // station cell is occupied by another pre-placed pin, scan forward
+        // up to a horizon for the closest window where BOTH conditions
+        // hold. When found, slide the pin and emit a warning so the user
+        // sees the displacement in the compute modal. When no feasible
+        // window exists within the horizon, fall through to the original
+        // placement and let the per-tick op-finding loop emit operator-less
+        // ticks (the legacy degraded behaviour).
+        let original_window_feasible = is_window_station_free(
+            grid,
+            start_t,
+            original_end_t,
+            station_idx,
+            i,
+        ) && is_window_operator_feasible(
+            start_t,
+            original_end_t,
+            station_idx,
+            operator_skills,
+            operator_availability,
+        );
+
+        let mut start_t = start_t;
+        let mut end_t = original_end_t;
+        if !original_window_feasible {
+            let max_scan_ticks: usize = 30 * 24 * 60 / tick_minutes as usize;
+            let mut shifted_to: Option<usize> = None;
+            for offset in 1..=max_scan_ticks {
+                let candidate_start = original_start_t + offset;
+                let candidate_end = candidate_start + actual_ticks;
+                while candidate_end > grid.num_ticks {
+                    grid.grow(grow_ticks);
+                }
+                if is_window_station_free(grid, candidate_start, candidate_end, station_idx, i)
+                    && is_window_operator_feasible(
+                        candidate_start,
+                        candidate_end,
+                        station_idx,
+                        operator_skills,
+                        operator_availability,
+                    )
+                {
+                    shifted_to = Some(candidate_start);
+                    break;
+                }
+            }
+            if let Some(new_start) = shifted_to {
+                let original_minutes = original_start_t as u64 * tick_minutes as u64;
+                let new_minutes = new_start as u64 * tick_minutes as u64;
+                warnings.push(Warning {
+                    task_id: Some(actions[i].task_id.clone()),
+                    message: format!(
+                        "Pin déplacé : aucun opérateur disponible à {} ; replanifié au créneau dispo le plus proche ({})",
+                        super::format_minutes(original_minutes, start_date),
+                        super::format_minutes(new_minutes, start_date),
+                    ),
+                });
+                start_t = new_start;
+                end_t = new_start + actual_ticks;
+                actions[i].pinned_start_tick = Some(start_t);
+                actions[i].pinned_end_tick = Some(end_t);
+            }
         }
 
         // Reserve the station for the whole interval.

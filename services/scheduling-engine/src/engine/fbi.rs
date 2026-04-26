@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 
 use crate::model::schedule::{
-    ComputedAssignment, ScheduleStats, StationGroupInput,
+    ComputedAssignment, ScheduleStats, StationGroupInput, Warning,
 };
 use crate::model::station::StationInput;
 use crate::model::operator::OperatorInput;
@@ -42,6 +42,7 @@ pub fn run_with_fbi(
     now_tick: usize,
     score_weights: &[f64; 7],
     precedence_min_gap_ticks: u32,
+    warnings: &mut Vec<Warning>,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     let station_id_to_idx: HashMap<String, usize> = stations
         .iter()
@@ -261,6 +262,7 @@ pub fn run_with_fbi(
             &station_urgency_boost,
             &score_weights,
             precedence_min_gap_ticks,
+            warnings,
         );
 
         // Remap and compute stats
@@ -359,8 +361,9 @@ pub fn run_with_fbi_ordering(
     now_tick: usize,
     score_weights: &[f64; 7],
     precedence_min_gap_ticks: u32,
+    warnings: &mut Vec<Warning>,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights, precedence_min_gap_ticks)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights, precedence_min_gap_ticks, warnings)
 }
 
 /// Multi-start FBI with perturbed scoring weights.
@@ -392,6 +395,7 @@ pub fn run_with_multi_start_fbi(
     progress: &super::ProgressSender,
     now_tick: usize,
     precedence_min_gap_ticks: u32,
+    warnings: &mut Vec<Warning>,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
     use rand::Rng;
     use rand::rngs::StdRng;
@@ -400,14 +404,20 @@ pub fn run_with_multi_start_fbi(
     let default_weights: [f64; 7] = [1.0; 7];
     let mut total_iters: u32 = 0;
 
-    // Pass 1: Baseline (TierFirst, default weights)
+    // Pass 1: Baseline (TierFirst, default weights). Per-pass warnings vec
+    // so the winning pass's warnings are the ones surfaced to the user —
+    // each pass produces deterministically identical warnings for the same
+    // pins, but only the winner's schedule is shown so we honour that.
+    let mut warnings_p1: Vec<Warning> = Vec::new();
     let (mut best_a, mut best_act, mut best_s, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
         BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
         now_tick, &default_weights,
         precedence_min_gap_ticks,
+        &mut warnings_p1,
     );
+    let mut best_warnings: Vec<Warning> = warnings_p1;
     total_iters += i1;
     let mut best_score = (best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
 
@@ -416,12 +426,14 @@ pub fn run_with_multi_start_fbi(
 
     // Pass 2: EDD ordering (if multi_start enabled)
     if multi_start {
+        let mut warnings_p2: Vec<Warning> = Vec::new();
         let (a2, act2, s2, i2) = run_with_fbi_ordering(
             jobs, stations, operators,
             tick_minutes, horizon_days, max_iterations, start_date,
             BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
+            &mut warnings_p2,
         );
         total_iters += i2;
         let score2 = (s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
@@ -434,6 +446,7 @@ pub fn run_with_multi_start_fbi(
             best_act = act2;
             best_s = s2;
             best_score = score2;
+            best_warnings = warnings_p2;
         }
 
         // Pass 3: SlackFirst ordering. Tier-stratified like TierFirst but
@@ -441,12 +454,14 @@ pub fn run_with_multi_start_fbi(
         // path first within each priority level. May produce better
         // schedules when several same-tier jobs compete with varying
         // chain lengths.
+        let mut warnings_p3: Vec<Warning> = Vec::new();
         let (a3, act3, s3, i3) = run_with_fbi_ordering(
             jobs, stations, operators,
             tick_minutes, horizon_days, max_iterations, start_date,
             BackwardOrdering::SlackFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
+            &mut warnings_p3,
         );
         total_iters += i3;
         let score3 = (s3.weighted_late_job_count, s3.weighted_lateness_minutes, s3.makespan_minutes);
@@ -459,6 +474,7 @@ pub fn run_with_multi_start_fbi(
             best_act = act3;
             best_s = s3;
             best_score = score3;
+            best_warnings = warnings_p3;
         }
     }
 
@@ -480,12 +496,14 @@ pub fn run_with_multi_start_fbi(
                 _ => BackwardOrdering::SlackFirst,
             };
 
+            let mut warnings_pp: Vec<Warning> = Vec::new();
             let (ap, actp, sp, ip) = run_with_fbi_ordering(
                 jobs, stations, operators,
                 tick_minutes, horizon_days, max_iterations, start_date,
                 ordering, station_groups, station_blocked_ranges, occupied_slots, progress,
                 now_tick, &weights,
                 precedence_min_gap_ticks,
+                &mut warnings_pp,
             );
             total_iters += ip;
             let score_p = (sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
@@ -498,12 +516,18 @@ pub fn run_with_multi_start_fbi(
                 best_act = actp;
                 best_s = sp;
                 best_score = score_p;
+                best_warnings = warnings_pp;
             }
         }
     }
 
     eprintln!("[MULTI-START] best: late_jobs={} w_late={} lateness={} makespan={} (total {} FBI iterations)",
         best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes, total_iters);
+
+    // Surface only the winning pass's warnings — the schedule shown to the
+    // user is best_a, so its accompanying warnings (e.g. pin displacements)
+    // are the ones that match the visible state.
+    warnings.extend(best_warnings);
 
     (best_a, best_act, best_s, total_iters)
 }

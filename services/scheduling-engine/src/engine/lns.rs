@@ -182,6 +182,9 @@ pub fn lns_improve(
 
         // Run full FBI with 1 iteration (skip convergence, fast).
         // Suppress FBI progress events (pass &None) to avoid flooding the modal.
+        // Pin-displacement warnings are discarded here — multi_start_fbi has
+        // already captured them; LNS recovery passes would only duplicate.
+        let mut _lns_warnings: Vec<crate::model::schedule::Warning> = Vec::new();
         let (new_a, new_act, new_s, new_i) = run_with_fbi_ordering(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, 1, // single FBI iteration
@@ -189,6 +192,7 @@ pub fn lns_improve(
             station_groups, station_blocked_ranges, occupied_slots,
             &None, now_tick, &default_weights,
             precedence_min_gap_ticks,
+            &mut _lns_warnings,
         );
         total_iters += new_i;
 

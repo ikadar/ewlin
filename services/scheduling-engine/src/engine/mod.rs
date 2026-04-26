@@ -157,6 +157,11 @@ fn compute_inner(
     // Run FBI loop with optional multi-start (TierFirst + EDD orderings)
     emit(progress, ProgressEvent::MergeStart); // signal "sending to engine"
 
+    // Pin displacement warnings emitted by pre_place_pinned_actions across
+    // all FBI passes. Same pin produces deterministically identical warnings
+    // each iteration, so we dedupe by task_id (last write wins) before
+    // appending to the response's warnings array.
+    let mut pin_warnings: Vec<Warning> = Vec::new();
     let (mut assignments, mut actions, mut stats, mut fbi_iterations) = fbi::run_with_multi_start_fbi(
         &request.jobs,
         &request.stations,
@@ -173,6 +178,7 @@ fn compute_inner(
         progress,
         now_tick,
         options.precedence_min_gap_ticks,
+        &mut pin_warnings,
     );
 
     // Moore escape hatch: if late imperative/important jobs remain after FBI,
@@ -326,6 +332,27 @@ fn compute_inner(
 
     let mut warnings = Vec::new();
     warnings.append(&mut concurrent_group_warnings);
+
+    // Dedupe pin-displacement warnings by task_id (last write wins). Each
+    // FBI iteration's pre_place re-emits the same warning for the same pin,
+    // and multi-start passes that lose to the winner have already had their
+    // warnings discarded inside run_with_multi_start_fbi — but FBI iteration
+    // duplicates within the winning pass survive that filter.
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut deduped_pin_warnings: Vec<Warning> = Vec::new();
+    for w in pin_warnings.into_iter() {
+        if let Some(ref tid) = w.task_id {
+            if let Some(&idx) = seen.get(tid) {
+                deduped_pin_warnings[idx] = w;
+            } else {
+                seen.insert(tid.clone(), deduped_pin_warnings.len());
+                deduped_pin_warnings.push(w);
+            }
+        } else {
+            deduped_pin_warnings.push(w);
+        }
+    }
+    warnings.extend(deduped_pin_warnings);
 
     // Check for unplaced tasks
     let unplaced: u32 = actions.iter().filter(|a| a.end_tick.is_none()).count() as u32;

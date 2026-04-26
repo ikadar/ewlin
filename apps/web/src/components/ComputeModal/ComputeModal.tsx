@@ -650,6 +650,34 @@ export const ComputeModal = memo(function ComputeModal({
                       )}
                     </div>
                   )}
+
+                  {/* Engine warnings (pin displacements, unplaced tasks, …) */}
+                  {result.warnings && result.warnings.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-zinc-800" data-testid="compute-warnings">
+                      <div className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold mb-2">
+                        Avertissements ({result.warnings.length})
+                      </div>
+                      {result.warnings.map((w, i) => {
+                        let jobRef: string | null = null;
+                        if (w.taskId) {
+                          const jobId = getJobIdForTask(snapshot, w.taskId);
+                          if (jobId) {
+                            const job = snapshot.jobs.find((j) => j.id === jobId);
+                            if (job) jobRef = job.reference;
+                          }
+                        }
+                        return (
+                          <div key={i} className="flex items-start gap-2 py-1 px-1.5 rounded text-xs hover:bg-zinc-800/50">
+                            <span className="text-amber-500 shrink-0 mt-px">⚠</span>
+                            <div className="flex-1 min-w-0">
+                              {jobRef && <span className="font-semibold text-zinc-100 mr-1.5">{jobRef}</span>}
+                              <span className="text-zinc-300">{w.message}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               )}
             </>

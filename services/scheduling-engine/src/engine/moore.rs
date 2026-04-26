@@ -187,12 +187,18 @@ pub fn moore_escape(
 
         attempts += 1;
         let default_weights: [f64; 7] = [1.0; 7];
+        // Pin-displacement warnings here are discarded — they are emitted
+        // deterministically by the prior multi_start_fbi pass which already
+        // surfaced them via best_warnings; re-emitting from a recovery pass
+        // would only produce duplicates.
+        let mut _moore_warnings: Vec<crate::model::schedule::Warning> = Vec::new();
         let (new_assignments, new_actions, new_stats, new_iters) = run_with_fbi_ordering(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, fbi_max_iterations, start_date,
             BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
+            &mut _moore_warnings,
         );
 
         let new_score = (new_stats.late_job_count, new_stats.weighted_lateness_minutes, new_stats.makespan_minutes);
