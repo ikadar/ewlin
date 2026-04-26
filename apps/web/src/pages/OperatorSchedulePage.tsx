@@ -1415,9 +1415,9 @@ function OperatorColumn({
   }, [visibleDayRange, pixelsPerHour, effectiveCollapses, gridStartDate]);
 
   // Unavailability + overtime overlays (only visible range).
-  // Overtime overlays are rendered FIRST so DOM order puts: overtime hachures →
+  // Overtime overlays are rendered FIRST so DOM order puts: overtime cross-grid →
   // unavailability hachures → tiles on top. The intended visual reading is
-  // "yellow hachures = exceptional availability, tiles sit on top normally".
+  // "gray cross grid = exceptional availability, tiles sit on top normally".
   const overlays = useMemo(() => {
     const startDay = visibleDayRange.start;
     const endDay = visibleDayRange.end;

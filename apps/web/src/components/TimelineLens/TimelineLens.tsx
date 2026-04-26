@@ -33,8 +33,8 @@ export interface TimelineLensProps {
   tileContent: ReactNode;
   /** Hatched unavailability bands for the active column, absolute ms. */
   unavailabilitySegments?: Array<{ startMs: number; endMs: number }>;
-  /** Yellow-hatched overtime bands for the active column, absolute ms. Tiles
-   *  render on top normally — these only mark "exceptional" availability. */
+  /** Overtime bands (gray plus-cross grid) for the active column, absolute ms.
+   *  Tiles render on top normally — these only mark "exceptional" availability. */
   overtimeSegments?: Array<{ startMs: number; endMs: number }>;
   /** Absolute ms used as the Y=0 reference for tile positions inside the lens. */
   gridStartMs: number;
@@ -315,11 +315,11 @@ export function TimelineLens({
           }}
         >
           {gridElements}
-          {/* Overtime hachures (yellow) — rendered BEFORE unavailability and
-              tiles so the natural DOM stacking puts: overtime → unavailability
-              (defensive — should never overlap) → tiles on top. The intended
-              user-facing reading is "yellow hachures = exceptional slot,
-              tiles sit on top normally". */}
+          {/* Overtime overlay (gray plus-cross grid) — rendered BEFORE
+              unavailability and tiles so the natural DOM stacking puts:
+              overtime → unavailability (defensive — should never overlap)
+              → tiles on top. The intended user-facing reading is "gray cross
+              grid = exceptional slot, tiles sit on top normally". */}
           {overtimeSegments.map((seg, idx) => {
             const top = ((seg.startMs - gridStartMs) / 3_600_000) * lpx;
             const height = Math.max(

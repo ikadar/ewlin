@@ -125,8 +125,9 @@ export function computeOperatorUnavailabilitySegments(
 
 /**
  * Same shape as `UnavailabilitySegment` but represents *overtime* periods
- * (positive availability). Caller renders these with yellow hachures
- * (bg-stripes-amber) instead of the dark hachures used for unavailability.
+ * (positive availability). Caller renders these with the gray plus-cross
+ * grid (bg-stripes-amber) instead of the dark diagonal hachures used for
+ * unavailability.
  */
 export type OvertimeSegment = UnavailabilitySegment;
 
@@ -134,7 +135,7 @@ export type OvertimeSegment = UnavailabilitySegment;
  * Compute overtime segments for an operator within a range of absolute ms.
  * Mirrors `computeOperatorUnavailabilitySegments` but returns the *positive*
  * overtime periods (heures supplémentaires) per day, in absolute ms ranges,
- * for the TimelineLens to render with yellow hachures.
+ * for the TimelineLens to render with the gray plus-cross grid.
  */
 export function computeOperatorOvertimeSegments(
   operator: Operator,

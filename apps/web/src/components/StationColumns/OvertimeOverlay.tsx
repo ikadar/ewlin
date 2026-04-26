@@ -23,14 +23,15 @@ export interface OvertimeOverlayProps {
 }
 
 /**
- * OvertimeOverlay — yellow 45° hachures marking operator overtime periods
- * (heures supplémentaires).
+ * OvertimeOverlay — neutral gray plus-cross grid marking operator overtime
+ * periods (heures supplémentaires).
  *
- * Mirrors `UnavailabilityOverlay` structurally (same SVG-stripe pattern at
- * the same angle, same collapse-aware splitting), but uses `bg-stripes-amber`
- * instead of `bg-stripes-dark`. Crucially: tiles render ON TOP of this overlay
- * normally — overtime is a regular availability slot, the hachures only mark
- * "exceptional time". This is enforced by render order (overlay before tiles).
+ * Mirrors `UnavailabilityOverlay` structurally (same SVG-tile pattern, same
+ * collapse-aware splitting), but uses `bg-stripes-amber` instead of
+ * `bg-stripes-dark` — a gray plus-sign brickwork rather than dark diagonal
+ * hachures. Crucially: tiles render ON TOP of this overlay normally — overtime
+ * is a regular availability slot, the marks only flag "exceptional time".
+ * This is enforced by render order (overlay before tiles).
  *
  * Overtime and absence ranges are guaranteed disjoint by the PHP API, so this
  * overlay never visually conflicts with `UnavailabilityOverlay`.

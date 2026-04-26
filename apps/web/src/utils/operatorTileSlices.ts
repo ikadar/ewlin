@@ -105,7 +105,7 @@ function unionWithOvertimes(
 
 /**
  * Compute overtime periods for a given day, in minutes-since-midnight, for
- * use by the OvertimeOverlay (yellow hachures rendered ABOVE base column,
+ * use by the OvertimeOverlay (gray plus-cross grid rendered ABOVE base column,
  * BELOW tiles). Returns merged, sorted ranges. Empty when the operator has
  * no overtime intersecting the day.
  *

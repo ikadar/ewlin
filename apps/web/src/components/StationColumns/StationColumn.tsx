@@ -39,8 +39,8 @@ export interface StationColumnProps {
   onDeselect?: () => void;
   /** Optional collapse bands — grid lines inside bands are skipped, totalHeight collapses. */
   collapses?: readonly Collapse[];
-  /** All operators. The dark hachures shrink and amber overtime stripes
-   *  appear only when at least one *qualified* operator (has a skill entry
+  /** All operators. The dark hachures shrink and the gray overtime cross-grid
+   *  appears only when at least one *qualified* operator (has a skill entry
    *  for this station) has overtime intersecting the day. Omit → station
    *  behaves like it always did (overtime invisible). */
   operators?: readonly Operator[];
@@ -235,11 +235,11 @@ export const StationColumn = memo(function StationColumn({
       aria-label={`Station ${station.name}`}
     >
       {/* Unavailability + overtime overlays.
-          DOM order: OvertimeOverlay (amber) → UnavailabilityOverlay (dark) → tiles.
-          Tiles render last so they sit on top normally. The amber/dark stripes
-          are guaranteed disjoint (overtime is unioned into the daySchedule
-          before computing dark hachures), so render order only matters for
-          tiles-on-top — not for hachure layering against each other. */}
+          DOM order: OvertimeOverlay (gray cross-grid) → UnavailabilityOverlay (dark
+          hachures) → tiles. Tiles render last so they sit on top normally. The
+          two patterns are guaranteed disjoint (overtime is unioned into the
+          daySchedule before computing dark hachures), so render order only
+          matters for tiles-on-top — not for layering the two patterns. */}
       {isMultiDayGrid ? (
         // Multi-day mode: render overlay for each visible day only
         (() => {

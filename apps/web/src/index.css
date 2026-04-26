@@ -331,9 +331,10 @@ body {
   background-repeat: repeat;
 }
 
-/* Striped pattern for operator overtime overlay — same 45° angle as
-   .bg-stripes-dark, but yellow. Tiles render on top normally (overtime
-   is a regular availability slot, the hachures just mark "exceptional"). */
+/* Operator overtime overlay — neutral mid-gray plus-cross grid (14×28 tile,
+   staggered brickwork pattern). Class name is legacy ("amber" / "stripes" no
+   longer reflect the visual). Tiles render on top normally — the cross grid
+   only marks "exceptional time", the slot itself is regularly available. */
 .bg-stripes-amber {
   background-image: url('/stripes-amber.svg');
   background-repeat: repeat;
@@ -497,7 +498,8 @@ html.light .bg-stripes-dark {
   opacity: 1;
 }
 
-/* Light mode amber stripes — yellow-700 hatching for overtime */
+/* Light mode overtime overlay — same gray plus-cross grid (color is
+   mode-agnostic). Override kept for symmetry with .bg-stripes-dark. */
 html.light .bg-stripes-amber {
   background-image: url('/stripes-amber-light.svg');
   opacity: 1;
