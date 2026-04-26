@@ -13,6 +13,11 @@ import { addOperatorAbsenceTool, addStationMaintenanceTool, listActiveConstraint
 import { updateJobDeadlineTool } from '../src/tools/jobs.js';
 import { resolveOperatorTool, resolveStationTool } from '../src/tools/resolve.js';
 import { proposePlanTool, askUserTool } from '../src/tools/system.js';
+import {
+  checkStationOperatorAvailability,
+  checkStationOperatorAvailabilityTool,
+  pinTaskAtTimeTool,
+} from '../src/tools/tasks.js';
 import { allTools, mcpExposedTools, findTool } from '../src/tools/registry.js';
 import type { PhpClient } from '../src/phpClient.js';
 
@@ -318,5 +323,181 @@ describe('system tools (propose_plan, ask_user)', () => {
     );
     expect(result.ok).toBe(true);
     expect(askUserTool.internal).toBe(true);
+  });
+});
+
+// 2026-04-13 is a Monday; 2026-04-18 is a Saturday. Tests use 12:00 to
+// stay safely inside the same local day regardless of runner TZ.
+const RYOBI_STATION = {
+  id: 'sta-ryobi',
+  name: 'Ryobi',
+  abbreviation: 'RYO',
+  operatingSchedule: {
+    monday:    { isOperating: true,  slots: [{ start: '08:00', end: '18:00' }] },
+    tuesday:   { isOperating: true,  slots: [{ start: '08:00', end: '18:00' }] },
+    wednesday: { isOperating: true,  slots: [{ start: '08:00', end: '18:00' }] },
+    thursday:  { isOperating: true,  slots: [{ start: '08:00', end: '18:00' }] },
+    friday:    { isOperating: true,  slots: [{ start: '08:00', end: '18:00' }] },
+    saturday:  { isOperating: false, slots: [] },
+    sunday:    { isOperating: false, slots: [] },
+  },
+  exceptions: [],
+};
+
+describe('checkStationOperatorAvailability (helper)', () => {
+  it('returns available=true when the day is operating and time is in slot', () => {
+    const result = checkStationOperatorAvailability(
+      { stations: [RYOBI_STATION] },
+      'sta-ryobi',
+      '2026-04-13T12:00:00',
+    );
+    expect(result.available).toBe(true);
+  });
+
+  it('returns available=false on a non-operating day', () => {
+    const result = checkStationOperatorAvailability(
+      { stations: [RYOBI_STATION] },
+      'sta-ryobi',
+      '2026-04-18T12:00:00',
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('samedi');
+  });
+
+  it('returns available=false outside the operating slots', () => {
+    const result = checkStationOperatorAvailability(
+      { stations: [RYOBI_STATION] },
+      'sta-ryobi',
+      '2026-04-13T19:00:00',
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toMatch(/hors des plages/);
+  });
+
+  it('returns available=false when an exception masks the slot', () => {
+    const masked = {
+      ...RYOBI_STATION,
+      exceptions: [
+        { startAt: '2026-04-13T09:00:00', endAt: '2026-04-13T15:00:00', reason: 'maintenance' },
+      ],
+    };
+    const result = checkStationOperatorAvailability(
+      { stations: [masked] },
+      'sta-ryobi',
+      '2026-04-13T12:00:00',
+    );
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('maintenance');
+  });
+
+  it('returns available=false when station not found', () => {
+    const result = checkStationOperatorAvailability(
+      { stations: [RYOBI_STATION] },
+      'sta-other',
+      '2026-04-13T12:00:00',
+    );
+    expect(result.available).toBe(false);
+  });
+
+  it('returns available=false when operatingSchedule is missing entirely', () => {
+    const noSched = { id: 'sta-x', name: 'X', operatingSchedule: null, exceptions: [] };
+    const result = checkStationOperatorAvailability(
+      { stations: [noSched] },
+      'sta-x',
+      '2026-04-13T12:00:00',
+    );
+    expect(result.available).toBe(false);
+  });
+});
+
+describe('check_station_operator_availability (tool)', () => {
+  it('reports available=true through the snapshot endpoint', async () => {
+    const { php, calls } = makeFakePhp({
+      'GET /api/v1/schedule/snapshot': { stations: [RYOBI_STATION], assignments: [] },
+    });
+    const result = await checkStationOperatorAvailabilityTool.handler(
+      { stationId: 'sta-ryobi', stationLabel: 'Ryobi', date: '2026-04-13', time: '12:00' },
+      makeCtx(php),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(calls.find((c) => c.path === '/api/v1/schedule/snapshot')).toBeTruthy();
+    const data = result.data as { available: boolean; stationLabel: string };
+    expect(data.available).toBe(true);
+    expect(data.stationLabel).toBe('Ryobi');
+  });
+
+  it('reports available=false with reason when station closed', async () => {
+    const { php } = makeFakePhp({
+      'GET /api/v1/schedule/snapshot': { stations: [RYOBI_STATION], assignments: [] },
+    });
+    const result = await checkStationOperatorAvailabilityTool.handler(
+      { stationId: 'sta-ryobi', stationLabel: 'Ryobi', date: '2026-04-18', time: '12:00' },
+      makeCtx(php),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { available: boolean; reason?: string };
+    expect(data.available).toBe(false);
+    expect(typeof data.reason).toBe('string');
+  });
+
+  it('is registered as readOnly and exposed via MCP', () => {
+    expect(checkStationOperatorAvailabilityTool.readOnly).toBe(true);
+    expect(checkStationOperatorAvailabilityTool.internal).toBeFalsy();
+  });
+});
+
+describe('pin_task_at_time (operator-availability safety net)', () => {
+  it('returns no warning when an operator is scheduled at the pinned slot', async () => {
+    const { php } = makeFakePhp({
+      'GET /api/v1/schedule/snapshot': {
+        stations: [RYOBI_STATION],
+        assignments: [{ id: 'as-1', taskId: 'task-1', targetId: 'sta-ryobi', scheduledStart: '', scheduledEnd: '', isPinned: false }],
+      },
+    });
+    const result = await pinTaskAtTimeTool.handler(
+      {
+        taskId: 'task-1',
+        taskLabel: 'MBO XL',
+        stationId: 'sta-ryobi',
+        stationLabel: 'Ryobi',
+        date: '2026-04-13',
+        time: '12:00',
+      },
+      makeCtx(php),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { warning?: string };
+    expect(data.warning).toBeUndefined();
+  });
+
+  it('attaches a warning when no operator is scheduled at the pinned slot', async () => {
+    const { php, calls } = makeFakePhp({
+      'GET /api/v1/schedule/snapshot': {
+        stations: [RYOBI_STATION],
+        assignments: [{ id: 'as-1', taskId: 'task-1', targetId: 'sta-ryobi', scheduledStart: '', scheduledEnd: '', isPinned: false }],
+      },
+    });
+    const result = await pinTaskAtTimeTool.handler(
+      {
+        taskId: 'task-1',
+        taskLabel: 'MBO XL',
+        stationId: 'sta-ryobi',
+        stationLabel: 'Ryobi',
+        date: '2026-04-18', // Saturday → non-operating
+        time: '12:00',
+      },
+      makeCtx(php),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { warning?: string };
+    expect(typeof data.warning).toBe('string');
+    expect(data.warning).toContain('samedi');
+    // The pin still went through despite the warning.
+    expect(calls.some((c) => c.method === 'PUT' && c.path === '/api/v1/tasks/task-1/assign')).toBe(true);
+    expect(calls.some((c) => c.method === 'PUT' && c.path === '/api/v1/tasks/task-1/pin')).toBe(true);
   });
 });

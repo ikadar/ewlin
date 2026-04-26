@@ -155,6 +155,120 @@ async function currentIsPinned(
   return asn ? asn.isPinned ?? false : null;
 }
 
+// JS Date.getDay() is 0=Sun..6=Sat — index into this array to get the
+// lowercase English key used by Station.operatingSchedule.
+const DAY_KEYS = [
+  'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+] as const;
+const DAY_LABELS_FR: Record<string, string> = {
+  monday: 'lundi',
+  tuesday: 'mardi',
+  wednesday: 'mercredi',
+  thursday: 'jeudi',
+  friday: 'vendredi',
+  saturday: 'samedi',
+  sunday: 'dimanche',
+};
+
+export interface AvailabilityCheck {
+  available: boolean;
+  reason?: string;
+}
+
+/**
+ * Pre-validate that a station has at least one qualified operator
+ * scheduled at the requested local datetime. Returns `{ available: true }`
+ * when the station's effective operating window covers the moment AND no
+ * `ScheduleException` masks it.
+ *
+ * Limitation: cannot detect "all qualified operators are busy on another
+ * station at the same tick" — that depends on a recompute. We catch the
+ * common cases (off-day, after hours, station maintenance window) which
+ * are the typical cause of pin → tile-without-operator regressions.
+ *
+ * Snapshot shape: `station.operatingSchedule` is the union of qualified
+ * operators' schedules (per the "machine dispo = operator dispo" rule),
+ * pre-computed by SnapshotBuilder::buildOperatorSchedulesByStation.
+ */
+export function checkStationOperatorAvailability(
+  snapshot: { stations: SnapshotStation[] },
+  stationId: string,
+  isoLocal: string,
+): AvailabilityCheck {
+  const station = snapshot.stations.find((s) => s.id === stationId);
+  if (!station) {
+    return { available: false, reason: `Station ${stationId} introuvable dans le snapshot.` };
+  }
+  const dt = new Date(isoLocal);
+  if (Number.isNaN(dt.getTime())) {
+    return { available: false, reason: `Datetime invalide : ${isoLocal}.` };
+  }
+  const dayKey = DAY_KEYS[dt.getDay()]!;
+  const dayLabel = DAY_LABELS_FR[dayKey] ?? dayKey;
+  const day = station.operatingSchedule?.[dayKey];
+  if (!day || !day.isOperating || day.slots.length === 0) {
+    return {
+      available: false,
+      reason: `Aucun opérateur qualifié n'est planifié sur ${station.name} le ${dayLabel}.`,
+    };
+  }
+  const hhmm = isoLocal.slice(11, 16);
+  const inSlot = day.slots.some((slot) => slot.start <= hhmm && hhmm < slot.end);
+  if (!inSlot) {
+    const slotsStr = day.slots.map((s) => `${s.start}-${s.end}`).join(', ');
+    return {
+      available: false,
+      reason: `${hhmm} est hors des plages opérateurs sur ${station.name} le ${dayLabel} (plages : ${slotsStr}).`,
+    };
+  }
+  // exceptions are naive local ISO ("YYYY-MM-DDTHH:MM:SS"), inclusive
+  // endpoints — same shape as `isoLocal`, so string compare is safe.
+  const masking = (station.exceptions ?? []).find(
+    (ex) => ex.startAt <= isoLocal && isoLocal <= ex.endAt,
+  );
+  if (masking) {
+    const r = masking.reason ? ` (${masking.reason})` : '';
+    return {
+      available: false,
+      reason: `${station.name} est marquée indisponible sur ce créneau${r}.`,
+    };
+  }
+  return { available: true };
+}
+
+export const checkStationOperatorAvailabilityTool: ToolDefinition = {
+  name: 'check_station_operator_availability',
+  description:
+    "Vérifie qu'au moins un opérateur qualifié est PLANIFIÉ sur une station à un créneau donné. À APPELER AVANT pin_task_at_time : si available=false, signale dans la narration ET dans le preview de l'action que la tuile sera placée sans opérateur (le moteur ne peut pas inventer un opérateur qui n'est pas là — il faudra ajouter une heure sup ou choisir un autre créneau). Vérifie le créneau de DÉBUT seulement ; pas besoin de vérifier toute la durée. Limite : ne détecte pas le cas où tous les opérateurs qualifiés sont déjà occupés sur une autre station au même tick (visible seulement après recompute).",
+  readOnly: true,
+  inputSchema: z.object({
+    stationId: uuidField('resolve_station'),
+    stationLabel: z.string().min(1),
+    date: z.string().describe("Date YYYY-MM-DD du créneau."),
+    time: z.string().describe("Heure HH:MM du créneau."),
+  }),
+  handler: async (input, ctx) => {
+    let isoLocal: string;
+    try {
+      isoLocal = combineDateAndTime(input.date, input.time);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+    const snap = await ctx.php.get<Snapshot>('/api/v1/schedule/snapshot');
+    const result = checkStationOperatorAvailability(snap, input.stationId, isoLocal);
+    return {
+      ok: true,
+      data: {
+        stationId: input.stationId,
+        stationLabel: input.stationLabel,
+        date: input.date,
+        time: input.time,
+        ...result,
+      },
+    };
+  },
+};
+
 export const pinTaskAtTimeTool: ToolDefinition = {
   name: 'pin_task_at_time',
   description:
@@ -169,9 +283,13 @@ export const pinTaskAtTimeTool: ToolDefinition = {
   }),
   handler: async (input, ctx) => {
     let scheduledStart: string;
+    let scheduledStartLocal: string;
     try {
       // PHP API requires full ISO 8601 with offset (server is TZ=Europe/Paris).
       scheduledStart = toIsoWithLocalOffset(input.date, input.time);
+      // Naive local form for the operator-availability check (matches the
+      // shape of Station.exceptions and operatingSchedule HH:MM windows).
+      scheduledStartLocal = combineDateAndTime(input.date, input.time);
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -189,14 +307,35 @@ export const pinTaskAtTimeTool: ToolDefinition = {
     // current state is unpinned; otherwise we would silently un-pin
     // a previously-pinned task just because the user re-issued the
     // command with a new time.
-    const alreadyPinned = await currentIsPinned(ctx, input.taskId);
+    //
+    // We fetch the snapshot once here and reuse it for the post-pin
+    // operator-availability safety net below (see Step 3).
+    const snap = await ctx.php.get<Snapshot>('/api/v1/schedule/snapshot');
+    const asn = snap.assignments.find((a) => a.taskId === input.taskId);
+    const alreadyPinned = asn ? asn.isPinned ?? false : null;
     if (alreadyPinned === false) {
       await ctx.php.put<unknown>(`/api/v1/tasks/${input.taskId}/pin`, {});
     }
+    // Step 3: safety-net availability check. If the LLM skipped
+    // check_station_operator_availability (or conditions changed since),
+    // we still surface a warning so the user can see why the engine
+    // produced a tile without an operator (forward_pass.rs deliberately
+    // leaves operators=[] when none is qualified-and-available, rather
+    // than ghost-assigning a busy/absent op).
+    const availability = checkStationOperatorAvailability(
+      snap,
+      input.stationId,
+      scheduledStartLocal,
+    );
     return {
       ok: true,
       preview,
-      data: { taskId: input.taskId, scheduledStart, wasAlreadyPinned: alreadyPinned === true },
+      data: {
+        taskId: input.taskId,
+        scheduledStart,
+        wasAlreadyPinned: alreadyPinned === true,
+        ...(availability.available ? {} : { warning: availability.reason }),
+      },
     };
   },
 };
@@ -256,7 +395,24 @@ interface SnapshotTask {
 }
 interface SnapshotElement { id: string; jobId?: string; name?: string | null }
 interface SnapshotJob { id: string; reference?: string | null; client?: string | null }
-interface SnapshotStation { id: string; name: string; abbreviation?: string | null }
+interface SnapshotDaySchedule {
+  isOperating: boolean;
+  slots: Array<{ start: string; end: string }>;
+}
+interface SnapshotScheduleException {
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+}
+interface SnapshotStation {
+  id: string;
+  name: string;
+  abbreviation?: string | null;
+  // Effective operating schedule = union of qualified-operator schedules.
+  // See SnapshotBuilder::buildOperatorSchedulesByStation (PHP).
+  operatingSchedule?: Partial<Record<string, SnapshotDaySchedule>> | null;
+  exceptions?: SnapshotScheduleException[] | null;
+}
 interface Snapshot {
   assignments: SnapshotAssignment[];
   tasks: SnapshotTask[];

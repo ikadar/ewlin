@@ -32,6 +32,7 @@ import {
   unpinTaskTool,
   extendRunningTaskTool,
   listRunningTasksTool,
+  checkStationOperatorAvailabilityTool,
 } from './tasks.js';
 import { proposePlanTool, askUserTool } from './system.js';
 
@@ -61,6 +62,7 @@ export const allTools: readonly ToolDefinition[] = [
   updateTaskDurationTool,
   extendRunningTaskTool,
   replaceTaskStationTool,
+  checkStationOperatorAvailabilityTool,
   pinTaskAtTimeTool,
   unpinTaskTool,
   // System (internal — not exposed via MCP)

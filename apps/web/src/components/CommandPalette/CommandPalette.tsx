@@ -773,9 +773,23 @@ function formatApplyResults(results: ApplyResultEntry[]): string {
   if (results.length === 0) return 'Aucune action à appliquer.';
   const ok = results.filter((r) => r.ok).length;
   const failed = results.length - ok;
-  if (failed === 0) {
-    return `${ok} action${ok > 1 ? 's' : ''} appliquée${ok > 1 ? 's' : ''}.`;
+  // Surface non-blocking warnings (e.g. pin with no scheduled operator)
+  // emitted by tool handlers in result.warning.
+  const warnings: string[] = [];
+  for (const r of results) {
+    if (!r.ok || !r.result || typeof r.result !== 'object') continue;
+    const w = (r.result as { warning?: unknown }).warning;
+    if (typeof w === 'string' && w.length > 0) warnings.push(w);
   }
-  const firstError = results.find((r) => !r.ok)?.error ?? 'erreur inconnue';
-  return `${ok}/${results.length} appliquées. Échec : ${firstError}`;
+  let summary: string;
+  if (failed === 0) {
+    summary = `${ok} action${ok > 1 ? 's' : ''} appliquée${ok > 1 ? 's' : ''}.`;
+  } else {
+    const firstError = results.find((r) => !r.ok)?.error ?? 'erreur inconnue';
+    summary = `${ok}/${results.length} appliquées. Échec : ${firstError}`;
+  }
+  if (warnings.length > 0) {
+    summary += `\n\n${warnings.map((w) => `⚠ ${w}`).join('\n')}`;
+  }
+  return summary;
 }
