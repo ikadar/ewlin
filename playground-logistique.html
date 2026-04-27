@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Logistique</title>
+<style>
+  /* ── Palette Flux (extrait de apps/web/src/index.css) ─────── */
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-active:         rgb(52 52 52);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --emerald-bg:  rgba(52, 211, 153, 0.10);
+    --amber-400:   #fbbf24;
+    --amber-bg:    rgba(251, 191, 36, 0.10);
+    --red-400:     #f87171;
+    --red-bg:      rgba(248, 113, 113, 0.10);
+    --blue-400:    #60a5fa;
+    --blue-bg:     rgba(96, 165, 250, 0.10);
+    --blue-600:    #2563eb;
+    --blue-500:    #3b82f6;
+
+    --flux-late-row-bg:    rgba(248, 113, 113, 0.06);
+
+    --backdrop:            rgba(0, 0, 0, 0.5);
+    --tooltip-bg:          rgba(35, 35, 35, 1);
+    --tooltip-border:      rgba(35, 35, 35, 1);
+    --tooltip-text:        #d4d4d8;
+    --tooltip-shadow:      0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ── Light mode (palette warm-mauve t3.chat-inspired, extrait de index.css) ── */
+  html.light {
+    --flux-base:           #ecddf0;
+    --flux-surface:        #e3d2e8;
+    --flux-elevated:       #dac8e0;
+    --flux-hover:          #d0bdd7;
+    --flux-active:         #c7b2ce;
+    --flux-border:         #c9b3d0;
+    --flux-border-light:   #baa5c4;
+    --flux-text-primary:   #1e0e2a;
+    --flux-text-secondary: #412c52;
+    --flux-text-tertiary:  #5c4568;
+    --flux-text-muted:     #7a6888;
+
+    /* Status colors boosted for contrast on mauve bg */
+    --emerald-400: #15803d;
+    --emerald-bg:  rgba(22, 163, 74, 0.12);
+    --amber-400:   #a16207;
+    --amber-bg:    rgba(202, 138, 4, 0.12);
+    --red-400:     #b91c1c;
+    --red-bg:      rgba(220, 38, 38, 0.12);
+    --blue-400:    #4338ca;       /* indigo-700 — replaces blue-400 */
+    --blue-bg:     rgba(67, 56, 202, 0.10);
+    --blue-600:    #6366f1;       /* indigo-500 */
+    --blue-500:    #818cf8;       /* indigo-400 */
+
+    --flux-late-row-bg:    rgba(220, 38, 38, 0.08);
+
+    --backdrop:            rgba(30, 14, 42, 0.20);
+    --tooltip-bg:          #e3d2e8;
+    --tooltip-border:      #c9b3d0;
+    --tooltip-text:        #1e0e2a;
+    --tooltip-shadow:      0 4px 12px rgba(30, 14, 42, 0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  *::-webkit-scrollbar { width: 0; height: 0; }
+  * { scrollbar-width: none; }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* Header — pattern OutsourcedProvidersPage */
+  .header {
+    border-bottom: 1px solid var(--flux-border);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .theme-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit; font-size: 0.85rem; font-weight: 500;
+  }
+  .theme-toggle:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+  }
+  .back {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--flux-text-secondary);
+    background: none; border: none;
+    cursor: pointer; font: inherit; font-weight: 500;
+  }
+  .back:hover { color: var(--flux-text-primary); }
+  .header-title {
+    font-size: 1.5rem;          /* ~19.5px */
+    font-weight: 600;
+    color: var(--flux-text-primary);
+  }
+  .header-subtitle {
+    color: var(--flux-text-tertiary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-top: 1px;
+  }
+
+  /* ── Main ───────────────────────────────────────────────── */
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* Filter row + counters in same row */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; gap: 24px; flex-wrap: wrap;
+  }
+  .filters { display: flex; gap: 4px; }
+  .filter-btn {
+    padding: 6px 12px;
+    font: inherit; font-size: 0.85rem; font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .filter-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .filter-btn.active {
+    background: var(--flux-hover);
+    border-color: var(--flux-border-light);
+    color: var(--flux-text-primary);
+  }
+
+  .counters {
+    display: flex; gap: 24px;
+    color: var(--flux-text-tertiary);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .counter strong {
+    color: var(--flux-text-primary);
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .counter .late { color: var(--red-400); font-weight: 600; }
+  .counter .ok { color: var(--emerald-400); font-weight: 600; }
+
+  /* ── Two columns ────────────────────────────────────────── */
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .column-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 4px 10px;
+    border-bottom: 1px solid var(--flux-border);
+    margin-bottom: 12px;
+  }
+  .column-title {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--flux-text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .column-title svg { color: var(--flux-text-tertiary); }
+  .column-count {
+    color: var(--flux-text-tertiary);
+    font-size: 0.85rem;
+  }
+
+  /* Reliquat banner — US-C3 */
+  .reliquat {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--amber-bg);
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+  }
+  .reliquat svg { color: var(--amber-400); flex-shrink: 0; }
+  .reliquat-text { flex: 1; color: var(--flux-text-secondary); }
+  .reliquat-text strong { color: var(--amber-400); font-weight: 600; }
+  .reliquat-actions { display: flex; gap: 6px; }
+  .reliquat-actions button {
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit; font-size: 11px; font-weight: 500;
+  }
+  .reliquat-actions button:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+  }
+
+  /* ── Movement row (table-like) ──────────────────────────── */
+  .rows {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 56px 80px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--flux-border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .row:last-child { border-bottom: none; }
+  .row:hover { background: var(--flux-hover); }
+  .row.late { background: var(--flux-late-row-bg); }
+  .row.late:hover { background: var(--red-bg); }
+  .row.completed { opacity: 0.5; }
+  .row.completed .row-title { text-decoration: line-through; }
+
+  .row-time {
+    font-size: 0.85rem;
+    color: var(--flux-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .row.late .row-time { color: var(--red-400); font-weight: 600; }
+
+  .row-type-badge {
+    display: inline-flex; align-items: center;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    width: fit-content;
+  }
+  .badge-st { color: var(--blue-400); background: var(--blue-bg); }
+  .badge-supplier { color: var(--emerald-400); background: var(--emerald-bg); }
+  .badge-client { color: var(--amber-400); background: var(--amber-bg); }
+
+  .row-content { min-width: 0; }
+  .row-title {
+    font-size: 1rem;
+    color: var(--flux-text-primary);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-subtitle {
+    font-size: 0.85rem;
+    color: var(--flux-text-tertiary);
+    font-weight: 500;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-late {
+    color: var(--red-400);
+    font-weight: 600;
+    margin-left: 6px;
+    font-size: 0.85rem;
+  }
+
+  .row-actions {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .icon-btn {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--flux-text-tertiary);
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .icon-btn:hover {
+    color: var(--flux-text-primary);
+    background: var(--flux-active);
+  }
+  .icon-btn.has-comment { color: var(--blue-400); }
+
+  /* Checkbox */
+  .check {
+    width: 22px; height: 22px;
+    border: 1.5px solid var(--flux-border-light);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: transparent;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .check:hover { border-color: var(--flux-text-tertiary); }
+  .check.checked {
+    background: var(--emerald-400);
+    border-color: var(--emerald-400);
+    color: rgb(15 15 15);
+  }
+  .check.checked[data-author]:hover::before {
+    content: attr(data-author);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    background: var(--tooltip-bg);
+    border: 1px solid var(--tooltip-border);
+    color: var(--tooltip-text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 100;
+    box-shadow: var(--tooltip-shadow);
+  }
+
+  /* Comment input row (collapsed below the row) */
+  .comment {
+    display: none;
+    grid-column: 1 / -1;
+    padding: 8px 14px 12px 84px;
+    border-top: 1px dashed var(--flux-border);
+    background: var(--flux-surface);
+  }
+  .comment.open { display: block; }
+  .comment input {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--flux-hover);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 4px;
+    color: var(--flux-text-primary);
+    font: inherit; font-size: 0.85rem; font-weight: 500;
+  }
+  .comment input:focus {
+    outline: none;
+    border-color: var(--flux-text-tertiary);
+  }
+  .comment .saved {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--flux-text-secondary);
+    font-size: 0.85rem;
+  }
+  .comment .saved svg { color: var(--blue-400); flex-shrink: 0; }
+  .comment .saved-text { flex: 1; }
+  .comment .saved-edit {
+    background: transparent; border: none;
+    color: var(--flux-text-tertiary);
+    cursor: pointer; padding: 2px;
+  }
+  .comment .saved-edit:hover { color: var(--flux-text-primary); }
+  .comment .hint {
+    color: var(--flux-text-muted);
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  /* Combined row+comment wrapper so border-bottom plays nicely */
+  .row-wrap { border-bottom: 1px solid var(--flux-border); }
+  .row-wrap:last-child { border-bottom: none; }
+  .row-wrap > .row { border-bottom: none; }
+
+  .empty {
+    text-align: center;
+    color: var(--flux-text-muted);
+    padding: 32px 0;
+    font-size: 0.85rem;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+  }
+
+  /* ── Side-sheet ─────────────────────────────────────────── */
+  .backdrop {
+    position: fixed; inset: 0;
+    background: var(--backdrop);
+    z-index: 40;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s;
+  }
+  .backdrop.visible { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: fixed; top: 0; right: 0;
+    width: 420px; height: 100vh;
+    background: var(--flux-elevated);
+    border-left: 1px solid var(--flux-border-light);
+    transform: translateX(100%);
+    transition: transform 0.18s ease-out;
+    z-index: 50;
+    display: flex; flex-direction: column;
+  }
+  .sheet.open { transform: translateX(0); }
+  .sheet-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--flux-border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .sheet-title { font-size: 1.1rem; font-weight: 600; color: var(--flux-text-primary); }
+  .sheet-close {
+    background: transparent; border: none;
+    color: var(--flux-text-tertiary);
+    cursor: pointer; padding: 4px;
+  }
+  .sheet-close:hover { color: var(--flux-text-primary); }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+  .field { margin-bottom: 14px; }
+  .field-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--flux-text-muted);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .field-value {
+    font-size: 1rem;
+    color: var(--flux-text-primary);
+    font-weight: 500;
+  }
+  .field-value .muted { color: var(--flux-text-tertiary); font-weight: 500; }
+  .field-value-comment {
+    background: var(--flux-surface);
+    border-left: 2px solid var(--blue-400);
+    padding: 8px 10px;
+    border-radius: 0 4px 4px 0;
+    color: var(--flux-text-secondary);
+    font-size: 0.92rem;
+  }
+  .sheet-cta {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--blue-600);
+    color: var(--flux-text-primary);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit; font-size: 0.92rem; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .sheet-cta:hover { background: var(--blue-500); }
+
+  /* Playground footer ribbon */
+  .pg-ribbon {
+    border-top: 1px solid var(--flux-border);
+    padding: 6px 24px;
+    background: var(--flux-surface);
+    color: var(--flux-text-muted);
+    font-size: 11px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .pg-ribbon strong { color: var(--blue-400); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header — pattern OutsourcedProvidersPage -->
+  <header class="header">
+    <div class="header-left">
+      <button class="back" title="Retour (Esc)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        Retour
+      </button>
+      <div>
+        <h1 class="header-title">Logistique</h1>
+        <div class="header-subtitle">Réceptions et expéditions de l'atelier</div>
+      </div>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" title="Basculer light / dark">
+      <span id="theme-icon"></span>
+      <span id="theme-label">Light</span>
+    </button>
+  </header>
+
+  <main class="main">
+    <!-- Filters + counters on the same row -->
+    <div class="toolbar">
+      <div class="filters">
+        <button class="filter-btn" data-filter="yesterday">Hier</button>
+        <button class="filter-btn active" data-filter="today">Aujourd'hui</button>
+        <button class="filter-btn" data-filter="tomorrow">Demain</button>
+        <button class="filter-btn" data-filter="week">Cette semaine</button>
+      </div>
+      <div class="counters">
+        <div class="counter">
+          <strong>4</strong>arrivées <span class="ok">2 effectuées</span> · <span class="late">1 en retard</span>
+        </div>
+        <div class="counter">
+          <strong>6</strong>départs <span class="ok">3 effectués</span>
+        </div>
+        <div class="counter">
+          <strong>1</strong>reliquat hier
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 columns -->
+    <div class="columns">
+      <!-- Arrivées -->
+      <section>
+        <header class="column-header">
+          <div class="column-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 12H3"/><path d="m11 18 6-6-6-6"/><path d="M21 5v14"/></svg>
+            Arrivées
+          </div>
+          <div class="column-count">4 prévues</div>
+        </header>
+
+        <!-- US-C3: reliquat -->
+        <div class="reliquat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <div class="reliquat-text">
+            <strong>Hier non confirmé :</strong> Retour ST Pelliculage — Job #4498. Le mouvement a-t-il finalement eu lieu&nbsp;?
+          </div>
+          <div class="reliquat-actions">
+            <button onclick="handleReliquat()">Confirmer</button>
+            <button onclick="handleReliquat()">Annuler</button>
+          </div>
+        </div>
+
+        <div class="rows" id="arrivals-list"></div>
+      </section>
+
+      <!-- Départs -->
+      <section>
+        <header class="column-header">
+          <div class="column-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"/><path d="M21 12H7"/><path d="m15 18 6-6-6-6"/></svg>
+            Départs
+          </div>
+          <div class="column-count">6 prévus</div>
+        </header>
+        <div class="rows" id="departures-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="pg-ribbon">
+    <div><strong>PLAYGROUND</strong> · Logistique Phase 1.0 — données fictives</div>
+    <div>Click ligne = détail · Check = marquer fait · Hover ✓ = qui+quand</div>
+  </div>
+</div>
+
+<!-- Side-sheet -->
+<div class="backdrop" id="backdrop" onclick="closeSheet()"></div>
+<aside class="sheet" id="sheet">
+  <div class="sheet-header">
+    <div class="sheet-title" id="sheet-title">Détail mouvement</div>
+    <button class="sheet-close" onclick="closeSheet()" title="Fermer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+</aside>
+
+<script>
+  // SVG icons (lucide subset)
+  const ICON = {
+    msg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    pencil: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>',
+    triangle: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+    arrow: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+    sun: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+    moon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+  };
+
+  // Mock data
+  const MOVEMENTS = [
+    // ARRIVALS
+    { id: 'a1', column: 'arrivals', type: 'st', time: '08:30',
+      title: 'Retour ST Quadri', subtitle: 'Job #4521 — Imprimerie ABC · 8 000 affiches A2',
+      counterparty: 'ST Couleurs Express', jobRef: '#4521',
+      late: true, lateMinutes: 35, checked: false, comment: '' },
+    { id: 'a2', column: 'arrivals', type: 'st', time: '10:00',
+      title: 'Retour ST Pelliculage', subtitle: 'Job #4515 — Société Durand · pelliculage mat 2 faces',
+      counterparty: 'ST Surfaces & Co', jobRef: '#4515',
+      checked: true, completedAt: '09:42', completedBy: 'Sophie',
+      comment: 'OK, palette en bon état' },
+    { id: 'a3', column: 'arrivals', type: 'supplier', time: '11:00',
+      title: 'Livraison Antalis (papier)', subtitle: '24 000 feuilles 350g/m² — réf BD-CRT-350',
+      counterparty: 'Antalis France', jobRef: 'BA-2891',
+      checked: false, comment: '' },
+    { id: 'a4', column: 'arrivals', type: 'st', time: '14:30',
+      title: 'Retour ST Découpe', subtitle: 'Job #4508 — Manufactures Boutin · découpe forme',
+      counterparty: 'ST Découpe Pro', jobRef: '#4508',
+      checked: true, completedAt: '14:38', completedBy: 'Sophie', comment: '' },
+
+    // DEPARTURES
+    { id: 'd1', column: 'departures', type: 'st', time: '09:30',
+      title: 'Départ ST Pelliculage', subtitle: 'Job #4519 — XYZ Promo · pelliculage brillant',
+      counterparty: 'ST Surfaces & Co', jobRef: '#4519',
+      checked: true, completedAt: '09:25', completedBy: 'Sophie', comment: '' },
+    { id: 'd2', column: 'departures', type: 'st', time: '13:00',
+      title: 'Départ ST Quadri', subtitle: 'Job #4524 — Édition Lumière · 3 000 livres',
+      counterparty: 'ST Couleurs Express', jobRef: '#4524',
+      checked: true, completedAt: '12:58', completedBy: 'Sophie', comment: '' },
+    { id: 'd3', column: 'departures', type: 'st', time: '14:00',
+      title: 'Départ ST Découpe', subtitle: 'Job #4525 — Société Durand · découpe forme spéciale',
+      counterparty: 'ST Découpe Pro', jobRef: '#4525',
+      checked: true, completedAt: '14:05', completedBy: 'Sophie',
+      comment: 'Carton de protection ajouté' },
+    { id: 'd4', column: 'departures', type: 'client', time: '15:30',
+      title: 'Expédition client Durand', subtitle: 'Job #4515 + #4516 · 2 palettes · GLS',
+      counterparty: 'Société Durand', jobRef: '#4515 + #4516',
+      checked: false, comment: '' },
+    { id: 'd5', column: 'departures', type: 'client', time: '16:00',
+      title: 'Expédition client ABC', subtitle: 'Job #4521 · 1 palette · Chronopost',
+      counterparty: 'Imprimerie ABC', jobRef: '#4521',
+      checked: false, comment: '' },
+    { id: 'd6', column: 'departures', type: 'client', time: '17:30',
+      title: 'Expédition client Boutin', subtitle: 'Job #4508 · 4 palettes · Camion dédié',
+      counterparty: 'Manufactures Boutin', jobRef: '#4508',
+      checked: false, comment: '' },
+  ];
+
+  const TYPE_LABEL = { st: 'ST', supplier: 'FOUR.', client: 'Client' };
+  const TYPE_FULL = { st: 'Sous-traitant', supplier: 'Fournisseur', client: 'Client' };
+
+  function render() {
+    renderColumn('arrivals', document.getElementById('arrivals-list'));
+    renderColumn('departures', document.getElementById('departures-list'));
+  }
+
+  function renderColumn(col, container) {
+    const items = MOVEMENTS.filter(m => m.column === col);
+    items.sort((a, b) => {
+      if (a.checked !== b.checked) return a.checked ? 1 : -1;
+      return a.time.localeCompare(b.time);
+    });
+    if (items.length === 0) {
+      container.outerHTML = '<div class="empty">Aucun mouvement prévu</div>';
+      return;
+    }
+    container.innerHTML = items.map(renderRow).join('');
+  }
+
+  function renderRow(m) {
+    const lateLabel = m.late && !m.checked
+      ? `<span class="row-late">En retard · ${m.lateMinutes} min</span>`
+      : '';
+    const checkedAttr = m.checked
+      ? `data-author="${m.completedBy} — ${m.completedAt}"`
+      : '';
+    const commentBtnClass = m.comment ? 'icon-btn has-comment' : 'icon-btn';
+    return `
+      <div class="row-wrap">
+        <div class="row ${m.checked ? 'completed' : ''} ${m.late && !m.checked ? 'late' : ''}" data-id="${m.id}" onclick="openSheet('${m.id}')">
+          <div class="row-time">${m.time}</div>
+          <div><span class="row-type-badge badge-${m.type}">${TYPE_LABEL[m.type]}</span></div>
+          <div class="row-content">
+            <div class="row-title">${m.title}${lateLabel}</div>
+            <div class="row-subtitle">${m.subtitle}</div>
+          </div>
+          <div class="row-actions" onclick="event.stopPropagation()">
+            <button class="${commentBtnClass}" title="${m.comment ? 'Commentaire : ' + m.comment : 'Ajouter un commentaire'}" onclick="toggleComment('${m.id}')">${ICON.msg}</button>
+            <button class="check ${m.checked ? 'checked' : ''}" ${checkedAttr} onclick="toggleCheck('${m.id}')" title="${m.checked ? 'Décocher' : 'Marquer comme effectué'}">${m.checked ? ICON.check : ''}</button>
+          </div>
+        </div>
+        <div class="comment ${m.comment ? 'open' : ''}" id="comment-${m.id}">
+          ${m.comment
+            ? `<div class="saved">${ICON.msg}<span class="saved-text">${m.comment}</span><button class="saved-edit" onclick="editComment('${m.id}')" title="Éditer">${ICON.pencil}</button></div>`
+            : `<input type="text" placeholder="Anomalie, retard, manque…  (Entrée pour valider, Esc pour fermer)" onkeydown="handleCommentKey(event, '${m.id}')" />
+               <div class="hint">Texte libre — visible par toute l'équipe</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function toggleCheck(id) {
+    const m = MOVEMENTS.find(x => x.id === id);
+    if (!m) return;
+    m.checked = !m.checked;
+    if (m.checked) {
+      const now = new Date();
+      m.completedAt = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      m.completedBy = 'Sophie';
+    } else {
+      m.completedAt = null; m.completedBy = null;
+    }
+    render();
+  }
+
+  function toggleComment(id) {
+    const el = document.getElementById(`comment-${id}`);
+    if (!el) return;
+    el.classList.toggle('open');
+    if (el.classList.contains('open')) {
+      const input = el.querySelector('input');
+      if (input) setTimeout(() => input.focus(), 50);
+    }
+  }
+
+  function editComment(id) {
+    const m = MOVEMENTS.find(x => x.id === id);
+    if (!m) return;
+    m.comment = '';
+    render();
+    setTimeout(() => toggleComment(id), 50);
+  }
+
+  function handleCommentKey(e, id) {
+    const m = MOVEMENTS.find(x => x.id === id);
+    if (!m) return;
+    if (e.key === 'Enter') { m.comment = e.target.value.trim(); render(); }
+    else if (e.key === 'Escape') { toggleComment(id); }
+  }
+
+  function handleReliquat() {
+    const banner = document.querySelector('.reliquat');
+    if (banner) {
+      banner.style.transition = 'opacity 0.15s';
+      banner.style.opacity = '0';
+      setTimeout(() => banner.remove(), 150);
+    }
+  }
+
+  function openSheet(id) {
+    const m = MOVEMENTS.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('sheet-title').textContent = m.title;
+    const lateBit = m.late ? ` <span class="muted">(retard ${m.lateMinutes} min)</span>` : '';
+    const status = m.checked
+      ? `Effectué <span class="muted">— ${m.completedBy} à ${m.completedAt}</span>`
+      : 'En attente';
+    document.getElementById('sheet-body').innerHTML = `
+      <div class="field">
+        <div class="field-label">Type</div>
+        <div class="field-value"><span class="row-type-badge badge-${m.type}">${TYPE_FULL[m.type]}</span></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Heure prévue</div>
+        <div class="field-value">${m.time}${lateBit}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Contrepartie</div>
+        <div class="field-value">${m.counterparty}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Référence</div>
+        <div class="field-value">${m.jobRef}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Détail</div>
+        <div class="field-value">${m.subtitle}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Statut</div>
+        <div class="field-value">${status}</div>
+      </div>
+      ${m.comment ? `
+        <div class="field">
+          <div class="field-label">Commentaire</div>
+          <div class="field-value field-value-comment">${m.comment}</div>
+        </div>` : ''}
+      <button class="sheet-cta">Voir le job complet ${ICON.arrow}</button>
+    `;
+    document.getElementById('sheet').classList.add('open');
+    document.getElementById('backdrop').classList.add('visible');
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet').classList.remove('open');
+    document.getElementById('backdrop').classList.remove('visible');
+  }
+
+  document.querySelectorAll('.filter-btn').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSheet();
+  });
+
+  // Theme toggle
+  function applyTheme(mode) {
+    document.documentElement.classList.toggle('light', mode === 'light');
+    document.getElementById('theme-icon').innerHTML = mode === 'light' ? ICON.moon : ICON.sun;
+    document.getElementById('theme-label').textContent = mode === 'light' ? 'Dark' : 'Light';
+  }
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = document.documentElement.classList.contains('light') ? 'dark' : 'light';
+    applyTheme(next);
+  });
+  applyTheme('light');
+
+  render();
+</script>
+
+</body>
+</html>

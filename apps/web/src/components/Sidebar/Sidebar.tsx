@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3 } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
@@ -32,7 +32,8 @@ export function Sidebar() {
   const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
   const isStationSchedule = location.pathname.startsWith('/stations');
   const isStats = location.pathname.startsWith('/stats');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isLogistique = location.pathname.startsWith('/logistique');
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -88,6 +89,12 @@ export function Sidebar() {
             label="Flux de production"
             isActive={isFlux}
             onClick={() => navigate('/flux')}
+          />
+          <SidebarButton
+            icon={Truck}
+            label="Logistique"
+            isActive={isLogistique}
+            onClick={() => navigate('/logistique')}
           />
           <SidebarButton
             icon={BarChart3}

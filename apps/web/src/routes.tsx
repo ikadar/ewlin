@@ -45,6 +45,7 @@ import { SafetyZonePage } from './pages/SafetyZonePage';
 import { PrecedenceGapPage } from './pages/PrecedenceGapPage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
+import { LogistiquePage } from './pages/LogistiquePage';
 import { ShippersPage } from './pages/ShippersPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OperatorSchedulePage from './pages/OperatorSchedulePage';
@@ -88,6 +89,9 @@ export function AppRoutes() {
 
         {/* Algorithm stats dashboard */}
         <Route path="/stats" element={<StatsPage />} />
+
+        {/* Logistique — réceptions et expéditions de l'atelier (Phase 1) */}
+        <Route path="/logistique" element={<LogistiquePage />} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

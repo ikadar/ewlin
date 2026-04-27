@@ -24,6 +24,7 @@ import { operatorApi } from './api/operatorApi';
 import { providerApi } from './api/providerApi';
 import { shipperApi } from './api/shipperApi';
 import { fluxApi } from './api/fluxApi';
+import { logisticsApi } from './api/logisticsApi';
 import { authApi } from './api/authApi';
 import { adminUserApi } from './api/adminUserApi';
 import { adminUserGroupApi } from './api/adminUserGroupApi';
@@ -53,6 +54,7 @@ export const store = configureStore({
     [providerApi.reducerPath]: providerApi.reducer,
     [shipperApi.reducerPath]: shipperApi.reducer,
     [fluxApi.reducerPath]: fluxApi.reducer,
+    [logisticsApi.reducerPath]: logisticsApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
     [adminUserApi.reducerPath]: adminUserApi.reducer,
     [adminUserGroupApi.reducerPath]: adminUserGroupApi.reducer,
@@ -82,6 +84,7 @@ export const store = configureStore({
       .concat(providerApi.middleware)
       .concat(shipperApi.middleware)
       .concat(fluxApi.middleware)
+      .concat(logisticsApi.middleware)
       .concat(authApi.middleware)
       .concat(adminUserApi.middleware)
       .concat(adminUserGroupApi.middleware)
@@ -266,6 +269,14 @@ export {
 export type { ShipperResponse, ShipperInput } from './api/shipperApi';
 
 export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, fluxApi } from './api/fluxApi';
+
+export {
+  useGetLogisticsNotesQuery,
+  useCreateLogisticsNoteMutation,
+  useDeleteLogisticsNoteMutation,
+  logisticsApi,
+} from './api/logisticsApi';
+export type { LogisticsNoteResponse, LogisticsRefType, CreateLogisticsNoteArg } from './api/logisticsApi';
 
 export { useLoginMutation, useGetMeQuery, authApi } from './api/authApi';
 
