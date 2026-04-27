@@ -28,6 +28,8 @@ import {
   X,
   AlertTriangle,
   ArrowRight,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   useGetFluxJobsQuery,
@@ -78,9 +80,10 @@ interface Movement {
   stStatus?: FluxSTStatus;
   /** Job UUID for the shipped toggle / job navigation */
   jobInternalId?: string;
-  /** True when the movement has reached its final state today (done / shipped),
-   *  shown dimmed but kept for tooltip + reversibility */
-  isCompletedToday: boolean;
+  /** True when the movement has reached its final state (done / shipped).
+   *  Displayed in green with a dimmed look but kept visible for tooltip /
+   *  reversibility instead of being filtered out of the screen. */
+  isCompleted: boolean;
   /** What semantic action this checkbox corresponds to (used for audit log) */
   action: string;
 }
@@ -135,7 +138,7 @@ function dateMatchesFilter(movement: Movement, filter: DateFilter, now: Date): b
       // "Today" includes both scheduled-for-today AND overdue items still pending
       // (reliquat). Reliquat sits at the top via the existing date sort.
       if (isSameDay(date, today)) return true;
-      return date < today && !movement.isCompletedToday;
+      return date < today && !movement.isCompleted;
     case 'tomorrow': {
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
@@ -167,12 +170,10 @@ interface DeriveContext {
   providersByName: Map<string, ProviderTimes>;
   assignmentsByTaskId: Map<string, TaskAssignment>;
   jobsByInternalId: Map<string, JobEntity>;
-  now: Date;
 }
 
 function deriveMovements(ctx: DeriveContext): Movement[] {
-  const { jobs, providersByName, assignmentsByTaskId, jobsByInternalId, now } = ctx;
-  const today = startOfDay(now);
+  const { jobs, providersByName, assignmentsByTaskId, jobsByInternalId } = ctx;
   const movements: Movement[] = [];
 
   for (const job of jobs) {
@@ -202,7 +203,7 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
             jobRef: `#${job.id}`,
             stStatus: 'pending',
             jobInternalId: job.internalId,
-            isCompletedToday: false,
+            isCompleted: false,
             action: 'st_dispatch',
           });
         } else if (out.status === 'progress') {
@@ -221,30 +222,28 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
             jobRef: `#${job.id}`,
             stStatus: 'progress',
             jobInternalId: job.internalId,
-            isCompletedToday: false,
+            isCompleted: false,
             action: 'st_return',
           });
         } else if (out.status === 'done' && assignment?.completedAt !== null && assignment !== undefined) {
           const completed = new Date(assignment.completedAt!);
-          if (isSameDay(completed, today)) {
-            movements.push({
-              id: `task-arrival-${out.taskId}`,
-              kind: 'arrival',
-              type: 'st',
-              refType: 'task',
-              refId: out.taskId,
-              scheduledAt: completed,
-              time: formatTimeOfDay(completed, times.reception),
-              title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
-              subtitle: `Job #${job.id} — ${jobLabel}`,
-              counterparty: out.providerName || '—',
-              jobRef: `#${job.id}`,
-              stStatus: 'done',
-              jobInternalId: job.internalId,
-              isCompletedToday: true,
-              action: 'st_return',
-            });
-          }
+          movements.push({
+            id: `task-arrival-${out.taskId}`,
+            kind: 'arrival',
+            type: 'st',
+            refType: 'task',
+            refId: out.taskId,
+            scheduledAt: completed,
+            time: formatTimeOfDay(completed, times.reception),
+            title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
+            subtitle: `Job #${job.id} — ${jobLabel}`,
+            counterparty: out.providerName || '—',
+            jobRef: `#${job.id}`,
+            stStatus: 'done',
+            jobInternalId: job.internalId,
+            isCompleted: true,
+            action: 'st_return',
+          });
         }
       }
     }
@@ -267,29 +266,27 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
         counterparty: job.client,
         jobRef: `#${job.id}`,
         jobInternalId: job.internalId,
-        isCompletedToday: false,
+        isCompleted: false,
         action: 'client_ship',
       });
     } else if (internalJob.shippedAt !== null) {
       const shippedAt = new Date(internalJob.shippedAt);
-      if (isSameDay(shippedAt, today)) {
-        movements.push({
-          id: `job-shipped-${job.internalId}`,
-          kind: 'departure',
-          type: 'client',
-          refType: 'job',
-          refId: job.internalId,
-          scheduledAt: shippedAt,
-          time: formatTimeOfDay(shippedAt, ''),
-          title: 'Expédition client',
-          subtitle: `Job #${job.id} — ${jobLabel}`,
-          counterparty: job.client,
-          jobRef: `#${job.id}`,
-          jobInternalId: job.internalId,
-          isCompletedToday: true,
-          action: 'client_ship',
-        });
-      }
+      movements.push({
+        id: `job-shipped-${job.internalId}`,
+        kind: 'departure',
+        type: 'client',
+        refType: 'job',
+        refId: job.internalId,
+        scheduledAt: shippedAt,
+        time: formatTimeOfDay(shippedAt, '17:00'),
+        title: 'Expédition client',
+        subtitle: `Job #${job.id} — ${jobLabel}`,
+        counterparty: job.client,
+        jobRef: `#${job.id}`,
+        jobInternalId: job.internalId,
+        isCompleted: true,
+        action: 'client_ship',
+      });
     }
   }
 
@@ -386,9 +383,8 @@ export function LogistiquePage() {
         providersByName,
         assignmentsByTaskId,
         jobsByInternalId,
-        now,
       }),
-    [jobs, providersByName, assignmentsByTaskId, jobsByInternalId, now],
+    [jobs, providersByName, assignmentsByTaskId, jobsByInternalId],
   );
 
   const filteredMovements = useMemo(
@@ -399,7 +395,7 @@ export function LogistiquePage() {
   const reliquat = useMemo(
     () =>
       allMovements.filter((m) => {
-        if (m.isCompletedToday) return false;
+        if (m.isCompleted) return false;
         if (m.scheduledAt === null) return false;
         return m.scheduledAt < startOfDay(now);
       }),
@@ -453,7 +449,7 @@ export function LogistiquePage() {
 
   const handleCheck = useCallback(
     async (m: Movement) => {
-      if (m.isCompletedToday) {
+      if (m.isCompleted) {
         if (m.type === 'st' && m.stStatus === 'done') {
           await updateSTStatus({ taskId: m.refId, status: 'progress' });
           await createAudit({
@@ -782,35 +778,46 @@ interface MovementRowProps {
 
 function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpenSheet }: MovementRowProps) {
   const today = startOfDay(new Date());
-  const isOverdue = !movement.isCompletedToday && movement.scheduledAt !== null && movement.scheduledAt < today;
+  const isOverdue = !movement.isCompleted && movement.scheduledAt !== null && movement.scheduledAt < today;
   const overdueDays = isOverdue && movement.scheduledAt
     ? Math.max(1, Math.floor((today.getTime() - startOfDay(movement.scheduledAt).getTime()) / 86_400_000))
     : 0;
 
-  const rowClass = movement.isCompletedToday
-    ? 'opacity-50 hover:opacity-75'
+  const rowClass = movement.isCompleted
+    ? 'bg-emerald-500/[0.08] hover:bg-emerald-500/[0.14] border-l-2 border-emerald-400'
     : isOverdue
       ? 'bg-red-500/[0.07] hover:bg-red-500/[0.12] border-l-2 border-red-400'
       : 'hover:bg-flux-hover';
 
-  const checkClass = movement.isCompletedToday
+  const checkClass = movement.isCompleted
     ? 'bg-emerald-400 border-emerald-400 text-flux-base'
     : 'border-flux-border-light hover:border-flux-text-tertiary bg-transparent text-transparent';
 
-  const checkTitle = movement.isCompletedToday
+  const checkTitle = movement.isCompleted
     ? audit
       ? `Effectué — ${formatAuditTooltip(audit)}\nClic = annuler`
       : 'Effectué (clic pour annuler)'
     : 'Marquer comme effectué';
 
+  const timeDisplay = isOverdue && movement.time
+    ? `J-${overdueDays} ${movement.time}`
+    : movement.time || '—';
+
+  const overdueDate = movement.scheduledAt
+    ? `${String(movement.scheduledAt.getDate()).padStart(2, '0')}/${String(movement.scheduledAt.getMonth() + 1).padStart(2, '0')}`
+    : '';
+  const overdueHour = movement.scheduledAt
+    ? `${String(movement.scheduledAt.getHours()).padStart(2, '0')}h`
+    : '';
+
   return (
     <div
       className={`grid items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors ${rowClass}`}
-      style={{ gridTemplateColumns: '52px 76px 1fr auto' }}
+      style={{ gridTemplateColumns: '76px 76px 1fr auto' }}
       onClick={() => onOpenSheet(movement)}
     >
-      <div className={`text-sm tabular-nums ${isOverdue ? 'text-red-400 font-semibold' : 'text-flux-text-secondary'}`}>
-        {movement.time || '—'}
+      <div className={`text-sm tabular-nums ${isOverdue ? 'text-red-400 font-semibold' : movement.isCompleted ? 'text-flux-text-tertiary' : 'text-flux-text-secondary'}`}>
+        {timeDisplay}
       </div>
       <div>
         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${TYPE_BADGE_CLASS[movement.type]}`}>
@@ -819,16 +826,15 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <div className={`text-sm font-medium truncate ${movement.isCompletedToday ? 'line-through text-flux-text-secondary' : 'text-flux-text-primary'}`}>
+          <div className={`text-sm font-medium truncate ${movement.isCompleted ? 'text-emerald-300' : 'text-flux-text-primary'}`}>
             {movement.title}
           </div>
           {isOverdue && (
             <span
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide text-red-400 bg-red-500/10 border border-red-500/30 shrink-0"
-              title={`Reliquat — prévu ${String(movement.scheduledAt!.getDate()).padStart(2, '0')}/${String(movement.scheduledAt!.getMonth() + 1).padStart(2, '0')}`}
             >
               <AlertTriangle size={10} />
-              Reliquat · {overdueDays}j
+              Retard {overdueDays}J ({overdueDate}) {overdueHour}
             </span>
           )}
         </div>
@@ -898,9 +904,17 @@ function DetailSheet({ movement, note, audit, onClose, onNavigateToJob }: Detail
           <Field
             label="Statut"
             value={
-              movement.isCompletedToday
-                ? `✓ Effectué${audit ? ` — ${formatAuditTooltip(audit)}` : ''}`
-                : '⏳ En attente'
+              movement.isCompleted ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                  <span>Effectué{audit ? ` — ${formatAuditTooltip(audit)}` : ''}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock size={14} className="text-flux-text-tertiary shrink-0" />
+                  <span>En attente</span>
+                </span>
+              )
             }
           />
           {note && (
