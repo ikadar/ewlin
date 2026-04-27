@@ -274,9 +274,17 @@ export {
   useGetLogisticsNotesQuery,
   useCreateLogisticsNoteMutation,
   useDeleteLogisticsNoteMutation,
+  useGetLatestLogisticsAuditsQuery,
+  useCreateLogisticsAuditMutation,
   logisticsApi,
 } from './api/logisticsApi';
-export type { LogisticsNoteResponse, LogisticsRefType, CreateLogisticsNoteArg } from './api/logisticsApi';
+export type {
+  LogisticsNoteResponse,
+  LogisticsRefType,
+  CreateLogisticsNoteArg,
+  LogisticsAuditResponse,
+  CreateLogisticsAuditArg,
+} from './api/logisticsApi';
 
 export { useLoginMutation, useGetMeQuery, authApi } from './api/authApi';
 

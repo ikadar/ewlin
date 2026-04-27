@@ -31,10 +31,31 @@ export interface CreateLogisticsNoteArg {
   note: string;
 }
 
+export interface LogisticsAuditResponse {
+  id: string;
+  refType: LogisticsRefType;
+  refId: string;
+  action: string;
+  actorName: string;
+  occurredAt: string;
+}
+
+export interface LogisticsAuditListArg {
+  refType: LogisticsRefType;
+  refIds: string[];
+}
+
+export interface CreateLogisticsAuditArg {
+  refType: LogisticsRefType;
+  refId: string;
+  action: string;
+  actorName: string;
+}
+
 export const logisticsApi = createApi({
   reducerPath: 'logisticsApi',
   baseQuery: baseQueryWithFixtureSupport,
-  tagTypes: ['LogisticsNotes'],
+  tagTypes: ['LogisticsNotes', 'LogisticsAudits'],
   endpoints: (builder) => ({
     getLogisticsNotes: builder.query<LogisticsNoteResponse[], LogisticsNoteListArg>({
       query: ({ refType, refIds }) => {
@@ -60,6 +81,23 @@ export const logisticsApi = createApi({
       }),
       invalidatesTags: ['LogisticsNotes'],
     }),
+    getLatestLogisticsAudits: builder.query<LogisticsAuditResponse[], LogisticsAuditListArg>({
+      query: ({ refType, refIds }) => {
+        const ids = refIds.join(',');
+        return `/logistics-audits/latest?refType=${refType}&refIds=${encodeURIComponent(ids)}`;
+      },
+      transformResponse: (response: { data: LogisticsAuditResponse[] } | LogisticsAuditResponse[]) =>
+        Array.isArray(response) ? response : (response.data ?? []),
+      providesTags: ['LogisticsAudits'],
+    }),
+    createLogisticsAudit: builder.mutation<LogisticsAuditResponse, CreateLogisticsAuditArg>({
+      query: (body) => ({
+        url: '/logistics-audits',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['LogisticsAudits'],
+    }),
   }),
 });
 
@@ -67,4 +105,6 @@ export const {
   useGetLogisticsNotesQuery,
   useCreateLogisticsNoteMutation,
   useDeleteLogisticsNoteMutation,
+  useGetLatestLogisticsAuditsQuery,
+  useCreateLogisticsAuditMutation,
 } = logisticsApi;
