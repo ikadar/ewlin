@@ -8,7 +8,9 @@
  *   - Date filter (Hier / Aujourd'hui / Demain / Cette semaine) — based on
  *     scheduledStart / scheduledEnd from the schedule snapshot, falls back to
  *     workshopExitDate for client expeditions.
- *   - "Reliquat" banner — overdue movements not yet processed (date < today).
+ *   - Reliquat — overdue movements (scheduled < today, not processed) appear
+ *     at the top of their column with a red accent bar + "Reliquat · Nj" badge,
+ *     still cockable. The toolbar counter shows how many are visible.
  *   - Each check writes a LogisticsAudit (who/when), surfaced as tooltip.
  *   - Recently-completed movements (today) stay visible, dimmed.
  *   - "Voir le job complet" navigates to the scheduler with the job selected.
@@ -119,7 +121,8 @@ function endOfWeek(d: Date): Date {
   return end;
 }
 
-function dateMatchesFilter(date: Date | null, filter: DateFilter, now: Date): boolean {
+function dateMatchesFilter(movement: Movement, filter: DateFilter, now: Date): boolean {
+  const date = movement.scheduledAt;
   if (date === null) return filter === 'today';
   const today = startOfDay(now);
   switch (filter) {
@@ -129,7 +132,10 @@ function dateMatchesFilter(date: Date | null, filter: DateFilter, now: Date): bo
       return isSameDay(date, yesterday);
     }
     case 'today':
-      return isSameDay(date, today);
+      // "Today" includes both scheduled-for-today AND overdue items still pending
+      // (reliquat). Reliquat sits at the top via the existing date sort.
+      if (isSameDay(date, today)) return true;
+      return date < today && !movement.isCompletedToday;
     case 'tomorrow': {
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
@@ -246,7 +252,6 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
     if (internalJob === undefined || job.internalId === undefined) continue;
 
     const exitDate = internalJob.workshopExitDate ? new Date(internalJob.workshopExitDate) : null;
-    const exitDateOnly = exitDate ? startOfDay(exitDate) : null;
 
     if (!internalJob.shipped) {
       movements.push({
@@ -255,8 +260,8 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
         type: 'client',
         refType: 'job',
         refId: job.internalId,
-        scheduledAt: exitDateOnly,
-        time: '',
+        scheduledAt: exitDate,
+        time: formatTimeOfDay(exitDate, '17:00'),
         title: 'Expédition client',
         subtitle: `Job #${job.id} — ${jobLabel}`,
         counterparty: job.client,
@@ -387,7 +392,7 @@ export function LogistiquePage() {
   );
 
   const filteredMovements = useMemo(
-    () => allMovements.filter((m) => dateMatchesFilter(m.scheduledAt, filter, now)),
+    () => allMovements.filter((m) => dateMatchesFilter(m, filter, now)),
     [allMovements, filter, now],
   );
 
@@ -569,10 +574,6 @@ export function LogistiquePage() {
           </div>
         </div>
 
-        {reliquat.length > 0 && (
-          <ReliquatBanner movements={reliquat} onSelect={setSheetMovement} />
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Column
             title="Arrivées"
@@ -635,62 +636,6 @@ export function LogistiquePage() {
           onClose={() => setSheetMovement(null)}
           onNavigateToJob={handleNavigateToJob}
         />
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Reliquat banner
-// ============================================================================
-
-interface ReliquatBannerProps {
-  movements: Movement[];
-  onSelect: (m: Movement) => void;
-}
-
-function ReliquatBanner({ movements, onSelect }: ReliquatBannerProps) {
-  const [expanded, setExpanded] = useState<boolean>(true);
-  return (
-    <div className="bg-amber-500/10 border border-amber-500/30 rounded-md p-3 mb-5">
-      <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle size={14} className="text-amber-400 shrink-0" />
-        <strong className="text-amber-400 text-xs uppercase tracking-wide">Reliquat</strong>
-        <span className="text-flux-text-secondary text-xs">
-          {movements.length} mouvement{movements.length > 1 ? 's' : ''} en retard non traité{movements.length > 1 ? 's' : ''}
-        </span>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="ml-auto text-flux-text-tertiary hover:text-flux-text-primary text-xs"
-        >
-          {expanded ? 'Masquer' : 'Afficher'}
-        </button>
-      </div>
-      {expanded && (
-        <ul className="space-y-1">
-          {movements.map((m) => (
-            <li key={m.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(m)}
-                className="w-full text-left flex items-center gap-2 text-xs text-flux-text-secondary hover:text-flux-text-primary px-2 py-1 rounded hover:bg-amber-500/10"
-              >
-                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${TYPE_BADGE_CLASS[m.type]}`}>
-                  {TYPE_BADGE_LABEL[m.type]}
-                </span>
-                <span className="font-medium text-flux-text-primary">{m.title}</span>
-                <span className="text-flux-text-muted">·</span>
-                <span>{m.subtitle}</span>
-                {m.scheduledAt && (
-                  <span className="ml-auto text-amber-400 tabular-nums">
-                    {String(m.scheduledAt.getDate()).padStart(2, '0')}/{String(m.scheduledAt.getMonth() + 1).padStart(2, '0')}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
@@ -836,11 +781,16 @@ interface MovementRowProps {
 }
 
 function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpenSheet }: MovementRowProps) {
-  const isOverdue = !movement.isCompletedToday && movement.scheduledAt !== null && movement.scheduledAt < startOfDay(new Date());
+  const today = startOfDay(new Date());
+  const isOverdue = !movement.isCompletedToday && movement.scheduledAt !== null && movement.scheduledAt < today;
+  const overdueDays = isOverdue && movement.scheduledAt
+    ? Math.max(1, Math.floor((today.getTime() - startOfDay(movement.scheduledAt).getTime()) / 86_400_000))
+    : 0;
+
   const rowClass = movement.isCompletedToday
     ? 'opacity-50 hover:opacity-75'
     : isOverdue
-      ? 'bg-red-500/5 hover:bg-red-500/10'
+      ? 'bg-red-500/[0.07] hover:bg-red-500/[0.12] border-l-2 border-red-400'
       : 'hover:bg-flux-hover';
 
   const checkClass = movement.isCompletedToday
@@ -868,8 +818,19 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
         </span>
       </div>
       <div className="min-w-0">
-        <div className={`text-sm font-medium truncate ${movement.isCompletedToday ? 'line-through text-flux-text-secondary' : 'text-flux-text-primary'}`}>
-          {movement.title}
+        <div className="flex items-center gap-2">
+          <div className={`text-sm font-medium truncate ${movement.isCompletedToday ? 'line-through text-flux-text-secondary' : 'text-flux-text-primary'}`}>
+            {movement.title}
+          </div>
+          {isOverdue && (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide text-red-400 bg-red-500/10 border border-red-500/30 shrink-0"
+              title={`Reliquat — prévu ${String(movement.scheduledAt!.getDate()).padStart(2, '0')}/${String(movement.scheduledAt!.getMonth() + 1).padStart(2, '0')}`}
+            >
+              <AlertTriangle size={10} />
+              Reliquat · {overdueDays}j
+            </span>
+          )}
         </div>
         <div className="text-flux-text-tertiary text-xs truncate">{movement.subtitle}</div>
       </div>
