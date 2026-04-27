@@ -247,42 +247,29 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
 
     const exitDate = internalJob.workshopExitDate ? new Date(internalJob.workshopExitDate) : null;
 
-    if (!internalJob.shipped) {
-      movements.push({
-        id: `job-shipped-${job.internalId}`,
-        kind: 'departure',
-        type: 'client',
-        refType: 'job',
-        refId: job.internalId,
-        scheduledAt: exitDate,
-        time: formatTimeOfDay(exitDate, '17:00'),
-        title: 'Expédition client',
-        subtitle: `Job #${job.id} — ${jobLabel}`,
-        counterparty: job.client,
-        jobRef: `#${job.id}`,
-        jobInternalId: job.internalId,
-        isCompleted: false,
-        action: 'client_ship',
-      });
-    } else if (internalJob.shippedAt !== null) {
-      const shippedAt = new Date(internalJob.shippedAt);
-      movements.push({
-        id: `job-shipped-${job.internalId}`,
-        kind: 'departure',
-        type: 'client',
-        refType: 'job',
-        refId: job.internalId,
-        scheduledAt: shippedAt,
-        time: formatTimeOfDay(shippedAt, '17:00'),
-        title: 'Expédition client',
-        subtitle: `Job #${job.id} — ${jobLabel}`,
-        counterparty: job.client,
-        jobRef: `#${job.id}`,
-        jobInternalId: job.internalId,
-        isCompleted: true,
-        action: 'client_ship',
-      });
-    }
+    // Always emit one client-expedition row per job: kept even between the
+    // optimistic update and the snapshot re-fetch (where shipped=true but
+    // shippedAt may briefly still be null) — falling back to exitDate or
+    // now() so the row never vanishes.
+    const shippedAt = internalJob.shipped
+      ? (internalJob.shippedAt ? new Date(internalJob.shippedAt) : (exitDate ?? new Date()))
+      : null;
+    movements.push({
+      id: `job-shipped-${job.internalId}`,
+      kind: 'departure',
+      type: 'client',
+      refType: 'job',
+      refId: job.internalId,
+      scheduledAt: shippedAt ?? exitDate,
+      time: formatTimeOfDay(shippedAt ?? exitDate, '17:00'),
+      title: 'Expédition client',
+      subtitle: `Job #${job.id} — ${jobLabel}`,
+      counterparty: job.client,
+      jobRef: `#${job.id}`,
+      jobInternalId: job.internalId,
+      isCompleted: internalJob.shipped,
+      action: 'client_ship',
+    });
   }
 
   movements.sort((a, b) => {
