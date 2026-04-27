@@ -23,7 +23,6 @@ import {
   ArrowRightToLine,
   ArrowRightFromLine,
   MessageSquare,
-  Check,
   Pencil,
   X,
   AlertTriangle,
@@ -31,6 +30,7 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react';
+import { PendingIcon, ProgressIcon, DoneIcon } from '../components/FluxTable/STCell';
 import {
   useGetFluxJobsQuery,
   useUpdateSTStatusMutation,
@@ -844,11 +844,24 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
         ? 'bg-red-500/[0.07] hover:bg-red-500/[0.12] border-l-2 border-red-400'
         : 'hover:bg-flux-hover';
 
-  const checkClass = movement.isCompleted
-    ? 'bg-emerald-400 border-emerald-400 text-flux-base'
-    : isLocked
-      ? 'border-flux-border bg-flux-surface text-transparent cursor-not-allowed'
-      : 'border-flux-border-light hover:border-flux-text-tertiary bg-transparent text-transparent';
+  // Reuse the 3-state visual vocabulary of the Flux dashboard's ST column
+  // (pending=gray empty circle, progress=orange filled dot, done=green
+  // check-circle). Same icon component, same .st-* color classes — keeps
+  // the warehouse staff's mental model consistent across screens.
+  const stateIcon = (() => {
+    if (movement.type === 'client') {
+      return movement.isCompleted ? <DoneIcon /> : <PendingIcon />;
+    }
+    if (movement.stStatus === 'progress') return <ProgressIcon />;
+    if (movement.stStatus === 'done') return <DoneIcon />;
+    return <PendingIcon />;
+  })();
+  const stateColorClass = (() => {
+    if (movement.type === 'client') return movement.isCompleted ? 'st-done' : 'st-pending';
+    if (movement.stStatus === 'progress') return 'st-progress';
+    if (movement.stStatus === 'done') return 'st-done';
+    return 'st-pending';
+  })();
 
   const checkTitle = movement.isCompleted
     ? audit
@@ -925,12 +938,14 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
           type="button"
           onClick={() => onCheck(movement)}
           disabled={isLocked}
-          className={`w-[22px] h-[22px] inline-flex items-center justify-center rounded border-[1.5px] shrink-0 transition-colors ${checkClass}`}
+          className={`inline-flex items-center justify-center w-6 h-6 shrink-0 bg-transparent border-0 p-0 ${stateColorClass} ${
+            isLocked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:brightness-125'
+          }`}
           title={checkTitle}
           aria-label={checkTitle}
           data-testid={`logistics-check-${movement.id}`}
         >
-          <Check size={14} />
+          {stateIcon}
         </button>
       </div>
     </div>
