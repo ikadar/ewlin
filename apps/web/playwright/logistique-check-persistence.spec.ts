@@ -71,6 +71,33 @@ test.describe('/logistique — check persistence', () => {
     expect(completedAttr).toBe('true');
   });
 
+  test('ST departure rows show calculated dates (not just provider fallback time)', async ({ page }) => {
+    // Wait for outsourced data + snapshot to load.
+    await page.waitForTimeout(500);
+
+    const departureRows = page.locator('[data-testid^="logistics-movement-task-departure-"]');
+    const count = await departureRows.count();
+    test.skip(count === 0, 'No ST departure rows visible — populate outsourced tasks first');
+
+    // Sample up to 5 rows and dump their planned/effective time cells.
+    const samples = Math.min(count, 5);
+    const observations: string[] = [];
+    for (let i = 0; i < samples; i++) {
+      const row = departureRows.nth(i);
+      const cells = row.locator('div').first(); // first div = "Prévu" cell
+      const planned = (await cells.textContent())?.trim() ?? '';
+      const title = await row.locator('[class*="text-sm"][class*="font-medium"]').first().textContent();
+      observations.push(`${planned} | ${title?.trim()}`);
+    }
+    console.log('ST departure samples:\n  ' + observations.join('\n  '));
+
+    // Heuristic assertion: at least one row should display a date+time, not
+    // just a bare "14:00" fallback. A pure HH:MM string is 5 chars; a real
+    // date is "DD/MM HH:MM" or "J-N HH:MM" — both >= 8 chars.
+    const hasComputedDate = observations.some((o) => o.split(' | ')[0].length >= 8);
+    expect(hasComputedDate, 'expected at least one ST departure with a computed DD/MM HH:MM date').toBe(true);
+  });
+
   test('checking a client expedition row keeps it visible green', async ({ page }) => {
     const candidates = page.locator('[data-testid^="logistics-movement-job-shipped-"][data-completed="false"]');
     const count = await candidates.count();

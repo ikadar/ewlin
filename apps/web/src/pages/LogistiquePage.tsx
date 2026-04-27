@@ -53,7 +53,9 @@ import { useGetSnapshotQuery } from '../store/api/scheduleApi';
 import { useAppSelector } from '../store';
 import { selectCurrentUser } from '../store/slices/authSlice';
 import type { FluxJob, FluxSTStatus } from '../components/FluxTable/fluxTypes';
-import type { TaskAssignment, Job as JobEntity } from '@flux/types';
+import type { TaskAssignment, Job as JobEntity, Task, OutsourcedProvider } from '@flux/types';
+import { isOutsourcedTask } from '@flux/types';
+import { calculateOutsourcingDates } from '../utils/outsourcingCalculation';
 
 // ============================================================================
 // Movement model
@@ -184,11 +186,15 @@ function formatTimeOfDay(d: Date | null, fallback: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function combineDateAndTime(dateOnly: Date, hhmm: string): Date {
-  const [h, m] = hhmm.split(':').map((s) => parseInt(s, 10));
-  const out = new Date(dateOnly);
-  out.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
-  return out;
+/** Format like "29/04 14:00" — date+time when known, fallback HH:MM otherwise. */
+function formatPlannedTime(d: Date | null, today: Date, fallback: string): string {
+  if (d === null) return fallback;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (isSameDay(d, today)) return `${hh}:${mm}`;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mo} ${hh}:${mm}`;
 }
 
 // ============================================================================
@@ -198,35 +204,82 @@ function combineDateAndTime(dateOnly: Date, hhmm: string): Date {
 interface DeriveContext {
   jobs: FluxJob[];
   providersByName: Map<string, ProviderTimes>;
+  providersById: Map<string, OutsourcedProvider>;
   assignmentsByTaskId: Map<string, TaskAssignment>;
   jobsByInternalId: Map<string, JobEntity>;
+  tasksByTaskId: Map<string, Task>;
+  /** elementId → tasks of that element sorted by sequenceOrder */
+  tasksByElementId: Map<string, Task[]>;
+  /** Last sequenceOrder across all elements of a job → used for oneWay detection */
+  lastSequenceByJobInternalId: Map<string, { elementId: string; sequenceOrder: number }>;
 }
 
 function deriveMovements(ctx: DeriveContext): Movement[] {
-  const { jobs, providersByName, assignmentsByTaskId, jobsByInternalId } = ctx;
+  const {
+    jobs,
+    providersByName,
+    providersById,
+    assignmentsByTaskId,
+    jobsByInternalId,
+    tasksByTaskId,
+    tasksByElementId,
+    lastSequenceByJobInternalId,
+  } = ctx;
   const movements: Movement[] = [];
 
   for (const job of jobs) {
     const jobLabel = job.designation ? `${job.client} · ${job.designation}` : job.client;
     const internalJob = job.internalId !== undefined ? jobsByInternalId.get(job.internalId) : undefined;
+    const lastSeq = job.internalId !== undefined ? lastSequenceByJobInternalId.get(job.internalId) : undefined;
 
     for (const element of job.elements) {
       for (const out of element.outsourcing) {
         const times = providersByName.get(out.providerName) ?? DEFAULT_TIMES;
+        const fullTask = tasksByTaskId.get(out.taskId);
+        const isOut = fullTask !== undefined && isOutsourcedTask(fullTask);
+        const provider = isOut ? providersById.get(fullTask.providerId) : undefined;
+
+        // Find predecessor task (sequenceOrder - 1 in the same element) and
+        // its scheduledEnd, which drives the engine's outsourcing-date math.
+        let predecessorEndTime: string | undefined;
+        if (isOut) {
+          const elementTasks = tasksByElementId.get(fullTask.elementId) ?? [];
+          const predecessor = elementTasks.find((t) => t.sequenceOrder === fullTask.sequenceOrder - 1);
+          if (predecessor) {
+            const predAssignment = assignmentsByTaskId.get(predecessor.id);
+            if (predAssignment) predecessorEndTime = predAssignment.scheduledEnd;
+          }
+        }
+
+        // oneWay = this is the very last task of the entire job → product
+        // ships directly from the provider to the customer, no return leg.
+        const isLastTaskOfJob = isOut && lastSeq !== undefined
+          && lastSeq.elementId === fullTask.elementId
+          && lastSeq.sequenceOrder === fullTask.sequenceOrder;
+
+        const calculated = (isOut && provider !== undefined)
+          ? calculateOutsourcingDates(predecessorEndTime, {
+              workDays: fullTask.duration.openDays,
+              latestDepartureTime: provider.latestDepartureTime,
+              receptionTime: provider.receptionTime,
+              transitDays: provider.transitDays,
+              oneWay: isLastTaskOfJob,
+            })
+          : null;
+
+        // Manual overrides on the Task (if the user typed them in the
+        // mini-form) win over the calculated values.
+        const manualDeparture = isOut && fullTask.manualDeparture ? new Date(fullTask.manualDeparture) : null;
+        const manualReturn = isOut && fullTask.manualReturn ? new Date(fullTask.manualReturn) : null;
+
+        const departureDate = manualDeparture ?? calculated?.departure ?? null;
+        const returnDate = manualReturn ?? calculated?.return ?? null;
+
         const assignment = assignmentsByTaskId.get(out.taskId);
-        const startDate = assignment !== undefined ? new Date(assignment.scheduledStart) : null;
-        const endDate = assignment !== undefined ? new Date(assignment.scheduledEnd) : null;
         const completedDate = assignment?.completedAt !== null && assignment?.completedAt !== undefined
           ? new Date(assignment.completedAt)
           : null;
 
-        // Departure row: scheduledAt is fixed to scheduledStart (planned date)
-        // so the row never migrates after check. actualAt is null because the
-        // engine doesn't currently record a "dispatched at" timestamp — the
-        // page hydrates it from the latest audit when available.
-        const departureScheduledAt = startDate
-          ? combineDateAndTime(startOfDay(startDate), times.departure)
-          : null;
         const departureDone = out.status === 'progress' || out.status === 'done';
         movements.push({
           id: `task-departure-${out.taskId}`,
@@ -234,9 +287,9 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           type: 'st',
           refType: 'task',
           refId: out.taskId,
-          scheduledAt: departureScheduledAt,
+          scheduledAt: departureDate,
           actualAt: null,
-          time: formatTimeOfDay(departureScheduledAt, times.departure),
+          time: departureDate ? formatTimeOfDay(departureDate, '') : times.departure,
           title: `Départ ST · ${out.actionType || 'sous-traitance'}`,
           subtitle: `Job #${job.id} — ${jobLabel}`,
           counterparty: out.providerName || '—',
@@ -247,31 +300,30 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           action: 'st_dispatch',
         });
 
-        // Return row: scheduledAt fixed to scheduledEnd. actualAt = completedAt
-        // when the task is done (the assignment carries the real reception
-        // timestamp), null otherwise.
-        const returnScheduledAt = endDate
-          ? combineDateAndTime(startOfDay(endDate), times.reception)
-          : null;
-        const returnDone = out.status === 'done';
-        movements.push({
-          id: `task-arrival-${out.taskId}`,
-          kind: 'arrival',
-          type: 'st',
-          refType: 'task',
-          refId: out.taskId,
-          scheduledAt: returnScheduledAt,
-          actualAt: returnDone ? completedDate : null,
-          time: formatTimeOfDay(returnScheduledAt, times.reception),
-          title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
-          subtitle: `Job #${job.id} — ${jobLabel}`,
-          counterparty: out.providerName || '—',
-          jobRef: `#${job.id}`,
-          stStatus: out.status,
-          jobInternalId: job.internalId,
-          isCompleted: returnDone,
-          action: 'st_return',
-        });
+        // Skip the Return row entirely when this ST step is the very last
+        // task of the job — "aller simple" means the provider ships directly
+        // to the customer, there's no return leg to track.
+        if (!isLastTaskOfJob) {
+          const returnDone = out.status === 'done';
+          movements.push({
+            id: `task-arrival-${out.taskId}`,
+            kind: 'arrival',
+            type: 'st',
+            refType: 'task',
+            refId: out.taskId,
+            scheduledAt: returnDate,
+            actualAt: returnDone ? completedDate : null,
+            time: returnDate ? formatTimeOfDay(returnDate, '') : times.reception,
+            title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
+            subtitle: `Job #${job.id} — ${jobLabel}`,
+            counterparty: out.providerName || '—',
+            jobRef: `#${job.id}`,
+            stStatus: out.status,
+            jobInternalId: job.internalId,
+            isCompleted: returnDone,
+            action: 'st_return',
+          });
+        }
       }
     }
 
@@ -403,6 +455,12 @@ export function LogistiquePage() {
     return map;
   }, [providers]);
 
+  const providersById = useMemo(() => {
+    const map = new Map<string, OutsourcedProvider>();
+    for (const p of snapshot?.providers ?? []) map.set(p.id, p);
+    return map;
+  }, [snapshot]);
+
   const assignmentsByTaskId = useMemo(() => {
     const map = new Map<string, TaskAssignment>();
     for (const a of snapshot?.assignments ?? []) map.set(a.taskId, a);
@@ -415,15 +473,59 @@ export function LogistiquePage() {
     return map;
   }, [snapshot]);
 
+  const tasksByTaskId = useMemo(() => {
+    const map = new Map<string, Task>();
+    for (const t of snapshot?.tasks ?? []) map.set(t.id, t);
+    return map;
+  }, [snapshot]);
+
+  const tasksByElementId = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of snapshot?.tasks ?? []) {
+      const list = map.get(t.elementId) ?? [];
+      list.push(t);
+      map.set(t.elementId, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    }
+    return map;
+  }, [snapshot]);
+
+  const lastSequenceByJobInternalId = useMemo(() => {
+    // For oneWay detection: the "last task of a job" is the task with the
+    // highest sequenceOrder across all elements of that job. Element order
+    // within a job doesn't change the temporal end (parallel branches collapse
+    // at the deadline), so the simple max-sequenceOrder rule is sufficient.
+    const map = new Map<string, { elementId: string; sequenceOrder: number }>();
+    for (const job of snapshot?.jobs ?? []) {
+      let best: { elementId: string; sequenceOrder: number } | undefined;
+      for (const elementId of job.elementIds) {
+        const tasks = tasksByElementId.get(elementId) ?? [];
+        for (const t of tasks) {
+          if (best === undefined || t.sequenceOrder > best.sequenceOrder) {
+            best = { elementId, sequenceOrder: t.sequenceOrder };
+          }
+        }
+      }
+      if (best !== undefined) map.set(job.id, best);
+    }
+    return map;
+  }, [snapshot, tasksByElementId]);
+
   const allMovements = useMemo(
     () =>
       deriveMovements({
         jobs,
         providersByName,
+        providersById,
         assignmentsByTaskId,
         jobsByInternalId,
+        tasksByTaskId,
+        tasksByElementId,
+        lastSequenceByJobInternalId,
       }),
-    [jobs, providersByName, assignmentsByTaskId, jobsByInternalId],
+    [jobs, providersByName, providersById, assignmentsByTaskId, jobsByInternalId, tasksByTaskId, tasksByElementId, lastSequenceByJobInternalId],
   );
 
   const allTaskRefIds = useMemo(
@@ -736,7 +838,7 @@ function Column({
         <div className="bg-flux-elevated border border-flux-border rounded-md overflow-hidden" data-testid={`logistics-column-${title.toLowerCase()}`}>
           <div
             className="grid items-center gap-3 px-3.5 py-1.5 text-[10px] uppercase tracking-wider text-flux-text-muted font-semibold border-b border-flux-border bg-flux-surface"
-            style={{ gridTemplateColumns: '76px 84px 76px 1fr auto' }}
+            style={{ gridTemplateColumns: '92px 84px 76px 1fr auto' }}
           >
             <div>Prévu</div>
             <div>Fait</div>
@@ -873,9 +975,9 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
         : 'Cette tâche est déjà revenue'
       : 'Marquer comme effectué';
 
-  const timeDisplay = isOverdue && movement.time
-    ? `J-${overdueDays} ${movement.time}`
-    : movement.time || '—';
+  const timeDisplay = isOverdue && movement.scheduledAt
+    ? `J-${overdueDays} ${formatTimeOfDay(movement.scheduledAt, '')}`
+    : formatPlannedTime(movement.scheduledAt, today, movement.time || '—');
 
   const overdueDate = movement.scheduledAt
     ? `${String(movement.scheduledAt.getDate()).padStart(2, '0')}/${String(movement.scheduledAt.getMonth() + 1).padStart(2, '0')}`
@@ -889,7 +991,7 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
   return (
     <div
       className={`grid items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors ${rowClass}`}
-      style={{ gridTemplateColumns: '76px 84px 76px 1fr auto' }}
+      style={{ gridTemplateColumns: '92px 84px 76px 1fr auto' }}
       onClick={() => onOpenSheet(movement)}
       data-testid={`logistics-movement-${movement.id}`}
       data-completed={movement.isCompleted ? 'true' : 'false'}
