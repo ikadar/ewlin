@@ -68,8 +68,14 @@ interface Movement {
   type: MovementType;
   refType: LogisticsRefType;
   refId: string;
-  /** ISO datetime — when this movement is scheduled to physically occur */
+  /** Planned datetime — when this movement is *expected* to occur. This
+   *  value is stable across the lifecycle so the row stays in place in
+   *  the sort order even after being checked. */
   scheduledAt: Date | null;
+  /** Actual datetime — when the movement was physically performed.
+   *  Null until checked; populated from completedAt / shippedAt / latest
+   *  audit when available. Displayed in the second time column. */
+  actualAt: Date | null;
   /** Display strings */
   time: string;
   title: string;
@@ -125,28 +131,52 @@ function endOfWeek(d: Date): Date {
 }
 
 function dateMatchesFilter(movement: Movement, filter: DateFilter, now: Date): boolean {
-  const date = movement.scheduledAt;
-  if (date === null) return filter === 'today';
   const today = startOfDay(now);
+  const planned = movement.scheduledAt;
+  const actual = movement.actualAt;
+
+  // A movement matches the filter if its planned OR actual date falls
+  // within the requested window — so a row stays visible under the
+  // filter where either of those dates lies.
+  const matches = (predicate: (d: Date) => boolean): boolean => {
+    if (planned !== null && predicate(planned)) return true;
+    if (actual !== null && predicate(actual)) return true;
+    return false;
+  };
+
   switch (filter) {
     case 'yesterday': {
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
-      return isSameDay(date, yesterday);
+      return matches((d) => isSameDay(d, yesterday));
     }
-    case 'today':
-      // "Today" includes both scheduled-for-today AND overdue items still pending
-      // (reliquat). Reliquat sits at the top via the existing date sort.
-      if (isSameDay(date, today)) return true;
-      return date < today && !movement.isCompleted;
+    case 'today': {
+      if (matches((d) => isSameDay(d, today))) return true;
+      // Reliquat: still-pending past-due items also belong under "Aujourd'hui"
+      // so the warehouse staff sees what they should already have processed.
+      if (planned !== null && planned < today && !movement.isCompleted) return true;
+      // Movements with no scheduled date fall back to today.
+      if (planned === null && actual === null) return true;
+      return false;
+    }
     case 'tomorrow': {
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
-      return isSameDay(date, tomorrow);
+      return matches((d) => isSameDay(d, tomorrow));
     }
     case 'week':
-      return date >= startOfWeek(now) && date < endOfWeek(now);
+      return matches((d) => d >= startOfWeek(now) && d < endOfWeek(now));
   }
+}
+
+function formatActualTime(d: Date | null, today: Date): string {
+  if (d === null) return '—';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (isSameDay(d, today)) return `${hh}:${mm}`;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mo} ${hh}:${mm}`;
 }
 
 function formatTimeOfDay(d: Date | null, fallback: string): string {
@@ -190,8 +220,10 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           ? new Date(assignment.completedAt)
           : null;
 
-        // Departure row: visible from "to dispatch" through "dispatched/done".
-        // isCompleted once status moves past pending.
+        // Departure row: scheduledAt is fixed to scheduledStart (planned date)
+        // so the row never migrates after check. actualAt is null because the
+        // engine doesn't currently record a "dispatched at" timestamp — the
+        // page hydrates it from the latest audit when available.
         const departureScheduledAt = startDate
           ? combineDateAndTime(startOfDay(startDate), times.departure)
           : null;
@@ -203,6 +235,7 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           refType: 'task',
           refId: out.taskId,
           scheduledAt: departureScheduledAt,
+          actualAt: null,
           time: formatTimeOfDay(departureScheduledAt, times.departure),
           title: `Départ ST · ${out.actionType || 'sous-traitance'}`,
           subtitle: `Job #${job.id} — ${jobLabel}`,
@@ -214,14 +247,12 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           action: 'st_dispatch',
         });
 
-        // Return row: visible from "to receive" through "received".
-        // isCompleted once status reaches done. Date prefers completedAt
-        // (real reception time) when available, otherwise scheduledEnd.
-        const returnScheduledAt = (() => {
-          if (out.status === 'done' && completedDate !== null) return completedDate;
-          if (endDate !== null) return combineDateAndTime(startOfDay(endDate), times.reception);
-          return null;
-        })();
+        // Return row: scheduledAt fixed to scheduledEnd. actualAt = completedAt
+        // when the task is done (the assignment carries the real reception
+        // timestamp), null otherwise.
+        const returnScheduledAt = endDate
+          ? combineDateAndTime(startOfDay(endDate), times.reception)
+          : null;
         const returnDone = out.status === 'done';
         movements.push({
           id: `task-arrival-${out.taskId}`,
@@ -230,6 +261,7 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           refType: 'task',
           refId: out.taskId,
           scheduledAt: returnScheduledAt,
+          actualAt: returnDone ? completedDate : null,
           time: formatTimeOfDay(returnScheduledAt, times.reception),
           title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
           subtitle: `Job #${job.id} — ${jobLabel}`,
@@ -247,12 +279,12 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
 
     const exitDate = internalJob.workshopExitDate ? new Date(internalJob.workshopExitDate) : null;
 
-    // Always emit one client-expedition row per job: kept even between the
-    // optimistic update and the snapshot re-fetch (where shipped=true but
-    // shippedAt may briefly still be null) — falling back to exitDate or
-    // now() so the row never vanishes.
+    // Client-expedition row: scheduledAt always = workshopExitDate so the
+    // row position is stable (doesn't migrate when the user checks). The
+    // actual shipping moment lives in actualAt (= shippedAt or, very
+    // briefly between optimistic and re-fetch, now()).
     const shippedAt = internalJob.shipped
-      ? (internalJob.shippedAt ? new Date(internalJob.shippedAt) : (exitDate ?? new Date()))
+      ? (internalJob.shippedAt ? new Date(internalJob.shippedAt) : new Date())
       : null;
     movements.push({
       id: `job-shipped-${job.internalId}`,
@@ -260,8 +292,9 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
       type: 'client',
       refType: 'job',
       refId: job.internalId,
-      scheduledAt: shippedAt ?? exitDate,
-      time: formatTimeOfDay(shippedAt ?? exitDate, '17:00'),
+      scheduledAt: exitDate,
+      actualAt: shippedAt,
+      time: formatTimeOfDay(exitDate, '17:00'),
       title: 'Expédition client',
       subtitle: `Job #${job.id} — ${jobLabel}`,
       counterparty: job.client,
@@ -393,42 +426,30 @@ export function LogistiquePage() {
     [jobs, providersByName, assignmentsByTaskId, jobsByInternalId],
   );
 
-  const filteredMovements = useMemo(
-    () => allMovements.filter((m) => dateMatchesFilter(m, filter, now)),
-    [allMovements, filter, now],
+  const allTaskRefIds = useMemo(
+    () => allMovements.filter((m) => m.refType === 'task').map((m) => m.refId),
+    [allMovements],
   );
-
-  const reliquat = useMemo(
-    () =>
-      allMovements.filter((m) => {
-        if (m.isCompleted) return false;
-        if (m.scheduledAt === null) return false;
-        return m.scheduledAt < startOfDay(now);
-      }),
-    [allMovements, now],
+  const allJobRefIds = useMemo(
+    () => allMovements.filter((m) => m.refType === 'job').map((m) => m.refId),
+    [allMovements],
   );
-
-  const arrivals = filteredMovements.filter((m) => m.kind === 'arrival');
-  const departures = filteredMovements.filter((m) => m.kind === 'departure');
-
-  const taskRefIds = filteredMovements.filter((m) => m.refType === 'task').map((m) => m.refId);
-  const jobRefIds = filteredMovements.filter((m) => m.refType === 'job').map((m) => m.refId);
 
   const { data: taskNotes = [] } = useGetLogisticsNotesQuery(
-    { refType: 'task', refIds: taskRefIds },
-    { skip: taskRefIds.length === 0 },
+    { refType: 'task', refIds: allTaskRefIds },
+    { skip: allTaskRefIds.length === 0 },
   );
   const { data: jobNotes = [] } = useGetLogisticsNotesQuery(
-    { refType: 'job', refIds: jobRefIds },
-    { skip: jobRefIds.length === 0 },
+    { refType: 'job', refIds: allJobRefIds },
+    { skip: allJobRefIds.length === 0 },
   );
   const { data: taskAudits = [] } = useGetLatestLogisticsAuditsQuery(
-    { refType: 'task', refIds: taskRefIds },
-    { skip: taskRefIds.length === 0 },
+    { refType: 'task', refIds: allTaskRefIds },
+    { skip: allTaskRefIds.length === 0 },
   );
   const { data: jobAudits = [] } = useGetLatestLogisticsAuditsQuery(
-    { refType: 'job', refIds: jobRefIds },
-    { skip: jobRefIds.length === 0 },
+    { refType: 'job', refIds: allJobRefIds },
+    { skip: allJobRefIds.length === 0 },
   );
 
   const notesByRef = useMemo(() => {
@@ -450,6 +471,38 @@ export function LogistiquePage() {
     }
     return map;
   }, [taskAudits, jobAudits]);
+
+  // Hydrate actualAt from audits when the underlying entity doesn't carry
+  // a "did-this-action-at" timestamp. Today this only matters for ST
+  // departures: the engine has no `dispatchedAt` field, so the user-visible
+  // "heure effective" comes from the latest audit on the task.
+  const hydratedMovements = useMemo(
+    () =>
+      allMovements.map((m) => {
+        if (m.actualAt !== null || !m.isCompleted) return m;
+        const audit = auditsByRef.get(`${m.refType}:${m.refId}`);
+        return audit ? { ...m, actualAt: new Date(audit.occurredAt) } : m;
+      }),
+    [allMovements, auditsByRef],
+  );
+
+  const filteredMovements = useMemo(
+    () => hydratedMovements.filter((m) => dateMatchesFilter(m, filter, now)),
+    [hydratedMovements, filter, now],
+  );
+
+  const reliquat = useMemo(
+    () =>
+      hydratedMovements.filter((m) => {
+        if (m.isCompleted) return false;
+        if (m.scheduledAt === null) return false;
+        return m.scheduledAt < startOfDay(now);
+      }),
+    [hydratedMovements, now],
+  );
+
+  const arrivals = filteredMovements.filter((m) => m.kind === 'arrival');
+  const departures = filteredMovements.filter((m) => m.kind === 'departure');
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -681,6 +734,16 @@ function Column({
         </div>
       ) : (
         <div className="bg-flux-elevated border border-flux-border rounded-md overflow-hidden" data-testid={`logistics-column-${title.toLowerCase()}`}>
+          <div
+            className="grid items-center gap-3 px-3.5 py-1.5 text-[10px] uppercase tracking-wider text-flux-text-muted font-semibold border-b border-flux-border bg-flux-surface"
+            style={{ gridTemplateColumns: '76px 84px 76px 1fr auto' }}
+          >
+            <div>Prévu</div>
+            <div>Fait</div>
+            <div>Type</div>
+            <div>Mouvement</div>
+            <div className="w-[68px]" />
+          </div>
           {movements.map((m, idx) => {
             const note = notesByRef.get(`${m.refType}:${m.refId}`);
             const audit = auditsByRef.get(`${m.refType}:${m.refId}`);
@@ -808,10 +871,12 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
     ? `${String(movement.scheduledAt.getHours()).padStart(2, '0')}h`
     : '';
 
+  const actualDisplay = formatActualTime(movement.actualAt, today);
+
   return (
     <div
       className={`grid items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors ${rowClass}`}
-      style={{ gridTemplateColumns: '76px 76px 1fr auto' }}
+      style={{ gridTemplateColumns: '76px 84px 76px 1fr auto' }}
       onClick={() => onOpenSheet(movement)}
       data-testid={`logistics-movement-${movement.id}`}
       data-completed={movement.isCompleted ? 'true' : 'false'}
@@ -820,6 +885,9 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
     >
       <div className={`text-sm tabular-nums ${isOverdue ? 'text-red-400 font-semibold' : movement.isCompleted ? 'text-flux-text-tertiary' : 'text-flux-text-secondary'}`}>
         {timeDisplay}
+      </div>
+      <div className={`text-sm tabular-nums ${movement.actualAt !== null ? 'text-emerald-300 font-semibold' : 'text-flux-text-muted'}`}>
+        {actualDisplay}
       </div>
       <div>
         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${TYPE_BADGE_CLASS[movement.type]}`}>
