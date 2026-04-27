@@ -186,65 +186,60 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
         const assignment = assignmentsByTaskId.get(out.taskId);
         const startDate = assignment !== undefined ? new Date(assignment.scheduledStart) : null;
         const endDate = assignment !== undefined ? new Date(assignment.scheduledEnd) : null;
+        const completedDate = assignment?.completedAt !== null && assignment?.completedAt !== undefined
+          ? new Date(assignment.completedAt)
+          : null;
 
-        if (out.status === 'pending') {
-          const scheduledAt = startDate ? combineDateAndTime(startOfDay(startDate), times.departure) : null;
-          movements.push({
-            id: `task-departure-${out.taskId}`,
-            kind: 'departure',
-            type: 'st',
-            refType: 'task',
-            refId: out.taskId,
-            scheduledAt,
-            time: formatTimeOfDay(scheduledAt, times.departure),
-            title: `Départ ST · ${out.actionType || 'sous-traitance'}`,
-            subtitle: `Job #${job.id} — ${jobLabel}`,
-            counterparty: out.providerName || '—',
-            jobRef: `#${job.id}`,
-            stStatus: 'pending',
-            jobInternalId: job.internalId,
-            isCompleted: false,
-            action: 'st_dispatch',
-          });
-        } else if (out.status === 'progress') {
-          const scheduledAt = endDate ? combineDateAndTime(startOfDay(endDate), times.reception) : null;
-          movements.push({
-            id: `task-arrival-${out.taskId}`,
-            kind: 'arrival',
-            type: 'st',
-            refType: 'task',
-            refId: out.taskId,
-            scheduledAt,
-            time: formatTimeOfDay(scheduledAt, times.reception),
-            title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
-            subtitle: `Job #${job.id} — ${jobLabel}`,
-            counterparty: out.providerName || '—',
-            jobRef: `#${job.id}`,
-            stStatus: 'progress',
-            jobInternalId: job.internalId,
-            isCompleted: false,
-            action: 'st_return',
-          });
-        } else if (out.status === 'done' && assignment?.completedAt !== null && assignment !== undefined) {
-          const completed = new Date(assignment.completedAt!);
-          movements.push({
-            id: `task-arrival-${out.taskId}`,
-            kind: 'arrival',
-            type: 'st',
-            refType: 'task',
-            refId: out.taskId,
-            scheduledAt: completed,
-            time: formatTimeOfDay(completed, times.reception),
-            title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
-            subtitle: `Job #${job.id} — ${jobLabel}`,
-            counterparty: out.providerName || '—',
-            jobRef: `#${job.id}`,
-            stStatus: 'done',
-            jobInternalId: job.internalId,
-            isCompleted: true,
-            action: 'st_return',
-          });
-        }
+        // Departure row: visible from "to dispatch" through "dispatched/done".
+        // isCompleted once status moves past pending.
+        const departureScheduledAt = startDate
+          ? combineDateAndTime(startOfDay(startDate), times.departure)
+          : null;
+        const departureDone = out.status === 'progress' || out.status === 'done';
+        movements.push({
+          id: `task-departure-${out.taskId}`,
+          kind: 'departure',
+          type: 'st',
+          refType: 'task',
+          refId: out.taskId,
+          scheduledAt: departureScheduledAt,
+          time: formatTimeOfDay(departureScheduledAt, times.departure),
+          title: `Départ ST · ${out.actionType || 'sous-traitance'}`,
+          subtitle: `Job #${job.id} — ${jobLabel}`,
+          counterparty: out.providerName || '—',
+          jobRef: `#${job.id}`,
+          stStatus: out.status,
+          jobInternalId: job.internalId,
+          isCompleted: departureDone,
+          action: 'st_dispatch',
+        });
+
+        // Return row: visible from "to receive" through "received".
+        // isCompleted once status reaches done. Date prefers completedAt
+        // (real reception time) when available, otherwise scheduledEnd.
+        const returnScheduledAt = (() => {
+          if (out.status === 'done' && completedDate !== null) return completedDate;
+          if (endDate !== null) return combineDateAndTime(startOfDay(endDate), times.reception);
+          return null;
+        })();
+        const returnDone = out.status === 'done';
+        movements.push({
+          id: `task-arrival-${out.taskId}`,
+          kind: 'arrival',
+          type: 'st',
+          refType: 'task',
+          refId: out.taskId,
+          scheduledAt: returnScheduledAt,
+          time: formatTimeOfDay(returnScheduledAt, times.reception),
+          title: `Retour ST · ${out.actionType || 'sous-traitance'}`,
+          subtitle: `Job #${job.id} — ${jobLabel}`,
+          counterparty: out.providerName || '—',
+          jobRef: `#${job.id}`,
+          stStatus: out.status,
+          jobInternalId: job.internalId,
+          isCompleted: returnDone,
+          action: 'st_return',
+        });
       }
     }
 
@@ -318,6 +313,30 @@ const TYPE_FULL_LABEL: Record<MovementType, string> = {
   st: 'Sous-traitant',
   client: 'Client',
 };
+
+/**
+ * Transition gating for the checkbox click.
+ *
+ * Returns null when the click is a no-op (e.g. clicking a Departure row
+ * whose underlying task is already returned — that semantic doesn't make
+ * sense, you'd undo the return first).
+ */
+function computeTransition(m: Movement): { status?: FluxSTStatus; action: string } | null {
+  if (m.type === 'st') {
+    if (m.kind === 'departure') {
+      if (m.stStatus === 'pending') return { status: 'progress', action: 'st_dispatch' };
+      if (m.stStatus === 'progress') return { status: 'pending', action: 'st_revert_dispatch' };
+      return null;
+    }
+    if (m.stStatus === 'progress') return { status: 'done', action: 'st_return' };
+    if (m.stStatus === 'done') return { status: 'progress', action: 'st_revert_return' };
+    return null;
+  }
+  if (m.type === 'client') {
+    return { action: m.isCompleted ? 'client_revert_ship' : 'client_ship' };
+  }
+  return null;
+}
 
 function formatAuditTooltip(audit: LogisticsAuditResponse): string {
   const when = new Date(audit.occurredAt);
@@ -449,36 +468,17 @@ export function LogistiquePage() {
 
   const handleCheck = useCallback(
     async (m: Movement) => {
-      if (m.isCompleted) {
-        if (m.type === 'st' && m.stStatus === 'done') {
-          await updateSTStatus({ taskId: m.refId, status: 'progress' });
-          await createAudit({
-            refType: m.refType,
-            refId: m.refId,
-            action: 'st_revert_return',
-            actorName,
-          });
-        } else if (m.type === 'client' && m.jobInternalId !== undefined) {
-          await toggleJobShipped({ jobInternalId: m.jobInternalId, shipped: false });
-          await createAudit({
-            refType: m.refType,
-            refId: m.refId,
-            action: 'client_revert_ship',
-            actorName,
-          });
-        }
-        return;
-      }
-      if (m.type === 'st' && m.stStatus !== undefined) {
-        const next: FluxSTStatus = m.stStatus === 'pending' ? 'progress' : 'done';
-        await updateSTStatus({ taskId: m.refId, status: next });
+      const transition = computeTransition(m);
+      if (transition === null) return;
+      if (m.type === 'st' && transition.status !== undefined) {
+        await updateSTStatus({ taskId: m.refId, status: transition.status });
       } else if (m.type === 'client' && m.jobInternalId !== undefined) {
-        await toggleJobShipped({ jobInternalId: m.jobInternalId, shipped: true });
+        await toggleJobShipped({ jobInternalId: m.jobInternalId, shipped: !m.isCompleted });
       }
       await createAudit({
         refType: m.refType,
         refId: m.refId,
-        action: m.action,
+        action: transition.action,
         actorName,
       });
     },
@@ -693,7 +693,7 @@ function Column({
           Aucun mouvement
         </div>
       ) : (
-        <div className="bg-flux-elevated border border-flux-border rounded-md overflow-hidden">
+        <div className="bg-flux-elevated border border-flux-border rounded-md overflow-hidden" data-testid={`logistics-column-${title.toLowerCase()}`}>
           {movements.map((m, idx) => {
             const note = notesByRef.get(`${m.refType}:${m.refId}`);
             const audit = auditsByRef.get(`${m.refType}:${m.refId}`);
@@ -783,21 +783,32 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
     ? Math.max(1, Math.floor((today.getTime() - startOfDay(movement.scheduledAt).getTime()) / 86_400_000))
     : 0;
 
+  const transition = computeTransition(movement);
+  const isLocked = transition === null;
+
   const rowClass = movement.isCompleted
     ? 'bg-emerald-500/[0.08] hover:bg-emerald-500/[0.14] border-l-2 border-emerald-400'
-    : isOverdue
-      ? 'bg-red-500/[0.07] hover:bg-red-500/[0.12] border-l-2 border-red-400'
-      : 'hover:bg-flux-hover';
+    : isLocked
+      ? 'opacity-60 hover:bg-flux-hover'
+      : isOverdue
+        ? 'bg-red-500/[0.07] hover:bg-red-500/[0.12] border-l-2 border-red-400'
+        : 'hover:bg-flux-hover';
 
   const checkClass = movement.isCompleted
     ? 'bg-emerald-400 border-emerald-400 text-flux-base'
-    : 'border-flux-border-light hover:border-flux-text-tertiary bg-transparent text-transparent';
+    : isLocked
+      ? 'border-flux-border bg-flux-surface text-transparent cursor-not-allowed'
+      : 'border-flux-border-light hover:border-flux-text-tertiary bg-transparent text-transparent';
 
   const checkTitle = movement.isCompleted
     ? audit
       ? `Effectué — ${formatAuditTooltip(audit)}\nClic = annuler`
       : 'Effectué (clic pour annuler)'
-    : 'Marquer comme effectué';
+    : isLocked
+      ? movement.kind === 'arrival'
+        ? 'Le départ n\'a pas encore été effectué'
+        : 'Cette tâche est déjà revenue'
+      : 'Marquer comme effectué';
 
   const timeDisplay = isOverdue && movement.time
     ? `J-${overdueDays} ${movement.time}`
@@ -815,6 +826,10 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
       className={`grid items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors ${rowClass}`}
       style={{ gridTemplateColumns: '76px 76px 1fr auto' }}
       onClick={() => onOpenSheet(movement)}
+      data-testid={`logistics-movement-${movement.id}`}
+      data-completed={movement.isCompleted ? 'true' : 'false'}
+      data-kind={movement.kind}
+      data-type={movement.type}
     >
       <div className={`text-sm tabular-nums ${isOverdue ? 'text-red-400 font-semibold' : movement.isCompleted ? 'text-flux-text-tertiary' : 'text-flux-text-secondary'}`}>
         {timeDisplay}
@@ -854,9 +869,11 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
         <button
           type="button"
           onClick={() => onCheck(movement)}
+          disabled={isLocked}
           className={`w-[22px] h-[22px] inline-flex items-center justify-center rounded border-[1.5px] shrink-0 transition-colors ${checkClass}`}
           title={checkTitle}
           aria-label={checkTitle}
+          data-testid={`logistics-check-${movement.id}`}
         >
           <Check size={14} />
         </button>
