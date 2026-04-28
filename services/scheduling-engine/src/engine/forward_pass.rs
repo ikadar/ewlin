@@ -2139,23 +2139,46 @@ fn pre_place_pinned_actions(
 
         // Reserve the station for the whole interval.
         //
-        // Conflict policy: if any tick in [start_t, end_t) is already
-        // occupied by a DIFFERENT pre-placed pinned action, we reject
-        // this pin entirely (skip grid write, leave start_tick/end_tick
-        // unset, do not emit). The action falls through to the regular
-        // forward-pass loop which respects `is_station_free` and will
-        // place it on the next free slot.
+        // Per-tick filter: skip ticks where no qualified operator is
+        // available. Such ticks fall inside a closure (overnight,
+        // weekend, lunch) and are physically unusable regardless of
+        // any pin — marking them as "occupied by pin i" would force
+        // the forward-pass loop to walk past them with `SkipTo`,
+        // burning ticks against the `max_outer_t = 100_000` defensive
+        // cap when a long pin straddles a multi-day off-period. With
+        // this filter the grid only carries the pin's actual working
+        // ticks; the dead window stays untouched and forward-pass
+        // jumps over it via the regular operator-availability path.
         //
-        // Why reject instead of overwrite: capacity-1 stations physically
-        // cannot host two tasks at once. Last-writer-wins on the grid
-        // combined with unconditional emission would produce two
-        // ComputedAssignments on the same (station, tick) — visible as
-        // overlapping tiles in the UI and persisted by PHP, where they
-        // accumulate across compute cycles via the safety-zone-frozen
-        // pin pathway (Option A in ScheduleComputeController.buildJobs).
+        // Conflict policy: if any USABLE tick in [start_t, end_t) is
+        // already occupied by a DIFFERENT pre-placed pinned action,
+        // reject this pin entirely (skip grid write, leave
+        // start_tick/end_tick unset, do not emit). The action falls
+        // through to the regular forward-pass loop which respects
+        // `is_station_free` and will place it on the next free slot.
+        //
+        // Why reject instead of overwrite: capacity-1 stations
+        // physically cannot host two tasks at once. Last-writer-wins
+        // on the grid combined with unconditional emission would
+        // produce two ComputedAssignments on the same (station,
+        // tick) — visible as overlapping tiles in the UI and
+        // persisted by PHP, where they accumulate across compute
+        // cycles via the safety-zone-frozen pin pathway (Option A in
+        // ScheduleComputeController.buildJobs).
         let station_idx = actions[i].station_idx;
+        let tick_is_usable = |t: usize| -> bool {
+            (0..operator_skills.len()).any(|op| {
+                operator_availability.is_available(op, t)
+                    && operator_skills[op]
+                        .iter()
+                        .any(|&(s, prof)| s == station_idx && prof > 0.0)
+            })
+        };
         let mut conflict_with: Option<usize> = None;
         for t in start_t..end_t {
+            if !tick_is_usable(t) {
+                continue;
+            }
             if let Some(prev) = grid.station_action_at(station_idx, t) {
                 if prev != i {
                     conflict_with = Some(prev);
@@ -2175,7 +2198,9 @@ fn pre_place_pinned_actions(
             continue;
         }
         for t in start_t..end_t {
-            grid.assign_station(station_idx, t, i);
+            if tick_is_usable(t) {
+                grid.assign_station(station_idx, t, i);
+            }
         }
 
         // Find and assign a default operator roster over the pinned
