@@ -2145,6 +2145,73 @@ fn pre_place_pinned_actions(
             grid.grow(grow_ticks);
         }
 
+        // Chunk-mini guard for safety-zone pins.
+        //
+        // A safety-zone pin reflects a placement decided by a prior
+        // compute and propagated forward through every subsequent
+        // recompute. Pre-place bypasses the scoring-loop chunk-mini
+        // check, so a placement that violates the station's chunk-mini
+        // policy (e.g. a 10-min first stint right before end-of-shift)
+        // gets perpetuated indefinitely. Re-validate the constraint
+        // here for safety-zone pins only — user pins (`is_pinned` &&
+        // `!is_frozen_by_safety_zone`) reflect explicit intent and are
+        // out of scope (see `Pin = créneau, pas opérateur`).
+        //
+        // Implicit invariant: eat=0 at this point. pre_place runs
+        // before the forward-pass loop has incremented eat. PHP only
+        // sets isFrozenBySafetyZone when scheduledStart >= now, so the
+        // operator hasn't started yet — degrading the pin costs no
+        // wasted setup.
+        //
+        // On chunk-mini fail: degrade the pin (clear flags + tick
+        // hints), emit a warning, fall through to the scoring loop
+        // which re-places under normal rules.
+        if actions[i].is_frozen_by_safety_zone && station_idx < station_attrs.len() {
+            let attrs = &station_attrs[station_idx];
+            let action_setup = actions[i].setup_ticks;
+            let action_total = actions[i].task_total_ticks;
+            let chunk_mini_ticks = attrs.chunk_mini_ticks(action_setup, action_total);
+            let action_run_total = (action_setup + actions[i].run_ticks) as usize;
+            let needed = action_run_total.min(chunk_mini_ticks as usize);
+            if needed > 1 {
+                let cap = grid.num_ticks.saturating_sub(start_t).min(needed);
+                let mut window = 0usize;
+                while window < cap {
+                    let tick = start_t + window;
+                    match grid.station_action_at(station_idx, tick) {
+                        None => {}
+                        Some(occupant) if occupant == i => {}
+                        _ => break,
+                    }
+                    let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
+                        skills.iter().any(|(s, p)| *s == station_idx && *p > 0.0)
+                            && operator_availability.is_available(op, tick)
+                    });
+                    if !any_op {
+                        break;
+                    }
+                    window += 1;
+                }
+                if window < needed {
+                    let original_minutes = start_t as u64 * tick_minutes as u64;
+                    warnings.push(Warning {
+                        task_id: Some(actions[i].task_id.clone()),
+                        message: format!(
+                            "Pin safety-zone retiré pour {} : fenêtre dispo {} min < chunk-mini {} min. Replanification.",
+                            super::format_minutes(original_minutes, start_date),
+                            window * tick_minutes as usize,
+                            needed * tick_minutes as usize,
+                        ),
+                    });
+                    actions[i].is_pinned = false;
+                    actions[i].is_frozen_by_safety_zone = false;
+                    actions[i].pinned_start_tick = None;
+                    actions[i].pinned_end_tick = None;
+                    continue;
+                }
+            }
+        }
+
         // Pin = start-time PREFERENCE, not a hard constraint. If the
         // requested window has no qualified-and-available operator OR the
         // station cell is occupied by another pre-placed pin, scan forward
@@ -3427,4 +3494,229 @@ mod availability_tests {
         assert!(!a.is_available(0, 672), "Monday 00:00 — outside overtime, outside base");
         assert!(!a.is_available(0, 673), "Monday 00:15 — outside overtime, outside base");
     }
+}
+
+#[cfg(test)]
+mod safety_zone_chunk_mini_tests {
+    //! Pre-place chunk-mini guard for safety-zone pins.
+    //!
+    //! When a previous compute placed an action with a too-short first
+    //! stint (e.g. 10 min before end-of-shift), the placement gets
+    //! propagated through every recompute via the safety-zone freeze
+    //! pathway. Pre-place bypasses the scoring-loop chunk-mini check, so
+    //! the bad placement perpetuates indefinitely. The guard re-validates
+    //! chunk-mini against the contiguous window starting at
+    //! `pinned_start_tick` and degrades the pin when the window is too
+    //! short. User pins (`is_pinned && !is_frozen_by_safety_zone`) are
+    //! out of scope.
+    use super::*;
+    use crate::engine::similarity::SpecSnapshot;
+    use chrono::NaiveDate;
+
+    fn station_attrs_default() -> StationAttrs {
+        StationAttrs {
+            attention_full: 1.0,
+            attention_run: 1.0,
+            max_run_attention: 1.0,
+            masked_time_enabled: false,
+            peremption_ticks: 0,
+            max_operators: 1,
+            // 5 ticks max chunk = 75 min at 15 min/tick.
+            max_chunk_ticks: 5,
+            // Defaults: 2.0 × setup, 0.5 × total.
+            chunk_mini_setup_multiplier: 2.0,
+            chunk_mini_task_percentage: 0.5,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        }
+    }
+
+    /// Build an Action with the minimum fields the chunk-mini guard
+    /// reads. All scoring-related fields are zeroed.
+    fn make_action(
+        idx: usize,
+        station_idx: usize,
+        setup_ticks: u32,
+        run_ticks: u32,
+        pinned_start_tick: usize,
+        is_frozen_by_safety_zone: bool,
+    ) -> Action {
+        let total = setup_ticks + run_ticks;
+        Action {
+            idx,
+            task_id: format!("task-{idx}"),
+            job_id: "job".into(),
+            station_idx,
+            setup_ticks,
+            run_ticks,
+            art: total,
+            original_art: total,
+            task_total_ticks: total,
+            eat: 0,
+            last: u64::MAX,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: Vec::new(),
+            start_tick: None,
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks: 0,
+            tick_operator_log: Vec::new(),
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            chain_remaining_art: total,
+            is_pinned: true,
+            is_frozen_by_safety_zone,
+            pinned_start_tick: Some(pinned_start_tick),
+            pinned_end_tick: Some(pinned_start_tick + total as usize),
+            peremption_count: 0,
+            pending_recalage: false,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
+            spec_snapshot: SpecSnapshot::default(),
+            setup_progress: 0.0,
+            setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
+        }
+    }
+
+    /// Build availability where op 0 is available only on the listed
+    /// tick ranges (inclusive of start, exclusive of end). Other ticks
+    /// are off (closure / end-of-shift).
+    fn restricted_availability(num_ticks: usize, available_ranges: &[(usize, usize)]) -> OperatorAvailability {
+        let schedules = vec![OperatorScheduleData {
+            schedules: None,
+            reference_week: None,
+            absences: Vec::new(),
+            overtimes: Vec::new(),
+        }];
+        let mut avail = OperatorAvailability::new(
+            1,
+            num_ticks,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 28).unwrap(),
+            schedules,
+        );
+        for t in 0..num_ticks {
+            while avail.data.get(0).map_or(0, |v| v.len()) <= t {
+                avail.data.get_mut(0).map(|v| v.push(false));
+            }
+            let in_range = available_ranges.iter().any(|(a, b)| t >= *a && t < *b);
+            if let Some(v) = avail.data.get_mut(0) {
+                v[t] = in_range;
+            }
+        }
+        avail
+    }
+
+    /// Convenience: invoke pre_place_pinned_actions on a single-action
+    /// scenario and return (actions, warnings) for inspection.
+    fn run_pre_place(
+        action: Action,
+        availability: OperatorAvailability,
+        station_attrs: StationAttrs,
+        num_ticks: usize,
+    ) -> (Vec<Action>, Vec<Warning>) {
+        let mut grid = ScheduleGrid::new(1, 1, num_ticks, 15);
+        let mut actions = vec![action];
+        let mut assignments = Vec::new();
+        let mut warnings = Vec::new();
+        let skills = vec![vec![(0usize, 1.0f64)]]; // op 0 skilled on station 0
+        let groups = vec![vec![]];
+        pre_place_pinned_actions(
+            &mut grid,
+            &mut actions,
+            96, // grow_ticks (1 day)
+            &mut assignments,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 28).unwrap(),
+            &[station_attrs],
+            &skills,
+            &availability,
+            &groups,
+            &mut warnings,
+        );
+        (actions, warnings)
+    }
+
+    #[test]
+    fn safety_zone_pin_with_short_window_is_degraded() {
+        // Komori-G40-style scenario: setup=4 ticks (60 min) + run=4 ticks
+        // (60 min) = 8 ticks total. chunk_mini_ticks =
+        // max(ceil(2.0×4)=8, ceil(0.5×8)=4).min(5) = 5.
+        // Operator available only on 2 ticks at the pin start.
+        let action = make_action(0, 0, 4, 4, 64, /*is_frozen_by_safety_zone=*/ true);
+        // Available ticks 64..66 (2 ticks); rest closed until next day.
+        let availability = restricted_availability(200, &[(64, 66), (96, 192)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+        );
+
+        assert!(!actions[0].is_pinned, "safety-zone pin must be degraded");
+        assert!(!actions[0].is_frozen_by_safety_zone, "is_frozen flag must be cleared");
+        assert!(actions[0].pinned_start_tick.is_none(), "pinned_start_tick cleared");
+        assert!(actions[0].pinned_end_tick.is_none(), "pinned_end_tick cleared");
+        assert!(actions[0].start_tick.is_none(), "start_tick must remain None — scoring loop will place");
+        assert!(
+            warnings.iter().any(|w| w.message.contains("safety-zone")),
+            "expected a degradation warning, got {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn user_pin_with_short_window_is_kept() {
+        // Same window as above but the pin is a user pin (not safety-zone).
+        // Per `Pin = créneau, pas opérateur`, user pins are honoured.
+        let action = make_action(0, 0, 4, 4, 64, /*is_frozen_by_safety_zone=*/ false);
+        let availability = restricted_availability(200, &[(64, 66), (96, 192)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+        );
+
+        // User pin still placed (start_tick set or shifted by the
+        // existing shift logic; either way is_pinned stays true and
+        // no chunk-mini-degradation warning is emitted).
+        assert!(actions[0].is_pinned, "user pin must NOT be degraded");
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("safety-zone retiré")),
+            "user pin should not trigger safety-zone degradation warning"
+        );
+    }
+
+    #[test]
+    fn safety_zone_pin_with_adequate_window_is_kept() {
+        // Plenty of room: operator available on 10 contiguous ticks
+        // covering the entire pin span.
+        let action = make_action(0, 0, 4, 4, 64, /*is_frozen_by_safety_zone=*/ true);
+        let availability = restricted_availability(200, &[(64, 80)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+        );
+
+        assert!(actions[0].is_pinned, "pin must be kept when window suffices");
+        assert!(actions[0].is_frozen_by_safety_zone, "frozen flag preserved");
+        assert!(actions[0].start_tick.is_some(), "pin placed: start_tick set");
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("safety-zone retiré")),
+            "no degradation warning on adequate window"
+        );
+    }
+
 }
