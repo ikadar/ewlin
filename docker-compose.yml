@@ -89,6 +89,9 @@ services:
       OPENAI_COMPAT_API_KEY: ${OPENAI_COMPAT_API_KEY:-}
       OPENAI_COMPAT_MODEL: ${OPENAI_COMPAT_MODEL:-openai/gpt-oss-20b}
       OPENAI_COMPAT_BASE_URL: ${OPENAI_COMPAT_BASE_URL:-https://api.groq.com/openai/v1}
+      # OpenRouter-only: append `:nitro` to the model id to prefer
+      # high-throughput providers. No-op for Groq/other openai-compat hosts.
+      OPENAI_COMPAT_NITRO: ${OPENAI_COMPAT_NITRO:-false}
       LLM_MODEL: ${LLM_MODEL:-claude-haiku-4-5-20251001}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
       LLM_MAX_TOKENS_PER_TURN: ${LLM_MAX_TOKENS_PER_TURN:-}

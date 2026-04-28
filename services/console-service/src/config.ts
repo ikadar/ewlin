@@ -27,6 +27,14 @@ export interface Config {
   openaiCompatApiKey: string;
   openaiCompatBaseUrl: string;
   openaiCompatModel: string;
+  /**
+   * OpenRouter-only: when true and the base URL points to OpenRouter,
+   * the model id is suffixed with `:nitro` at request time, sorting
+   * providers by throughput (highest tokens/sec first). Equivalent to
+   * setting `provider.sort = "throughput"` in the request body.
+   * No-op when targeting other openai-compat hosts.
+   */
+  openaiCompatNitro: boolean;
   llmModel: string;
   llmTemperature: number;
   llmMaxTurns: number;
@@ -60,6 +68,12 @@ function envFloatOr(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function envBoolOr(name: string, fallback: boolean): boolean {
+  const v = process.env[name];
+  if (v === undefined) return fallback;
+  return /^(1|true|yes|on)$/i.test(v.trim());
+}
+
 function envProvider(): LlmProvider {
   const raw = (process.env['LLM_PROVIDER'] ?? 'anthropic').toLowerCase();
   // Accept legacy 'groq' alias for the openai-compat family.
@@ -82,6 +96,7 @@ export function loadConfig(): Config {
     openaiCompatApiKey: envOr('OPENAI_COMPAT_API_KEY', ''),
     openaiCompatBaseUrl: envOr('OPENAI_COMPAT_BASE_URL', 'https://api.groq.com/openai/v1'),
     openaiCompatModel: envOr('OPENAI_COMPAT_MODEL', 'openai/gpt-oss-20b'),
+    openaiCompatNitro: envBoolOr('OPENAI_COMPAT_NITRO', false),
     llmModel: envOr('LLM_MODEL', 'claude-haiku-4-5-20251001'),
     llmTemperature: envFloatOr('LLM_TEMPERATURE', 0),
     llmMaxTurns: envIntOr('LLM_MAX_TURNS', 8),

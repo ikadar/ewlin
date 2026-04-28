@@ -52,13 +52,21 @@ function buildLlmClient(config: Config): { client: LlmClient; model: string } | 
     if (!config.openaiCompatApiKey) {
       return { error: "OPENAI_COMPAT_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service." };
     }
+    // OpenRouter `:nitro` suffix sorts providers by throughput (tokens/sec).
+    // It's a model-id alias, only meaningful for OpenRouter — appending it
+    // for Groq/Together/etc. would 404. Idempotent: skip if already suffixed.
+    const isOpenRouter = /openrouter\.ai/i.test(config.openaiCompatBaseUrl);
+    const effectiveModel =
+      config.openaiCompatNitro && isOpenRouter && !/:nitro$/i.test(config.openaiCompatModel)
+        ? `${config.openaiCompatModel}:nitro`
+        : config.openaiCompatModel;
     return {
       client: new OpenAICompatClient(
         config.openaiCompatApiKey,
         config.openaiCompatBaseUrl,
-        config.openaiCompatModel,
+        effectiveModel,
       ),
-      model: config.openaiCompatModel,
+      model: effectiveModel,
     };
   }
   if (!config.anthropicApiKey) {
