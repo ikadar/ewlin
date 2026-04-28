@@ -239,6 +239,16 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
 
       const toolUses = extractToolUses(response.content);
 
+      // Per-turn trace to debug stuck loops (MAX_TURNS_REACHED).
+      // Logs to stderr → visible via `docker compose logs console-service`.
+      const turnTools = toolUses.map((tu) => tu.name).join(',') || '(none)';
+      const stop = response.stop_reason ?? '?';
+      const usage = response.usage;
+      console.error(
+        `[loop] turn=${turn + 1}/${args.config.llmMaxTurns} stop=${stop} ` +
+          `tools=[${turnTools}] in=${usage.input_tokens} out=${usage.output_tokens}`,
+      );
+
       // tool_choice='any' should make this impossible, but defend anyway.
       if (toolUses.length === 0) {
         if (turn < args.config.llmMaxTurns - 1) {
