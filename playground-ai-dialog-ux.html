@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground · AI Dialog UX (Alt+K)</title>
+<style>
+  /* ── Flux palette (extrait apps/web/src/index.css) ───────── */
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-active:         rgb(52 52 52);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --red-400:     #f87171;
+    --blue-400:    #60a5fa;
+    --blue-500:    #3b82f6;
+    --blue-600:    #2563eb;
+    --cyan-400:    #22d3ee;
+    --violet-400:  #a78bfa;
+    --pink-400:    #f472b6;
+
+    --backdrop:    rgba(0, 0, 0, 0.5);
+    --shadow-lg:   0 20px 60px rgba(0,0,0,.55), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, 'SF Pro Text', sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); border-radius: 999px; }
+
+  /* ── App layout ──────────────────────────────────────────── */
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+
+  .topbar {
+    border-bottom: 1px solid var(--flux-border);
+    padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--flux-surface);
+  }
+  .topbar h1 {
+    font-size: 0.95rem; font-weight: 600; color: var(--flux-text-primary);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topbar h1 .crumb {
+    color: var(--flux-text-muted); font-weight: 400;
+  }
+  .topbar h1 .pill {
+    font-size: 0.7rem; padding: 2px 8px; border-radius: 999px;
+    background: rgba(96,165,250,.12); color: var(--blue-400);
+    border: 1px solid rgba(96,165,250,.22); font-weight: 500;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 360px;
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* ── Sidebar (left controls) ─────────────────────────────── */
+  .sidebar {
+    border-right: 1px solid var(--flux-border);
+    padding: 18px 16px;
+    overflow-y: auto;
+    background: var(--flux-surface);
+  }
+  .sidebar-section { margin-bottom: 22px; }
+  .sidebar-label {
+    display: block; font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--flux-text-muted); margin-bottom: 10px;
+  }
+
+  /* Proposal tabs (vertical) */
+  .prop-tabs { display: flex; flex-direction: column; gap: 6px; }
+  .prop-tab {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    background: transparent; border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    cursor: pointer; text-align: left; font: inherit;
+    transition: all .12s;
+  }
+  .prop-tab:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .prop-tab.active {
+    background: rgba(96,165,250,.1);
+    border-color: rgba(96,165,250,.4);
+    color: var(--flux-text-primary);
+  }
+  .prop-tab .letter {
+    flex: 0 0 22px; height: 22px; border-radius: 6px;
+    background: var(--flux-elevated); display: grid; place-items: center;
+    font-weight: 700; font-size: 0.75rem; color: var(--flux-text-tertiary);
+  }
+  .prop-tab.active .letter {
+    background: var(--blue-600); color: white;
+  }
+  .prop-tab .label-main { font-weight: 600; font-size: 0.85rem; line-height: 1.2; }
+  .prop-tab .label-sub  { font-size: 0.72rem; color: var(--flux-text-muted); margin-top: 2px; }
+
+  /* Radio + check rows */
+  .opt-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; color: var(--flux-text-secondary);
+    user-select: none;
+  }
+  .opt-row:hover { background: var(--flux-hover); }
+  .opt-row input { accent-color: var(--blue-500); }
+
+  /* ── Main preview ────────────────────────────────────────── */
+  .preview {
+    overflow: hidden;
+    background:
+      radial-gradient(80% 60% at 50% 10%, rgba(96,165,250,.04), transparent 60%),
+      var(--flux-base);
+    display: grid; grid-template-rows: 1fr auto;
+    min-height: 0;
+  }
+
+  .preview-stage {
+    overflow: auto;
+    padding: 36px 36px 60px;
+    display: flex; justify-content: center;
+    position: relative;
+  }
+
+  /* Faux-page hint behind the palette to simulate context */
+  .page-bg {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.02), transparent 220px),
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,.025) 0 1px,
+        transparent 1px 56px),
+      repeating-linear-gradient(0deg,
+        rgba(255,255,255,.018) 0 1px,
+        transparent 1px 28px);
+    opacity: .55;
+    pointer-events: none;
+  }
+
+  /* ── Mock CommandPalette ─────────────────────────────────── */
+  .palette {
+    position: relative;
+    width: 720px; max-width: 100%;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    margin-top: 24px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    /* Adapts to context: short in intro, breathing room in chat, capped at viewport */
+    max-height: calc(100vh - 110px);
+  }
+  .palette.chat-mode {
+    /* Floor so 1-turn chat doesn't feel smaller than intro mode */
+    min-height: clamp(280px, 45vh, 460px);
+  }
+  /* In chat-mode, input swaps to the bottom and grows a top border */
+  .palette.chat-mode .palette-input {
+    order: 3;
+    border-bottom: 0;
+    border-top: 1px solid var(--flux-border);
+  }
+  .palette.chat-mode .palette-body {
+    order: 2;
+  }
+  .palette.chat-mode .palette-shortcuts { display: none; }
+  /* Intro mode: shortcuts visible, conversation hidden */
+  .palette:not(.chat-mode) .palette-body { display: none; }
+
+  .palette-input {
+    order: 1;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    z-index: 2;
+  }
+  .palette-input .pi-icon {
+    width: 18px; height: 18px; color: var(--flux-text-muted);
+    display: grid; place-items: center;
+  }
+  .palette-input input {
+    flex: 1; background: transparent; border: 0; outline: 0;
+    color: var(--flux-text-primary); font: inherit; font-size: 0.92rem;
+  }
+  .palette-input input::placeholder { color: var(--flux-text-muted); }
+  .palette-input .kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem; color: var(--flux-text-muted);
+    border: 1px solid var(--flux-border-light); border-radius: 4px;
+    padding: 2px 6px; background: var(--flux-elevated);
+  }
+
+  .palette-body {
+    order: 2;
+    padding: 14px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .palette-body[data-density="compact"] { padding: 10px; }
+
+  /* ── Intro mode: shortcut zones grid (mock of current palette) ── */
+  .palette-shortcuts {
+    order: 2;
+    padding: 12px 12px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .palette-shortcuts .ai-prompt-row {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: rgba(96,165,250,.08);
+    border: 1px solid rgba(96,165,250,.3);
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 6px;
+  }
+  .palette-shortcuts .ai-prompt-row:hover { background: rgba(96,165,250,.14); }
+  .palette-shortcuts .ai-prompt-row .spark { color: var(--blue-400); }
+  .palette-shortcuts .ai-prompt-row .lbl   { color: var(--flux-text-muted); font-size: 0.84rem; }
+  .palette-shortcuts .ai-prompt-row .quote { color: var(--flux-text-primary); font-size: 0.88rem; }
+  .palette-shortcuts .ai-prompt-row .enter-hint {
+    margin-left: auto; font-family: ui-monospace, monospace;
+    font-size: 0.7rem; color: var(--flux-text-muted);
+    border: 1px solid var(--flux-border-light); border-radius: 4px;
+    padding: 1px 6px; background: var(--flux-elevated);
+  }
+  .shortcut-zone {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px 12px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .shortcut-zone:hover { background: var(--flux-hover); border-color: var(--flux-border-light); }
+  .shortcut-zone .top {
+    display: flex; align-items: center; justify-content: space-between;
+    color: var(--flux-text-primary); font-weight: 600; font-size: 0.86rem;
+  }
+  .shortcut-zone .kbd {
+    font-family: ui-monospace, monospace; font-size: 0.7rem;
+    color: var(--flux-text-muted);
+    border: 1px solid var(--flux-border-light); border-radius: 4px;
+    padding: 1px 6px; background: var(--flux-base);
+  }
+  .shortcut-zone .desc {
+    color: var(--flux-text-muted); font-size: 0.78rem;
+  }
+  .palette-shortcuts .footer-hint {
+    grid-column: 1 / -1;
+    display: flex; gap: 16px;
+    padding-top: 8px;
+    color: var(--flux-text-muted); font-size: 0.74rem;
+    border-top: 1px solid var(--flux-border);
+    margin-top: 4px;
+  }
+  .palette-shortcuts .footer-hint .kbd-mini {
+    font-family: ui-monospace, monospace;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border-light);
+    border-radius: 3px; padding: 1px 5px; color: var(--flux-text-secondary);
+    margin-right: 4px;
+  }
+
+  /* ── Morph replay button (above palette in stage) ───────────── */
+  .stage-controls {
+    position: absolute; top: 16px; right: 24px;
+    display: flex; gap: 8px;
+    z-index: 5;
+  }
+  .stage-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 6px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-secondary);
+    font: inherit; font-size: 0.78rem; font-weight: 500;
+    cursor: pointer;
+  }
+  .stage-btn:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+    border-color: var(--blue-500);
+  }
+  .stage-btn.primary {
+    background: var(--blue-600); color: white; border-color: var(--blue-600);
+  }
+  .stage-btn.primary:hover { background: var(--blue-500); }
+  .stage-mode-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 500;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    color: var(--flux-text-tertiary);
+  }
+  .stage-mode-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--flux-text-muted);
+  }
+  .stage-mode-pill[data-mode="chat"] {
+    color: var(--blue-400); border-color: rgba(96,165,250,.3);
+    background: rgba(96,165,250,.08);
+  }
+  .stage-mode-pill[data-mode="chat"] .dot { background: var(--blue-400); }
+
+  /* ── Common turn primitives (used by several proposals) ── */
+  .entity {
+    color: var(--flux-text-primary);
+    font-weight: 600;
+    border-bottom: 1px dotted rgba(96,165,250,.4);
+    padding-bottom: 1px;
+  }
+  .entity[data-kind="job"]     { color: #fff; border-color: rgba(96,165,250,.55); }
+  .entity[data-kind="station"] { color: #fff; border-color: rgba(167,139,250,.55); }
+  .entity[data-kind="op"]      { color: #fff; border-color: rgba(244,114,182,.55); }
+  .entity[data-kind="time"]    { color: #fff; border-color: rgba(52,211,153,.55); }
+
+  /* Apply pill (used by A and B) */
+  .apply-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 999px;
+    background: var(--blue-600); color: white;
+    font-weight: 600; font-size: 0.85rem;
+    border: 0; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(37,99,235,.35);
+  }
+  .apply-pill:hover { background: var(--blue-500); }
+  .apply-pill .kbd-inline {
+    font-family: ui-monospace, monospace; font-size: 0.7rem;
+    background: rgba(0,0,0,.25); padding: 1px 6px; border-radius: 3px;
+  }
+  .ghost-btn {
+    background: transparent; border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-secondary);
+    padding: 5px 12px; border-radius: 999px;
+    font: inherit; font-size: 0.82rem; cursor: pointer;
+  }
+  .ghost-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+
+  /* ──────────────────────────────────────────────────────── */
+  /*  Proposal A — Threaded chat                              */
+  /* ──────────────────────────────────────────────────────── */
+  .propA { display: flex; flex-direction: column; gap: 14px; }
+  .propA[data-density="compact"] { gap: 10px; }
+  .propA .turn-user {
+    align-self: flex-end;
+    max-width: 78%;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 14px 14px 4px 14px;
+    padding: 8px 12px;
+    color: var(--flux-text-secondary);
+    font-size: 0.88rem;
+  }
+  .propA .turn-ai {
+    display: flex; gap: 10px;
+    color: var(--flux-text-primary);
+    font-size: 0.92rem; line-height: 1.55;
+  }
+  .propA .turn-ai .ai-mark {
+    flex: 0 0 18px; line-height: 1.5;
+    color: var(--blue-400);
+    font-size: 0.95rem;
+  }
+  .propA .turn-ai .ai-body { flex: 1; min-width: 0; }
+  .propA .ai-prose { color: var(--flux-text-secondary); }
+  .propA .ai-prose .lead { color: var(--flux-text-primary); }
+  .propA .actions-fold {
+    margin-top: 6px;
+    font-size: 0.82rem; color: var(--flux-text-tertiary);
+    cursor: pointer; user-select: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 8px; border-radius: 6px;
+    border: 1px dashed var(--flux-border-light);
+    background: transparent;
+  }
+  .propA .actions-fold:hover { background: var(--flux-hover); color: var(--flux-text-secondary); }
+  .propA .actions-expanded {
+    margin-top: 8px; padding: 8px 12px;
+    background: var(--flux-elevated);
+    border-left: 2px solid var(--blue-500);
+    border-radius: 4px;
+    font-size: 0.84rem;
+  }
+  .propA .actions-expanded ol { padding-left: 20px; }
+  .propA .actions-expanded li { padding: 2px 0; color: var(--flux-text-secondary); }
+  .propA .actions-expanded li b { color: var(--flux-text-primary); }
+  .propA .turn-controls {
+    display: flex; justify-content: flex-end; gap: 8px;
+    margin-top: 10px;
+  }
+  .propA .turn-stale { opacity: .58; }
+  .propA .options-row {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  }
+  .propA .opt-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 8px;
+    font-size: 0.84rem;
+    cursor: pointer;
+  }
+  .propA .opt-pill:hover {
+    background: var(--flux-hover);
+    border-color: var(--blue-500);
+  }
+  .propA .opt-pill .num {
+    width: 18px; height: 18px; display: grid; place-items: center;
+    background: var(--flux-base); border-radius: 4px;
+    font-family: ui-monospace, monospace; font-size: 0.72rem;
+    color: var(--flux-text-tertiary);
+  }
+  .propA .opt-pill .meta {
+    color: var(--flux-text-muted); font-size: 0.78rem; margin-left: 4px;
+  }
+
+  /* ──────────────────────────────────────────────────────── */
+  /*  Proposal B — Notebook turns                             */
+  /* ──────────────────────────────────────────────────────── */
+  .propB { display: flex; flex-direction: column; }
+  .propB .nb-turn {
+    border-top: 1px solid var(--flux-border);
+    padding: 14px 4px 16px;
+  }
+  .propB .nb-turn:first-child { border-top: 0; padding-top: 4px; }
+  .propB[data-density="compact"] .nb-turn { padding: 10px 4px 12px; }
+  .propB .nb-collapsed {
+    padding: 8px 4px;
+    color: var(--flux-text-muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .propB .nb-collapsed:hover { color: var(--flux-text-secondary); }
+  .propB .nb-collapsed .chev { color: var(--flux-text-muted); }
+  .propB .nb-user {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 8px;
+  }
+  .propB .nb-user .prefix { color: var(--cyan-400); margin-right: 6px; }
+  .propB .nb-ai-prose {
+    font-size: 0.92rem; color: var(--flux-text-primary);
+    line-height: 1.55; margin-bottom: 10px;
+  }
+  .propB .nb-actions {
+    display: grid; gap: 4px;
+    margin-bottom: 12px;
+  }
+  .propB .nb-action {
+    display: grid; grid-template-columns: 90px 1fr;
+    gap: 12px; padding: 4px 0;
+    font-size: 0.84rem;
+    align-items: baseline;
+  }
+  .propB .nb-action .verb {
+    color: var(--blue-400); font-weight: 600;
+    font-variant: small-caps; letter-spacing: .03em;
+    text-align: right;
+  }
+  .propB .nb-action .target { color: var(--flux-text-secondary); }
+  .propB .nb-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding-top: 4px;
+  }
+  .propB .nb-footer .footnote {
+    color: var(--flux-text-muted); font-size: 0.78rem;
+    margin-right: auto; align-self: center;
+  }
+  .propB .nb-options { display: flex; flex-direction: column; gap: 4px; }
+  .propB .nb-option {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 5px 8px; border-radius: 6px;
+    cursor: pointer;
+  }
+  .propB .nb-option:hover { background: var(--flux-hover); }
+  .propB .nb-option .num {
+    color: var(--cyan-400); font-family: ui-monospace, monospace;
+    font-size: 0.82rem;
+  }
+  .propB .nb-option .label { color: var(--flux-text-primary); font-size: 0.88rem; }
+  .propB .nb-option .meta { color: var(--flux-text-muted); font-size: 0.8rem; }
+
+  /* ──────────────────────────────────────────────────────── */
+  /*  Proposal C — REPL prose (pure language, no list)        */
+  /* ──────────────────────────────────────────────────────── */
+  .propC {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88rem; line-height: 1.65;
+    color: var(--flux-text-primary);
+    padding: 4px 6px;
+  }
+  .propC .repl-row { display: flex; gap: 10px; padding: 3px 0; }
+  .propC .repl-row .prompt-prefix {
+    flex: 0 0 16px; user-select: none;
+  }
+  .propC .repl-row.user .prompt-prefix { color: var(--cyan-400); }
+  .propC .repl-row.ai   .prompt-prefix { color: var(--blue-400); }
+  .propC .repl-row.user .repl-text { color: var(--flux-text-secondary); }
+  .propC .repl-row.ai   .repl-text {
+    color: var(--flux-text-primary);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.55;
+  }
+  .propC .repl-row.ai .repl-text .verb-action {
+    color: var(--blue-400);
+    border-bottom: 1px dotted rgba(96,165,250,.4);
+    cursor: pointer; padding-bottom: 1px;
+  }
+  .propC .repl-options {
+    display: flex; flex-direction: column; gap: 2px;
+    padding-left: 26px;
+  }
+  .propC .repl-option {
+    cursor: pointer; padding: 2px 6px; border-radius: 4px;
+    color: var(--flux-text-primary);
+  }
+  .propC .repl-option:hover { background: var(--flux-hover); }
+  .propC .repl-option .num { color: var(--cyan-400); }
+  .propC .repl-option .meta { color: var(--flux-text-muted); }
+  .propC .repl-status {
+    margin-top: 14px; padding-top: 10px;
+    border-top: 1px dashed var(--flux-border);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem; color: var(--flux-text-muted);
+    display: flex; gap: 16px; justify-content: space-between;
+  }
+  .propC .repl-status .right b {
+    color: var(--flux-text-secondary); font-weight: 500;
+  }
+  .propC .repl-status .kbd-mini {
+    font-family: ui-monospace, monospace;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border-light);
+    border-radius: 3px; padding: 1px 5px; color: var(--flux-text-secondary);
+  }
+  .propC .repl-row.ai.stale .repl-text { color: var(--flux-text-tertiary); }
+
+  /* ──────────────────────────────────────────────────────── */
+  /*  Proposal D — Split: dialogue + draft plan               */
+  /* ──────────────────────────────────────────────────────── */
+  .propD {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 14px;
+    min-height: 280px;
+  }
+  .propD[data-density="compact"] { gap: 10px; }
+  .propD .col-thread {
+    display: flex; flex-direction: column; gap: 10px;
+    padding-right: 12px;
+    border-right: 1px solid var(--flux-border);
+    overflow-y: auto;
+  }
+  .propD .d-turn-user {
+    font-size: 0.85rem;
+    color: var(--flux-text-tertiary);
+    background: var(--flux-elevated);
+    border-radius: 8px;
+    padding: 6px 10px;
+    align-self: flex-end;
+    max-width: 78%;
+  }
+  .propD .d-turn-ai {
+    font-size: 0.88rem;
+    color: var(--flux-text-secondary);
+    line-height: 1.5;
+    padding: 4px 0;
+  }
+  .propD .d-turn-ai .ai-mark { color: var(--blue-400); margin-right: 6px; }
+  .propD .d-turn-ai.stale { opacity: .55; }
+  .propD .d-options { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .propD .d-option {
+    cursor: pointer; padding: 4px 8px; border-radius: 6px;
+    font-size: 0.82rem; color: var(--flux-text-secondary);
+  }
+  .propD .d-option:hover { background: var(--flux-hover); }
+  .propD .d-option .num { color: var(--cyan-400); margin-right: 6px; font-family: ui-monospace, monospace; }
+  .propD .d-option .meta { color: var(--flux-text-muted); margin-left: 6px; font-size: 0.78rem; }
+
+  .propD .col-draft {
+    display: flex; flex-direction: column; gap: 10px;
+    background: linear-gradient(180deg, rgba(96,165,250,.04), transparent 60%);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 8px;
+    padding: 12px;
+    align-self: flex-start;
+    position: relative;
+  }
+  .propD .col-draft::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 12px; right: 12px;
+    height: 2px; background: linear-gradient(90deg, var(--blue-500), transparent);
+    border-radius: 2px;
+  }
+  .propD .draft-empty {
+    color: var(--flux-text-muted); font-size: 0.82rem;
+    text-align: center; padding: 28px 8px;
+  }
+  .propD .draft-title {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--flux-text-muted); font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .propD .draft-title .badge {
+    background: rgba(96,165,250,.15); color: var(--blue-400);
+    padding: 1px 7px; border-radius: 999px;
+    font-size: 0.68rem; letter-spacing: .04em;
+  }
+  .propD .draft-narration {
+    font-size: 0.84rem; color: var(--flux-text-primary);
+    line-height: 1.5;
+  }
+  .propD .draft-entities { display: flex; flex-wrap: wrap; gap: 4px; }
+  .propD .draft-entity {
+    font-size: 0.72rem;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border-light);
+    padding: 2px 8px; border-radius: 999px;
+    color: var(--flux-text-secondary);
+  }
+  .propD .draft-entity[data-kind="job"]     { border-color: rgba(96,165,250,.35); }
+  .propD .draft-entity[data-kind="station"] { border-color: rgba(167,139,250,.35); }
+  .propD .draft-entity[data-kind="op"]      { border-color: rgba(244,114,182,.35); }
+  .propD .draft-actions {
+    display: flex; flex-direction: column; gap: 6px;
+    border-top: 1px dashed var(--flux-border);
+    padding-top: 10px;
+  }
+  .propD .draft-action {
+    display: flex; gap: 8px; font-size: 0.8rem;
+    color: var(--flux-text-secondary);
+  }
+  .propD .draft-action.added   { animation: flashIn .9s ease; }
+  .propD .draft-action.removed { opacity: .35; text-decoration: line-through; }
+  .propD .draft-action .v {
+    color: var(--blue-400); font-weight: 600; flex: 0 0 70px;
+    font-variant: small-caps; letter-spacing: .03em;
+  }
+  @keyframes flashIn {
+    0%   { background: rgba(96,165,250,.18); }
+    100% { background: transparent; }
+  }
+  .propD .draft-apply { padding-top: 4px; }
+  .propD .draft-apply .apply-pill { width: 100%; justify-content: center; }
+
+  /* ── Captions (designer annotations) ─────────────────────── */
+  .caption {
+    background: rgba(251,191,36,.08);
+    color: var(--amber-400);
+    border: 1px dashed rgba(251,191,36,.3);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  .caption.standalone { margin: 6px 0; }
+  .captions-off .caption { display: none !important; }
+
+  /* ── Right panel: thèse + prompt output ──────────────────── */
+  .rightpane {
+    border-left: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    display: grid;
+    grid-template-rows: 1fr auto auto;
+    min-height: 0;
+  }
+  .thesis {
+    padding: 18px 16px;
+    overflow-y: auto;
+  }
+  .thesis-eyebrow {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--flux-text-muted); font-weight: 600; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .thesis-eyebrow .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--blue-500);
+  }
+  .thesis-title {
+    font-size: 1.05rem; font-weight: 600;
+    color: var(--flux-text-primary); margin-bottom: 8px;
+  }
+  .thesis-body {
+    font-size: 0.85rem; color: var(--flux-text-secondary);
+    line-height: 1.55; margin-bottom: 14px;
+  }
+  .thesis-axe {
+    margin-bottom: 12px;
+  }
+  .thesis-axe .ax-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--flux-text-muted); font-weight: 600; margin-bottom: 4px;
+  }
+  .thesis-axe .ax-value {
+    font-size: 0.85rem; color: var(--flux-text-primary);
+  }
+  .thesis-pros, .thesis-cons {
+    font-size: 0.82rem; line-height: 1.5; padding: 8px 10px;
+    border-radius: 6px; margin-bottom: 6px;
+  }
+  .thesis-pros {
+    background: rgba(52,211,153,.06); color: var(--flux-text-secondary);
+    border-left: 2px solid var(--emerald-400);
+  }
+  .thesis-pros b { color: var(--emerald-400); }
+  .thesis-cons {
+    background: rgba(248,113,113,.06); color: var(--flux-text-secondary);
+    border-left: 2px solid var(--red-400);
+  }
+  .thesis-cons b { color: var(--red-400); }
+
+  .notes-block {
+    border-top: 1px solid var(--flux-border);
+    padding: 14px 16px;
+  }
+  .notes-block label {
+    display: block; font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--flux-text-muted); margin-bottom: 8px;
+  }
+  .notes-block textarea {
+    width: 100%; min-height: 60px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--flux-text-primary); font: inherit; font-size: 0.85rem;
+    resize: vertical;
+    outline: none;
+  }
+  .notes-block textarea:focus {
+    border-color: var(--blue-500);
+  }
+
+  .prompt-block {
+    border-top: 1px solid var(--flux-border);
+    padding: 12px 16px 16px;
+    background: var(--flux-base);
+  }
+  .prompt-block-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .prompt-block-head label {
+    font-size: 0.72rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--flux-text-muted);
+  }
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 6px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-secondary);
+    font: inherit; font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .copy-btn.copied { background: rgba(52,211,153,.12); color: var(--emerald-400); border-color: rgba(52,211,153,.4); }
+  .prompt-output {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    color: var(--flux-text-secondary);
+    line-height: 1.5;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    max-height: 180px; overflow-y: auto;
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>
+      <span>Playground</span>
+      <span class="crumb">/ AI Dialog UX (Alt+K)</span>
+      <span class="pill">4 propositions</span>
+    </h1>
+    <div style="font-size:.78rem;color:var(--flux-text-muted)">
+      Designer mode · scénario unique rendu dans 4 styles
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ── LEFT: controls ──────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <span class="sidebar-label">Proposition</span>
+        <div class="prop-tabs" id="propTabs">
+          <button class="prop-tab active" data-prop="A">
+            <span class="letter">A</span>
+            <span>
+              <div class="label-main">Thread chat</div>
+              <div class="label-sub">Métaphore Slack/ChatGPT — bulles & prose</div>
+            </span>
+          </button>
+          <button class="prop-tab" data-prop="B">
+            <span class="letter">B</span>
+            <span>
+              <div class="label-main">Notebook turns</div>
+              <div class="label-sub">Cellules empilées scannables, document-feel</div>
+            </span>
+          </button>
+          <button class="prop-tab" data-prop="C">
+            <span class="letter">C</span>
+            <span>
+              <div class="label-main">REPL prose</div>
+              <div class="label-sub">Une carte qui grandit, prose pure, zéro liste</div>
+            </span>
+          </button>
+          <button class="prop-tab" data-prop="D">
+            <span class="letter">D</span>
+            <span>
+              <div class="label-main">Split: dialogue + brouillon</div>
+              <div class="label-sub">Thread à gauche, plan révisé à droite</div>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">État au démarrage</span>
+        <label class="opt-row"><input type="radio" name="startMode" value="intro" checked> Intro (palette de raccourcis)</label>
+        <label class="opt-row"><input type="radio" name="startMode" value="chat"> Chat (après morph)</label>
+        <div style="font-size:.75rem;color:var(--flux-text-muted);margin-top:6px;line-height:1.4">
+          En mode <i>Intro</i>, écris dans le champ et tape <code>↩</code> (ou clique <b>Envoyer</b>) pour jouer l'animation.
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Profondeur de conversation</span>
+        <label class="opt-row"><input type="radio" name="depth" value="1"> 1 tour (juste la question)</label>
+        <label class="opt-row"><input type="radio" name="depth" value="2"> 2 tours (question + plan)</label>
+        <label class="opt-row"><input type="radio" name="depth" value="3" checked> 3 tours (+ raffinement)</label>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Densité</span>
+        <label class="opt-row"><input type="radio" name="density" value="comfortable" checked> Confortable</label>
+        <label class="opt-row"><input type="radio" name="density" value="compact"> Compact</label>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">Annotations designer</span>
+        <label class="opt-row"><input type="checkbox" id="captionsToggle" checked> Afficher les notes UX dans la maquette</label>
+      </div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--flux-border); padding-top:14px">
+        <span class="sidebar-label">Scénario joué</span>
+        <div style="font-size:.8rem; color: var(--flux-text-tertiary); line-height:1.5">
+          <i>« déplace l'OF SLEEP-Q3 à mardi prochain »</i><br>
+          → ambiguïté (3 OF correspondent)<br>
+          → user choisit, IA propose un plan avec 4 actions<br>
+          → user raffine (« sans pinner »), IA révise.
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── CENTER: live preview ─────────────────────────── -->
+    <section class="preview">
+      <div class="preview-stage" id="stage">
+        <div class="page-bg"></div>
+
+        <div class="stage-controls">
+          <span class="stage-mode-pill" id="stageModePill" data-mode="intro">
+            <span class="dot"></span>
+            <span id="stageModeLabel">Mode commande</span>
+          </span>
+          <button class="stage-btn" id="resetBtn" title="Retour à la palette de raccourcis">
+            ⟲ Reset
+          </button>
+          <button class="stage-btn primary" id="morphBtn">
+            ▶ Envoyer · jouer le morph
+          </button>
+        </div>
+
+        <div class="palette" id="palette">
+          <div class="palette-input" id="paletteInput">
+            <span class="pi-icon">⌗</span>
+            <input id="paletteInputField" type="text" placeholder="Rechercher une commande, ou demander à l'IA…" value="">
+            <span class="kbd">⌥ K</span>
+          </div>
+          <div class="palette-shortcuts" id="paletteShortcuts"></div>
+          <div class="palette-body" id="paletteBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── RIGHT: thèse + prompt output ─────────────────── -->
+    <aside class="rightpane">
+      <div class="thesis" id="thesis"></div>
+      <div class="notes-block">
+        <label for="userNotes">Tes remarques (optionnel)</label>
+        <textarea id="userNotes" placeholder="Ce qui te plaît, ce qui cloche, ce que tu veux ajuster…"></textarea>
+      </div>
+      <div class="prompt-block">
+        <div class="prompt-block-head">
+          <label>Prompt à recopier</label>
+          <button class="copy-btn" id="copyBtn">📋 Copier</button>
+        </div>
+        <pre class="prompt-output" id="promptOutput"></pre>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const state = {
+  prop: 'A',
+  depth: 3,
+  density: 'comfortable',
+  captions: true,
+  notes: '',
+  mode: 'intro',          // 'intro' (command palette) | 'chat' (after morph)
+  startMode: 'intro',     // mode the playground boots into
+};
+const DEFAULTS = { ...state };
+
+// ── Mock shortcut zones for intro mode ─────────────────────
+const SHORTCUT_ZONES = [
+  { name: 'Atelier',    kbd: '⌥ A', desc: 'Stations & machines' },
+  { name: 'Équipe',     kbd: '⌥ E', desc: 'Opérateurs & plannings' },
+  { name: 'Plan',       kbd: '⌥ P', desc: 'Planning courant' },
+  { name: 'OFs',        kbd: '⌥ O', desc: 'Ordres de fabrication' },
+  { name: 'Logistique', kbd: '⌥ L', desc: 'Expéditions & transferts' },
+  { name: 'Console',    kbd: '⌥ C', desc: 'Logs & debug' },
+];
+
+// ── Scenario data (one shared mock conversation) ───────────
+const SCENARIO = {
+  // Turn 1: ambiguous user prompt → AI asks
+  t1: {
+    user: "déplace l'OF SLEEP-Q3 à mardi prochain",
+    ai: {
+      kind: 'question',
+      proseShort: "Plusieurs OF correspondent à <em>SLEEP-Q3</em>. Lequel ?",
+      proseLong:  "Trois OF correspondent à <em>SLEEP-Q3</em> et sont actifs cette semaine — lequel veux-tu déplacer ?",
+      options: [
+        { num: 1, label: "SLEEP-Q3-001",  product: "Matelas King",  meta: "deadline 12 mai" },
+        { num: 2, label: "SLEEP-Q3-007",  product: "Matelas Queen", meta: "deadline 15 mai" },
+        { num: 3, label: "SLEEP-Q3-012",  product: "Sommier Q3",    meta: "deadline 20 mai" },
+      ],
+    }
+  },
+
+  // Turn 2: user picks → AI proposes a 4-action plan with pin
+  t2: {
+    user: "le 1",
+    ai: {
+      kind: 'plan',
+      // Used by A, B and D (multi-line acceptable)
+      narration:
+        'OK, je décale <span class="entity" data-kind="job">SLEEP-Q3-001</span> ' +
+        '(Matelas King) à <span class="entity" data-kind="time">mardi 5 mai 9h00</span>. ' +
+        'Cela libère la station <span class="entity" data-kind="station">Découpe</span> lundi pour ' +
+        'les 2 OF urgents derrière, et reporte la livraison de 3 jours (deadline OK).',
+      // Used by C (pure prose, all actions baked in)
+      proseInline:
+        'Je <span class="verb-action">décale</span> ' +
+        '<span class="entity" data-kind="job">SLEEP-Q3-001</span> à ' +
+        '<span class="entity" data-kind="time">mardi 5 mai 9h00</span>, ' +
+        '<span class="verb-action">replace</span> ' +
+        '<span class="entity" data-kind="job">JOB-A</span> et ' +
+        '<span class="entity" data-kind="job">JOB-B</span> sur lundi pour libérer ' +
+        '<span class="entity" data-kind="station">Découpe</span>, ' +
+        'et <span class="verb-action">pinne</span> le créneau pour qu\'il ne bouge plus.',
+      entities: [
+        { kind: 'job',     label: 'SLEEP-Q3-001' },
+        { kind: 'station', label: 'Découpe' },
+        { kind: 'op',      label: 'Marc' },
+      ],
+      actions: [
+        { verb: 'Déplacer',  target: 'SLEEP-Q3-001 → mardi 5 mai 9h00' },
+        { verb: 'Replacer',  target: 'JOB-A → lundi 4 mai 14h00' },
+        { verb: 'Replacer',  target: 'JOB-B → lundi 4 mai 15h30' },
+        { verb: 'Pin',       target: 'SLEEP-Q3-001 sur mardi 5 mai',   diff: 'pin' },
+      ],
+    }
+  },
+
+  // Turn 3: refinement — user removes the pin, AI revises
+  t3: {
+    user: "ok mais sans pinner",
+    ai: {
+      kind: 'plan',
+      narration:
+        'Compris. Même plan, mais sans le pin : ' +
+        '<span class="entity" data-kind="job">SLEEP-Q3-001</span> reste libre de bouger ' +
+        'au prochain recalcul.',
+      proseInline:
+        'Compris. Je <span class="verb-action">décale</span> ' +
+        '<span class="entity" data-kind="job">SLEEP-Q3-001</span> à ' +
+        '<span class="entity" data-kind="time">mardi 5 mai 9h00</span> et je ' +
+        '<span class="verb-action">replace</span> ' +
+        '<span class="entity" data-kind="job">JOB-A</span> et ' +
+        '<span class="entity" data-kind="job">JOB-B</span> sur lundi. ' +
+        'Le créneau reste libre.',
+      entities: [
+        { kind: 'job', label: 'SLEEP-Q3-001' },
+      ],
+      actions: [
+        { verb: 'Déplacer',  target: 'SLEEP-Q3-001 → mardi 5 mai 9h00' },
+        { verb: 'Replacer',  target: 'JOB-A → lundi 4 mai 14h00' },
+        { verb: 'Replacer',  target: 'JOB-B → lundi 4 mai 15h30' },
+        // Pin is removed — used by D for the strikethrough animation
+      ],
+      removed: [
+        { verb: 'Pin', target: 'SLEEP-Q3-001 sur mardi 5 mai' },
+      ]
+    }
+  },
+};
+
+// ── Thesis content (right pane copy) ───────────────────────
+const THESIS = {
+  A: {
+    title: 'A — Thread chat',
+    body:
+      "Le dialogue <em>est</em> l'objet central : un fil vertical qui scrolle, " +
+      "où chaque tour user et IA est visible. " +
+      "Le format \"je vais faire X\" devient une <b>réponse en prose</b> que l'IA " +
+      "donne à voix haute ; les actions techniques se replient derrière un petit " +
+      "lien <code>⌥ 4 modifications →</code> qu'on déplie quand on veut le détail.",
+    axes: [
+      { label: '(A) Thread', value: 'Vertical scrollable, bulles user à droite, IA prose à gauche' },
+      { label: '(B) Format IA', value: 'Prose lead + actions repliées par défaut' },
+    ],
+    pros: 'Familier (Linear/Slack/ChatGPT). Le contexte d\'une longue conversation reste lisible. La mention "Plan à confirmer" disparaît : c\'est juste l\'IA qui dit ce qu\'elle va faire.',
+    cons: 'Coût vertical : un long thread peut pousser l\'input loin. Risque de "vibe trop conversationnelle" pour des opérateurs pressés.',
+  },
+  B: {
+    title: 'B — Notebook turns',
+    body:
+      "Métaphore Notion / Jupyter : chaque tour est une <b>cellule</b> empilée. " +
+      "Anciens tours collapsibles à 1 ligne, nouveau tour étendu. " +
+      "L'IA répond en prose, puis liste les actions en <b>verbe-d'abord</b>, " +
+      "tabulées comme un sommaire — pas comme un formulaire.",
+    axes: [
+      { label: '(A) Thread', value: 'Cellules document-style, anciens tours peek-able' },
+      { label: '(B) Format IA', value: 'Prose + table verbe/cible (pas de chevrons, pas de pills)' },
+    ],
+    pros: 'Très scannable, dense, calme. Le user peut revenir 2 tours en arrière sans fouiller. La typographie verbe-en-petites-capitales casse l\'effet "checklist".',
+    cons: 'Plus froid qu\'un chat. Moins évident pour les ambiguïtés (questions courtes paraissent vides dans une cellule).',
+  },
+  C: {
+    title: 'C — REPL prose',
+    body:
+      "Position radicale : la <b>langue est l'UI</b>. Une seule carte mono-spaced " +
+      "qui grandit. Préfixes <code>›</code> (user) et <code>↳</code> (IA). " +
+      "L'IA décrit son plan en <b>prose pure</b>, avec les verbes d'action soulignés et " +
+      "cliquables — <i>aucune liste, aucune pill, aucun bouton</i>. " +
+      "Confirmation au clavier (<code>↩</code>), édition au clavier (<code>⌫</code>).",
+    axes: [
+      { label: '(A) Thread', value: 'Carte unique cumulative, texte aligné comme un terminal' },
+      { label: '(B) Format IA', value: 'Prose seule. Verbes d\'action inline, pas de liste séparée' },
+    ],
+    pros: 'Honnête : si l\'IA ne sait pas le dire en français, elle ne devrait pas le faire. Pas de bruit visuel. Très "outil de pro". Aligne avec la mémoire <code>AI = no intellisense</code>.',
+    cons: 'Demande une IA qui synthétise vraiment bien. Pour 10 actions hétérogènes, la prose devient lourde — il faudra un fallback.',
+  },
+  D: {
+    title: 'D — Split: dialogue + brouillon',
+    body:
+      "Sépare ce qu\'on <b>discute</b> de ce qu\'on <b>fera</b>. À gauche, un thread " +
+      "compact (juste les tours). À droite, un <b>brouillon de plan</b> qui se " +
+      "révise tour après tour — actions ajoutées surlignées, retirées barrées. " +
+      "Un seul bouton Appliquer, attaché au brouillon.",
+    axes: [
+      { label: '(A) Thread', value: 'Chat compact à gauche, plan persistant à droite' },
+      { label: '(B) Format IA', value: 'Plan extrait du dialogue → panneau structuré indépendant' },
+    ],
+    pros: 'On voit en permanence l\'état réel du plan, indépendamment du verbiage. Idéal pour des conversations à 4-5 tours où le plan se construit progressivement. Le brouillon agit comme contrat visuel.',
+    cons: 'Demande de la largeur (palette doit s\'élargir). Risque de duplication (les actions sont dans le dialogue ET dans le brouillon).',
+  },
+};
+
+// ── Helpers ────────────────────────────────────────────────
+const $  = (s, root=document) => root.querySelector(s);
+const $$ = (s, root=document) => Array.from(root.querySelectorAll(s));
+const h  = (tag, attrs={}, children=[]) => {
+  const el = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) {
+    if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else el.setAttribute(k, v);
+  }
+  for (const c of [].concat(children)) {
+    if (c == null) continue;
+    el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  return el;
+};
+const cap = (text) => state.captions
+  ? `<div class="caption">${text}</div>`
+  : '';
+const capStandalone = (text) => state.captions
+  ? `<div class="caption standalone">${text}</div>`
+  : '';
+
+// ── Renderers per proposal ─────────────────────────────────
+function renderA(body, depth) {
+  body.className = 'palette-body propA';
+  body.dataset.density = state.density;
+  let html = '';
+
+  // T1
+  html += `<div class="turn-user">${SCENARIO.t1.user}</div>`;
+  html += `
+    <div class="turn-ai${depth > 1 ? ' turn-stale' : ''}">
+      <div class="ai-mark">✦</div>
+      <div class="ai-body">
+        <div class="ai-prose">${SCENARIO.t1.ai.proseShort}</div>
+        <div class="options-row">
+          ${SCENARIO.t1.ai.options.map(o => `
+            <button class="opt-pill"><span class="num">${o.num}</span> ${o.label} <span class="meta">${o.product}</span></button>
+          `).join('')}
+        </div>
+        ${depth === 1 ? cap("Plainte (B) : pour les questions, on garde le format <i>prose + options</i>. Clavier : 1/2/3 sélectionnent.") : ''}
+      </div>
+    </div>`;
+
+  if (depth >= 2) {
+    html += `<div class="turn-user">${SCENARIO.t2.user}</div>`;
+    html += `
+      <div class="turn-ai${depth > 2 ? ' turn-stale' : ''}">
+        <div class="ai-mark">✦</div>
+        <div class="ai-body">
+          <div class="ai-prose"><span class="lead">${SCENARIO.t2.ai.narration}</span></div>
+          <button class="actions-fold" data-fold="t2">
+            ⌥ <b>4 modifications</b> · clic pour détail
+          </button>
+          <div class="actions-expanded" id="aexp-t2" style="display:none">
+            <ol>
+              ${SCENARIO.t2.ai.actions.map(a => `<li><b>${a.verb}</b> — ${a.target}</li>`).join('')}
+            </ol>
+          </div>
+          ${depth === 2 ? `
+            <div class="turn-controls">
+              <button class="apply-pill">Appliquer <span class="kbd-inline">⏎</span></button>
+            </div>
+            ${cap("Plainte (B) : la narration <b>est</b> la réponse — pas de sous-titre 'Plan à confirmer'. Le détail technique se replie pour rester poli.")}
+          ` : ''}
+        </div>
+      </div>`;
+  }
+
+  if (depth >= 3) {
+    html += `<div class="turn-user">${SCENARIO.t3.user}</div>`;
+    html += `
+      <div class="turn-ai">
+        <div class="ai-mark">✦</div>
+        <div class="ai-body">
+          <div class="ai-prose"><span class="lead">${SCENARIO.t3.ai.narration}</span></div>
+          <button class="actions-fold" data-fold="t3">
+            ⌥ <b>3 modifications</b> · clic pour détail
+          </button>
+          <div class="actions-expanded" id="aexp-t3" style="display:none">
+            <ol>
+              ${SCENARIO.t3.ai.actions.map(a => `<li><b>${a.verb}</b> — ${a.target}</li>`).join('')}
+            </ol>
+          </div>
+          <div class="turn-controls">
+            <button class="apply-pill">Appliquer <span class="kbd-inline">⏎</span></button>
+          </div>
+          ${cap("Plainte (A) : on voit le tour 1, le tour 2 (gris) et le tour 3 (vif) — la <i>discussion</i> est là, et l'historique persiste si l'utilisateur veut remonter.")}
+        </div>
+      </div>`;
+  }
+
+  body.innerHTML = html;
+
+  // Bind fold toggles
+  $$('.actions-fold', body).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = $('#aexp-' + btn.dataset.fold, body);
+      target.style.display = target.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+}
+
+function renderB(body, depth) {
+  body.className = 'palette-body propB';
+  body.dataset.density = state.density;
+  let html = '';
+
+  const renderTurn = (t, isLast, label) => {
+    if (t.ai.kind === 'question') {
+      return `
+        <div class="nb-turn">
+          <div class="nb-user"><span class="prefix">›</span>${t.user}</div>
+          <div class="nb-ai-prose">${t.ai.proseLong}</div>
+          <div class="nb-options">
+            ${t.ai.options.map(o => `
+              <div class="nb-option">
+                <span class="num">${o.num}.</span>
+                <span class="label"><b>${o.label}</b> — ${o.product}</span>
+                <span class="meta">${o.meta}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    }
+    const verbColWidth = state.density === 'compact' ? '70px' : '90px';
+    return `
+      <div class="nb-turn">
+        <div class="nb-user"><span class="prefix">›</span>${t.user}</div>
+        <div class="nb-ai-prose">${t.ai.narration}</div>
+        <div class="nb-actions">
+          ${t.ai.actions.map(a => `
+            <div class="nb-action" style="grid-template-columns: ${verbColWidth} 1fr">
+              <span class="verb">${a.verb}</span>
+              <span class="target">${a.target}</span>
+            </div>`).join('')}
+        </div>
+        ${isLast ? `
+          <div class="nb-footer">
+            <span class="footnote">${t.ai.actions.length} modifications · prêtes à appliquer</span>
+            <button class="ghost-btn">Modifier</button>
+            <button class="apply-pill">Appliquer <span class="kbd-inline">⏎</span></button>
+          </div>
+          ${cap("Plainte (B) : la liste verbe-en-petites-capitales · cible casse complètement l'effet 'checklist à cocher'. Ça lit comme une note de service.")}
+        ` : ''}
+      </div>`;
+  };
+
+  // Collapsed older turns hint
+  if (depth >= 2) {
+    html += `<div class="nb-collapsed"><span class="chev">›</span> Tour 1 — ambiguïté résolue (clic pour déplier)</div>`;
+  } else {
+    html += renderTurn(SCENARIO.t1, true, 'Tour 1');
+  }
+
+  if (depth >= 2 && depth < 3) {
+    html += renderTurn(SCENARIO.t2, true, 'Tour 2');
+  } else if (depth >= 3) {
+    html += `<div class="nb-collapsed"><span class="chev">›</span> Tour 2 — 4 modifs avec pin</div>`;
+    html += renderTurn(SCENARIO.t3, true, 'Tour 3');
+  }
+
+  if (depth === 1) {
+    body.innerHTML = html + capStandalone("Plainte (A) en 1 tour : la cellule a déjà l'allure d'un fragment de doc. Quand un 2e tour arrive, il s'empile en dessous (ancien collapse en peek).");
+  } else {
+    body.innerHTML = html;
+  }
+}
+
+function renderC(body, depth) {
+  body.className = 'palette-body propC';
+  body.dataset.density = state.density;
+  let html = '';
+
+  // T1
+  html += `<div class="repl-row user"><span class="prompt-prefix">›</span><span class="repl-text">${SCENARIO.t1.user}</span></div>`;
+  html += `<div class="repl-row ai${depth > 1 ? ' stale' : ''}"><span class="prompt-prefix">↳</span><span class="repl-text">${SCENARIO.t1.ai.proseLong}</span></div>`;
+  html += `<div class="repl-options">
+    ${SCENARIO.t1.ai.options.map(o => `
+      <div class="repl-option"><span class="num">${o.num}.</span> <b>${o.label}</b> — ${o.product} <span class="meta">· ${o.meta}</span></div>
+    `).join('')}
+  </div>`;
+
+  if (depth >= 2) {
+    html += `<div class="repl-row user"><span class="prompt-prefix">›</span><span class="repl-text">${SCENARIO.t2.user}</span></div>`;
+    html += `<div class="repl-row ai${depth > 2 ? ' stale' : ''}"><span class="prompt-prefix">↳</span><span class="repl-text">${SCENARIO.t2.ai.proseInline}</span></div>`;
+  }
+  if (depth >= 3) {
+    html += `<div class="repl-row user"><span class="prompt-prefix">›</span><span class="repl-text">${SCENARIO.t3.user}</span></div>`;
+    html += `<div class="repl-row ai"><span class="prompt-prefix">↳</span><span class="repl-text">${SCENARIO.t3.ai.proseInline}</span></div>`;
+  }
+
+  // status footer (only if there's a current plan)
+  if (depth >= 2) {
+    html += `
+      <div class="repl-status">
+        <span class="left">Aucune liste, aucune pill — la prose <i>est</i> le plan.</span>
+        <span class="right">
+          <span class="kbd-mini">↩</span> appliquer · <span class="kbd-mini">⌫</span> reformuler
+        </span>
+      </div>`;
+  }
+
+  body.innerHTML = html;
+
+  if (state.captions) {
+    body.innerHTML += capStandalone(
+      "Plainte (B) : aucune bullet-list. Les <b>verbes d'action</b> sont soulignés (clic = éditer ce verbe seul). " +
+      "Plainte (A) : tout le fil reste visible — on voit \"j'ai dit ça, l'IA a dit ça, j'ai raffiné, l'IA a re-dit ça\"."
+    );
+  }
+}
+
+function renderD(body, depth) {
+  body.className = 'palette-body propD';
+  body.dataset.density = state.density;
+
+  // ── Left col: thread ──
+  let thread = '';
+
+  thread += `<div class="d-turn-user">${SCENARIO.t1.user}</div>`;
+  thread += `
+    <div class="d-turn-ai${depth > 1 ? ' stale' : ''}">
+      <span class="ai-mark">✦</span>${SCENARIO.t1.ai.proseShort}
+      <div class="d-options">
+        ${SCENARIO.t1.ai.options.map(o => `
+          <div class="d-option"><span class="num">${o.num}.</span><b>${o.label}</b> — ${o.product}<span class="meta">${o.meta}</span></div>
+        `).join('')}
+      </div>
+    </div>`;
+
+  if (depth >= 2) {
+    thread += `<div class="d-turn-user">${SCENARIO.t2.user}</div>`;
+    const proseShort = state.density === 'compact'
+      ? "OK, je décale <span class='entity' data-kind='job'>SLEEP-Q3-001</span> à mardi (voir brouillon →)."
+      : "OK — j'ai monté un plan, voir le brouillon à droite.";
+    thread += `<div class="d-turn-ai${depth > 2 ? ' stale' : ''}"><span class="ai-mark">✦</span>${proseShort}</div>`;
+  }
+  if (depth >= 3) {
+    thread += `<div class="d-turn-user">${SCENARIO.t3.user}</div>`;
+    thread += `<div class="d-turn-ai"><span class="ai-mark">✦</span>Compris — j'ai retiré le pin du brouillon.</div>`;
+  }
+
+  // ── Right col: draft ──
+  let draft = '';
+  const live = depth >= 2 ? (depth >= 3 ? SCENARIO.t3.ai : SCENARIO.t2.ai) : null;
+
+  if (!live) {
+    draft = `<div class="draft-empty">
+      Aucun plan en cours.<br><span style="font-size:.75rem">L'IA construit ici dès qu'un plan se dessine.</span>
+    </div>`;
+  } else {
+    const removed = depth >= 3 ? (SCENARIO.t3.ai.removed || []) : [];
+    draft = `
+      <div class="draft-title">
+        Plan en cours
+        <span class="badge">${live.actions.length} modif${live.actions.length>1?'s':''}</span>
+      </div>
+      <div class="draft-narration">${live.narration}</div>
+      <div class="draft-entities">
+        ${live.entities.map(e => `<span class="draft-entity" data-kind="${e.kind}">${e.label}</span>`).join('')}
+      </div>
+      <div class="draft-actions">
+        ${live.actions.map((a, i) => `
+          <div class="draft-action${depth >= 3 && i === 0 ? '' : ''}">
+            <span class="v">${a.verb}</span>
+            <span>${a.target}</span>
+          </div>`).join('')}
+        ${removed.map(a => `
+          <div class="draft-action removed">
+            <span class="v">${a.verb}</span>
+            <span>${a.target}</span>
+          </div>`).join('')}
+      </div>
+      <div class="draft-apply">
+        <button class="apply-pill">Appliquer <span class="kbd-inline">⏎</span></button>
+      </div>`;
+  }
+
+  body.innerHTML = `
+    <div class="col-thread">${thread}</div>
+    <div class="col-draft">${draft}</div>
+  `;
+
+  if (state.captions) {
+    body.innerHTML += `<div style="grid-column:1/-1">${capStandalone(
+      "Plainte (B) : le 'ce que je vais faire' n'est plus une réponse de l'IA — c'est un <b>document</b> persistant à droite. L'IA dit en prose ce qu'elle a changé ; le brouillon montre l'<i>état</i>."
+    )}${capStandalone(
+      "Plainte (A) : le thread reste visible à gauche, mais sans dupliquer les actions — l'IA répond en 1 ligne (\"je décale\", \"j'ai retiré le pin\")."
+    )}</div>`;
+  }
+}
+
+const RENDERERS = { A: renderA, B: renderB, C: renderC, D: renderD };
+
+// ── Intro mode renderer (shortcut zones, mock of real palette) ──
+function renderShortcuts(container) {
+  const inputVal = $('#paletteInputField').value.trim();
+  let html = '';
+
+  if (inputVal) {
+    // When input has text, show "Ask AI" prompt as the highlighted action
+    html += `
+      <div class="ai-prompt-row" id="askAiRow">
+        <span class="spark">✦</span>
+        <span class="lbl">Demander à l'IA :</span>
+        <span class="quote">« ${inputVal} »</span>
+        <span class="enter-hint">↩</span>
+      </div>`;
+  }
+
+  html += SHORTCUT_ZONES.map(z => `
+    <div class="shortcut-zone">
+      <div class="top"><span>${z.name}</span><span class="kbd">${z.kbd}</span></div>
+      <div class="desc">${z.desc}</div>
+    </div>
+  `).join('');
+
+  html += `
+    <div class="footer-hint">
+      <span><span class="kbd-mini">↑↓</span> naviguer</span>
+      <span><span class="kbd-mini">↩</span> ouvrir</span>
+      <span><span class="kbd-mini">Esc</span> fermer</span>
+    </div>`;
+
+  container.innerHTML = html;
+
+  if (inputVal) {
+    $('#askAiRow', container).addEventListener('click', () => morph('chat'));
+  }
+}
+
+// ── Morph animation (double-FLIP: input slides AND palette height grows) ──
+let morphInFlight = false;
+function morph(toMode) {
+  if (morphInFlight) return;
+  if (toMode === state.mode) return;
+  morphInFlight = true;
+
+  const palette  = $('#palette');
+  const input    = $('#paletteInput');
+  const body     = $('#paletteBody');
+  const shortcuts = $('#paletteShortcuts');
+
+  // FIRST: capture both input AND palette dimensions
+  const inputFirst   = input.getBoundingClientRect();
+  const paletteFirst = palette.getBoundingClientRect();
+
+  // Update state + re-render content for new mode
+  state.mode = toMode;
+  if (toMode === 'chat') {
+    palette.classList.add('chat-mode');
+    RENDERERS[state.prop](body, state.depth);
+  } else {
+    palette.classList.remove('chat-mode');
+    renderShortcuts(shortcuts);
+  }
+  updateModePill();
+
+  // LAST: capture new positions/dimensions after class swap & re-render
+  const inputLast   = input.getBoundingClientRect();
+  const paletteLast = palette.getBoundingClientRect();
+  const dy = inputFirst.top - inputLast.top;
+
+  // INVERT: pin input back to where it was, pin palette to its old height
+  palette.style.transition = 'none';
+  palette.style.height = paletteFirst.height + 'px';
+
+  input.style.transition = 'none';
+  input.style.transform = `translateY(${dy}px)`;
+
+  // Incoming content starts invisible
+  const incoming = toMode === 'chat' ? body : shortcuts;
+  incoming.style.opacity = '0';
+  incoming.style.transition = 'none';
+
+  // Force reflow so the inverted state is committed before animating
+  // eslint-disable-next-line no-unused-expressions
+  palette.offsetHeight;
+
+  // PLAY: both height + transform animate with same duration & easing → coordinated movement
+  requestAnimationFrame(() => {
+    const easing = 'cubic-bezier(.25,.8,.25,1)';
+    palette.style.transition = `height 0.42s ${easing}`;
+    palette.style.height = paletteLast.height + 'px';
+
+    input.style.transition = `transform 0.42s ${easing}`;
+    input.style.transform = 'translateY(0)';
+
+    incoming.style.transition = 'opacity 0.32s 0.18s ease';
+    incoming.style.opacity = '1';
+  });
+
+  // Cleanup — remove all inline styles so layout returns to natural sizing
+  setTimeout(() => {
+    palette.style.transition = '';
+    palette.style.height = '';
+    input.style.transition = '';
+    input.style.transform = '';
+    incoming.style.transition = '';
+    incoming.style.opacity = '';
+    morphInFlight = false;
+  }, 720);
+}
+
+function updateModePill() {
+  const pill = $('#stageModePill');
+  pill.dataset.mode = state.mode;
+  $('#stageModeLabel').textContent = state.mode === 'chat' ? 'Mode chat IA' : 'Mode commande';
+
+  // The input itself changes role: command-bar → chat-input
+  const icon = $('#paletteInput .pi-icon');
+  const kbd  = $('#paletteInput .kbd');
+  const inp  = $('#paletteInputField');
+  if (state.mode === 'chat') {
+    icon.textContent = '✦';
+    icon.style.color = 'var(--blue-400)';
+    kbd.textContent = '↩';
+    inp.placeholder = "Continuer la conversation avec l'IA…";
+  } else {
+    icon.textContent = '⌗';
+    icon.style.color = '';
+    kbd.textContent = '⌥ K';
+    inp.placeholder = "Rechercher une commande, ou demander à l'IA…";
+  }
+}
+
+// ── Thesis pane ────────────────────────────────────────────
+function renderThesis() {
+  const t = THESIS[state.prop];
+  $('#thesis').innerHTML = `
+    <div class="thesis-eyebrow">
+      <span class="dot"></span>
+      Mécanique commune · à toutes les propositions
+    </div>
+    <div class="thesis-title" style="font-size:.95rem">Morph palette → chat</div>
+    <div class="thesis-body">
+      Le palette part en <b>mode commande</b> (input en haut, grille de raccourcis en bas — fidèle à l'existant).
+      Dès que le user envoie un prompt à l'IA, la modale <b>morphe</b> en <b>mode chat</b> : les raccourcis s'effacent, l'input glisse en bas, le thread s'installe au-dessus.
+      <code>Esc</code> en mode chat ramène à l'intro (et ferme le tout au 2e Esc — à valider).
+    </div>
+    <div style="border-top:1px solid var(--flux-border); margin: 14px 0 14px"></div>
+    <div class="thesis-eyebrow">
+      <span class="dot"></span>
+      Proposition · designer note
+    </div>
+    <div class="thesis-title">${t.title}</div>
+    <div class="thesis-body">${t.body}</div>
+    ${t.axes.map(a => `
+      <div class="thesis-axe">
+        <div class="ax-label">${a.label}</div>
+        <div class="ax-value">${a.value}</div>
+      </div>`).join('')}
+    <div class="thesis-pros"><b>+</b> ${t.pros}</div>
+    <div class="thesis-cons"><b>−</b> ${t.cons}</div>
+  `;
+}
+
+// ── Prompt output ──────────────────────────────────────────
+function buildPrompt() {
+  const t = THESIS[state.prop];
+  const lines = [];
+  lines.push(`Choix retenu pour le dialogue IA dans la palette Alt+K : ${t.title}.`);
+  lines.push('');
+  lines.push('### Mécanique commune (shell)');
+  lines.push("La palette a deux modes :");
+  lines.push("  · INTRO  — input en haut, grille de raccourcis en bas (état actuel).");
+  lines.push("  · CHAT   — input en bas, thread de conversation au-dessus.");
+  lines.push("Le passage INTRO → CHAT s'opère par une animation de morph (~400 ms) :");
+  lines.push("  · les zones de raccourcis disparaissent (fade out),");
+  lines.push("  · l'input glisse du haut vers le bas (transform translateY animé via FLIP),");
+  lines.push("  · le thread fade-in au-dessus.");
+  lines.push("Esc en mode chat ramène à intro (et 2e Esc ferme le palette).");
+  lines.push('');
+  lines.push(`### Style du thread (proposition retenue : ${t.title})`);
+  lines.push(`Idée directrice : ${t.body.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()}`);
+  lines.push('');
+  lines.push('Réponses aux deux plaintes :');
+  for (const a of t.axes) lines.push(`  ${a.label} ${a.value}`);
+  lines.push('');
+  lines.push('### Paramètres');
+  lines.push('  · Densité : ' + (state.density === 'compact' ? 'compact' : 'confortable'));
+  lines.push('  · Profondeur testée : ' + state.depth + ' tour(s) (ambiguïté + raffinement inclus)');
+  if (state.notes && state.notes.trim()) {
+    lines.push('');
+    lines.push('### Remarques de Julien à intégrer');
+    state.notes.trim().split('\n').forEach(l => lines.push('  · ' + l));
+  }
+  lines.push('');
+  lines.push('### À implémenter');
+  lines.push('  · apps/web/src/components/CommandPalette/CommandPalette.tsx :');
+  lines.push('    - introduire un mode "chat" (état séparé, animé en CSS+FLIP)');
+  lines.push('    - remplacer l\'AIView mono-vue par un fil persistant pendant la session');
+  lines.push('    - refondre PlanCardInline (lignes 614-698) selon le format ci-dessus');
+  lines.push('    - conserver l\'envoi conversation[] au backend pour le contexte');
+  return lines.join('\n');
+}
+
+function updatePrompt() {
+  $('#promptOutput').textContent = buildPrompt();
+}
+
+// ── Main update ────────────────────────────────────────────
+function updateAll() {
+  document.body.classList.toggle('captions-off', !state.captions);
+
+  const palette = $('#palette');
+  if (state.mode === 'chat') {
+    palette.classList.add('chat-mode');
+    RENDERERS[state.prop]($('#paletteBody'), state.depth);
+  } else {
+    palette.classList.remove('chat-mode');
+    renderShortcuts($('#paletteShortcuts'));
+  }
+  updateModePill();
+
+  renderThesis();
+  updatePrompt();
+
+  // Update active tab
+  $$('.prop-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.prop === state.prop);
+  });
+}
+
+// ── Bindings ───────────────────────────────────────────────
+$$('.prop-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.prop = btn.dataset.prop;
+    updateAll();
+  });
+});
+$$('input[name=depth]').forEach(r => {
+  r.addEventListener('change', e => {
+    state.depth = +e.target.value;
+    updateAll();
+  });
+});
+$$('input[name=density]').forEach(r => {
+  r.addEventListener('change', e => {
+    state.density = e.target.value;
+    updateAll();
+  });
+});
+$('#captionsToggle').addEventListener('change', e => {
+  state.captions = e.target.checked;
+  updateAll();
+});
+$('#userNotes').addEventListener('input', e => {
+  state.notes = e.target.value;
+  updatePrompt();
+});
+
+// ── Mode toggle (sidebar): snap without animation ───────────
+$$('input[name=startMode]').forEach(r => {
+  r.addEventListener('change', e => {
+    state.startMode = e.target.value;
+    state.mode = e.target.value;
+    if (state.mode === 'intro') {
+      $('#paletteInputField').value = '';
+    }
+    updateAll();
+  });
+});
+
+// ── Palette input (intro mode): live update + Enter triggers morph ──
+$('#paletteInputField').addEventListener('input', () => {
+  if (state.mode === 'intro') {
+    renderShortcuts($('#paletteShortcuts'));
+  }
+});
+$('#paletteInputField').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && state.mode === 'intro') {
+    e.preventDefault();
+    if (!$('#paletteInputField').value.trim()) {
+      $('#paletteInputField').value = SCENARIO.t1.user;
+      renderShortcuts($('#paletteShortcuts'));
+    }
+    morph('chat');
+    // Convention chat : "Enter = envoyer = vider l'input"
+    $('#paletteInputField').value = '';
+  } else if (e.key === 'Escape') {
+    if (state.mode === 'chat') {
+      morph('intro');
+      $('#paletteInputField').value = '';
+    }
+  }
+});
+
+// ── Morph button: explicit "play the animation" ─────────────
+$('#morphBtn').addEventListener('click', () => {
+  if (state.mode === 'chat') {
+    // Already in chat — bounce back to intro first, then play forward
+    state.mode = 'intro';
+    $('#palette').classList.remove('chat-mode');
+    $('#paletteInputField').value = '';
+    renderShortcuts($('#paletteShortcuts'));
+    updateModePill();
+    setTimeout(() => {
+      $('#paletteInputField').value = SCENARIO.t1.user;
+      renderShortcuts($('#paletteShortcuts'));
+      setTimeout(() => {
+        morph('chat');
+        $('#paletteInputField').value = '';
+      }, 320);
+    }, 80);
+  } else {
+    if (!$('#paletteInputField').value.trim()) {
+      $('#paletteInputField').value = SCENARIO.t1.user;
+      renderShortcuts($('#paletteShortcuts'));
+    }
+    setTimeout(() => {
+      morph('chat');
+      $('#paletteInputField').value = '';
+    }, 80);
+  }
+});
+
+// ── Reset button: back to intro, clear input ───────────────
+$('#resetBtn').addEventListener('click', () => {
+  $('#paletteInputField').value = '';
+  if (state.mode === 'chat') {
+    morph('intro');
+  } else {
+    renderShortcuts($('#paletteShortcuts'));
+  }
+});
+
+$('#copyBtn').addEventListener('click', async () => {
+  const btn = $('#copyBtn');
+  try {
+    await navigator.clipboard.writeText($('#promptOutput').textContent);
+    btn.classList.add('copied');
+    btn.textContent = '✓ Copié';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.textContent = '📋 Copier';
+    }, 1400);
+  } catch (e) {
+    btn.textContent = '✗ Erreur clipboard';
+  }
+});
+
+// Keyboard: number keys to switch proposals (when not in textarea)
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  const map = { 'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D' };
+  const k = e.key.toLowerCase();
+  if (map[k]) {
+    state.prop = map[k];
+    updateAll();
+    e.preventDefault();
+  }
+});
+
+// ── Boot ──────────────────────────────────────────────────
+updateAll();
+</script>
+</body>
+</html>
