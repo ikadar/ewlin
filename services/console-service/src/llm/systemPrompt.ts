@@ -13,7 +13,7 @@
  * passed via the function-calling parameters channel.
  */
 import type { ToolDefinition } from '../tools/types.js';
-import { zodToJsonSchema } from '../tools/jsonSchema.js';
+import { zodToJsonSchema, compactJsonSchema } from '../tools/jsonSchema.js';
 
 export function buildSystemPrompt(todayIso: string, tools: readonly ToolDefinition[]): string {
   const toolList = tools
@@ -26,11 +26,13 @@ export function buildSystemPrompt(todayIso: string, tools: readonly ToolDefiniti
       const base = `- ${t.name}${flag} : ${t.description}`;
       // Action tools aren't in the function-calling catalog during /execute,
       // so the model can't introspect their schema natively. Inline a
-      // compact JSON Schema so it knows exactly which args to put inside
-      // propose_plan(actions:[{tool, args, preview}]).
+      // compact TS-like signature so it knows exactly which args to put
+      // inside propose_plan(actions:[{tool, args, preview}]). Compact form
+      // costs ~7× fewer tokens than full JSON Schema for the same info,
+      // shrinking the cacheable prefix and the cold-start bill.
       if (!t.readOnly && !t.internal) {
-        const schema = JSON.stringify(zodToJsonSchema(t.inputSchema));
-        return `${base}\n  Args schema: ${schema}`;
+        const sig = compactJsonSchema(zodToJsonSchema(t.inputSchema));
+        return `${base}\n  Args: ${sig}`;
       }
       return base;
     })
