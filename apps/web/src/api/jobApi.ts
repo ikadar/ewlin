@@ -39,7 +39,14 @@ export interface CreateJobRequest {
   client: string;
   referent?: string;
   description: string;
-  workshopExitDate: string;
+  /**
+   * Absolute workshop exit date (ISO datetime). Optional when
+   * deadlineRelativeWorkingDays is provided — the backend enforces "at
+   * least one of the two" via cross-field validation.
+   */
+  workshopExitDate?: string;
+  /** Working-days delay (J+X) used to auto-fill workshopExitDate at last BAT OK. */
+  deadlineRelativeWorkingDays?: number;
   batDeadline?: string | null;
   deadlinePriority?: number;
   quantity?: number;
@@ -58,7 +65,8 @@ export interface CreateJobResponse {
   reference: string;
   client: string;
   description: string;
-  workshopExitDate: string;
+  workshopExitDate: string | null;
+  deadlineRelativeWorkingDays?: number | null;
   status: string;
   elements: Array<{
     id: string;
@@ -208,6 +216,7 @@ export function transformJcfToRequest(
   batDeadline?: string,
   referent?: string,
   deadlinePriority?: number,
+  deadlineRelativeWorkingDays?: number | null,
 ): CreateJobRequest {
   // Parse required jobs: "JOB-001, JOB-002" → ["JOB-001", "JOB-002"]
   const requiredJobReferences = requiredJobs
@@ -218,9 +227,12 @@ export function transformJcfToRequest(
     reference: jobId,
     client,
     description: intitule,
-    workshopExitDate: deadline,
     status: 'planned',
     elements: elements.map(transformJcfElementToRequest),
+    ...(deadline ? { workshopExitDate: deadline } : {}),
+    ...(deadlineRelativeWorkingDays != null
+      ? { deadlineRelativeWorkingDays }
+      : {}),
     ...(quantity ? { quantity: parseInt(quantity, 10) } : {}),
     ...(shipperId ? { shipperId } : {}),
     ...(requiredJobReferences && requiredJobReferences.length > 0 ? { requiredJobReferences } : {}),
