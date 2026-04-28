@@ -107,9 +107,15 @@ pub fn run_with_fbi(
 
     let mut best_assignments: Vec<ComputedAssignment> = Vec::new();
     let mut best_actions: Vec<Action> = Vec::new();
+    // Sentinel "always lose" baseline so the FIRST real iteration always
+    // wins. `total_tasks: u32::MAX, scheduled_tasks: 0` makes the unplaced
+    // primary key max-out — without this, the first iteration's
+    // (real_unplaced ≥ 0) is never strictly less than the sentinel's
+    // (0 − 0 = 0), so any partial schedule is silently dropped and the
+    // function returns empty `best_assignments`.
     let mut best_stats = ScheduleStats {
         makespan_minutes: u64::MAX,
-        total_tasks: 0,
+        total_tasks: u32::MAX,
         scheduled_tasks: 0,
         deadline_violations: u32::MAX,
         late_task_count: u32::MAX,
