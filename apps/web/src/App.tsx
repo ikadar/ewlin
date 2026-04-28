@@ -495,7 +495,7 @@ function AppContent() {
       setIsJcfSaving(false);
       dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
       // Auto-recompute: keep the planning fresh after the save.
-      autoRecompute.trigger(isEditMode ? `edit job ${editingJobId}` : 'create job');
+      autoRecompute.trigger(isEditMode ? `edit job ${jcfJobId}` : `create job ${jcfJobId}`);
       // Navigate back: preserve current surface so App.tsx (and its
       // useAutoRecompute debounced trigger above) stays mounted long
       // enough to fire the background compute. Falling back to '/' here
@@ -1504,7 +1504,9 @@ function AppContent() {
         try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
       }
     }
-  }, [snapshot.tasks, snapshot.assignments, togglePin, invalidateSnapshot, updateOutsourcingDates]);
+
+    autoRecompute.trigger(`edit outsourcing departure ${taskId}`);
+  }, [snapshot.tasks, snapshot.assignments, togglePin, invalidateSnapshot, updateOutsourcingDates, autoRecompute]);
 
   // v0.5.11: Handle outsourcing return change (local state only)
   const handleOutsourcingReturnChange = useCallback(async (taskId: string, returnDate: Date | undefined) => {
@@ -1559,7 +1561,9 @@ function AppContent() {
         try { await togglePin(taskId).unwrap(); } catch { /* ignore */ }
       }
     }
-  }, [snapshot.tasks, snapshot.assignments, togglePin, invalidateSnapshot, updateOutsourcingDates]);
+
+    autoRecompute.trigger(`edit outsourcing return ${taskId}`);
+  }, [snapshot.tasks, snapshot.assignments, togglePin, invalidateSnapshot, updateOutsourcingDates, autoRecompute]);
 
   // REQ-14: Handle date click - scroll grid to the clicked date
   const handleDateClick = useCallback((date: Date) => {
