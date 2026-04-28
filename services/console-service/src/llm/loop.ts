@@ -193,16 +193,20 @@ function extractAssistantText(content: AnthropicContentBlock[]): string {
 
 export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteResult> {
   const todayIso = todayIsoUtc();
-  // In /execute (dryRun=true), hide mutating action tools entirely — the
-  // model only sees resolve/list/check (readOnly) + propose_plan/ask_user
-  // (internal). This forces it to construct args from resolutions and call
-  // propose_plan directly, instead of "test-driving" an action tool first.
-  // That single change saves ~1 turn (~2-3s) per request.
-  const visibleTools = args.dryRun
+  // The system prompt always lists ALL tools so the model knows they exist
+  // and how to reference them (e.g. "cancel_constraint"). But the function-
+  // calling catalog (the tools the model can actually invoke) is filtered
+  // in /execute: only readOnly (resolve/list/check) and internal
+  // (propose_plan/ask_user). Mutating tools must be expressed via
+  // propose_plan(actions:[...]) — they are NOT directly callable.
+  // This separation prevents the "test-drive an action then call
+  // propose_plan" wasteful pattern while still letting the model name
+  // any tool in its proposed plan.
+  const callableTools = args.dryRun
     ? allTools.filter((t) => t.readOnly || t.internal)
     : allTools;
-  const systemPrompt = buildSystemPrompt(todayIso, visibleTools);
-  const toolCatalog = buildToolCatalog(visibleTools);
+  const systemPrompt = buildSystemPrompt(todayIso, allTools);
+  const toolCatalog = buildToolCatalog(callableTools);
 
   const built = buildLlmClient(args.config);
   if ('error' in built) {

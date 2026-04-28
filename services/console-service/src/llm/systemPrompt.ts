@@ -13,12 +13,26 @@
  * passed via the function-calling parameters channel.
  */
 import type { ToolDefinition } from '../tools/types.js';
+import { zodToJsonSchema } from '../tools/jsonSchema.js';
 
 export function buildSystemPrompt(todayIso: string, tools: readonly ToolDefinition[]): string {
   const toolList = tools
     .map((t) => {
-      const flag = t.internal ? ' (interne)' : t.readOnly ? ' (lecture seule)' : '';
-      return `- ${t.name}${flag} : ${t.description}`;
+      const flag = t.internal
+        ? ' (interne)'
+        : t.readOnly
+          ? ' (lecture seule)'
+          : ' (action — via propose_plan uniquement)';
+      const base = `- ${t.name}${flag} : ${t.description}`;
+      // Action tools aren't in the function-calling catalog during /execute,
+      // so the model can't introspect their schema natively. Inline a
+      // compact JSON Schema so it knows exactly which args to put inside
+      // propose_plan(actions:[{tool, args, preview}]).
+      if (!t.readOnly && !t.internal) {
+        const schema = JSON.stringify(zodToJsonSchema(t.inputSchema));
+        return `${base}\n  Args schema: ${schema}`;
+      }
+      return base;
     })
     .join('\n');
 
@@ -54,7 +68,7 @@ RÈGLES STRICTES
 6. Quand l'utilisateur dit "absent du 13 au 15 inclus", comprends que les trois jours sont concernés (fromDate=13, toDate=15).
 7. Pour le format setup+run d'une durée ("30+150"), parse setup=30 et run=150.
 8. Toutes tes réponses (narrations, questions, previews) sont en français.
-9. Tu ne dois JAMAIS appeler les tools d'action avec un dryRun explicite — c'est le serveur qui décide. Tu construis simplement le plan et tu le proposes.
+9. Tu ne dois JAMAIS appeler directement les tools marqués "(action — via propose_plan uniquement)". L'API ne te les expose pas. Tu DOIS les nommer comme valeur de "tool" dans propose_plan(actions: [{tool: "<nom>", args: {...}, preview: "..."}]). Ces tools sont nombreux (cancel_constraint, add_operator_absence, add_operator_overtime, add_station_maintenance, update_job_deadline, pin_task_at_time, etc.) — ils ne sont PAS dans la liste des fonctions appelables, mais leur signature (args attendus) est documentée dans la section TES OUTILS ci-dessus.
 10. Si l'intention de l'utilisateur est ambigüe ou hors périmètre (ex : il parle de météo), réponds via propose_plan avec un tableau d'actions vide et une narration qui explique poliment que tu ne peux pas traiter ça.
 11. AVANT toute action "pin_task_at_time", tu DOIS appeler "check_station_operator_availability" sur la station et le créneau visés. Si elle retourne available=false, le moteur de planification produira une tuile SANS opérateur (par design, il refuse d'affecter un opérateur indisponible). Tu dois alors :
     - inclure un avertissement explicite dans la narration du propose_plan (ex : "⚠ Aucun opérateur n'est planifié sur la Ryobi le jeudi 14h — la tuile sera placée sans opérateur. Tu peux ajouter une heure sup ou changer le créneau.") ;
