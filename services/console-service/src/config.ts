@@ -99,7 +99,12 @@ export function loadConfig(): Config {
     openaiCompatNitro: envBoolOr('OPENAI_COMPAT_NITRO', false),
     llmModel: envOr('LLM_MODEL', 'claude-haiku-4-5-20251001'),
     llmTemperature: envFloatOr('LLM_TEMPERATURE', 0),
-    llmMaxTurns: envIntOr('LLM_MAX_TURNS', 8),
+    // 12 not 8: smaller openai-compat models (gpt-oss-20b, llama-3) burn
+    // a few "(none)" empty turns even after the IMPÉRATIVEMENT prompt
+    // nudge, plus the propose_plan args-validation gate adds 1-2 corrective
+    // round-trips before terminating. 8 turns hit MAX_TURNS_REACHED on
+    // benign cancel/move requests with those models. Override via env.
+    llmMaxTurns: envIntOr('LLM_MAX_TURNS', 12),
     llmTotalTimeoutMs: envIntOr('LLM_TOTAL_TIMEOUT_MS', 60000),
     llmMaxTokensPerTurn: envIntOr('LLM_MAX_TOKENS_PER_TURN', defaultMaxTokens),
     logLevel: (envOr('LOG_LEVEL', 'info') as Config['logLevel']),

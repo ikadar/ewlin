@@ -326,32 +326,59 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
           // and surfaces as a baffling Zod error at /apply time. Catching
           // it here means the model gets the issue as a tool_result and
           // can self-correct on the next turn.
-          const planErrors: string[] = [];
+          interface PlanError {
+            tool: string;
+            issues: Array<{ path: string; message: string }>;
+            sentArgs: Record<string, unknown>;
+            expectedSchema: Record<string, unknown>;
+          }
+          const planErrors: PlanError[] = [];
+          const unknownTools: string[] = [];
           for (const action of planData.actions) {
             const actionDef = findTool(action.tool);
             if (!actionDef) {
-              planErrors.push(`tool '${action.tool}' inconnu`);
+              unknownTools.push(action.tool);
               continue;
             }
             const argsCheck = actionDef.inputSchema.safeParse(action.args);
             if (!argsCheck.success) {
-              const issues = argsCheck.error.issues
-                .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
-                .join('; ');
-              planErrors.push(`${action.tool} → args invalides (${issues})`);
+              planErrors.push({
+                tool: action.tool,
+                issues: argsCheck.error.issues.map((i) => ({
+                  path: i.path.join('.') || '<root>',
+                  message: i.message,
+                })),
+                sentArgs: action.args,
+                expectedSchema: zodToJsonSchema(actionDef.inputSchema) as Record<string, unknown>,
+              });
             }
           }
 
-          if (planErrors.length > 0) {
-            const errMsg =
-              `Plan refusé : ${planErrors.join(' | ')}. ` +
-              "Corrige les args (camelCase, voir la signature des tools dans les schemas) puis rappelle propose_plan.";
-            // Replace the optimistic ok tool_result with the corrective error
-            // so the model sees the failure rather than a green light.
+          if (planErrors.length > 0 || unknownTools.length > 0) {
+            // Rich, structured error so even smaller models can see exactly
+            // what they sent and what was expected. Emphasises that the
+            // recovery path is to call propose_plan again — NOT the action
+            // tool — because some models otherwise re-invoke the action
+            // tool in dry-run instead of repackaging the plan.
+            const payload = {
+              ok: false,
+              error: 'PROPOSE_PLAN_REJECTED',
+              message:
+                'Le plan que tu viens d’émettre a des actions invalides. ' +
+                'NE rappelle PAS le tool d’action ; rappelle propose_plan ' +
+                'avec les args corrigés selon "expected_schema" ci-dessous.',
+              unknown_tools: unknownTools,
+              invalid_actions: planErrors.map((p) => ({
+                tool: p.tool,
+                issues: p.issues,
+                sent_args: p.sentArgs,
+                expected_schema: p.expectedSchema,
+              })),
+            };
             toolResultBlocks[toolResultBlocks.length - 1] = {
               type: 'tool_result',
               tool_use_id: tu.id,
-              content: JSON.stringify({ ok: false, error: errMsg }),
+              content: JSON.stringify(payload),
               is_error: true,
             };
             continue; // don't terminate — let the loop iterate
