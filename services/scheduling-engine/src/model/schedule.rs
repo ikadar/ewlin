@@ -56,7 +56,13 @@ pub struct ComputeOptions {
     pub tick_minutes: u32,
     #[serde(default = "default_fbi_max_iterations")]
     pub fbi_max_iterations: u32,
-    #[serde(default)]
+    /// Run TierFirst, EDD and SlackFirst orderings in parallel and pick
+    /// the best score. Default is `true` — production callers don't ship
+    /// the field and got the bool field-default (`false`) silently for a
+    /// long time, masking the EDD/SlackFirst paths entirely. Tests and
+    /// the precedence validator opt out explicitly to keep their result
+    /// deterministic.
+    #[serde(default = "default_multi_start")]
     pub multi_start: bool,
     /// Number of additional perturbed multi-start passes to run.
     /// Each pass uses randomly perturbed scoring weights (seeded for determinism).
@@ -112,6 +118,10 @@ fn default_tick_minutes() -> u32 {
 
 fn default_fbi_max_iterations() -> u32 {
     3
+}
+
+fn default_multi_start() -> bool {
+    true
 }
 
 fn default_perturbed_starts() -> u32 {
