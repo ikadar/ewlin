@@ -1676,6 +1676,67 @@ fn assign_action_at_tick(
         }
     }
 
+    // Continuation chunk-mini guard. The scoring loop's chunk-mini check
+    // (~50 lines above the call to this fn) gates *starts*: an action
+    // can't begin in a window that won't amortise its setup. The same
+    // policy must apply to *resumes* — otherwise an in-progress action
+    // can pick up 1-tick fragments in micro-gaps between consecutive
+    // pinned tasks on a capacity-1 station, producing physically
+    // impossible interleavings (5 min of work between two unrelated
+    // pinned tasks holding the press). Concrete case: Komori G40 with
+    // three back-to-back safety-zone pins, an in-progress non-pinned
+    // task slipped 5-min stints into the 1-tick precedence-gap holes
+    // between them and emitted a wall-clock span overlapping all three
+    // pins.
+    //
+    // The guard skips the policy when:
+    //   * the action is brand new (was_new path; the scoring-loop check
+    //     already handled it)
+    //   * the action's chunk-mini policy would reduce to 0 ticks
+    //     (defensive: never block on a degenerate floor)
+    //   * the action's chain is preempting a lower-priority occupant
+    //     elsewhere (handled by `available_work_window` itself via the
+    //     scoring_priority + scoring_slack arguments)
+    //
+    // Stall (not SkipTo) so the outer loop progresses tick-by-tick;
+    // skipping ahead would over-shoot legitimate sub-window resumes.
+    let is_continuation = actions[action_idx].start_tick.is_some()
+        && actions[action_idx].end_tick.is_none()
+        && actions[action_idx].art > 0;
+    if is_continuation {
+        let action = &actions[action_idx];
+        let setup_floor =
+            (attrs.chunk_mini_setup_multiplier * action.setup_ticks as f64).ceil() as u32;
+        let task_floor =
+            (attrs.chunk_mini_task_percentage * action.task_total_ticks as f64).ceil() as u32;
+        let chunk_mini_ticks = setup_floor
+            .max(task_floor)
+            .min(attrs.max_chunk_ticks.max(1));
+        let needed = action.art.min(chunk_mini_ticks) as usize;
+        if needed > 1 {
+            let scoring_slack = action.last as i64 - t as i64 - action.art as i64;
+            let window = available_work_window(
+                grid,
+                operator_skills,
+                operator_availability,
+                actions,
+                action.deadline_priority,
+                scoring_slack,
+                station_idx,
+                t,
+                needed,
+            );
+            if window < needed {
+                // Pretend the operator pool is empty for this tick: the
+                // existing Stalled path increments `idle_ticks`, runs
+                // peremption bookkeeping (so a long wait correctly fires
+                // re-calage), and leaves the station unmarked here so
+                // it stays available for whoever can use it.
+                return AssignOutcome::Stalled;
+            }
+        }
+    }
+
     let setup_ticks = actions[action_idx].setup_ticks;
     let in_setup = actions[action_idx].eat < setup_ticks;
 
