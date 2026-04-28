@@ -12,10 +12,10 @@
  * a reasonable token budget. Detailed schemas live in the tool definitions
  * passed via the function-calling parameters channel.
  */
-import { allTools } from '../tools/registry.js';
+import type { ToolDefinition } from '../tools/types.js';
 
-export function buildSystemPrompt(todayIso: string): string {
-  const toolList = allTools
+export function buildSystemPrompt(todayIso: string, tools: readonly ToolDefinition[]): string {
+  const toolList = tools
     .map((t) => {
       const flag = t.internal ? ' (interne)' : t.readOnly ? ' (lecture seule)' : '';
       return `- ${t.name}${flag} : ${t.description}`;

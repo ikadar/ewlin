@@ -100,6 +100,12 @@ export class AnthropicClient {
   ): Promise<AnthropicMessagesResponse> {
     const url = `${this.baseUrl}/v1/messages`;
 
+    // Mark prompt-caching breakpoints on the two stable, identical-across-
+    // turns pieces: the system prompt and the tool catalog. Anthropic
+    // discounts cached input tokens by ~90% and lowers TTFT on cache hits.
+    // Up to 4 breakpoints supported; we use 2.
+    const wireRequest = applyCacheControl(request);
+
     let res: Response;
     try {
       res = await fetch(url, {
@@ -110,7 +116,7 @@ export class AnthropicClient {
           'x-api-key': this.apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(wireRequest),
         signal,
       });
     } catch (err) {
@@ -125,4 +131,35 @@ export class AnthropicClient {
     }
     return (await res.json()) as AnthropicMessagesResponse;
   }
+}
+
+/**
+ * Expand the request to use Anthropic's prompt-caching wire format on the
+ * stable prefix (system prompt + tools). Caller passes a string `system`
+ * and a flat tools array; we rewrite them to:
+ *   - system: [{ type: 'text', text, cache_control: ephemeral }]
+ *   - tools : [...rest, { ...lastTool, cache_control: ephemeral }]
+ * Both breakpoints sit at the boundary of "things that don't change between
+ * turns" (system + tools) and "things that change every turn" (messages).
+ *
+ * Returns an opaque shape because the cache-aware fields aren't in the
+ * AnthropicMessagesRequest type — they're a wire-only concern.
+ */
+function applyCacheControl(req: AnthropicMessagesRequest): unknown {
+  const ephemeral = { type: 'ephemeral' } as const;
+  const out: Record<string, unknown> = { ...req };
+
+  if (typeof req.system === 'string' && req.system.length > 0) {
+    out.system = [{ type: 'text', text: req.system, cache_control: ephemeral }];
+  }
+
+  if (req.tools && req.tools.length > 0) {
+    out.tools = req.tools.map((t, i) =>
+      i === req.tools!.length - 1
+        ? { ...t, cache_control: ephemeral }
+        : t,
+    );
+  }
+
+  return out;
 }

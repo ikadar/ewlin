@@ -127,8 +127,8 @@ export interface RunExecuteLoopArgs {
   php?: PhpClient;
 }
 
-function buildToolCatalog(): AnthropicToolDefinition[] {
-  return allTools.map((t) => ({
+function buildToolCatalog(tools: readonly typeof allTools[number][]): AnthropicToolDefinition[] {
+  return tools.map((t) => ({
     name: t.name,
     description: t.description,
     input_schema: zodToJsonSchema(t.inputSchema) as Record<string, unknown>,
@@ -193,8 +193,16 @@ function extractAssistantText(content: AnthropicContentBlock[]): string {
 
 export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteResult> {
   const todayIso = todayIsoUtc();
-  const systemPrompt = buildSystemPrompt(todayIso);
-  const toolCatalog = buildToolCatalog();
+  // In /execute (dryRun=true), hide mutating action tools entirely — the
+  // model only sees resolve/list/check (readOnly) + propose_plan/ask_user
+  // (internal). This forces it to construct args from resolutions and call
+  // propose_plan directly, instead of "test-driving" an action tool first.
+  // That single change saves ~1 turn (~2-3s) per request.
+  const visibleTools = args.dryRun
+    ? allTools.filter((t) => t.readOnly || t.internal)
+    : allTools;
+  const systemPrompt = buildSystemPrompt(todayIso, visibleTools);
+  const toolCatalog = buildToolCatalog(visibleTools);
 
   const built = buildLlmClient(args.config);
   if ('error' in built) {
