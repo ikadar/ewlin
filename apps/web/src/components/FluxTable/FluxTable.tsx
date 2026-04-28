@@ -452,9 +452,28 @@ const FluxTableRow = memo(function FluxTableRow({
         {job.referent ?? ''}
       </td>
 
-      {/* Sortie */}
+      {/* Sortie — date absolue, "J+X" relatif, ou date + (J+X) quand auto-calculé */}
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
-        {job.sortie}
+        {job.sortie === null && job.deadlineRelativeWorkingDays !== null ? (
+          <span
+            className="font-mono italic text-flux-text-muted"
+            title="Date de départ non encore calculée — sera figée au passage à BAT OK"
+          >
+            J+{job.deadlineRelativeWorkingDays}
+          </span>
+        ) : job.sortie !== null && job.deadlineRelativeWorkingDays !== null ? (
+          <span
+            className="inline-flex items-baseline gap-1"
+            title={`Date calculée à partir de la deadline relative initiale J+${job.deadlineRelativeWorkingDays}`}
+          >
+            <span>{job.sortie}</span>
+            <span className="font-mono text-flux-text-muted text-[11px]">
+              (J+{job.deadlineRelativeWorkingDays})
+            </span>
+          </span>
+        ) : (
+          job.sortie ?? ''
+        )}
       </td>
 
       {/* Prerequisite badge/listbox cells */}

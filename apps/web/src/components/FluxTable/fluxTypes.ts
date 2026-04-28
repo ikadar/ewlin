@@ -173,8 +173,15 @@ export interface FluxJob {
   client: string;
   referent: string | null;
   designation: string;
-  /** Workshop exit date in JJ/MM format, e.g. "28/02". */
-  sortie: string;
+  /**
+   * Workshop exit date in JJ/MM format, e.g. "28/02".
+   * Null when the job uses a deadline-relative model and the last BAT OK
+   * has not yet triggered the auto-fill.
+   */
+  sortie: string | null;
+  /** Working-days delay (J+X) — set when the job has a relative deadline,
+   * preserved even after auto-fill so the original value remains visible. */
+  deadlineRelativeWorkingDays: number | null;
   /** BAT deadline in JJ/MM format, e.g. "15/04". null if not set. */
   batDeadline: string | null;
   /** One element for single-element jobs; two or more for multi-element. */

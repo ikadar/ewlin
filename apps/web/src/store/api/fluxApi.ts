@@ -64,8 +64,12 @@ interface FluxJobApiResponse {
   designation: string;
   client: string;
   referent: string | null;
-  /** Workshop exit date in JJ/MM format */
-  sortie: string;
+  /** Workshop exit date in JJ/MM format. Null when the job uses a
+   * deadline-relative model and BAT OK has not auto-filled yet. */
+  sortie: string | null;
+  /** Working-days delay (J+X). Preserved through auto-fill so the
+   * original relative value remains visible after workshopExitDate is set. */
+  deadlineRelativeWorkingDays: number | null;
   elements: FluxElementApiResponse[];
   /** Station progress data — empty until K3.1 is implemented */
   stationData: Record<string, unknown>;
@@ -103,7 +107,8 @@ function transformFluxJobsResponse(
       designation: job.designation,
       client: job.client,
       referent: job.referent ?? null,
-      sortie: job.sortie,
+      sortie: job.sortie ?? null,
+      deadlineRelativeWorkingDays: job.deadlineRelativeWorkingDays ?? null,
       elements: job.elements.map((el) => ({
         id: el.id,
         label: el.label,

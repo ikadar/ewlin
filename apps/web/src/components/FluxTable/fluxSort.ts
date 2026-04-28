@@ -26,9 +26,13 @@ export type SortDirection = 'asc' | 'desc';
 
 /**
  * Converts a "DD/MM" sortie date to "MMDD" for lexicographically correct month ordering.
- * Example: "28/02" → "0228", "05/03" → "0305"
+ * Example: "28/02" → "0228", "05/03" → "0305".
+ * Returns "" for null sorties so jobs without absolute deadlines sink consistently.
  */
-function sortieKey(sortie: string): string {
+function sortieKey(sortie: string | null): string {
+  if (sortie === null) {
+    return '';
+  }
   const [day, month] = sortie.split('/');
   return `${month ?? ''}${day ?? ''}`;
 }
