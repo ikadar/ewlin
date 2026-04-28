@@ -1749,6 +1749,22 @@ fn assign_action_at_tick(
                 // Stall: leave the action in-progress without consuming
                 // this tick. Don't mark the station here — the next
                 // pinned task arriving must be free to claim it.
+                //
+                // Peremption is a physical property (ink dries, register
+                // shifts) — calage decays regardless of WHY the resume is
+                // blocked. Accumulate idle ticks here too, so a multi-day
+                // gap between stints triggers the re-calage rule like any
+                // other stall. Without this, the early return silently
+                // bypassed the post-setup peremption check, and the engine
+                // emitted multi-day spans with zero recalages.
+                let setup_ticks = actions[action_idx].setup_ticks;
+                actions[action_idx].idle_ticks += 1;
+                apply_peremption_rule(
+                    &mut actions[action_idx],
+                    setup_ticks,
+                    attrs.peremption_ticks,
+                    t as u32,
+                );
                 return AssignOutcome::Stalled;
             }
         }
@@ -3120,6 +3136,115 @@ mod peremption_tests {
         assert!(triggered);
         assert_eq!(a.eat, 0, "re-setup needed after weekend");
         assert_eq!(a.art, 6 + 1, "run progress preserved, setup_ticks re-added");
+    }
+
+    /// Regression: the chunk-mini guard's early `Stalled` return inside
+    /// `assign_action_at_tick` was bypassing `idle_ticks` accumulation,
+    /// so multi-day gaps between two stints of the same continuation
+    /// never crossed the peremption threshold. Concrete case: Ryobi 528
+    /// task on job 4562 (Michelin) — stint 1 on Thu evening, stint 2 on
+    /// Mon morning, total productive time exactly setup+run = 120 min,
+    /// `recalages: []`. With the fix, the chunk-mini stall increments
+    /// `idle_ticks` and runs `apply_peremption_rule` at every tick where
+    /// the resume window is too short, so post-setup peremption fires.
+    #[test]
+    fn chunk_mini_stall_accumulates_idle_for_peremption() {
+        use chrono::NaiveDate;
+        // Ryobi-528-shaped: setup=1 tick (15 min), run=7 ticks (105 min),
+        // peremption_ticks=8 (120 min).
+        let setup_ticks = 1u32;
+        let run_ticks = 7u32;
+        let peremption_ticks = 8u32;
+
+        // Mid-stint state: stint 1 produced 3 ticks of work (1 setup + 2
+        // run), so eat=3 sits in the post-setup regime. art=5 remaining.
+        let mut action = make_action(setup_ticks, run_ticks, 3, 5, 0);
+        action.start_tick = Some(0);
+        action.original_art = setup_ticks + run_ticks;
+        action.task_total_ticks = setup_ticks + run_ticks;
+        action.chain_remaining_art = action.art;
+
+        let attrs = StationAttrs {
+            attention_full: 1.0,
+            attention_run: 1.0,
+            max_run_attention: 1.0,
+            masked_time_enabled: false,
+            peremption_ticks,
+            max_operators: 1,
+            max_chunk_ticks: 24,
+            chunk_mini_setup_multiplier: 2.0,
+            chunk_mini_task_percentage: 0.5,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        };
+
+        // Operator 0 unavailable across the entire test horizon — every
+        // chunk-mini `any_op` window check returns false, every tick
+        // funnels into the early `Stalled` return path.
+        let num_ticks = 50;
+        let mut availability = OperatorAvailability::new(
+            1,
+            num_ticks,
+            15,
+            NaiveDate::from_ymd_opt(2026, 5, 7).unwrap(),
+            vec![OperatorScheduleData {
+                schedules: None,
+                reference_week: None,
+                absences: Vec::new(),
+                overtimes: Vec::new(),
+            }],
+        );
+        for t in 0..num_ticks {
+            while availability.data.get(0).map_or(0, |v| v.len()) <= t {
+                let _ = availability.data.get_mut(0).map(|v| v.push(false));
+            }
+            if let Some(v) = availability.data.get_mut(0) {
+                v[t] = false;
+            }
+        }
+
+        let mut grid = ScheduleGrid::new(1, 1, num_ticks, 15);
+        let mut actions = vec![action];
+        let skills = vec![vec![(0usize, 1.0f64)]];
+        let groups = vec![vec![]];
+        let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
+
+        for t in 0..(peremption_ticks as usize) {
+            let outcome = assign_action_at_tick(
+                &mut grid,
+                &mut actions,
+                0,
+                t,
+                std::slice::from_ref(&attrs),
+                &skills,
+                &mut availability,
+                &groups,
+                &station_to_group,
+                15,
+                96,
+            );
+            assert!(
+                matches!(outcome, AssignOutcome::Stalled),
+                "tick {t} expected Stalled via chunk-mini guard"
+            );
+        }
+
+        assert!(
+            actions[0].peremption_count >= 1,
+            "peremption must fire after {} chunk-mini stalls; got count={} idle_ticks={}",
+            peremption_ticks,
+            actions[0].peremption_count,
+            actions[0].idle_ticks,
+        );
+        assert_eq!(
+            actions[0].art,
+            5 + setup_ticks,
+            "post-setup peremption re-adds setup_ticks to art"
+        );
+        assert!(
+            actions[0].pending_recalage,
+            "post-setup peremption flags pending_recalage for the next productive tick"
+        );
     }
 }
 
