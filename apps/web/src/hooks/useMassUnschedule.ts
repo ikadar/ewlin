@@ -33,9 +33,9 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
     if (!snapshotData) return 0;
     const now = new Date();
     const nowStr = now.toISOString();
-    const hours = snapshotData.safetyZoneHours ?? 0;
+    const frozenUntil = snapshotData.safetyZoneFrozenUntil ?? null;
     const overrides = buildOverrideLookup(snapshotData);
-    const seqByTask = hours > 0 ? buildSequenceIndexLookup(snapshotData) : null;
+    const seqByTask = frozenUntil ? buildSequenceIndexLookup(snapshotData) : null;
     const jobByTask = new Map<string, string>();
     if (seqByTask) {
       for (const job of snapshotData.jobs) {
@@ -49,7 +49,7 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
       if (!includeInProgress && a.scheduledStart <= nowStr && (!a.scheduledEnd || a.scheduledEnd > nowStr)) return false;
       // Safety-zone filter: skipped entirely when `includeFrozen` is on
       // (the user opted in to lift active-flocon tiles).
-      if (!includeFrozen && seqByTask && isInSafetyZone(a.scheduledStart, hours, now)) {
+      if (!includeFrozen && seqByTask && isInSafetyZone(a.scheduledStart, frozenUntil, now)) {
         const jobId = jobByTask.get(a.taskId);
         const seqIdx = seqByTask.get(a.taskId);
         const task = tasksById.get(a.taskId);

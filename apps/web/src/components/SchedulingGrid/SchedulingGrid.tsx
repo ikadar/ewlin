@@ -97,8 +97,11 @@ export interface SchedulingGridProps {
   operators?: Operator[];
   /** Collapse bands to render across all columns. Computed by parent from operator schedules. */
   collapses?: readonly Collapse[];
-  /** Safety zone duration in hours. 0 disables the feature (no band, no flocon). */
+  /** Safety zone duration in working hours (display label only). 0 disables the feature. */
   safetyZoneHours?: number;
+  /** Server-computed boundary: ISO timestamp at which `safetyZoneHours`
+   * of working time has elapsed. Drives band position and flocon check. */
+  safetyZoneFrozenUntil?: string | null;
   /** Active safety overrides from the current snapshot. */
   safetyOverrides?: ReadonlyArray<{
     jobId: string;
@@ -146,6 +149,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       operators,
       collapses,
       safetyZoneHours = 0,
+      safetyZoneFrozenUntil = null,
       safetyOverrides,
       sequenceIndexByTaskId,
       onToggleFrozenOverride,
@@ -282,9 +286,19 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return m;
   }, [safetyOverrides]);
 
-  // Safety zone band: height computed collapse-agnostically (zone is a
-  // calendar-hours concept, not a working-hours one — user's V1 decision).
-  const safetyZonePx = safetyZoneHours > 0 ? safetyZoneHours * pixelsPerHour : 0;
+  // Safety zone band: end Y is mapped from the server-computed
+  // `safetyZoneFrozenUntil` instant via `timeToYPosition`, so the band
+  // visually stops exactly where the freeze logic does. Working-hours
+  // accumulation already happened server-side; here we only translate
+  // the boundary instant into collapse-aware pixels.
+  const safetyZonePx = useMemo(() => {
+    if (!safetyZoneFrozenUntil) return 0;
+    const boundaryDate = new Date(safetyZoneFrozenUntil);
+    const boundaryY = timeToYPosition(
+      boundaryDate, startHour, pixelsPerHour, startDate, effectiveCollapses,
+    );
+    return Math.max(0, boundaryY - nowPosition);
+  }, [safetyZoneFrozenUntil, startHour, pixelsPerHour, startDate, effectiveCollapses, nowPosition]);
 
   // Create lookup maps for jobs and tasks
   const jobMap = useMemo(() => {
@@ -828,8 +842,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                     if (!cached) return null;
                     const interrupt = taskInterruption.get(assignment.id);
                     const sequenceIndex = sequenceIndexByTaskId?.get(cached.task.id);
-                    const inZone = safetyZoneHours > 0
-                      && isInSafetyZone(assignment.scheduledStart, safetyZoneHours, now);
+                    const inZone = isInSafetyZone(
+                      assignment.scheduledStart, safetyZoneFrozenUntil, now,
+                    );
                     const isOverridden = inZone && sequenceIndex !== undefined
                       && overrideLookup.get(
                         makeSafetyKey(cached.job.id, sequenceIndex, cached.task.stationId),

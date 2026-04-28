@@ -2,8 +2,10 @@
  * Safety Zone derivation helpers.
  *
  * Conceptually: a rolling zone from now() in which assignments are
- * frozen by the scheduling engine. The frontend derives per-tile state
- * from the snapshot (safetyZoneHours + safetyOverrides) and `now()`.
+ * frozen by the scheduling engine. The boundary is computed server-side
+ * in *working hours* and shipped on the snapshot as
+ * `safetyZoneFrozenUntil` (ISO timestamp). The frontend derives per-tile
+ * state from this boundary + safetyOverrides + `now()`.
  *
  * See playground-safety-zone.html and the v0.6.x safety-zone release doc.
  */
@@ -70,18 +72,20 @@ export function buildSequenceIndexLookup(snapshot: ScheduleSnapshot): Map<string
 
 /**
  * Is the assignment inside the safety zone at the given "now"?
- * Returns false when the feature is disabled (hours === 0) or when the
- * start is in the past.
+ *
+ * Boundary is the server-computed `safetyZoneFrozenUntil` (working-hours
+ * accumulator from snapshot generation). Returns false when the feature
+ * is disabled (boundary nullish) or when the start is in the past.
  */
 export function isInSafetyZone(
   scheduledStartIso: string,
-  safetyZoneHours: number,
+  frozenUntilIso: string | null | undefined,
   now: Date = new Date(),
 ): boolean {
-  if (!safetyZoneHours || safetyZoneHours <= 0) return false;
+  if (!frozenUntilIso) return false;
   const start = new Date(scheduledStartIso).getTime();
   const nowMs = now.getTime();
-  const boundaryMs = nowMs + safetyZoneHours * 3_600_000;
+  const boundaryMs = new Date(frozenUntilIso).getTime();
   return start >= nowMs && start < boundaryMs;
 }
 
@@ -93,11 +97,11 @@ export function deriveSafetyState(
   job: Job,
   sequenceIndex: number,
   stationId: string,
-  safetyZoneHours: number,
+  frozenUntilIso: string | null | undefined,
   overrideLookup: Map<string, boolean>,
   now: Date = new Date(),
 ): { inSafetyZone: boolean; isFrozenOverridden: boolean } {
-  const inZone = isInSafetyZone(assignment.scheduledStart, safetyZoneHours, now);
+  const inZone = isInSafetyZone(assignment.scheduledStart, frozenUntilIso, now);
   if (!inZone) return { inSafetyZone: false, isFrozenOverridden: false };
   const overridden = overrideLookup.get(makeSafetyKey(job.id, sequenceIndex, stationId)) === true;
   return { inSafetyZone: true, isFrozenOverridden: overridden };

@@ -2010,6 +2010,7 @@ function AppContent() {
           operators={snapshot.operators}
           collapses={effectiveCollapses}
           safetyZoneHours={snapshot.safetyZoneHours ?? 0}
+          safetyZoneFrozenUntil={snapshot.safetyZoneFrozenUntil}
           safetyOverrides={snapshot.safetyOverrides}
           sequenceIndexByTaskId={sequenceIndexByTaskId}
           onToggleFrozenOverride={handleToggleFrozenOverride}

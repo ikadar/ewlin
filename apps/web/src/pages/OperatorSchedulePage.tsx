@@ -1090,9 +1090,9 @@ export default function OperatorSchedulePage() {
       : undefined;
 
     // Safety zone per-tile state.
-    const zoneHours = snapshot.safetyZoneHours ?? 0;
-    const inZone = zoneHours > 0 && assignment
-      ? isInSafetyZone(assignment.scheduledStart, zoneHours, new Date())
+    const frozenUntil = snapshot.safetyZoneFrozenUntil ?? null;
+    const inZone = frozenUntil && assignment
+      ? isInSafetyZone(assignment.scheduledStart, frozenUntil, new Date())
       : false;
     const seqIdx = task ? sequenceIndexByTaskId.get(task.id) : undefined;
     const stationIdForTile = task && isInternalTask(task) ? task.stationId : undefined;
@@ -1243,11 +1243,22 @@ export default function OperatorSchedulePage() {
                   onMouseMove={handleOperatorsMouseMove}
                   onMouseLeave={handleOperatorsMouseLeave}
                 >
-                  {/* Safety zone band (Sky tint-horizontal) */}
-                  {(snapshot.safetyZoneHours ?? 0) > 0 && (
+                  {/* Safety zone band (Sky tint-horizontal). Bottom Y is
+                      mapped from the server boundary so the band aligns
+                      with where the engine actually freezes. */}
+                  {snapshot.safetyZoneFrozenUntil && (
                     <SafetyBand
                       nowPx={nowPosition}
-                      zoneHeightPx={(snapshot.safetyZoneHours ?? 0) * pixelsPerHour}
+                      zoneHeightPx={Math.max(
+                        0,
+                        timeToYPosition(
+                          new Date(snapshot.safetyZoneFrozenUntil),
+                          START_HOUR,
+                          pixelsPerHour,
+                          gridStartDate,
+                          effectiveCollapses,
+                        ) - nowPosition,
+                      )}
                       boundaryLabel={`+${snapshot.safetyZoneHours ?? 0} h`}
                     />
                   )}
