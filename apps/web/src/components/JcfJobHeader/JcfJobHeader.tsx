@@ -12,6 +12,18 @@ import { useCreateClientMutation } from '../../store';
 import { useCreateReferentMutation } from '../../store';
 import { useDebouncedValue } from '../../hooks';
 
+function RequiredDot({ show }: { show: boolean }) {
+  return (
+    <span
+      className={`absolute top-0.5 right-1 w-[6px] h-[6px] rounded-full bg-amber-500 z-20 transition-opacity duration-300 ${
+        show ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+      title="Champ requis"
+      aria-hidden="true"
+    />
+  );
+}
+
 export interface JcfJobHeaderProps {
   jobId: string;
   /** Called when job ID/reference is changed (v0.5.6) */
@@ -277,12 +289,11 @@ export function JcfJobHeader({
   };
 
   const deadlineDisplay = deadline.includes('-') ? formatToFrench(deadline) : deadline;
-  // Native datetime-local expects YYYY-MM-DDTHH:mm
+  // Native datetime-local expects YYYY-MM-DDTHH:mm. Empty string keeps the input empty.
   const parsedDeadline = deadline.includes('-') ? deadline : parseFrenchDate(deadline);
-  // Ensure date-only values get a time for datetime-local
-  const deadlineNativeValue = parsedDeadline && !parsedDeadline.includes('T')
-    ? `${parsedDeadline}T14:00`
-    : parsedDeadline || `${new Date().toISOString().slice(0, 10)}T14:00`;
+  const deadlineNativeValue = parsedDeadline
+    ? (parsedDeadline.includes('T') ? parsedDeadline : `${parsedDeadline}T14:00`)
+    : '';
 
   // --- BAT Deadline ---
   const handleBatDeadlineBlur = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -299,9 +310,9 @@ export function JcfJobHeader({
   const batDeadlineVal = batDeadline ?? '';
   const batDeadlineDisplay = batDeadlineVal.includes('-') ? formatToFrench(batDeadlineVal) : batDeadlineVal;
   const parsedBatDeadline = batDeadlineVal.includes('-') ? batDeadlineVal : parseFrenchDate(batDeadlineVal);
-  const batDeadlineNativeValue = parsedBatDeadline && !parsedBatDeadline.includes('T')
-    ? `${parsedBatDeadline}T14:00`
-    : parsedBatDeadline || `${new Date().toISOString().slice(0, 10)}T14:00`;
+  const batDeadlineNativeValue = parsedBatDeadline
+    ? (parsedBatDeadline.includes('T') ? parsedBatDeadline : `${parsedBatDeadline}T14:00`)
+    : '';
 
   return (
     <div
@@ -315,22 +326,25 @@ export function JcfJobHeader({
           <label htmlFor="jcf-job-id" className={labelClass}>
             ID
           </label>
-          <input
-            id="jcf-job-id"
-            type="text"
-            value={jobId}
-            onChange={onJobIdChange ? (e) => onJobIdChange(e.target.value) : undefined}
-            onBlur={handleJobIdBlur}
-            readOnly={!onJobIdChange}
-            className={`w-full border border-zinc-700 rounded-[3px] px-[7px] py-[5px] font-mono ${
-              onJobIdChange
-                ? 'bg-zinc-900 text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                : 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
-            }`}
-            tabIndex={onJobIdChange ? 0 : -1}
-            autoComplete="off"
-            data-testid="jcf-field-id"
-          />
+          <div className="relative">
+            <input
+              id="jcf-job-id"
+              type="text"
+              value={jobId}
+              onChange={onJobIdChange ? (e) => onJobIdChange(e.target.value) : undefined}
+              onBlur={handleJobIdBlur}
+              readOnly={!onJobIdChange}
+              className={`w-full border border-zinc-700 rounded-[3px] px-[7px] py-[5px] font-mono ${
+                onJobIdChange
+                  ? 'bg-zinc-900 text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500'
+                  : 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
+              }`}
+              tabIndex={onJobIdChange ? 0 : -1}
+              autoComplete="off"
+              data-testid="jcf-field-id"
+            />
+            <RequiredDot show={!jobId.trim()} />
+          </div>
         </div>
 
         {/* Client — autocomplete */}
@@ -338,15 +352,18 @@ export function JcfJobHeader({
           <label htmlFor="jcf-client" className={labelClass}>
             Client
           </label>
-          <JcfAutocomplete
-            id="jcf-client"
-            value={client}
-            onChange={onClientChange}
-            suggestions={clientSuggestions}
-            inputClassName={inputBaseClass}
-            onSelect={handleClientSelect}
-            onBlur={handleClientBlur}
-          />
+          <div className="relative">
+            <JcfAutocomplete
+              id="jcf-client"
+              value={client}
+              onChange={onClientChange}
+              suggestions={clientSuggestions}
+              inputClassName={inputBaseClass}
+              onSelect={handleClientSelect}
+              onBlur={handleClientBlur}
+            />
+            <RequiredDot show={!client.trim()} />
+          </div>
         </div>
 
         {/* Referent — autocomplete */}
@@ -386,15 +403,18 @@ export function JcfJobHeader({
           <label htmlFor="jcf-intitule" className={labelClass}>
             Intitulé
           </label>
-          <input
-            id="jcf-intitule"
-            type="text"
-            value={intitule}
-            onChange={(e) => onIntituleChange(e.target.value)}
-            className={inputBaseClass}
-            autoComplete="off"
-            data-testid="jcf-field-intitule"
-          />
+          <div className="relative">
+            <input
+              id="jcf-intitule"
+              type="text"
+              value={intitule}
+              onChange={(e) => onIntituleChange(e.target.value)}
+              className={inputBaseClass}
+              autoComplete="off"
+              data-testid="jcf-field-intitule"
+            />
+            <RequiredDot show={!intitule.trim()} />
+          </div>
         </div>
 
         {/* Quantité */}
@@ -402,15 +422,18 @@ export function JcfJobHeader({
           <label htmlFor="jcf-quantite" className={labelClass}>
             Quantité
           </label>
-          <input
-            id="jcf-quantite"
-            type="text"
-            value={quantity}
-            onChange={(e) => onQuantityChange(e.target.value)}
-            className={`${inputBaseClass} text-right font-mono`}
-            autoComplete="off"
-            data-testid="jcf-field-quantite"
-          />
+          <div className="relative">
+            <input
+              id="jcf-quantite"
+              type="text"
+              value={quantity}
+              onChange={(e) => onQuantityChange(e.target.value)}
+              className={`${inputBaseClass} text-right font-mono`}
+              autoComplete="off"
+              data-testid="jcf-field-quantite"
+            />
+            <RequiredDot show={!quantity.trim()} />
+          </div>
         </div>
 
         {/* Required Jobs (prerequisites) */}
