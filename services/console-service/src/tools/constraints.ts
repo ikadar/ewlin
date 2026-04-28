@@ -40,16 +40,18 @@ interface StationResponse {
 
 // Stable composite ids so list_active_constraints / cancel_constraint
 // can round-trip between listing and deletion without a real DB id.
+// Separator must not appear in UUIDs or ISO datetimes — `|` satisfies both,
+// where `:` would not (datetimes embed it).
 function operatorAbsenceKey(operatorId: string, absence: AbsenceLike): string {
-  return `op:${operatorId}:${absence.startAt}:${absence.endAt}`;
+  return `op|${operatorId}|${absence.startAt}|${absence.endAt}`;
 }
 
 function operatorOvertimeKey(operatorId: string, overtime: AbsenceLike): string {
-  return `ot:${operatorId}:${overtime.startAt}:${overtime.endAt}`;
+  return `ot|${operatorId}|${overtime.startAt}|${overtime.endAt}`;
 }
 
 function stationExceptionKey(stationId: string, exception: AbsenceLike): string {
-  return `st:${stationId}:${exception.startAt}:${exception.endAt}`;
+  return `st|${stationId}|${exception.startAt}|${exception.endAt}`;
 }
 
 export const addOperatorAbsenceTool: ToolDefinition = {
@@ -214,13 +216,13 @@ export const addStationMaintenanceTool: ToolDefinition = {
 export const cancelConstraintTool: ToolDefinition = {
   name: 'cancel_constraint',
   description:
-    "Supprime une absence d'opérateur, une heure sup d'opérateur, ou une indispo de station. L'ID est fourni par list_active_constraints (`op:{operatorId}:{startAt}:{endAt}` pour absence, `ot:{operatorId}:{startAt}:{endAt}` pour heure sup, `st:{stationId}:{startAt}:{endAt}` pour station).",
+    "Supprime une absence d'opérateur, une heure sup d'opérateur, ou une indispo de station. L'ID est fourni par list_active_constraints (`op|{operatorId}|{startAt}|{endAt}` pour absence, `ot|{operatorId}|{startAt}|{endAt}` pour heure sup, `st|{stationId}|{startAt}|{endAt}` pour station).",
   inputSchema: z.object({
     constraintId: z
       .string()
       .min(1)
       .describe(
-        'Identifiant composite retourné par list_active_constraints (`op:...` ou `st:...`).',
+        'Identifiant composite retourné par list_active_constraints (`op|...`, `ot|...` ou `st|...`).',
       ),
     label: z.string().optional().describe("Description lisible pour le preview."),
   }),
@@ -234,7 +236,7 @@ export const cancelConstraintTool: ToolDefinition = {
       };
     }
 
-    const parts = input.constraintId.split(':');
+    const parts = input.constraintId.split('|');
     if (parts[0] === 'op' && parts.length === 4) {
       const [, operatorId, startAt, endAt] = parts;
       const current = await ctx.php.get<OperatorResponse>(
