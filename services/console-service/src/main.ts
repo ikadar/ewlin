@@ -19,8 +19,8 @@ if (config.llmProvider === 'anthropic' && !config.anthropicApiKey) {
   console.error('LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty.');
   process.exit(1);
 }
-if (config.llmProvider === 'groq' && !config.groqApiKey) {
-  console.error('LLM_PROVIDER=groq but GROQ_API_KEY is empty.');
+if (config.llmProvider === 'openai-compat' && !config.openaiCompatApiKey) {
+  console.error('LLM_PROVIDER=openai-compat but OPENAI_COMPAT_API_KEY is empty.');
   process.exit(1);
 }
 

@@ -1,20 +1,22 @@
 /**
  * Centralized configuration loaded from environment variables.
  *
- * Two LLM providers supported:
+ * Two LLM provider families supported:
  *   - 'anthropic' (default) — Claude Messages API. Reliable tool use,
  *     French quality, prompt caching available.
- *   - 'groq' — OpenAI-compatible endpoint with GPT OSS 20B by default.
- *     Cheaper, much faster (LPU), reasoning model with tool_calls.
+ *   - 'openai-compat' — any OpenAI-compatible endpoint (Groq, OpenRouter,
+ *     Together, Fireworks, Cerebras, …). Selected via the OPENAI_COMPAT_*
+ *     env vars; switch the underlying host by changing OPENAI_COMPAT_BASE_URL
+ *     and OPENAI_COMPAT_MODEL without touching code.
  *
- * Switch is `LLM_PROVIDER`. When 'groq', `GROQ_API_KEY` is required and
- * `GROQ_MODEL` overrides the default model id. The Anthropic vars stay
- * available so we can flip back without rebuilding.
+ * Switch is `LLM_PROVIDER`. When 'openai-compat', `OPENAI_COMPAT_API_KEY`
+ * is required. The Anthropic vars stay available so we can flip back
+ * without rebuilding.
  *
  * The HTTP_PORT default is 3004 to avoid colliding with the existing
  * services (php-fpm 9000, scheduling-engine 3003, mariadb 3306, mercure 3000).
  */
-export type LlmProvider = 'anthropic' | 'groq';
+export type LlmProvider = 'anthropic' | 'openai-compat';
 
 export interface Config {
   httpPort: number;
@@ -22,17 +24,18 @@ export interface Config {
   llmProvider: LlmProvider;
   anthropicApiKey: string;
   anthropicBaseUrl: string;
-  groqApiKey: string;
-  groqBaseUrl: string;
-  groqModel: string;
+  openaiCompatApiKey: string;
+  openaiCompatBaseUrl: string;
+  openaiCompatModel: string;
   llmModel: string;
   llmTemperature: number;
   llmMaxTurns: number;
   llmTotalTimeoutMs: number;
   /**
-   * Output budget per LLM turn. GPT OSS is a reasoning model whose
-   * `reasoning_tokens` count toward this limit, so a value tuned for
-   * Anthropic (~512) is too tight on Groq. Default scales by provider.
+   * Output budget per LLM turn. Reasoning models (e.g. GPT OSS via
+   * OpenRouter) emit `reasoning_tokens` that count toward this limit,
+   * so a value tuned for Anthropic (~512) is too tight there. Default
+   * scales by provider; override with LLM_MAX_TOKENS_PER_TURN.
    */
   llmMaxTokensPerTurn: number;
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
@@ -59,24 +62,26 @@ function envFloatOr(name: string, fallback: number): number {
 
 function envProvider(): LlmProvider {
   const raw = (process.env['LLM_PROVIDER'] ?? 'anthropic').toLowerCase();
-  return raw === 'groq' ? 'groq' : 'anthropic';
+  // Accept legacy 'groq' alias for the openai-compat family.
+  if (raw === 'openai-compat' || raw === 'groq') return 'openai-compat';
+  return 'anthropic';
 }
 
 export function loadConfig(): Config {
   const provider = envProvider();
-  // Reasoning models (Groq GPT OSS) need a wider per-turn budget because
-  // their `reasoning_tokens` are billed against max_tokens. 2048 is a
-  // safe default for tool-chain turns; raise via LLM_MAX_TOKENS_PER_TURN.
-  const defaultMaxTokens = provider === 'groq' ? 2048 : 512;
+  // Reasoning models (GPT OSS, o1-style) emit reasoning_tokens billed
+  // against max_tokens, so the per-turn budget must be larger than for
+  // Anthropic. 2048 is safe for tool-chain turns; raise via env.
+  const defaultMaxTokens = provider === 'openai-compat' ? 2048 : 512;
   return {
     httpPort: envIntOr('HTTP_PORT', 3004),
     phpApiUrl: envOr('PHP_API_URL', 'http://localhost:8080'),
     llmProvider: provider,
     anthropicApiKey: envOr('ANTHROPIC_API_KEY', ''),
     anthropicBaseUrl: envOr('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
-    groqApiKey: envOr('GROQ_API_KEY', ''),
-    groqBaseUrl: envOr('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
-    groqModel: envOr('GROQ_MODEL', 'openai/gpt-oss-20b'),
+    openaiCompatApiKey: envOr('OPENAI_COMPAT_API_KEY', ''),
+    openaiCompatBaseUrl: envOr('OPENAI_COMPAT_BASE_URL', 'https://api.groq.com/openai/v1'),
+    openaiCompatModel: envOr('OPENAI_COMPAT_MODEL', 'openai/gpt-oss-20b'),
     llmModel: envOr('LLM_MODEL', 'claude-haiku-4-5-20251001'),
     llmTemperature: envFloatOr('LLM_TEMPERATURE', 0),
     llmMaxTurns: envIntOr('LLM_MAX_TURNS', 8),

@@ -48,13 +48,17 @@ interface LlmClient {
 }
 
 function buildLlmClient(config: Config): { client: LlmClient; model: string } | { error: string } {
-  if (config.llmProvider === 'groq') {
-    if (!config.groqApiKey) {
-      return { error: "GROQ_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service." };
+  if (config.llmProvider === 'openai-compat') {
+    if (!config.openaiCompatApiKey) {
+      return { error: "OPENAI_COMPAT_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service." };
     }
     return {
-      client: new OpenAICompatClient(config.groqApiKey, config.groqBaseUrl, config.groqModel),
-      model: config.groqModel,
+      client: new OpenAICompatClient(
+        config.openaiCompatApiKey,
+        config.openaiCompatBaseUrl,
+        config.openaiCompatModel,
+      ),
+      model: config.openaiCompatModel,
     };
   }
   if (!config.anthropicApiKey) {
