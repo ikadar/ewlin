@@ -5,15 +5,12 @@ import {
   aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
 } from '../../utils/operatorTileSlices';
+import { getStationDayScheduleForDate } from '../../utils/stationSchedule';
 
 export interface UnavailabilitySegment {
   startMs: number;
   endMs: number;
 }
-
-const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
-  'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
-];
 
 function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
@@ -21,15 +18,7 @@ function parseTimeToMinutes(time: string): number {
 }
 
 function getStationDaySchedule(station: Station, date: Date): DaySchedule {
-  if (station.exceptions?.length) {
-    const dateStr =
-      `${date.getFullYear()}-` +
-      `${String(date.getMonth() + 1).padStart(2, '0')}-` +
-      `${String(date.getDate()).padStart(2, '0')}`;
-    const exception = station.exceptions.find((e) => e.date === dateStr);
-    if (exception) return exception.schedule;
-  }
-  return station.operatingSchedule[DAY_NAMES[date.getDay()]];
+  return getStationDayScheduleForDate(date, station);
 }
 
 /**

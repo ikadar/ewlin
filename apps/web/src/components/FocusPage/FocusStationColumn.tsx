@@ -18,6 +18,7 @@ import {
   computeTileDataCache,
   type ElementBlockingInfo,
 } from '../../utils/stationTileData';
+import { getStationDayScheduleForDate } from '../../utils/stationSchedule';
 
 export interface FocusStationColumnProps {
   station: Station;
@@ -31,24 +32,8 @@ export interface FocusStationColumnProps {
   dayCount: number;
 }
 
-const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
-  'sunday',
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-];
-
 function getStationDaySchedule(station: Station, date: Date): DaySchedule {
-  if (station.exceptions?.length) {
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const exception = station.exceptions.find((e) => e.date === dateStr);
-    if (exception) return exception.schedule;
-  }
-  const dayName = DAY_NAMES[date.getDay()];
-  return station.operatingSchedule[dayName];
+  return getStationDayScheduleForDate(date, station);
 }
 
 /**

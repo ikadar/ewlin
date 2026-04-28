@@ -6,35 +6,14 @@
  */
 
 import type { Station, DaySchedule, TimeSlot } from '@flux/types';
+import { getStationDayScheduleForDate } from './stationSchedule';
 
 /**
- * Get the day schedule for a specific date, checking exceptions first.
+ * Get the day schedule for a specific date, narrowed by ADR-017 period
+ * exceptions on the station.
  */
 export function getDayScheduleForDate(date: Date, station: Station): DaySchedule {
-  // Format date as YYYY-MM-DD for exception lookup
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
-
-  // Check for schedule exception first
-  const exception = station.exceptions.find((e) => e.date === dateStr);
-  if (exception) {
-    return exception.schedule;
-  }
-
-  // Use regular schedule based on day of week
-  const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  switch (dayOfWeek) {
-    case 0: return station.operatingSchedule.sunday;
-    case 1: return station.operatingSchedule.monday;
-    case 2: return station.operatingSchedule.tuesday;
-    case 3: return station.operatingSchedule.wednesday;
-    case 4: return station.operatingSchedule.thursday;
-    case 5: return station.operatingSchedule.friday;
-    case 6: return station.operatingSchedule.saturday;
-    default: return { isOperating: false, slots: [] };
-  }
+  return getStationDayScheduleForDate(date, station);
 }
 
 /**

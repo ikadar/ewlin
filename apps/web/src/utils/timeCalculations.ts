@@ -6,16 +6,7 @@
 import type { InternalTask, Station, DaySchedule } from '@flux/types';
 import { getTotalMinutes } from '@flux/types';
 import { subtractWorkingTime } from './workingTime';
-
-const DAY_NAMES: (keyof Station['operatingSchedule'])[] = [
-  'sunday',
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-];
+import { getStationDayScheduleForDate } from './stationSchedule';
 
 /**
  * Parse time string "HH:MM" to minutes since midnight.
@@ -26,24 +17,11 @@ function parseTimeToMinutes(time: string): number {
 }
 
 /**
- * Get the day schedule for a specific date, considering exceptions.
+ * Get the day schedule for a specific date, narrowed by ADR-017 period
+ * exceptions on the station.
  */
 function getDaySchedule(station: Station, date: Date): DaySchedule {
-  // Check for exceptions first (use local date for comparison)
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
-  const exception = station.exceptions.find((e) => e.date === dateStr);
-
-  if (exception) {
-    return exception.schedule;
-  }
-
-  // Use regular operating schedule
-  const dayOfWeek = date.getDay();
-  const dayName = DAY_NAMES[dayOfWeek];
-  return station.operatingSchedule[dayName];
+  return getStationDayScheduleForDate(date, station);
 }
 
 /**
