@@ -319,6 +319,44 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
             narration: string;
             actions: ProposedAction[];
           };
+
+          // Validate each action's args against the target tool's schema.
+          // propose_plan's own schema only validates the wrapper shape, so
+          // without this an action with missing/wrong fields slips through
+          // and surfaces as a baffling Zod error at /apply time. Catching
+          // it here means the model gets the issue as a tool_result and
+          // can self-correct on the next turn.
+          const planErrors: string[] = [];
+          for (const action of planData.actions) {
+            const actionDef = findTool(action.tool);
+            if (!actionDef) {
+              planErrors.push(`tool '${action.tool}' inconnu`);
+              continue;
+            }
+            const argsCheck = actionDef.inputSchema.safeParse(action.args);
+            if (!argsCheck.success) {
+              const issues = argsCheck.error.issues
+                .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+                .join('; ');
+              planErrors.push(`${action.tool} → args invalides (${issues})`);
+            }
+          }
+
+          if (planErrors.length > 0) {
+            const errMsg =
+              `Plan refusé : ${planErrors.join(' | ')}. ` +
+              "Corrige les args (camelCase, voir la signature des tools dans les schemas) puis rappelle propose_plan.";
+            // Replace the optimistic ok tool_result with the corrective error
+            // so the model sees the failure rather than a green light.
+            toolResultBlocks[toolResultBlocks.length - 1] = {
+              type: 'tool_result',
+              tool_use_id: tu.id,
+              content: JSON.stringify({ ok: false, error: errMsg }),
+              is_error: true,
+            };
+            continue; // don't terminate — let the loop iterate
+          }
+
           terminal = {
             kind: 'plan',
             narration: planData.narration,
