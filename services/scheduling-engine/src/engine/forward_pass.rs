@@ -768,6 +768,7 @@ pub fn run_forward_pass(
         operator_skills,
         operator_availability,
         operator_groups,
+        now_tick,
         warnings,
     );
 
@@ -2097,6 +2098,7 @@ fn pre_place_pinned_actions(
     operator_skills: &[Vec<(usize, f64)>],
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
+    now_tick: usize,
     warnings: &mut Vec<Warning>,
 ) {
     for i in 0..actions.len() {
@@ -2157,16 +2159,28 @@ fn pre_place_pinned_actions(
         // `!is_frozen_by_safety_zone`) reflect explicit intent and are
         // out of scope (see `Pin = créneau, pas opérateur`).
         //
-        // Implicit invariant: eat=0 at this point. pre_place runs
-        // before the forward-pass loop has incremented eat. PHP only
-        // sets isFrozenBySafetyZone when scheduledStart >= now, so the
-        // operator hasn't started yet — degrading the pin costs no
-        // wasted setup.
+        // In-progress exemption: when `start_t < now_tick` the operator
+        // has already started the work in the real world. The placement
+        // is committed; the engine cannot undo physical setup time.
+        // Skip the chunk-mini check — preserving the tile (and its
+        // end_tick) is more important than re-validating fragmentation.
+        // PHP also routes in-progress assignments through this branch
+        // by extending the safety-zone condition to
+        // `scheduledStart < now < scheduledEnd && !isCompleted`.
+        //
+        // Otherwise (upcoming-frozen pin, start_t >= now_tick): eat=0
+        // is implicit (pre_place runs before the forward-pass loop has
+        // incremented eat) and the operator hasn't started yet, so
+        // degrading the pin costs no wasted setup.
         //
         // On chunk-mini fail: degrade the pin (clear flags + tick
         // hints), emit a warning, fall through to the scoring loop
         // which re-places under normal rules.
-        if actions[i].is_frozen_by_safety_zone && station_idx < station_attrs.len() {
+        let is_in_progress_pin = start_t < now_tick;
+        if actions[i].is_frozen_by_safety_zone
+            && !is_in_progress_pin
+            && station_idx < station_attrs.len()
+        {
             let attrs = &station_attrs[station_idx];
             let action_setup = actions[i].setup_ticks;
             let action_total = actions[i].task_total_ticks;
@@ -3621,6 +3635,7 @@ mod safety_zone_chunk_mini_tests {
         availability: OperatorAvailability,
         station_attrs: StationAttrs,
         num_ticks: usize,
+        now_tick: usize,
     ) -> (Vec<Action>, Vec<Warning>) {
         let mut grid = ScheduleGrid::new(1, 1, num_ticks, 15);
         let mut actions = vec![action];
@@ -3639,6 +3654,7 @@ mod safety_zone_chunk_mini_tests {
             &skills,
             &availability,
             &groups,
+            now_tick,
             &mut warnings,
         );
         (actions, warnings)
@@ -3659,6 +3675,7 @@ mod safety_zone_chunk_mini_tests {
             availability,
             station_attrs_default(),
             200,
+            /*now_tick=*/ 60,
         );
 
         assert!(!actions[0].is_pinned, "safety-zone pin must be degraded");
@@ -3684,6 +3701,7 @@ mod safety_zone_chunk_mini_tests {
             availability,
             station_attrs_default(),
             200,
+            /*now_tick=*/ 60,
         );
 
         // User pin still placed (start_tick set or shifted by the
@@ -3708,6 +3726,7 @@ mod safety_zone_chunk_mini_tests {
             availability,
             station_attrs_default(),
             200,
+            /*now_tick=*/ 60,
         );
 
         assert!(actions[0].is_pinned, "pin must be kept when window suffices");
@@ -3719,4 +3738,66 @@ mod safety_zone_chunk_mini_tests {
         );
     }
 
+    #[test]
+    fn in_progress_safety_zone_pin_skips_chunk_mini_guard() {
+        // In-progress pin: pinned_start_tick (60) is in the past
+        // relative to now_tick (66). Operator started at tick 60 and is
+        // about to finish at tick 68. Without the in-progress exemption
+        // the chunk-mini guard would degrade this pin and the tile
+        // would jump elsewhere — wrong: the work is physically
+        // committed, the engine cannot undo it.
+        //
+        // The pin must survive the guard verbatim, end_tick stays at 68.
+        let action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
+        let availability = restricted_availability(200, &[(60, 68)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 66,
+        );
+
+        assert!(actions[0].is_pinned, "in-progress pin must be preserved");
+        assert!(actions[0].is_frozen_by_safety_zone, "frozen flag preserved");
+        assert_eq!(
+            actions[0].start_tick,
+            Some(60),
+            "start_tick verbatim (no shift on in-progress)"
+        );
+        assert_eq!(
+            actions[0].end_tick,
+            Some(68),
+            "end_tick verbatim — operator finishes when scheduled"
+        );
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("safety-zone retiré")),
+            "no degradation warning on in-progress pin: {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn in_progress_pin_with_short_remaining_window_still_kept() {
+        // Pathological case: a tile crossing now with very little time
+        // left. Even when only 1 tick remains in the future, the
+        // in-progress exemption keeps the pin verbatim — the past 7
+        // ticks of work are physically done.
+        let action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
+        let availability = restricted_availability(200, &[(60, 68)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 67,
+        );
+
+        assert!(
+            actions[0].is_pinned,
+            "1-tick-remaining in-progress pin must still be preserved"
+        );
+        assert_eq!(actions[0].end_tick, Some(68));
+    }
 }
