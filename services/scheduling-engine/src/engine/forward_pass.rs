@@ -1689,17 +1689,14 @@ fn assign_action_at_tick(
     // between them and emitted a wall-clock span overlapping all three
     // pins.
     //
-    // The guard skips the policy when:
-    //   * the action is brand new (was_new path; the scoring-loop check
-    //     already handled it)
-    //   * the action's chunk-mini policy would reduce to 0 ticks
-    //     (defensive: never block on a degenerate floor)
-    //   * the action's chain is preempting a lower-priority occupant
-    //     elsewhere (handled by `available_work_window` itself via the
-    //     scoring_priority + scoring_slack arguments)
-    //
-    // Stall (not SkipTo) so the outer loop progresses tick-by-tick;
-    // skipping ahead would over-shoot legitimate sub-window resumes.
+    // We can't reuse `available_work_window` directly because it treats
+    // any non-`None` station occupant as a wall, including the action's
+    // own marks — past ticks already worked, future ticks pre-reserved
+    // by the loop just before scoring. For a continuation those *are*
+    // the action's window; we walk the run ourselves and ignore
+    // self-marks. Other-action marks (pinned or in-progress neighbour)
+    // and operator-off ticks still terminate the run, matching the
+    // original semantics.
     let is_continuation = actions[action_idx].start_tick.is_some()
         && actions[action_idx].end_tick.is_none()
         && actions[action_idx].art > 0;
@@ -1714,24 +1711,30 @@ fn assign_action_at_tick(
             .min(attrs.max_chunk_ticks.max(1));
         let needed = action.art.min(chunk_mini_ticks) as usize;
         if needed > 1 {
-            let scoring_slack = action.last as i64 - t as i64 - action.art as i64;
-            let window = available_work_window(
-                grid,
-                operator_skills,
-                operator_availability,
-                actions,
-                action.deadline_priority,
-                scoring_slack,
-                station_idx,
-                t,
-                needed,
-            );
+            let cap = (grid.num_ticks.saturating_sub(t)).min(needed);
+            let mut window = 0usize;
+            while window < cap {
+                let tick = t + window;
+                match grid.station_action_at(station_idx, tick) {
+                    None => {}
+                    Some(occupant) if occupant == action_idx => {} // self — pass
+                    _ => break,
+                }
+                let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
+                    skills
+                        .iter()
+                        .any(|(s, p)| *s == station_idx && *p > 0.0)
+                        && operator_availability.is_available(op, tick)
+                });
+                if !any_op {
+                    break;
+                }
+                window += 1;
+            }
             if window < needed {
-                // Pretend the operator pool is empty for this tick: the
-                // existing Stalled path increments `idle_ticks`, runs
-                // peremption bookkeeping (so a long wait correctly fires
-                // re-calage), and leaves the station unmarked here so
-                // it stays available for whoever can use it.
+                // Stall: leave the action in-progress without consuming
+                // this tick. Don't mark the station here — the next
+                // pinned task arriving must be free to claim it.
                 return AssignOutcome::Stalled;
             }
         }
