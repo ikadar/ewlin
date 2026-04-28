@@ -37,7 +37,7 @@ export interface ValidationError {
 
 // Level 1: Live format validation messages
 const MESSAGES = {
-  pagination: `<strong>Pagination invalide</strong><br>Doit être <code>2</code> (feuillet) ou un multiple de 4 (cahier).<br>Exemples : <code>2</code>, <code>4</code>, <code>8</code>, <code>16</code>`,
+  pagination: `<strong>Pagination invalide</strong><br>Doit être un entier positif.`,
   papier: `<strong>Format Papier invalide</strong><br>Syntaxe attendue : <code>Type:Grammage</code><br>Exemples : <code>Couché:135</code>, <code>Offset:80</code>`,
   imposition: `<strong>Format Imposition invalide</strong><br>Syntaxe attendue : <code>LxH(poses)</code><br>Exemples : <code>50x70(8)</code>, <code>65x90(16p)</code>`,
   impression: `<strong>Format Impression invalide</strong><br>Syntaxe attendue : <code>recto/verso</code><br>Exemples : <code>Q/Q</code>, <code>Q/</code>, <code>CMJN/CMJN</code>`,
@@ -76,13 +76,13 @@ const SUBMIT_MESSAGES: Record<JcfFieldKey, string> = {
 // ── Individual Field Validators ──────────────────────────────────────────────
 
 /**
- * Validate pagination: must be 2 (feuillet) or multiple of 4 (cahier)
+ * Validate pagination: must be a strictly positive integer.
  */
 export function isValidPagination(value: string): boolean {
   if (!value) return true; // Empty is valid (not our concern at L1)
-  const num = parseInt(value, 10);
-  if (isNaN(num)) return false;
-  return num === 2 || (num >= 4 && num % 4 === 0);
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return false;
+  return parseInt(trimmed, 10) >= 1;
 }
 
 /**

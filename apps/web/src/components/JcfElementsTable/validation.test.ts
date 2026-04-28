@@ -31,30 +31,25 @@ describe('isValidPagination', () => {
     expect(isValidPagination('')).toBe(true);
   });
 
-  it('returns true for feuillet (2)', () => {
+  it('returns true for any positive integer', () => {
+    expect(isValidPagination('1')).toBe(true);
     expect(isValidPagination('2')).toBe(true);
-  });
-
-  it('returns true for cahier multiples of 4', () => {
+    expect(isValidPagination('3')).toBe(true);
     expect(isValidPagination('4')).toBe(true);
     expect(isValidPagination('8')).toBe(true);
-    expect(isValidPagination('12')).toBe(true);
-    expect(isValidPagination('16')).toBe(true);
-    expect(isValidPagination('32')).toBe(true);
+    expect(isValidPagination('17')).toBe(true);
+    expect(isValidPagination('100')).toBe(true);
   });
 
-  it('returns false for invalid pagination values', () => {
-    expect(isValidPagination('1')).toBe(false);
-    expect(isValidPagination('3')).toBe(false);
-    expect(isValidPagination('5')).toBe(false);
-    expect(isValidPagination('6')).toBe(false);
-    expect(isValidPagination('7')).toBe(false);
-    expect(isValidPagination('10')).toBe(false);
+  it('returns false for zero or negative', () => {
+    expect(isValidPagination('0')).toBe(false);
+    expect(isValidPagination('-4')).toBe(false);
   });
 
-  it('returns false for non-numeric input', () => {
+  it('returns false for non-numeric or decimal input', () => {
     expect(isValidPagination('abc')).toBe(false);
-    // Note: '4a' parses to 4 via parseInt, so it's valid (lenient parsing)
+    expect(isValidPagination('4a')).toBe(false);
+    expect(isValidPagination('4.5')).toBe(false);
   });
 });
 
@@ -328,7 +323,7 @@ describe('validateElementLive', () => {
   });
 
   it('returns error for invalid pagination', () => {
-    const element: JcfElement = { ...baseElement, pagination: '3' };
+    const element: JcfElement = { ...baseElement, pagination: 'abc' };
     const errors = validateElementLive(element, 0);
     expect(errors).toHaveLength(1);
     expect(errors[0].field).toBe('pagination');
@@ -373,7 +368,7 @@ describe('validateElementLive', () => {
   it('returns multiple errors for multiple invalid fields', () => {
     const element: JcfElement = {
       ...baseElement,
-      pagination: '3',
+      pagination: 'abc',
       papier: 'Couché135',
       impression: 'Q',
     };
@@ -444,7 +439,7 @@ describe('validateAllElements', () => {
 
   it('returns errors keyed by element-field', () => {
     const elements: JcfElement[] = [
-      { ...baseElement, pagination: '3' },
+      { ...baseElement, pagination: 'abc' },
       { ...baseElement, name: 'E2', papier: 'Couché135' },
     ];
     const errorMap = validateAllElements(elements);
@@ -587,7 +582,7 @@ describe('validateForSubmit', () => {
   it('still returns DSL format errors in template mode', () => {
     const element: JcfElement = {
       ...baseElement,
-      pagination: '3', // Invalid pagination
+      pagination: 'abc', // Invalid pagination
     };
     const errors = validateForSubmit([element], 'template');
     const paginationErrors = errors.filter((e) => e.field === 'pagination');
@@ -612,7 +607,7 @@ describe('validateForSubmit', () => {
 
   it('validates multiple elements independently', () => {
     const elements: JcfElement[] = [
-      { ...baseElement, pagination: '3' }, // Invalid DSL
+      { ...baseElement, pagination: 'abc' }, // Invalid DSL
       { ...baseElement, name: 'E2', papier: 'Couché:135' }, // Missing sequence
     ];
     const errors = validateForSubmit(elements, 'job');
@@ -660,7 +655,7 @@ describe('validateAllForSubmit', () => {
 
   it('returns errors keyed by element-field', () => {
     const elements: JcfElement[] = [
-      { ...baseElement, pagination: '3' }, // Invalid DSL
+      { ...baseElement, pagination: 'abc' }, // Invalid DSL
       { ...baseElement, name: 'E2', papier: 'Couché:135' }, // Missing sequence
     ];
     const errorMap = validateAllForSubmit(elements, 'job');
@@ -682,7 +677,7 @@ describe('validateAllForSubmit', () => {
   it('returns live type errors for DSL format errors', () => {
     const element: JcfElement = {
       ...baseElement,
-      pagination: '3',
+      pagination: 'abc',
     };
     const errorMap = validateAllForSubmit([element], 'job');
     const paginationError = errorMap.get('0-pagination');
