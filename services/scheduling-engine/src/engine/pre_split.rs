@@ -155,6 +155,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 // is fixed by the user). Pre-split skips them upstream, so
                 // these chunked actions are by definition non-pinned.
                 is_pinned: false,
+                is_frozen_by_safety_zone: false,
                 pinned_start_tick: None,
                 pinned_end_tick: None,
                 peremption_count: 0,
@@ -240,6 +241,7 @@ mod tests {
             total_productivity: 0.0,
             ticks_counted: 0,
             is_pinned: false,
+            is_frozen_by_safety_zone: false,
             chain_remaining_art: setup_ticks + run_ticks,
             pinned_start_tick: None,
             pinned_end_tick: None,
@@ -393,6 +395,7 @@ pub fn clone_action(a: &Action) -> Action {
         ticks_counted: a.ticks_counted,
         chain_remaining_art: a.chain_remaining_art,
         is_pinned: a.is_pinned,
+        is_frozen_by_safety_zone: a.is_frozen_by_safety_zone,
         pinned_start_tick: a.pinned_start_tick,
         pinned_end_tick: a.pinned_end_tick,
         peremption_count: a.peremption_count,

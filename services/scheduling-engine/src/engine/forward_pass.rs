@@ -261,6 +261,15 @@ pub struct Action {
     /// tick-major loop with start_tick/end_tick set and art=0, so the
     /// scoring loop skips it and successors see its fixed end_tick.
     pub is_pinned: bool,
+    /// True iff `is_pinned` was set by PHP's safety-zone freeze pathway
+    /// (i.e. a previously-placed task that sits inside the rolling
+    /// working-hours window). Distinct from a user pin, which has the
+    /// same `is_pinned: true` flag but originates from an explicit
+    /// user choice. `pre_place_pinned_actions` honours safety-zone
+    /// pins verbatim (no shift) because Phase 1 already produced a
+    /// feasible placement; the contiguous-window check would shift
+    /// multi-stint tasks into slots occupied by other actions.
+    pub is_frozen_by_safety_zone: bool,
     /// Total remaining work in this action's successor chain (this task + all
     /// successors). Used by the scoring function to prioritize tasks at the
     /// head of long chains where delay cascades.
@@ -2097,7 +2106,18 @@ fn pre_place_pinned_actions(
 
         let mut start_t = start_t;
         let mut end_t = original_end_t;
-        if !original_window_feasible {
+        // Safety-zone pins skip the shift entirely. They reflect the
+        // existing schedule produced by a prior compute that the engine
+        // already validated; the shift would only fire because the
+        // contiguous-window check fails on multi-stint tasks (operator
+        // shift end mid-window, overnight closure, lunch break inside the
+        // pin span). Sliding them forward lands them on top of other
+        // actions and produces visible station overlaps. The closure-
+        // aware per-tick marking below already handles operator-off
+        // ticks correctly — leaving the pin at its original instant
+        // mirrors what Phase 1 produced.
+        let allow_shift = !actions[i].is_frozen_by_safety_zone;
+        if !original_window_feasible && allow_shift {
             let max_scan_ticks: usize = 30 * 24 * 60 / tick_minutes as usize;
             let mut shifted_to: Option<usize> = None;
             for offset in 1..=max_scan_ticks {
@@ -2789,6 +2809,7 @@ mod peremption_tests {
             total_productivity: 0.0,
             ticks_counted: 0,
             is_pinned: false,
+            is_frozen_by_safety_zone: false,
             chain_remaining_art: setup_ticks + run_ticks,
             pinned_start_tick: None,
             pinned_end_tick: None,
@@ -2974,6 +2995,7 @@ mod attention_capacity_tests {
             total_productivity: 0.0,
             ticks_counted: 0,
             is_pinned: false,
+            is_frozen_by_safety_zone: false,
             chain_remaining_art: total,
             pinned_start_tick: None,
             pinned_end_tick: None,

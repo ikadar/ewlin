@@ -72,6 +72,23 @@ pub struct TaskInput {
     /// when `None` (legacy clients, missing scheduledEnd).
     #[serde(default)]
     pub pinned_end_tick: Option<usize>,
+    /// True iff the pin was injected by PHP's safety-zone freeze pathway
+    /// (i.e. the task was already placed by a prior compute, sits inside
+    /// the rolling working-hours window, and the user has not overridden
+    /// the freeze). User pins (`assignment.isPinned == true` in the DB)
+    /// leave this false even though they also set `is_pinned: true`.
+    ///
+    /// `pre_place_pinned_actions` consults this flag to decide whether
+    /// to honour the pin position verbatim (safety-zone: yes — Phase 1
+    /// already produced a feasible placement, the contiguous-window
+    /// check would fail spuriously on multi-stint tasks and shift the
+    /// pin into a slot occupied by another action) or treat the pin as
+    /// a start-time preference and slide it forward to the next
+    /// fully-feasible window emitting a "Pin déplacé" warning (user
+    /// pin: yes — the user picked a preferred moment, the engine may
+    /// move it if infeasible).
+    #[serde(default)]
+    pub is_frozen_by_safety_zone: bool,
     /// When set, this task is an outsourced step. The engine does not place
     /// it on a station/operator; instead it acts as a floor-shifter on its
     /// successor: the engine computes the return tick dynamically from the
