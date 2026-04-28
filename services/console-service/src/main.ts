@@ -15,6 +15,15 @@ import { startMcpStdio } from './mcp/stdio.js';
 const mode = process.argv[2] ?? 'http';
 const config = loadConfig();
 
+if (config.llmProvider === 'anthropic' && !config.anthropicApiKey) {
+  console.error('LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty.');
+  process.exit(1);
+}
+if (config.llmProvider === 'groq' && !config.groqApiKey) {
+  console.error('LLM_PROVIDER=groq but GROQ_API_KEY is empty.');
+  process.exit(1);
+}
+
 async function main(): Promise<void> {
   switch (mode) {
     case 'http':
