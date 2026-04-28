@@ -255,15 +255,28 @@ pub fn lns_improve(
 
 /// Lexicographic "strictly better" check for the LNS objective.
 ///
-/// Primary: late_job_count. A strict decrease is always better.
-/// A strict increase is always worse. When tied, fall through to
-/// the secondary check.
+/// Primary: unplaced_count (= total_tasks − scheduled_tasks). A schedule
+/// that leaves tasks un-end-ticked (forward-pass `max_outer_t` bailout,
+/// infeasible pin window, etc.) is strictly worse than one that placed
+/// every task — the missing task simply doesn't ship. Catching this here
+/// also prevents LNS from "improving" by destroying repair capacity.
 ///
-/// Secondary (at equal late_job_count): any-of strict improvement on
+/// Secondary: late_job_count. A strict decrease is always better.
+/// A strict increase is always worse. When tied, fall through.
+///
+/// Tertiary (at equal late_job_count): any-of strict improvement on
 /// calage bonus metrics (sum, mean, median). At least one of the three
 /// must be strictly greater than the reference AND none of the three
 /// may be strictly smaller.
 pub(crate) fn is_strictly_better(candidate: &ScheduleStats, reference: &ScheduleStats) -> bool {
+    let candidate_unplaced = candidate.total_tasks - candidate.scheduled_tasks;
+    let reference_unplaced = reference.total_tasks - reference.scheduled_tasks;
+    if candidate_unplaced < reference_unplaced {
+        return true;
+    }
+    if candidate_unplaced > reference_unplaced {
+        return false;
+    }
     if candidate.late_job_count < reference.late_job_count {
         return true;
     }

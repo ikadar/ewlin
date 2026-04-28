@@ -284,11 +284,17 @@ pub fn run_with_fbi(
             late_job_count: stats.late_job_count,
         });
 
-        // Track best result: prefer fewer weighted-late jobs (protects
-        // imperative over flexible), then less weighted lateness, then
-        // shorter makespan.
-        let current_score = (stats.weighted_late_job_count, stats.weighted_lateness_minutes, current_makespan);
-        let best_score = (best_stats.weighted_late_job_count, best_stats.weighted_lateness_minutes, best_stats.makespan_minutes);
+        // Track best result: lex-order on (unplaced, weighted-late jobs,
+        // weighted lateness, makespan). Unplaced ranks above lateness —
+        // a task we couldn't place is strictly worse than a late one,
+        // because the user can't ship a task that doesn't exist in the
+        // schedule. Forward pass can hit `max_outer_t` and bail with some
+        // actions un-end-ticked; this guard keeps such results from
+        // beating a fully-placed-but-late baseline.
+        let current_unplaced = (stats.total_tasks - stats.scheduled_tasks) as u64;
+        let best_unplaced = (best_stats.total_tasks - best_stats.scheduled_tasks) as u64;
+        let current_score = (current_unplaced, stats.weighted_late_job_count, stats.weighted_lateness_minutes, current_makespan);
+        let best_score = (best_unplaced, best_stats.weighted_late_job_count, best_stats.weighted_lateness_minutes, best_stats.makespan_minutes);
         if current_score < best_score {
             best_assignments = remapped;
             best_stats = stats;
@@ -419,10 +425,15 @@ pub fn run_with_multi_start_fbi(
     );
     let mut best_warnings: Vec<Warning> = warnings_p1;
     total_iters += i1;
-    let mut best_score = (best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
+    // Score tuple: (unplaced, weighted_late_job_count, weighted_lateness_minutes, makespan_minutes).
+    // Unplaced is primary because a task missing from the schedule is
+    // strictly worse than a late one — see the `current_score` block in
+    // `run_with_fbi_ordering` for the rationale.
+    let mut best_unplaced = (best_s.total_tasks - best_s.scheduled_tasks) as u64;
+    let mut best_score = (best_unplaced, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
 
-    eprintln!("[MULTI-START] pass 0 (baseline TierFirst): late_jobs={} w_late={} lateness={} makespan={}",
-        best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
+    eprintln!("[MULTI-START] pass 0 (baseline TierFirst): unplaced={} late_jobs={} w_late={} lateness={} makespan={}",
+        best_unplaced, best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes);
 
     // Pass 2: EDD ordering (if multi_start enabled)
     if multi_start {
@@ -436,16 +447,18 @@ pub fn run_with_multi_start_fbi(
             &mut warnings_p2,
         );
         total_iters += i2;
-        let score2 = (s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+        let unplaced2 = (s2.total_tasks - s2.scheduled_tasks) as u64;
+        let score2 = (unplaced2, s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
 
-        eprintln!("[MULTI-START] pass 1 (EDD): late_jobs={} w_late={} lateness={} makespan={}",
-            s2.late_job_count, s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
+        eprintln!("[MULTI-START] pass 1 (EDD): unplaced={} late_jobs={} w_late={} lateness={} makespan={}",
+            unplaced2, s2.late_job_count, s2.weighted_late_job_count, s2.weighted_lateness_minutes, s2.makespan_minutes);
 
         if score2 < best_score {
             best_a = a2;
             best_act = act2;
             best_s = s2;
             best_score = score2;
+            best_unplaced = unplaced2;
             best_warnings = warnings_p2;
         }
 
@@ -464,16 +477,18 @@ pub fn run_with_multi_start_fbi(
             &mut warnings_p3,
         );
         total_iters += i3;
-        let score3 = (s3.weighted_late_job_count, s3.weighted_lateness_minutes, s3.makespan_minutes);
+        let unplaced3 = (s3.total_tasks - s3.scheduled_tasks) as u64;
+        let score3 = (unplaced3, s3.weighted_late_job_count, s3.weighted_lateness_minutes, s3.makespan_minutes);
 
-        eprintln!("[MULTI-START] pass 2 (SlackFirst): late_jobs={} w_late={} lateness={} makespan={}",
-            s3.late_job_count, s3.weighted_late_job_count, s3.weighted_lateness_minutes, s3.makespan_minutes);
+        eprintln!("[MULTI-START] pass 2 (SlackFirst): unplaced={} late_jobs={} w_late={} lateness={} makespan={}",
+            unplaced3, s3.late_job_count, s3.weighted_late_job_count, s3.weighted_lateness_minutes, s3.makespan_minutes);
 
         if score3 < best_score {
             best_a = a3;
             best_act = act3;
             best_s = s3;
             best_score = score3;
+            best_unplaced = unplaced3;
             best_warnings = warnings_p3;
         }
     }
@@ -506,23 +521,25 @@ pub fn run_with_multi_start_fbi(
                 &mut warnings_pp,
             );
             total_iters += ip;
-            let score_p = (sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
+            let unplaced_p = (sp.total_tasks - sp.scheduled_tasks) as u64;
+            let score_p = (unplaced_p, sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
 
-            eprintln!("[MULTI-START] pass {} (perturbed {:?} w={:.2?}): late_jobs={} w_late={} lateness={} makespan={}",
-                pass + 3, ordering, weights, sp.late_job_count, sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
+            eprintln!("[MULTI-START] pass {} (perturbed {:?} w={:.2?}): unplaced={} late_jobs={} w_late={} lateness={} makespan={}",
+                pass + 3, ordering, weights, unplaced_p, sp.late_job_count, sp.weighted_late_job_count, sp.weighted_lateness_minutes, sp.makespan_minutes);
 
             if score_p < best_score {
                 best_a = ap;
                 best_act = actp;
                 best_s = sp;
                 best_score = score_p;
+                best_unplaced = unplaced_p;
                 best_warnings = warnings_pp;
             }
         }
     }
 
-    eprintln!("[MULTI-START] best: late_jobs={} w_late={} lateness={} makespan={} (total {} FBI iterations)",
-        best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes, total_iters);
+    eprintln!("[MULTI-START] best: unplaced={} late_jobs={} w_late={} lateness={} makespan={} (total {} FBI iterations)",
+        best_unplaced, best_s.late_job_count, best_s.weighted_late_job_count, best_s.weighted_lateness_minutes, best_s.makespan_minutes, total_iters);
 
     // Surface only the winning pass's warnings — the schedule shown to the
     // user is best_a, so its accompanying warnings (e.g. pin displacements)
