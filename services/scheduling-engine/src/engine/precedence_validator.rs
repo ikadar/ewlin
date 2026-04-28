@@ -325,6 +325,7 @@ mod tests {
             pinned_start_tick: None,
             pinned_end_tick: None,
             outsourced: None,
+            earliest_start_tick: None,
         }
     }
 
@@ -652,6 +653,7 @@ mod tests {
                 pinned_start_tick: None,
                 pinned_end_tick: None,
                 outsourced: None,
+                earliest_start_tick: None,
             }
         }
 
@@ -667,6 +669,7 @@ mod tests {
                 pinned_start_tick: None,
                 pinned_end_tick: None,
                 outsourced: None,
+                earliest_start_tick: None,
             }
         }
 

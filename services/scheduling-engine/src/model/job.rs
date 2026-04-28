@@ -97,6 +97,20 @@ pub struct TaskInput {
     /// estimate that was time-of-day blind).
     #[serde(default)]
     pub outsourced: Option<OutsourcedParams>,
+    /// Hard floor on the earliest tick at which this task may start. The
+    /// scoring loop refuses to place the action at any tick `t < earliest_start_tick`,
+    /// and `pre_place_pinned_actions` degrades pins whose `pinned_start_tick`
+    /// is below this value (emitting a warning so the user sees the displacement).
+    ///
+    /// Sourced by PHP from external constraints the engine doesn't natively
+    /// model. Currently the only producer is the BAT-deadline rule:
+    ///   - Internal task in element E: blocked when E.batStatus is not Ready
+    ///   - Outsourced task in element E: blocked when at least one prerequisite
+    ///     element of E has batStatus not Ready
+    /// In both cases the floor is `Job.batDeadline` converted to tick units.
+    /// The engine treats the field neutrally — it doesn't know about BAT.
+    #[serde(default)]
+    pub earliest_start_tick: Option<usize>,
 }
 
 /// Provider parameters needed to compute departure & return ticks of a

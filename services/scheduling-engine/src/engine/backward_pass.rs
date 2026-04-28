@@ -914,6 +914,7 @@ mod tests {
                         pinned_start_tick: None,
                         pinned_end_tick: None,
                         outsourced: None,
+                        earliest_start_tick: None,
                     },
                     TaskInput {
                         id: "task-laminate".into(),
@@ -926,6 +927,7 @@ mod tests {
                         pinned_start_tick: Some(pinned_tick),
                         pinned_end_tick: None,
                         outsourced: None,
+                        earliest_start_tick: None,
                     },
                     TaskInput {
                         id: "task-cut".into(),
@@ -938,6 +940,7 @@ mod tests {
                         pinned_start_tick: None,
                         pinned_end_tick: None,
                         outsourced: None,
+                        earliest_start_tick: None,
                     },
                 ],
                 spec: None,

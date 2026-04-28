@@ -224,6 +224,12 @@ pub struct Action {
     pub job_deadline_tick: u64,
     /// Earliest tick at which this action can retry after a LAST safety rollback
     pub earliest_retry_tick: Option<usize>,
+    /// Hard floor on the earliest tick at which this action may start.
+    /// Sourced from `TaskInput.earliest_start_tick` (currently driven by
+    /// the BAT-deadline rule on the PHP side; see model/job.rs). The
+    /// scoring loop refuses placements at `t < earliest_start_tick` and
+    /// `pre_place_pinned_actions` degrades pins below this floor.
+    pub earliest_start_tick: Option<usize>,
     /// Additional predecessor action indices for cross-element / cross-job dependencies.
     /// Each entry is (action_idx, gap_ticks). All must have end_tick + gap <= current tick.
     pub additional_predecessors: Vec<(usize, u32)>,
@@ -959,6 +965,13 @@ pub fn run_forward_pass(
             if t < earliest_retry[i] { continue; }
             if let Some(retry_tick) = action.earliest_retry_tick {
                 if t < retry_tick { continue; }
+            }
+            // Hard floor sourced from PHP (currently the BAT-deadline
+            // rule). The action cannot start before this tick regardless
+            // of operator availability or precedence — the gate is more
+            // fundamental than the engine's optimisation criteria.
+            if let Some(est) = action.earliest_start_tick {
+                if t < est { continue; }
             }
             // Precedence guard: predecessor must finish strictly BEFORE the
             // successor's first tick. The strict-gap requirement adds 1
@@ -2147,6 +2160,48 @@ fn pre_place_pinned_actions(
             grid.grow(grow_ticks);
         }
 
+        // earliest_start_tick guard for ALL pins (user + safety-zone).
+        //
+        // The earliest_start_tick floor sourced from PHP (currently the
+        // BAT-deadline rule) is more fundamental than any pin: a task
+        // physically cannot start before BAT is approved, regardless of
+        // user or safety-zone intent. When a pin sits below this floor,
+        // degrade it and emit a warning so the displacement is visible.
+        //
+        // In-progress exemption (start_t < now_tick): the work is already
+        // happening, the floor was either satisfied earlier or the user
+        // has acknowledged the constraint by letting the task run. The
+        // engine cannot undo committed physical work.
+        if let Some(est) = actions[i].earliest_start_tick {
+            let in_progress = start_t < now_tick;
+            if !in_progress && start_t < est {
+                let pin_minutes = start_t as u64 * tick_minutes as u64;
+                let est_minutes = est as u64 * tick_minutes as u64;
+                let message = if actions[i].is_frozen_by_safety_zone {
+                    format!(
+                        "Pin safety-zone retiré pour {} : la tâche ne peut démarrer avant {} (contrainte BAT/earliest-start). Replanification.",
+                        super::format_minutes(pin_minutes, start_date),
+                        super::format_minutes(est_minutes, start_date),
+                    )
+                } else {
+                    format!(
+                        "Pin utilisateur retiré pour {} : la tâche ne peut démarrer avant {} (contrainte BAT/earliest-start). La tâche sera replanifiée par le moteur.",
+                        super::format_minutes(pin_minutes, start_date),
+                        super::format_minutes(est_minutes, start_date),
+                    )
+                };
+                warnings.push(Warning {
+                    task_id: Some(actions[i].task_id.clone()),
+                    message,
+                });
+                actions[i].is_pinned = false;
+                actions[i].is_frozen_by_safety_zone = false;
+                actions[i].pinned_start_tick = None;
+                actions[i].pinned_end_tick = None;
+                continue;
+            }
+        }
+
         // Chunk-mini guard for safety-zone pins.
         //
         // A safety-zone pin reflects a placement decided by a prior
@@ -2945,6 +3000,7 @@ mod peremption_tests {
             deadline_priority: 2,
             job_deadline_tick: u64::MAX,
             earliest_retry_tick: None,
+            earliest_start_tick: None,
             additional_predecessors: Vec::new(),
             work_accumulator: 0.0,
             idle_ticks,
@@ -3131,6 +3187,7 @@ mod attention_capacity_tests {
             deadline_priority: 2,
             job_deadline_tick: u64::MAX,
             earliest_retry_tick: None,
+            earliest_start_tick: None,
             additional_predecessors: Vec::new(),
             work_accumulator: 0.0,
             idle_ticks: 0,
@@ -3577,6 +3634,7 @@ mod safety_zone_chunk_mini_tests {
             deadline_priority: 2,
             job_deadline_tick: u64::MAX,
             earliest_retry_tick: None,
+            earliest_start_tick: None,
             additional_predecessors: Vec::new(),
             work_accumulator: 0.0,
             idle_ticks: 0,
@@ -3799,5 +3857,111 @@ mod safety_zone_chunk_mini_tests {
             "1-tick-remaining in-progress pin must still be preserved"
         );
         assert_eq!(actions[0].end_tick, Some(68));
+    }
+
+    // ============================================================
+    // earliest_start_tick (BAT-deadline floor) tests
+    // ============================================================
+
+    #[test]
+    fn user_pin_before_earliest_start_is_degraded_with_warning() {
+        // User pinned a task at tick 50 but earliest_start_tick=80
+        // (e.g. BAT not approved until then). Even though the pin
+        // reflects explicit intent, the BAT constraint is more
+        // fundamental — the task physically can't start before the
+        // proof is approved. Pin is degraded with an explicit warning.
+        let mut action = make_action(0, 0, 4, 4, 50, /*is_frozen_by_safety_zone=*/ false);
+        action.earliest_start_tick = Some(80);
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 0,
+        );
+
+        assert!(!actions[0].is_pinned, "user pin must be degraded below earliest_start");
+        assert!(actions[0].pinned_start_tick.is_none());
+        assert!(actions[0].pinned_end_tick.is_none());
+        assert!(
+            warnings.iter().any(|w| w.message.contains("Pin utilisateur retiré")
+                && w.message.contains("BAT")),
+            "expected an explicit user-pin warning mentioning BAT, got {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn safety_zone_pin_before_earliest_start_is_degraded() {
+        // Safety-zone pin at tick 50, earliest_start_tick=80 — pin
+        // degraded with safety-zone wording.
+        let mut action = make_action(0, 0, 4, 4, 50, /*is_frozen_by_safety_zone=*/ true);
+        action.earliest_start_tick = Some(80);
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 0,
+        );
+
+        assert!(!actions[0].is_pinned, "safety-zone pin must be degraded below earliest_start");
+        assert!(
+            warnings.iter().any(|w| w.message.contains("Pin safety-zone retiré")
+                && w.message.contains("BAT")),
+            "expected an explicit safety-zone-pin warning mentioning BAT, got {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn pin_at_or_above_earliest_start_is_kept() {
+        // Pin exactly at earliest_start_tick is honoured.
+        let mut action = make_action(0, 0, 4, 4, 80, /*is_frozen_by_safety_zone=*/ false);
+        action.earliest_start_tick = Some(80);
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 0,
+        );
+
+        assert!(actions[0].is_pinned, "pin at earliest_start must be kept");
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("Pin utilisateur retiré")),
+            "no warning when pin honours floor"
+        );
+    }
+
+    #[test]
+    fn in_progress_pin_below_earliest_start_is_kept() {
+        // Edge case: a pin whose start is in the past relative to now
+        // (in-progress) AND below earliest_start_tick. The in-progress
+        // exemption wins — the work is already happening, the engine
+        // cannot undo it. The earliest_start floor only applies to
+        // FUTURE placements.
+        let mut action = make_action(0, 0, 4, 4, 50, /*is_frozen_by_safety_zone=*/ true);
+        action.earliest_start_tick = Some(80);
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 55, // 55 > 50, so the pin is in-progress
+        );
+
+        assert!(actions[0].is_pinned, "in-progress pin must NOT be degraded by earliest_start");
+        assert_eq!(actions[0].start_tick, Some(50), "start_tick verbatim");
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("retiré")),
+            "no degradation warning on in-progress pin: {warnings:?}"
+        );
     }
 }
