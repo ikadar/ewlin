@@ -912,7 +912,7 @@ mod tests {
                         is_pinned: false,
                         pinned_start_tick: None,
                         pinned_end_tick: None,
-                        predecessor_gap_minutes: 0,
+                        outsourced: None,
                     },
                     TaskInput {
                         id: "task-laminate".into(),
@@ -923,7 +923,7 @@ mod tests {
                         is_pinned: true,
                         pinned_start_tick: Some(pinned_tick),
                         pinned_end_tick: None,
-                        predecessor_gap_minutes: 0,
+                        outsourced: None,
                     },
                     TaskInput {
                         id: "task-cut".into(),
@@ -934,7 +934,7 @@ mod tests {
                         is_pinned: false,
                         pinned_start_tick: None,
                         pinned_end_tick: None,
-                        predecessor_gap_minutes: 0,
+                        outsourced: None,
                     },
                 ],
                 spec: None,

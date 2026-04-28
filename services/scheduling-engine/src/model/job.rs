@@ -72,15 +72,55 @@ pub struct TaskInput {
     /// when `None` (legacy clients, missing scheduledEnd).
     #[serde(default)]
     pub pinned_end_tick: Option<usize>,
-    /// Extra gap (in minutes) to add after the predecessor before this task
-    /// can start. Used for outsourced tasks: PHP skips the outsourced task
-    /// but encodes its estimated duration as a gap on the next internal task.
+    /// When set, this task is an outsourced step. The engine does not place
+    /// it on a station/operator; instead it acts as a floor-shifter on its
+    /// successor: the engine computes the return tick dynamically from the
+    /// predecessor's end tick at forward-pass time (single source of truth
+    /// for ST scheduling, replacing the pre-engine `predecessorGapMinutes`
+    /// estimate that was time-of-day blind).
     #[serde(default)]
-    pub predecessor_gap_minutes: u32,
+    pub outsourced: Option<OutsourcedParams>,
+}
+
+/// Provider parameters needed to compute departure & return ticks of a
+/// single outsourced step. Snapshotted at compute-request time so the
+/// engine has no need to look up provider state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutsourcedParams {
+    pub provider_id: String,
+    /// Number of business days the work itself takes at the provider.
+    pub work_days: u32,
+    /// Calendar days transit each way. Counted as business days too —
+    /// matches the existing PHP behaviour (`addBusinessDays`).
+    pub transit_days: u32,
+    /// Latest minute-of-day at which the provider's truck collects work
+    /// (cutoff). Predecessor ending after this minute pushes departure to
+    /// the next business day.
+    pub latest_departure_minutes: u32,
+    /// Minute-of-day at which returned work arrives back at the workshop.
+    pub reception_minutes: u32,
+    /// User-typed override of the departure tick (since today midnight,
+    /// in tick units). When set, calculation skips the cutoff/business-day
+    /// logic and uses this value verbatim.
+    #[serde(default)]
+    pub manual_departure_tick: Option<usize>,
+    /// User-typed override of the return tick (since today midnight, in
+    /// tick units). When set, the successor's earliest start is fixed to
+    /// this tick regardless of how the auto-formula would have placed it.
+    #[serde(default)]
+    pub manual_return_tick: Option<usize>,
 }
 
 impl TaskInput {
     pub fn total_minutes(&self) -> u32 {
         self.setup_minutes + self.run_minutes
+    }
+
+    /// True when this task is an outsourced step that must NOT be placed
+    /// on a station/operator. The engine treats it as a floor-shifter
+    /// (see `OutsourcedParams`) rather than a placeable action.
+    pub fn is_outsourced(&self) -> bool {
+        self.outsourced.is_some()
     }
 }

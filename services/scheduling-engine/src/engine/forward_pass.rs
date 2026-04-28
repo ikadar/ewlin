@@ -314,6 +314,14 @@ pub struct Action {
     /// emitted ComputedAssignment so the UI sees the actual setup/run
     /// boundary instead of the config-derived approximation.
     pub setup_end_tick: Option<u32>,
+    /// Outsourced steps inserted (in sequence order) between this action's
+    /// internal predecessor and itself. Empty when no ST sits in front of
+    /// this action. Walked at predecessor-floor evaluation time:
+    /// `floor = compute_chain_return_tick(pred.end_tick, &chain, ...)`.
+    /// IDs are intentionally absent — chain emission for the output
+    /// payload is done in a second pass over the input `jobs` so trailing
+    /// ST steps (no internal successor) are also covered.
+    pub outsourced_predecessor_chain: Vec<crate::model::job::OutsourcedParams>,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -960,14 +968,38 @@ pub fn run_forward_pass(
             // keys on `pred.end_tick == t` to lock the operator across
             // the boundary.
             if let Some(pred_idx) = action.predecessor_idx {
-                let gap = actions[i].predecessor_gap_ticks as usize;
                 let strict_gap = if is_same_task_chunk_continuation(action, &actions[pred_idx]) {
                     0
                 } else {
                     precedence_min_gap_ticks as usize
                 };
                 match actions[pred_idx].end_tick {
-                    Some(pred_end) if pred_end + gap + strict_gap <= t => {}
+                    Some(pred_end) => {
+                        // Floor = the earliest tick this action may start.
+                        // - No ST chain: pred_end + drying_gap (existing behaviour).
+                        // - ST chain present: walk it in sequence to obtain
+                        //   the actual return tick of the last ST step,
+                        //   computed from the predecessor's *actual* end
+                        //   tick (the very thing the pre-engine
+                        //   estimate-based gap could not see — and the
+                        //   reason this whole refactor exists).
+                        let floor = if actions[i].outsourced_predecessor_chain.is_empty() {
+                            pred_end + actions[i].predecessor_gap_ticks as usize
+                        } else {
+                            let today_midnight = start_date
+                                .and_hms_opt(0, 0, 0)
+                                .expect("midnight is always valid");
+                            super::outsourced::compute_chain_return_tick(
+                                pred_end as u64,
+                                &actions[i].outsourced_predecessor_chain,
+                                today_midnight,
+                                tick_minutes,
+                            ) as usize
+                        };
+                        if floor + strict_gap > t {
+                            continue;
+                        }
+                    }
                     _ => continue,
                 }
             }
@@ -2742,6 +2774,7 @@ mod peremption_tests {
             spec_snapshot: crate::engine::similarity::SpecSnapshot::default(),
             setup_progress: 0.0,
             setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
         }
     }
 
@@ -2926,6 +2959,7 @@ mod attention_capacity_tests {
             spec_snapshot: crate::engine::similarity::SpecSnapshot::default(),
             setup_progress: 0.0,
             setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
         }
     }
 

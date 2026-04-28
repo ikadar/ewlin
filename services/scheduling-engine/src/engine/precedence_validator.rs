@@ -323,7 +323,7 @@ mod tests {
             is_pinned: false,
             pinned_start_tick: None,
             pinned_end_tick: None,
-            predecessor_gap_minutes: 0,
+            outsourced: None,
         }
     }
 
@@ -649,7 +649,7 @@ mod tests {
                 is_pinned: false,
                 pinned_start_tick: None,
                 pinned_end_tick: None,
-                predecessor_gap_minutes: 0,
+                outsourced: None,
             }
         }
 
@@ -663,7 +663,7 @@ mod tests {
                 is_pinned: false,
                 pinned_start_tick: None,
                 pinned_end_tick: None,
-                predecessor_gap_minutes: 0,
+                outsourced: None,
             }
         }
 

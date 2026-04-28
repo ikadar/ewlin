@@ -1,9 +1,11 @@
 mod backward_pass;
+pub mod business_calendar;
 pub mod fbi;
 mod forward_pass;
 mod grid;
 pub mod lns;
 pub mod moore;
+pub mod outsourced;
 pub mod pre_split;
 pub mod precedence_validator;
 pub mod similarity;
@@ -29,8 +31,8 @@ use chrono::Local;
 use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
 use crate::model::schedule::{
-    ComputeRequest, ComputedAssignment, OperatorAssignment, ScheduleResult,
-    ScheduleStats, Warning,
+    ComputeRequest, ComputedAssignment, OperatorAssignment, OutsourcedAssignment,
+    ScheduleResult, ScheduleStats, Warning,
 };
 use crate::model::station::StationInput;
 
@@ -371,6 +373,13 @@ fn compute_inner(
 
     emit(progress, ProgressEvent::EngineDone { compute_time_ms });
 
+    let outsourced_assignments = build_outsourced_assignments(
+        &request.jobs,
+        &assignments,
+        start_date,
+        tick_minutes,
+    );
+
     ScheduleResult {
         assignments,
         stats,
@@ -378,7 +387,86 @@ fn compute_inner(
         fbi_iterations,
         compute_time_ms,
         tick_minutes,
+        outsourced_assignments,
     }
+}
+
+/// Walk every element's tasks in sequence order and emit one
+/// `OutsourcedAssignment` per outsourced TaskInput, anchoring on the
+/// previous Internal task's actual scheduledEnd (or, in a multi-step ST
+/// chain, on the running return-of-previous-ST). The result is consumed
+/// verbatim by PHP — no further date computation is needed downstream.
+///
+/// When the predecessor is unplaced (no entry in `assignments`) the ST
+/// step is silently skipped: the engine already reports an "X tasks
+/// could not be placed" warning for the upstream gap, and emitting an
+/// ST assignment without a real anchor would either need a fabricated
+/// "today midnight" anchor (misleading) or a `null` field (PHP-side
+/// burden). Easier and safer to leave the assignment unset; the PHP
+/// persistence layer treats absence as "no engine answer for this task".
+fn build_outsourced_assignments(
+    jobs: &[crate::model::job::JobInput],
+    assignments: &[ComputedAssignment],
+    start_date: chrono::NaiveDate,
+    tick_minutes: u32,
+) -> Vec<OutsourcedAssignment> {
+    use chrono::NaiveDateTime;
+
+    let internal_end_by_task: HashMap<&str, NaiveDateTime> = assignments
+        .iter()
+        .filter_map(|a| {
+            NaiveDateTime::parse_from_str(&a.scheduled_end, "%Y-%m-%dT%H:%M:%S")
+                .ok()
+                .map(|dt| (a.task_id.as_str(), dt))
+        })
+        .collect();
+
+    let today_midnight = start_date
+        .and_hms_opt(0, 0, 0)
+        .expect("midnight is always valid");
+
+    let mut out: Vec<OutsourcedAssignment> = Vec::new();
+    for job in jobs {
+        for element in &job.elements {
+            let mut sorted = element.tasks.clone();
+            sorted.sort_by_key(|t| t.sequence_order);
+
+            // last_end carries either the Internal predecessor's
+            // scheduledEnd or, when chained, the previous ST step's
+            // computed return — either of which is the correct anchor
+            // for the next step's departure formula.
+            let mut last_end: Option<NaiveDateTime> = None;
+            for task in &sorted {
+                match &task.outsourced {
+                    Some(params) => {
+                        if let Some(pred_end) = last_end {
+                            let dates = outsourced::compute_dates(
+                                pred_end, params, today_midnight, tick_minutes,
+                            );
+                            out.push(OutsourcedAssignment {
+                                task_id: task.id.clone(),
+                                provider_id: params.provider_id.clone(),
+                                scheduled_start: dates.departure_dt
+                                    .format("%Y-%m-%dT%H:%M:%S")
+                                    .to_string(),
+                                scheduled_end: dates.return_dt
+                                    .format("%Y-%m-%dT%H:%M:%S")
+                                    .to_string(),
+                            });
+                            last_end = Some(dates.return_dt);
+                        }
+                        // else: predecessor not placed — see fn comment.
+                    }
+                    None => {
+                        last_end = internal_end_by_task
+                            .get(task.id.as_str())
+                            .copied();
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Validate operator concurrent groups against the request snapshot.
@@ -675,6 +763,12 @@ pub fn build_actions(
             sorted_tasks.sort_by_key(|t| t.sequence_order);
 
             let mut prev_task_id: Option<String> = None;
+            // Outsourced steps that have appeared in sequence order since
+            // the last internal task. They are not placed by the engine;
+            // they get attached to the next internal task as its
+            // `outsourced_predecessor_chain`, which the forward pass
+            // walks to compute that task's earliest start.
+            let mut pending_outsourced_chain: Vec<crate::model::job::OutsourcedParams> = Vec::new();
 
             // Extract similarity-relevant spec fields once per element — all
             // its tasks share the same underlying ElementSpec.
@@ -683,6 +777,16 @@ pub fn build_actions(
             );
 
             for task in &sorted_tasks {
+                // Outsourced step: defer to the next internal task. Don't
+                // push an Action — the engine doesn't place it on a station
+                // or operator. Its scheduledStart / scheduledEnd are
+                // emitted in a separate pass over `jobs` after forward_pass
+                // completes (see `build_outsourced_assignments`).
+                if let Some(out_params) = &task.outsourced {
+                    pending_outsourced_chain.push(out_params.clone());
+                    continue;
+                }
+
                 let station_idx = match station_id_to_idx.get(&task.station_id) {
                     Some(&idx) => idx,
                     None => continue, // skip unknown stations
@@ -708,8 +812,13 @@ pub fn build_actions(
                     }
                     None => 0,
                 };
-                let outsourcing_gap = minutes_to_ticks(task.predecessor_gap_minutes, tick_minutes);
-                let predecessor_gap_ticks = drying_gap + outsourcing_gap;
+                // Outsourcing is no longer expressed as a fixed pre-computed
+                // gap. Outsourced tasks now arrive in the input as their own
+                // TaskInputs (kind=Outsourced), are skipped by build_actions,
+                // and their dynamic return tick is computed at forward-pass
+                // time from the predecessor's actual end_tick — so the
+                // contribution to `predecessor_gap_ticks` here is zero.
+                let predecessor_gap_ticks = drying_gap;
 
                 let last = last_values.get(&task.id).copied().unwrap_or(u64::MAX);
 
@@ -752,11 +861,16 @@ pub fn build_actions(
                     spec_snapshot: spec_snapshot.clone(),
                     setup_progress: 0.0,
                     setup_end_tick: None,
+                    outsourced_predecessor_chain: std::mem::take(&mut pending_outsourced_chain),
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
                 prev_task_id = Some(task.id.clone());
             }
+            // Note: any ST tasks left at the tail of an element (no
+            // internal successor) are intentionally ignored here. Their
+            // assignments are still emitted later by the output pass over
+            // `jobs`, anchored on the last internal task's end_tick.
         }
     }
 
@@ -1401,7 +1515,7 @@ mod integration_tests {
                     is_pinned: false,
                     pinned_start_tick: None,
                     pinned_end_tick: None,
-                    predecessor_gap_minutes: 0,
+                    outsourced: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1726,7 +1840,7 @@ mod integration_tests {
                         is_pinned: true,
                         pinned_start_tick: Some(pinned_tick),
                         pinned_end_tick: None,
-                        predecessor_gap_minutes: 0,
+                        outsourced: None,
                     },
                     TaskInput {
                         id: "task-finish".into(),
@@ -1736,8 +1850,8 @@ mod integration_tests {
                         sequence_order: 1,
                         is_pinned: false,
                         pinned_start_tick: None,
-                    pinned_end_tick: None,
-                    predecessor_gap_minutes: 0,
+                        pinned_end_tick: None,
+                        outsourced: None,
                     },
                 ],
                 spec: None,
@@ -1932,7 +2046,7 @@ mod integration_tests {
                     is_pinned: false,
                     pinned_start_tick: None,
                     pinned_end_tick: None,
-                    predecessor_gap_minutes: 0,
+                    outsourced: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1993,8 +2107,8 @@ mod integration_tests {
                 id: format!("{id}-elem"),
                 name: None,
                 tasks: vec![
-                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, pinned_start_tick: None, pinned_end_tick: None, predecessor_gap_minutes: 0 },
-                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, pinned_start_tick: None, pinned_end_tick: None, predecessor_gap_minutes: 0 },
+                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None },
+                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None },
                 ],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2065,7 +2179,7 @@ mod integration_tests {
                     is_pinned: true,
                     pinned_start_tick: Some(pin_tick),
                     pinned_end_tick: None,
-                    predecessor_gap_minutes: 0,
+                    outsourced: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2161,7 +2275,7 @@ mod integration_tests {
                     is_pinned: true,
                     pinned_start_tick: Some(start),
                     pinned_end_tick: Some(end),
-                    predecessor_gap_minutes: 0,
+                    outsourced: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2205,6 +2319,281 @@ mod integration_tests {
         assert_eq!(
             b_end - b_start, 60,
             "B's emitted duration must also follow pinned_end_tick (1 tick)"
+        );
+    }
+
+    // ====================================================================
+    // Outsourcing precedence regression — reproduces the job-4569 bug.
+    //
+    // Before the SSOT-in-Rust refactor, ST steps were collapsed in PHP to
+    // a flat `predecessorGapMinutes = totalCalendarDays × 24 × 60` on the
+    // next internal task. That formula was time-of-day blind: when the
+    // internal predecessor finished after the provider cutoff, the real
+    // ST departure pushed to the next business day, the real return ran
+    // 24h+ later than the gap predicted, and the engine cheerfully placed
+    // the successor *before* the actual return — silent precedence
+    // violation invisible to the precedence_validator (it never saw the
+    // ST task at all).
+    //
+    // Now: the engine receives the ST task as a TaskInput with
+    // `outsourced` set, computes the return tick from the predecessor's
+    // ACTUAL end_tick at forward-pass time, and uses it as the floor for
+    // the successor. The integration test below proves the constraint
+    // holds end-to-end.
+    // ====================================================================
+    #[test]
+    fn outsourced_step_floor_blocks_internal_successor_until_return() {
+        use crate::model::job::OutsourcedParams;
+
+        let stations = vec![
+            make_station("press", "Press", false),
+            make_station("finish", "Finish", false),
+        ];
+
+        let operators = vec![
+            make_always_on_operator(
+                "op",
+                "Op",
+                &[("press", 1.0), ("finish", 1.0)],
+                Vec::new(),
+            ),
+        ];
+
+        // Job with [Internal A on press, Outsourced (2 work days, 1
+        // transit each way, cutoff 14:00, reception 09:00), Internal B
+        // on finish]. With a fresh schedule the engine will start A at
+        // start_date 00:00 — A ends within minutes. ST departs same day
+        // (assuming start_date is a weekday) at 14:00, returns 4 BD
+        // later at 09:00. B must therefore start ≥ that return moment.
+        let outsourced_params = OutsourcedParams {
+            provider_id: "prov-1".into(),
+            work_days: 2,
+            transit_days: 1,
+            latest_departure_minutes: 14 * 60,
+            reception_minutes: 9 * 60,
+            manual_departure_tick: None,
+            manual_return_tick: None,
+        };
+
+        let job = JobInput {
+            id: "job-4569".into(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: "elem".into(),
+                name: None,
+                tasks: vec![
+                    TaskInput {
+                        id: "task-A".into(),
+                        station_id: "press".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 0,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        pinned_end_tick: None,
+                        outsourced: None,
+                    },
+                    TaskInput {
+                        id: "task-ST".into(),
+                        station_id: String::new(), // ignored when outsourced is set
+                        setup_minutes: 0,
+                        run_minutes: 0,
+                        sequence_order: 1,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        pinned_end_tick: None,
+                        outsourced: Some(outsourced_params.clone()),
+                    },
+                    TaskInput {
+                        id: "task-B".into(),
+                        station_id: "finish".into(),
+                        setup_minutes: 0,
+                        run_minutes: 60,
+                        sequence_order: 2,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        pinned_end_tick: None,
+                        outsourced: None,
+                    },
+                ],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let request = ComputeRequest {
+            stations,
+            operators,
+            jobs: vec![job],
+            options: Some(ComputeOptions {
+                horizon_days: 30,
+                tick_minutes: 15,
+                fbi_max_iterations: 1,
+                multi_start: false,
+                perturbed_starts: 0,
+                skip_lns: Some(true),
+                lns_budget_ms: None,
+                precedence_min_gap_ticks: 1,
+            }),
+            station_groups: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+
+        let result = compute(&request);
+
+        // Find the assignments by task id.
+        let a = result.assignments.iter().find(|a| a.task_id == "task-A")
+            .expect("Internal A should be placed");
+        let b = result.assignments.iter().find(|a| a.task_id == "task-B")
+            .expect("Internal B should be placed");
+        let st = result.outsourced_assignments.iter()
+            .find(|o| o.task_id == "task-ST")
+            .expect("ST must be present in outsourced_assignments");
+
+        // The actual claim: B must not start before the ST return.
+        // Precise comparison via parsed datetimes; the ISO strings the
+        // engine emits compare lexicographically too, but parsing is
+        // robust to formatting variation.
+        let b_start = iso_to_minutes(&b.scheduled_start);
+        let st_return = iso_to_minutes(&st.scheduled_end);
+        assert!(
+            b_start >= st_return,
+            "Internal B must start ≥ ST return. A ends {}, ST departs {}, ST returns {}, B starts {}",
+            a.scheduled_end, st.scheduled_start, st.scheduled_end, b.scheduled_start
+        );
+
+        // ST departure must be after A ends (sanity).
+        let a_end = iso_to_minutes(&a.scheduled_end);
+        let st_dep = iso_to_minutes(&st.scheduled_start);
+        assert!(
+            st_dep >= a_end,
+            "ST departure {} must be ≥ A end {}",
+            st.scheduled_start, a.scheduled_end
+        );
+
+        // Provider id round-trips intact.
+        assert_eq!(st.provider_id, "prov-1");
+    }
+
+    /// Same shape but with `manualReturn` overriding the auto-formula:
+    /// the engine must respect the user's hard date.
+    #[test]
+    fn manual_return_override_constrains_internal_successor() {
+        use crate::model::job::OutsourcedParams;
+
+        let stations = vec![
+            make_station("press", "Press", false),
+            make_station("finish", "Finish", false),
+        ];
+        let operators = vec![
+            make_always_on_operator(
+                "op",
+                "Op",
+                &[("press", 1.0), ("finish", 1.0)],
+                Vec::new(),
+            ),
+        ];
+
+        // Manual return = 5 days × 24h × (60min / 15 tick_min) = 480 ticks.
+        // Whatever date math would have produced, the engine must place
+        // task-B at or after that exact tick.
+        let manual_return_tick: usize = 5 * 24 * 60 / 15;
+        let outsourced_params = OutsourcedParams {
+            provider_id: "prov-1".into(),
+            work_days: 1,
+            transit_days: 0,
+            latest_departure_minutes: 14 * 60,
+            reception_minutes: 9 * 60,
+            manual_departure_tick: None,
+            manual_return_tick: Some(manual_return_tick),
+        };
+
+        let job = JobInput {
+            id: "j".into(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: "e".into(),
+                name: None,
+                tasks: vec![
+                    TaskInput {
+                        id: "A".into(),
+                        station_id: "press".into(),
+                        setup_minutes: 0,
+                        run_minutes: 30,
+                        sequence_order: 0,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        pinned_end_tick: None,
+                        outsourced: None,
+                    },
+                    TaskInput {
+                        id: "ST".into(),
+                        station_id: String::new(),
+                        setup_minutes: 0,
+                        run_minutes: 0,
+                        sequence_order: 1,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        pinned_end_tick: None,
+                        outsourced: Some(outsourced_params.clone()),
+                    },
+                    TaskInput {
+                        id: "B".into(),
+                        station_id: "finish".into(),
+                        setup_minutes: 0,
+                        run_minutes: 30,
+                        sequence_order: 2,
+                        is_pinned: false,
+                        pinned_start_tick: None,
+                        pinned_end_tick: None,
+                        outsourced: None,
+                    },
+                ],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let request = ComputeRequest {
+            stations,
+            operators,
+            jobs: vec![job],
+            options: Some(ComputeOptions {
+                horizon_days: 30,
+                tick_minutes: 15,
+                fbi_max_iterations: 1,
+                multi_start: false,
+                perturbed_starts: 0,
+                skip_lns: Some(true),
+                lns_budget_ms: None,
+                precedence_min_gap_ticks: 1,
+            }),
+            station_groups: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+
+        let result = compute(&request);
+        let b = result.assignments.iter().find(|a| a.task_id == "B")
+            .expect("B should be placed");
+        let st = result.outsourced_assignments.iter().find(|o| o.task_id == "ST")
+            .expect("ST emitted");
+
+        // ST.scheduled_end must equal the manual return moment: 5 days
+        // since start_date midnight = 5 × 24 × 60 = 7200 minutes.
+        let st_return = iso_to_minutes(&st.scheduled_end);
+        let b_start = iso_to_minutes(&b.scheduled_start);
+        assert!(
+            b_start >= st_return,
+            "manual_return_tick must gate B: ST returns {}, B starts {}",
+            st.scheduled_end, b.scheduled_start
         );
     }
 }

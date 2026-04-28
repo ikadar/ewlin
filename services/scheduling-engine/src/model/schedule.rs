@@ -134,6 +134,27 @@ pub struct ScheduleResult {
     /// Actual tick granularity used (may differ from requested if per-station
     /// tick_minutes are configured — the engine uses the minimum).
     pub tick_minutes: u32,
+    /// Outsourced (ST) step placements: one entry per outsourced TaskInput
+    /// the request submitted, in element-sequence order. Empty when the
+    /// request had no outsourced tasks. Each entry's `departure` /
+    /// `return` are computed by the engine from the predecessor internal
+    /// task's actual end tick — no PHP-side recomputation needed.
+    #[serde(default)]
+    pub outsourced_assignments: Vec<OutsourcedAssignment>,
+}
+
+/// One placed outsourced step, ready for PHP-side persistence verbatim.
+/// `scheduled_start` and `scheduled_end` use the same ISO 8601 (no
+/// timezone) format as `ComputedAssignment.scheduled_start`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutsourcedAssignment {
+    pub task_id: String,
+    pub provider_id: String,
+    /// Departure datetime — when the work leaves the workshop.
+    pub scheduled_start: String,
+    /// Return datetime — when the work is back from the provider.
+    pub scheduled_end: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

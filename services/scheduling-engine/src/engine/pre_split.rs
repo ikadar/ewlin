@@ -104,6 +104,16 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 0
             };
 
+            // Same logic for the outsourced chain: only the first chunk
+            // inherits the chain that sits between the original
+            // predecessor and the (now-split) action. Subsequent chunks
+            // chain through prev_chunk_idx and have no ST gap to honour.
+            let outsourced_predecessor_chain = if is_first {
+                action.outsourced_predecessor_chain.clone()
+            } else {
+                Vec::new()
+            };
+
             // Cross-element / cross-job extra predecessors apply to the
             // first chunk only (subsequent chunks chain through prev_chunk_idx).
             let additional_predecessors = if is_first {
@@ -154,6 +164,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 spec_snapshot: action.spec_snapshot.clone(),
                 setup_progress: 0.0,
                 setup_end_tick: None,
+                outsourced_predecessor_chain,
             });
 
             prev_chunk_idx = Some(idx);
@@ -239,6 +250,7 @@ mod tests {
             spec_snapshot: SpecSnapshot::default(),
             setup_progress: 0.0,
             setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
         }
     }
 
@@ -390,5 +402,6 @@ pub fn clone_action(a: &Action) -> Action {
         spec_snapshot: a.spec_snapshot.clone(),
         setup_progress: a.setup_progress,
         setup_end_tick: a.setup_end_tick,
+        outsourced_predecessor_chain: a.outsourced_predecessor_chain.clone(),
     }
 }
