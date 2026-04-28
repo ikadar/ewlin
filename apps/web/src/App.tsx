@@ -392,6 +392,7 @@ function AppContent() {
   const [jcfRequiredJobs, setJcfRequiredJobs] = useState('');
   const [jcfDeadline, setJcfDeadline] = useState('');
   const [jcfBatDeadline, setJcfBatDeadline] = useState('');
+  const [jcfDeadlineRelativeDays, setJcfDeadlineRelativeDays] = useState<string>('');
   const [jcfDeadlinePriority, setJcfDeadlinePriority] = useState(2);
   // v0.4.8: Client and Template autocomplete state
   const [jcfClient, setJcfClient] = useState('');
@@ -452,6 +453,10 @@ function AppContent() {
     setJcfSaveError(null);
 
     try {
+      const parsedRelativeDays = jcfDeadlineRelativeDays.trim() === ''
+        ? null
+        : parseInt(jcfDeadlineRelativeDays, 10);
+
       if (isEditMode && editingJobId) {
         // v0.5.13b: Update existing job (metadata + elements)
         await updateJob({
@@ -461,7 +466,8 @@ function AppContent() {
             client: jcfClient,
             referent: jcfReferent || null,
             description: jcfIntitule,
-            workshopExitDate: jcfDeadline,
+            workshopExitDate: jcfDeadline || null,
+            deadlineRelativeWorkingDays: parsedRelativeDays,
             batDeadline: jcfBatDeadline || null,
             deadlinePriority: jcfDeadlinePriority,
             elements: jcfElements.map(transformJcfElementToRequest),
@@ -486,6 +492,7 @@ function AppContent() {
           jcfBatDeadline || undefined,
           jcfReferent || undefined,
           jcfDeadlinePriority,
+          parsedRelativeDays,
         );
         await createJob(request).unwrap();
       }
@@ -512,6 +519,7 @@ function AppContent() {
       setJcfRequiredJobs('');
       setJcfDeadline('');
       setJcfBatDeadline('');
+      setJcfDeadlineRelativeDays('');
       setJcfDeadlinePriority(2);
       setJcfElements([{ ...DEFAULT_ELEMENT }]);
       setSequenceWorkflows([]); // v0.4.31: Reset workflow on save
@@ -524,7 +532,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch, autoRecompute]);
+  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlineRelativeDays, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch, autoRecompute]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -558,6 +566,8 @@ function AppContent() {
     setJcfIntitule('');
     setJcfQuantity('');
     setJcfDeadline('');
+    setJcfBatDeadline('');
+    setJcfDeadlineRelativeDays('');
     setJcfElements([{ ...DEFAULT_ELEMENT }]);
     setSequenceWorkflows([]); // v0.4.31: Reset workflow on close
     setJcfSaveError(null); // v0.4.33: Reset API error on close
@@ -690,8 +700,11 @@ function AppContent() {
     setJcfClient(job.client);
     setJcfReferent(job.referent ?? '');
     setJcfIntitule(job.description);
-    setJcfDeadline(job.workshopExitDate);
+    setJcfDeadline(job.workshopExitDate ?? '');
     setJcfBatDeadline(job.batDeadline ?? '');
+    setJcfDeadlineRelativeDays(
+      job.deadlineRelativeWorkingDays != null ? String(job.deadlineRelativeWorkingDays) : ''
+    );
     setJcfDeadlinePriority(job.deadlinePriority ?? 2);
     setJcfQuantity(job.quantity?.toString() ?? '');
     setJcfShipperId(job.shipperId ?? '');
@@ -2115,6 +2128,8 @@ function AppContent() {
           onShipperIdChange={setJcfShipperId}
           deadline={jcfDeadline}
           onDeadlineChange={setJcfDeadline}
+          deadlineRelativeDays={jcfDeadlineRelativeDays}
+          onDeadlineRelativeDaysChange={setJcfDeadlineRelativeDays}
           batDeadline={jcfBatDeadline}
           onBatDeadlineChange={setJcfBatDeadline}
           deadlinePriority={jcfDeadlinePriority}

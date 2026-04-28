@@ -264,7 +264,8 @@ export async function createJob(request: CreateJobRequest): Promise<CreateJobRes
       reference: request.reference,
       client: request.client,
       description: request.description,
-      workshopExitDate: request.workshopExitDate,
+      workshopExitDate: request.workshopExitDate ?? null,
+      deadlineRelativeWorkingDays: request.deadlineRelativeWorkingDays ?? null,
       status: request.status,
       elements: request.elements.map((el, index) => ({
         id: `elem-${index}-${Date.now()}`,

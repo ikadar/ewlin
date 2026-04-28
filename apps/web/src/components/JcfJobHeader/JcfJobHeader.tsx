@@ -44,6 +44,9 @@ export interface JcfJobHeaderProps {
   onShipperIdChange?: (value: string) => void;
   deadline: string;
   onDeadlineChange: (value: string) => void;
+  /** Relative deadline as J+X working days (string in form state, parsed at submit). */
+  deadlineRelativeDays?: string;
+  onDeadlineRelativeDaysChange?: (value: string) => void;
   /** BAT deadline (ISO or French format) */
   batDeadline?: string;
   onBatDeadlineChange?: (value: string) => void;
@@ -84,6 +87,8 @@ export function JcfJobHeader({
   onShipperIdChange,
   deadline,
   onDeadlineChange,
+  deadlineRelativeDays,
+  onDeadlineRelativeDaysChange,
   batDeadline,
   onBatDeadlineChange,
   deadlinePriority,
@@ -456,20 +461,57 @@ export function JcfJobHeader({
 
       {/* Row 2: Details */}
       <div className="flex gap-[10px] flex-wrap mt-2">
-        {/* Deadline */}
-        <div className="w-[182px]">
-          <label htmlFor="jcf-deadline" className={labelClass}>
-            Départ atelier
-          </label>
-          <input
-            id="jcf-deadline"
-            type="datetime-local"
-            value={deadlineNativeValue}
-            onChange={handleNativeDateChange}
-            className={`${inputBaseClass} font-mono [color-scheme:dark]`}
-            data-testid="jcf-field-deadline"
-          />
-        </div>
+        {/* Deadline + Délai relatif: at least one must be filled (OR-required) */}
+        {(() => {
+          const relativeRaw = (deadlineRelativeDays ?? '').trim();
+          const bothEmpty = !deadline.trim() && relativeRaw === '';
+          return (
+            <>
+              <div className="w-[182px]">
+                <label htmlFor="jcf-deadline" className={labelClass}>
+                  Départ atelier
+                </label>
+                <div className="relative">
+                  <input
+                    id="jcf-deadline"
+                    type="datetime-local"
+                    value={deadlineNativeValue}
+                    onChange={handleNativeDateChange}
+                    className={`${inputBaseClass} font-mono [color-scheme:dark]`}
+                    data-testid="jcf-field-deadline"
+                  />
+                  <RequiredDot show={bothEmpty} />
+                </div>
+              </div>
+
+              {onDeadlineRelativeDaysChange && (
+                <div className="w-[120px]">
+                  <label htmlFor="jcf-deadline-relative" className={labelClass}>
+                    Délai (J+)
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="jcf-deadline-relative"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="\d*"
+                      value={deadlineRelativeDays ?? ''}
+                      onChange={(e) => {
+                        const cleaned = e.target.value.replace(/[^\d]/g, '');
+                        onDeadlineRelativeDaysChange(cleaned);
+                      }}
+                      className={`${inputBaseClass} text-right font-mono`}
+                      placeholder="ex: 5"
+                      autoComplete="off"
+                      data-testid="jcf-field-deadline-relative"
+                    />
+                    <RequiredDot show={bothEmpty} />
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* D.L. BAT */}
         {onBatDeadlineChange && (
