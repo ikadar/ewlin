@@ -22,16 +22,49 @@ import type { Config } from '../config.js';
 import {
   AnthropicClient,
   type AnthropicMessage,
+  type AnthropicMessagesRequest,
+  type AnthropicMessagesResponse,
   type AnthropicContentBlock,
   type AnthropicToolDefinition,
   type AnthropicToolUseBlock,
 } from './anthropic.js';
+import { OpenAICompatClient } from './openaiCompat.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import { allTools, findTool } from '../tools/registry.js';
 import { zodToJsonSchema } from '../tools/jsonSchema.js';
 import { PhpClient } from '../phpClient.js';
 import type { ToolContext, ToolResult } from '../tools/types.js';
 import { todayIsoUtc } from '../tools/dates.js';
+
+/**
+ * Provider-agnostic surface used by the loop. Anthropic and OpenAI-compat
+ * (Groq) both implement this — see anthropic.ts and openaiCompat.ts.
+ */
+interface LlmClient {
+  messages(
+    request: AnthropicMessagesRequest,
+    signal?: AbortSignal,
+  ): Promise<AnthropicMessagesResponse>;
+}
+
+function buildLlmClient(config: Config): { client: LlmClient; model: string } | { error: string } {
+  if (config.llmProvider === 'groq') {
+    if (!config.groqApiKey) {
+      return { error: "GROQ_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service." };
+    }
+    return {
+      client: new OpenAICompatClient(config.groqApiKey, config.groqBaseUrl, config.groqModel),
+      model: config.groqModel,
+    };
+  }
+  if (!config.anthropicApiKey) {
+    return { error: "ANTHROPIC_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service." };
+  }
+  return {
+    client: new AnthropicClient(config.anthropicApiKey, config.anthropicBaseUrl),
+    model: config.llmModel,
+  };
+}
 
 /**
  * Wire shape stored on the FE between turns. Mirrors Anthropic's
@@ -151,17 +184,16 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
   const systemPrompt = buildSystemPrompt(todayIso);
   const toolCatalog = buildToolCatalog();
 
-  if (!args.config.anthropicApiKey) {
+  const built = buildLlmClient(args.config);
+  if ('error' in built) {
     return {
       kind: 'error',
       error: 'MISSING_API_KEY',
-      message:
-        "ANTHROPIC_API_KEY n'est pas configurée côté console-service. Ajoute-la dans .env puis redémarre le service.",
+      message: built.error,
       conversationAfter: [],
     };
   }
-
-  const anthropic = new AnthropicClient(args.config.anthropicApiKey, args.config.anthropicBaseUrl);
+  const { client: llm, model: llmModel } = built;
   const php = args.php ?? new PhpClient(args.config.phpApiUrl, args.jwt);
   const ctx: ToolContext = { php, dryRun: args.dryRun, todayIso };
 
@@ -180,16 +212,17 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
 
   try {
     for (let turn = 0; turn < args.config.llmMaxTurns; turn++) {
-      const response = await anthropic.messages(
+      const response = await llm.messages(
         {
-          model: args.config.llmModel,
-          max_tokens: 2048,
+          model: llmModel,
+          max_tokens: args.config.llmMaxTokensPerTurn,
           system: systemPrompt,
           messages,
           tools: toolCatalog,
           // 'any' forces a tool call every turn — the model still chooses
           // WHICH tool, so it can call propose_plan/ask_user to terminate.
-          // Anthropic's tool_choice is honored (unlike Ollama's).
+          // Anthropic honors this directly; OpenAICompatClient maps to
+          // OpenAI's 'required'.
           tool_choice: { type: 'any' },
           temperature: args.config.llmTemperature,
         },
