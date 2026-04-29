@@ -20,9 +20,11 @@ interface CompletionToggleIconProps {
   isCompleted: boolean;
   /** Optional callback fired AFTER a successful toggle in prod mode (e.g. to invalidate the snapshot cache). */
   onToggled?: (newState: boolean) => void;
+  /** Override the default icon dimensions (default: 'w-3 h-3' to match grid tiles). */
+  iconClassName?: string;
 }
 
-export function CompletionToggleIcon({ taskId, isCompleted, onToggled }: CompletionToggleIconProps) {
+export function CompletionToggleIcon({ taskId, isCompleted, onToggled, iconClassName = 'w-3 h-3' }: CompletionToggleIconProps) {
   const { mode } = useScenarioMode();
   const [toggleProdCompletion, { isLoading }] = useToggleProdCompletionMutation();
 
@@ -65,7 +67,7 @@ export function CompletionToggleIcon({ taskId, isCompleted, onToggled }: Complet
       data-completed={isCompleted ? 'true' : 'false'}
       data-mode={mode}
     >
-      <Icon className="w-3 h-3 shrink-0" />
+      <Icon className={`${iconClassName} shrink-0`} />
     </span>
   );
 }

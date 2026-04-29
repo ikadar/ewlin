@@ -4,6 +4,7 @@ import { X, Calendar, CalendarCheck } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
 import { getTasksForJob } from '../../utils/taskHelpers';
+import { useScenarioMode } from '../../contexts/ScenarioContext';
 
 export interface JobDetailsPanelProps {
   /** Selected job to display (null if none selected) */
@@ -167,11 +168,17 @@ export function JobDetailsPanel({
     }
   }, [contextMenu, onRecallTask]);
 
+  const { mode: scenarioMode } = useScenarioMode();
   const handleContextMenuToggleComplete = useCallback(() => {
+    // V1 versioning rule: completion is execution truth, editable only
+    // from the prod view. In préprod the JDP shows the mirrored state
+    // but the chef cannot fake completion — that would corrupt the
+    // planning basis at the next promotion.
+    if (scenarioMode !== 'prod') return;
     if (contextMenu && onToggleComplete) {
       onToggleComplete(contextMenu.assignmentId);
     }
-  }, [contextMenu, onToggleComplete]);
+  }, [contextMenu, onToggleComplete, scenarioMode]);
 
   const handleContextMenuTogglePin = useCallback(() => {
     if (contextMenu && onTogglePin) {
@@ -367,6 +374,7 @@ export function JobDetailsPanel({
           onFuse={onFuseTask ? handleContextMenuFuse : undefined}
           isSplit={isContextMenuSplit}
           isUnassigned={contextMenu.isUnassigned}
+          hideCompletionToggle={scenarioMode !== 'prod'}
           onClose={handleContextMenuClose}
         />
       )}

@@ -15,6 +15,8 @@ export interface JobDetailContextMenuProps {
   isSplit?: boolean;
   /** Whether this is an unassigned task (hides recall/completion) */
   isUnassigned?: boolean;
+  /** Hide the "Marquer terminée" option (V1 versioning: completion editable from prod view only). */
+  hideCompletionToggle?: boolean;
   onClose: () => void;
 }
 
@@ -59,6 +61,7 @@ export function JobDetailContextMenu({
   onFuse,
   isSplit = false,
   isUnassigned = false,
+  hideCompletionToggle = false,
   onClose,
 }: JobDetailContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -163,12 +166,14 @@ export function JobDetailContextMenu({
     >
       {!isUnassigned && (
         <>
-          <MenuItem
-            icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-            label={isCompleted ? 'Marquer à faire' : 'Marquer terminée'}
-            onClick={handleToggleComplete}
-            testId="job-detail-context-toggle-complete"
-          />
+          {!hideCompletionToggle && (
+            <MenuItem
+              icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              label={isCompleted ? 'Marquer à faire' : 'Marquer terminée'}
+              onClick={handleToggleComplete}
+              testId="job-detail-context-toggle-complete"
+            />
+          )}
           <MenuItem
             icon={<Pin className="w-4 h-4" />}
             label={isPinned ? 'Désépingler' : 'Épingler'}

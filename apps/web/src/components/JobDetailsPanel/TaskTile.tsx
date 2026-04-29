@@ -1,9 +1,10 @@
 import { memo } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
-import { Circle, CircleCheck, Scissors, Pin } from 'lucide-react';
+import { Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
+import { CompletionToggleIcon } from '../Tile/CompletionToggleIcon';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -232,13 +233,10 @@ export const TaskTile = memo(function TaskTile({
   // Get display name (station name for internal tasks)
   const displayName = station?.name || 'Unknown';
 
-  // Completion icon click handler
-  const handleToggleComplete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onToggleComplete && assignment) {
-      onToggleComplete(assignment.id);
-    }
-  };
+  // Completion is now reported via CompletionToggleIcon (frozen in préprod,
+  // dual-write to overlay + preprod when in prod). The legacy
+  // onToggleComplete callback is kept on the props for the JDP context-menu
+  // path, which is gated separately at the JobDetailsPanel level.
 
   // Pin icon click handler
   const handleTogglePin = (e: React.MouseEvent) => {
@@ -287,15 +285,11 @@ export const TaskTile = memo(function TaskTile({
       >
         <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              onClick={handleToggleComplete}
-              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
-                isCompleted ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'
-              }`}
-              title={isCompleted ? 'Marquer non terminée' : 'Marquer terminée'}
-            >
-              {isCompleted ? <CircleCheck className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-            </span>
+            <CompletionToggleIcon
+              taskId={task.id}
+              isCompleted={isCompleted}
+              iconClassName="w-3.5 h-3.5"
+            />
             <span
               onClick={handleTogglePin}
               className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
