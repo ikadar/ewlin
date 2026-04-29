@@ -2,8 +2,13 @@ import { useMemo } from 'react';
 
 export interface HoverCrosslinkProps {
   'data-flux-task-id'?: string;
-  onMouseEnter?: (e: React.MouseEvent) => void;
-  onMouseLeave?: (e: React.MouseEvent) => void;
+  /**
+   * Double-click triggers the heartbeat pulse on every DOM node carrying
+   * the same `data-flux-task-id`. Replaces the original hover-driven
+   * behaviour (caused too many accidental pulses when scanning the
+   * grid). Single-click semantics on the host element are unchanged.
+   */
+  onDoubleClick?: (e: React.MouseEvent) => void;
 }
 
 /** Duration of the heartbeat animation (matches @keyframes flux-hover-heartbeat). */
@@ -68,29 +73,20 @@ export function pulseTaskTiles(taskId: string | undefined): void {
 }
 
 /**
- * Viewport check against the window — grid tiles sit in scroll containers
- * clipped by the window, so their bounding rect reflects the actual
- * clipped position and a window-relative test is enough.
- */
-function isInViewport(el: HTMLElement): boolean {
-  const rect = el.getBoundingClientRect();
-  const vw = window.innerWidth || document.documentElement.clientWidth;
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return rect.bottom > 0 && rect.right > 0 && rect.top < vh && rect.left < vw;
-}
-
-/**
- * Crosslink a JDP tile row with its matching grid tile(s): while the mouse
- * hovers either side, every DOM node carrying `data-flux-task-id={taskId}`
- * gets the `flux-hover-linked` class, triggering the one-shot heartbeat
- * animation defined in index.css. Stateless on the React side — we poke
- * the DOM directly so we never cascade re-renders across the whole grid.
+ * Crosslink a JDP tile row with its matching grid tile(s): when the user
+ * **double-clicks** either side, every DOM node carrying
+ * `data-flux-task-id={taskId}` plays the one-shot heartbeat animation
+ * defined in `index.css`. Stateless on the React side — we poke the DOM
+ * directly so we never cascade re-renders across the whole grid.
  *
  * Gated on viewport: if the task has grid tiles but none are currently
- * visible, the heartbeat is skipped entirely — otherwise hovering a JDP
- * row would pulse it while hinting at an offscreen crosslink target the
- * user can't see. Tasks without any grid tile (e.g. outsourced) still
- * animate normally.
+ * visible, the pulse is dispatched via `pulseTaskTiles`, which uses an
+ * IntersectionObserver to defer the animation until a destination tile
+ * scrolls into view. JDP rows always pulse immediately (click
+ * confirmation).
+ *
+ * Hook name kept for source-control continuity; the trigger is now the
+ * `onDoubleClick` event (was hover before).
  *
  * Usage:
  *   <div {...useHoverCrosslink(task.id)}>…</div>
@@ -98,23 +94,13 @@ function isInViewport(el: HTMLElement): boolean {
 export function useHoverCrosslink(taskId: string | undefined): HoverCrosslinkProps {
   return useMemo(() => {
     if (!taskId) return {};
-    const selector = `[data-flux-task-id="${CSS.escape(taskId)}"]`;
     return {
       'data-flux-task-id': taskId,
-      onMouseEnter: () => {
-        const all = document.querySelectorAll<HTMLElement>(selector);
-        if (all.length === 0) return;
-
-        const gridTiles: HTMLElement[] = [];
-        all.forEach((el) => {
-          if (!el.matches('[data-testid^="task-tile-"]')) gridTiles.push(el);
-        });
-        if (gridTiles.length > 0 && !gridTiles.some(isInViewport)) return;
-
-        all.forEach((el) => el.classList.add('flux-hover-linked'));
-      },
-      onMouseLeave: () => {
-        document.querySelectorAll(selector).forEach((el) => el.classList.remove('flux-hover-linked'));
+      onDoubleClick: (e: React.MouseEvent) => {
+        // Don't let the dblclick reach parent click handlers (selection,
+        // popovers). The pulse is the dblclick's only effect.
+        e.stopPropagation();
+        pulseTaskTiles(taskId);
       },
     };
   }, [taskId]);

@@ -9,7 +9,7 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import type { PrerequisiteBlockingInfo } from '../../utils';
-import { useTooltipDelay, useHoverCrosslink } from '../../hooks';
+import { useHoverCrosslink } from '../../hooks';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
@@ -137,20 +137,27 @@ export const Tile = memo(function Tile({
   onToggleFrozenOverride,
   sequenceIndex,
 }: TileProps) {
-  // Unified tooltip delay (500ms show, 0ms hide)
-  const { isVisible: showTooltip, onMouseEnter: handleTooltipEnter, onMouseLeave: handleTooltipLeave } = useTooltipDelay();
-  // JDP ↔ grid crosslink — pulse only fires when the tile belongs to the
-  // currently selected job (i.e. the one whose JDP is open). Other jobs'
-  // tiles keep data-flux-task-id so JDP-side hovers still find them, but
-  // hovering them directly in the grid stays silent.
+  // Tooltip + crosslink reveal moved from hover to double-click. Hover
+  // triggers were too noisy when scanning the grid; dblclick is an
+  // explicit user intent. Single click still selects, right-click still
+  // opens the context menu.
+  const [showTooltip, setShowTooltip] = useState(false);
   const crosslink = useHoverCrosslink(task.id);
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    handleTooltipEnter();
-    if (isSelected) crosslink.onMouseEnter?.(e);
-  };
-  const handleMouseLeave = (e: React.MouseEvent) => {
-    handleTooltipLeave();
-    if (isSelected) crosslink.onMouseLeave?.(e);
+  // Auto-dismiss tooltip on the next document click (deferred to next
+  // tick so the dblclick that opened it doesn't immediately close it).
+  useEffect(() => {
+    if (!showTooltip) return;
+    const close = () => setShowTooltip(false);
+    const t = window.setTimeout(() => document.addEventListener('click', close), 0);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener('click', close);
+    };
+  }, [showTooltip]);
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowTooltip((v) => !v);
+    if (isSelected) crosslink.onDoubleClick?.(e);
   };
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;
@@ -256,8 +263,7 @@ export const Tile = memo(function Tile({
       }}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onDoubleClick={handleDoubleClick}
       data-job-id={job.id}
       data-testid={`tile-${assignment.id}`}
       data-scheduled-start={assignment.scheduledStart}

@@ -136,10 +136,11 @@ export function TileSegment({
   isSelected = false,
   onToggleFrozenOverride,
 }: TileSegmentProps) {
-  // JDP ↔ operator grid hover crosslink — only selected-job segments pulse.
+  // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
+  // selected-job segments only. Was a hover trigger; switched to dblclick
+  // (explicit user intent, no accidental pulses while scanning).
   const crosslink = useHoverCrosslink(taskId);
-  const hoverEnter = isSelected ? crosslink.onMouseEnter : undefined;
-  const hoverLeave = isSelected ? crosslink.onMouseLeave : undefined;
+  const handleDoubleClick = isSelected ? crosslink.onDoubleClick : undefined;
   // Safety zone visual integration mirrors Tile.tsx so both planning
   // surfaces (machine grid + operator grid) stay visually consistent.
   const isSafetyFrozen = inSafetyZone && !isFrozenOverridden;
@@ -208,8 +209,7 @@ export function TileSegment({
       data-safety-frozen={isSafetyFrozen ? 'true' : undefined}
       data-safety-overridden={inSafetyZone && isFrozenOverridden ? 'true' : undefined}
       data-flux-task-id={crosslink['data-flux-task-id']}
-      onMouseEnter={hoverEnter}
-      onMouseLeave={hoverLeave}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Background + left border, clipped by CSS polygon */}
       <div
