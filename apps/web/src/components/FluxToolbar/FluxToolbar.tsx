@@ -1,5 +1,8 @@
 import { memo, useRef } from 'react';
 import { Search, Plus } from 'lucide-react';
+import type { FluxFilters } from '@/components/FluxTable/fluxFilters';
+import type { FluxJob } from '@/components/FluxTable/fluxTypes';
+import { FluxFilterBar } from './FluxFilterBar';
 
 interface FluxToolbarProps {
   searchValue: string;
@@ -7,6 +10,10 @@ interface FluxToolbarProps {
   onNewJob: () => void;
   /** Ref forwarded from parent so Alt+F can focus this input. */
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
+  /** All jobs from the API — used to derive dynamic filter options. */
+  jobs: ReadonlyArray<FluxJob>;
+  filters: FluxFilters;
+  onFiltersChange: (next: FluxFilters) => void;
 }
 
 /**
@@ -19,6 +26,9 @@ export const FluxToolbar = memo(function FluxToolbar({
   onSearchChange,
   onNewJob,
   searchInputRef,
+  jobs,
+  filters,
+  onFiltersChange,
 }: FluxToolbarProps) {
   const internalRef = useRef<HTMLInputElement>(null);
   const ref = searchInputRef ?? internalRef;
@@ -45,24 +55,25 @@ export const FluxToolbar = memo(function FluxToolbar({
       </div>
 
       {/* Search bar */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary pointer-events-none"
-            strokeWidth={2}
-          />
-          <input
-            ref={ref}
-            type="text"
-            value={searchValue}
-            onChange={e => onSearchChange(e.target.value)}
-            placeholder="Rechercher..."
-            className="w-full pl-10 pr-4 py-2 text-base bg-flux-hover border border-flux-border rounded-lg text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            data-testid="flux-search"
-            aria-label="Rechercher dans le tableau de flux"
-          />
-        </div>
+      <div className="relative mb-3">
+        <Search
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary pointer-events-none"
+          strokeWidth={2}
+        />
+        <input
+          ref={ref}
+          type="text"
+          value={searchValue}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Rechercher..."
+          className="w-full pl-10 pr-4 py-2 text-base bg-flux-hover border border-flux-border rounded-lg text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+          data-testid="flux-search"
+          aria-label="Rechercher dans le tableau de flux"
+        />
       </div>
+
+      {/* Filter bar */}
+      <FluxFilterBar jobs={jobs} filters={filters} onChange={onFiltersChange} />
     </div>
   );
 });

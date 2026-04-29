@@ -179,11 +179,15 @@ export interface FluxJob {
    * has not yet triggered the auto-fill.
    */
   sortie: string | null;
+  /** Workshop exit date in ISO `YYYY-MM-DD` format. Used for date-range filters. */
+  sortieIso: string | null;
   /** Working-days delay (J+X) — set when the job has a relative deadline,
    * preserved even after auto-fill so the original value remains visible. */
   deadlineRelativeWorkingDays: number | null;
-  /** BAT deadline in JJ/MM format, e.g. "15/04". null if not set. */
+  /** BAT deadline in `YYYY-MM-DDTHH:mm` ISO format. null if not set. */
   batDeadline: string | null;
+  /** Job urgency, 0 (Impératif) → 3 (Flexible). Default 2 (Standard). */
+  deadlinePriority: number;
   /** One element for single-element jobs; two or more for multi-element. */
   elements: FluxElement[];
   transporteur: string | null;

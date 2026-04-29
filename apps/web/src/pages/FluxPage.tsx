@@ -11,11 +11,14 @@ import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
   computeTabCounts,
+  EMPTY_FLUX_FILTERS,
+  filterByCriteria,
   filterBySearch,
   filterByTab,
   pathnameToTab,
   tabToPathname,
   TAB_IDS,
+  type FluxFilters,
 } from '@/components/FluxTable/fluxFilters';
 import { sortFluxJobs, type SortColumn, type SortDirection } from '@/components/FluxTable/fluxSort';
 
@@ -85,6 +88,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
 
   // ── Search / keyboard state ──────────────────────────────────────────────
   const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<FluxFilters>(EMPTY_FLUX_FILTERS);
   const [focusedRowIndex, setFocusedRowIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,20 +105,24 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     }
   }, [sortColumn]);
 
-  // Filtered + sorted jobs: tab filter → search → sort
+  // Filtered + sorted jobs: tab filter → search → criteria → sort
   const filteredJobs = useMemo(
     () => sortFluxJobs(
-      jobs.filter(job => filterByTab(job, activeTab) && filterBySearch(job, search)),
+      jobs.filter(job =>
+        filterByTab(job, activeTab) &&
+        filterBySearch(job, search) &&
+        filterByCriteria(job, filters)
+      ),
       sortColumn,
       sortDirection,
     ),
-    [jobs, activeTab, search, sortColumn, sortDirection],
+    [jobs, activeTab, search, filters, sortColumn, sortDirection],
   );
 
-  // Tab counts: all 5 tabs recalculated based on current search and job state
+  // Tab counts: recalculated based on current search, filters, and job state
   const tabCounts = useMemo(
-    () => computeTabCounts(jobs, search),
-    [jobs, search],
+    () => computeTabCounts(jobs, search, filters),
+    [jobs, search, filters],
   );
 
   // Focused job ID for visual highlight (Alt+↑/↓)
@@ -132,6 +140,11 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const handleSearchChange = useCallback((value: string) => {
     setFocusedRowIndex(-1);
     setSearch(value);
+  }, []);
+
+  const handleFiltersChange = useCallback((next: FluxFilters) => {
+    setFocusedRowIndex(-1);
+    setFilters(next);
   }, []);
 
   const handleNewJob = useCallback(() => {
@@ -314,12 +327,15 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
       <div className="flex-1 overflow-hidden">
         <div className="p-4 h-full">
           <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden flex flex-col">
-            {/* Toolbar: title + search bar */}
+            {/* Toolbar: title + search bar + filter bar */}
             <FluxToolbar
               searchValue={search}
               onSearchChange={handleSearchChange}
               onNewJob={handleNewJob}
               searchInputRef={searchInputRef}
+              jobs={jobs}
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
             />
 
             {/* Tab bar */}

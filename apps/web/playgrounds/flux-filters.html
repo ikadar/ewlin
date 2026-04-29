@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Filters Playground — Flux Scheduler</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-hover: rgb(46, 46, 46);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-tertiary: rgb(160, 160, 160);
+    --flux-text-muted: rgb(128, 128, 128);
+    --flux-blue: rgb(59, 130, 246);
+    --flux-blue-hover: rgb(37, 99, 235);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--flux-base); color: var(--flux-text-primary);
+    min-height: 100vh; padding: 24px;
+    font-size: 13px; line-height: 1.45;
+  }
+
+  .header { max-width: 1280px; margin: 0 auto 16px; }
+  .header h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .header p { color: var(--flux-text-muted); font-size: 12px; }
+
+  .panel-controls {
+    max-width: 1280px; margin: 0 auto 12px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .panel-controls label { color: var(--flux-text-muted); font-size: 11px; align-self: center; }
+  .panel-controls .swatch {
+    padding: 4px 10px; font-size: 11px;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-secondary); border-radius: 4px; cursor: pointer;
+  }
+  .panel-controls .swatch.active { background: var(--flux-blue); border-color: var(--flux-blue); color: white; }
+
+  /* The flux page card */
+  .flux-card {
+    max-width: 1280px; margin: 0 auto;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border); border-radius: 8px; overflow: hidden;
+    display: flex; flex-direction: column;
+    min-height: 700px;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    border-bottom: 1px solid var(--flux-border);
+    padding: 16px 24px;
+  }
+  .toolbar-title-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .toolbar-title { font-size: 18px; font-weight: 600; color: var(--flux-text-primary); }
+  .btn-new {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; background: var(--flux-blue); border: 1px solid var(--flux-blue);
+    color: white; font-size: 13px; font-weight: 500; border-radius: 4px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-new:hover { background: var(--flux-blue-hover); }
+  .btn-new svg { width: 14px; height: 14px; }
+
+  /* Search bar */
+  .search-row { position: relative; margin-bottom: 12px; }
+  .search-row svg.search-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: var(--flux-text-tertiary); pointer-events: none;
+  }
+  .search-input {
+    width: 100%; padding: 8px 14px 8px 34px; font-size: 13px;
+    background: var(--flux-hover); border: 1px solid var(--flux-border);
+    border-radius: 6px; color: var(--flux-text-primary);
+    outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search-input::placeholder { color: var(--flux-text-muted); }
+  .search-input:focus { border-color: transparent; box-shadow: 0 0 0 2px var(--flux-blue); }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .filter-bar .reset-link {
+    background: none; border: none; color: var(--flux-text-tertiary);
+    font-size: 12px; cursor: pointer; padding: 4px 6px;
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .filter-bar .reset-link:hover { color: var(--flux-text-primary); }
+  .filter-bar .reset-link[disabled] { opacity: 0.35; cursor: default; text-decoration: none; }
+
+  /* Multi-select trigger */
+  .ms-wrap { position: relative; }
+  .ms-trigger {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; min-height: 32px;
+    background: var(--flux-base); border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-primary); border-radius: 4px;
+    font-size: 12px; cursor: pointer; transition: border-color 0.15s;
+    white-space: nowrap; max-width: 220px;
+  }
+  .ms-trigger:hover { border-color: var(--flux-text-tertiary); }
+  .ms-trigger.has-value { border-color: var(--flux-blue); }
+  .ms-label { color: var(--flux-text-tertiary); }
+  .ms-trigger.has-value .ms-label { color: var(--flux-text-primary); }
+  .ms-trigger .ms-count {
+    background: var(--flux-blue); color: white; padding: 1px 6px;
+    border-radius: 999px; font-size: 11px; font-weight: 600; min-width: 18px; text-align: center;
+  }
+  .ms-trigger svg { width: 12px; height: 12px; color: var(--flux-text-tertiary); flex-shrink: 0; }
+  .ms-clear-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--flux-text-tertiary); display: inline-flex; align-items: center;
+  }
+  .ms-clear-btn:hover { color: var(--flux-text-primary); }
+
+  /* Multi-select dropdown */
+  .ms-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border-light);
+    border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    min-width: 220px; max-height: 320px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .ms-search {
+    padding: 8px; border-bottom: 1px solid var(--flux-border);
+  }
+  .ms-search input {
+    width: 100%; padding: 5px 8px; font-size: 12px;
+    background: var(--flux-base); border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-primary); border-radius: 4px; outline: none;
+  }
+  .ms-search input:focus { border-color: var(--flux-blue); }
+  .ms-list { overflow-y: auto; padding: 4px 0; }
+  .ms-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer; font-size: 12px;
+    color: var(--flux-text-primary); transition: background 0.1s;
+  }
+  .ms-option:hover { background: var(--flux-hover); }
+  .ms-option.active { background: var(--flux-hover); }
+  .ms-option input[type="checkbox"] {
+    width: 14px; height: 14px; accent-color: var(--flux-blue); cursor: pointer; flex-shrink: 0;
+  }
+  .ms-option-label { flex: 1; }
+  .ms-option .swatch-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .ms-empty { padding: 12px; color: var(--flux-text-muted); font-size: 12px; text-align: center; }
+  .ms-footer {
+    padding: 6px 8px; border-top: 1px solid var(--flux-border);
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .ms-footer button {
+    background: none; border: none; color: var(--flux-text-tertiary);
+    font-size: 11px; cursor: pointer; padding: 2px 6px; border-radius: 3px;
+  }
+  .ms-footer button:hover { color: var(--flux-text-primary); background: var(--flux-hover); }
+
+  /* Date range */
+  .date-range {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px;
+    background: var(--flux-base); border: 1px solid var(--flux-border-light);
+    border-radius: 4px;
+  }
+  .date-range.has-value { border-color: var(--flux-blue); }
+  .date-range-label {
+    font-size: 11px; color: var(--flux-text-tertiary);
+    margin-right: 4px;
+  }
+  .date-range.has-value .date-range-label { color: var(--flux-text-primary); }
+  .date-range input[type="date"] {
+    background: transparent; border: none; color: var(--flux-text-primary);
+    font-size: 12px; padding: 3px 0; outline: none;
+    color-scheme: dark; font-family: inherit;
+  }
+  .date-range .sep { color: var(--flux-text-muted); font-size: 11px; }
+  .date-range .clear-x {
+    background: none; border: none; color: var(--flux-text-tertiary);
+    cursor: pointer; padding: 0 2px;
+    display: inline-flex; align-items: center;
+  }
+  .date-range .clear-x:hover { color: var(--flux-text-primary); }
+
+  /* Active filter recap line */
+  .recap {
+    display: flex; flex-wrap: wrap; gap: 4px 14px;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed var(--flux-border);
+    align-items: center; min-height: 28px;
+  }
+  .recap.empty { display: none; }
+  .recap-group {
+    display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  }
+  .recap-key {
+    font-size: 11px; color: var(--flux-text-tertiary); margin-right: 2px;
+    text-transform: lowercase; letter-spacing: 0.02em;
+  }
+  .recap-key::after { content: ":"; }
+  .recap-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 4px 2px 8px;
+    background: rgba(59, 130, 246, 0.18);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: var(--flux-text-primary);
+    border-radius: 999px; font-size: 11px; line-height: 1.4;
+    max-width: 220px;
+  }
+  .recap-chip .swatch-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+  .recap-chip .recap-text {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .recap-chip button {
+    background: none; border: none; color: var(--flux-text-tertiary);
+    cursor: pointer; padding: 0 2px; display: inline-flex; align-items: center;
+    border-radius: 50%;
+  }
+  .recap-chip button:hover { color: var(--flux-text-primary); background: rgba(255,255,255,0.08); }
+  .recap-sep {
+    color: var(--flux-text-muted); font-size: 11px;
+    user-select: none;
+  }
+
+  /* Tab bar (just for context) */
+  .tab-bar {
+    display: flex; border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-elevated);
+  }
+  .tab {
+    padding: 10px 16px; font-size: 12px; color: var(--flux-text-tertiary);
+    cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .tab:hover { color: var(--flux-text-primary); }
+  .tab.active { color: var(--flux-text-primary); border-bottom-color: var(--flux-blue); }
+  .tab .count {
+    margin-left: 6px; font-size: 11px;
+    background: var(--flux-hover); padding: 1px 6px; border-radius: 999px;
+  }
+  .tab.active .count { background: var(--flux-blue); color: white; }
+
+  /* Table */
+  .table-wrap { flex: 1; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead { background: var(--flux-elevated); }
+  th {
+    text-align: left; padding: 8px 12px; font-weight: 500;
+    color: var(--flux-text-tertiary); border-bottom: 1px solid var(--flux-border);
+    position: sticky; top: 0; background: var(--flux-elevated);
+  }
+  td {
+    padding: 8px 12px; border-bottom: 1px solid var(--flux-border);
+    color: var(--flux-text-primary);
+  }
+  tr:hover td { background: var(--flux-hover); }
+  .badge {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 500;
+  }
+  .badge-prio-0 { background: rgba(248, 113, 113, 0.18); color: rgb(248, 113, 113); }
+  .badge-prio-1 { background: rgba(251, 146, 60, 0.18); color: rgb(251, 146, 60); }
+  .badge-prio-2 { background: rgba(160, 160, 160, 0.18); color: var(--flux-text-secondary); }
+  .badge-prio-3 { background: rgba(96, 165, 250, 0.18); color: rgb(96, 165, 250); }
+
+  .status-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px;
+  }
+  .status-todo { background: rgb(248, 113, 113); }
+  .status-prep { background: rgb(251, 146, 60); }
+  .status-ready { background: rgb(96, 165, 250); }
+  .status-shipped { background: rgb(34, 197, 94); }
+  .status-invoiced { background: rgb(168, 85, 247); }
+
+  .results-meta {
+    padding: 8px 16px; font-size: 11px; color: var(--flux-text-muted);
+    border-bottom: 1px solid var(--flux-border); background: var(--flux-base);
+  }
+
+  /* Notes */
+  .notes {
+    max-width: 1280px; margin: 16px auto 0; font-size: 11px;
+    color: var(--flux-text-muted); padding: 12px;
+    background: var(--flux-surface); border: 1px solid var(--flux-border); border-radius: 6px;
+  }
+  .notes h3 { color: var(--flux-text-secondary); font-size: 12px; margin-bottom: 6px; }
+  .notes ul { list-style: none; padding: 0; }
+  .notes li { padding: 2px 0; }
+  .notes li::before { content: "› "; color: var(--flux-text-tertiary); }
+  kbd {
+    background: var(--flux-elevated); border: 1px solid var(--flux-border-light);
+    padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Filtres écran de Flux — playground</h1>
+  <p>Bandeau de filtres sous la barre de recherche. 7 filtres : Statut, Client, Transporteur, Priorité, Numéro dossier (multi-select) + Date de départ &amp; Deadline BAT (intervalles).</p>
+</div>
+
+<div class="panel-controls">
+  <label>Variantes :</label>
+  <button class="swatch active" data-variant="full">Bandeau complet (1 ligne wrap)</button>
+  <button class="swatch" data-variant="grouped">2 lignes (multi-selects / dates)</button>
+</div>
+
+<div class="flux-card">
+  <div class="toolbar">
+    <div class="toolbar-title-row">
+      <h2 class="toolbar-title">Flux de production</h2>
+      <button class="btn-new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nouveau job
+      </button>
+    </div>
+
+    <div class="search-row">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" type="text" id="search" placeholder="Rechercher…" />
+    </div>
+
+    <div class="filter-bar" id="filter-bar"></div>
+    <div class="recap empty" id="recap"></div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active">Tous <span class="count" id="cnt-all">0</span></div>
+    <div class="tab">BAT à traiter <span class="count">3</span></div>
+    <div class="tab">Cdes papier <span class="count">2</span></div>
+    <div class="tab">Cdes formes <span class="count">1</span></div>
+    <div class="tab">Plaques à produire <span class="count">2</span></div>
+    <div class="tab">S-T à faire <span class="count">4</span></div>
+    <div class="tab">À facturer <span class="count">1</span></div>
+  </div>
+
+  <div class="results-meta" id="results-meta">…</div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>N° doss.</th>
+          <th>Client</th>
+          <th>Désignation</th>
+          <th>Transporteur</th>
+          <th>Priorité</th>
+          <th>Statut</th>
+          <th>Sortie</th>
+          <th>Deadline BAT</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="notes">
+  <h3>Décisions UX retenues</h3>
+  <ul>
+    <li>Multi-selects compacts : libellé seul si vide, libellé + badge bleu de comptage si valeurs sélectionnées (ex. <em>Client (3)</em>). Bordure bleue quand actif.</li>
+    <li>Dates : deux <code>&lt;input type="date"&gt;</code> natifs côte-à-côte, un X pour effacer ; pas de date picker custom (cohérent avec <code>DateTimePicker</code>).</li>
+    <li>Statut = <em>5 valeurs synthétiques</em> (À traiter / En préparation / Prêt à imprimer / Parti / Facturé) — pas les 11 statuts de prérequis bruts (qui doublonneraient avec les onglets).</li>
+    <li>Lien <em>Réinitialiser</em> à droite du bandeau, désactivé si aucun filtre actif.</li>
+    <li>Logique : <strong>AND inter-filtres</strong>, <strong>OR intra-filtre multi-select</strong>. La barre de recherche reste indépendante.</li>
+    <li>Filtres options dynamiques : Client / Transporteur / Numéro dossier listent uniquement les valeurs présentes dans les jobs visibles (pas les 1000 clients du back).</li>
+  </ul>
+</div>
+
+<script>
+// ── Mock data — varied enough to exercise every filter ───────────────────────
+const MOCK_JOBS = [
+  { id:"00042", client:"Editions Aquitaine", designation:"Catalogue été 2026", transporteur:"DHL", priority:0, status:"todo", sortie:"2026-05-12", batDeadline:"2026-05-02" },
+  { id:"00043", client:"Editions Aquitaine", designation:"Plaquette commerciale", transporteur:"DHL", priority:2, status:"prep", sortie:"2026-05-15", batDeadline:"2026-05-04" },
+  { id:"00044", client:"Mairie de Bordeaux", designation:"Affiche concours", transporteur:"GLS", priority:1, status:"ready", sortie:"2026-05-08", batDeadline:"2026-04-30" },
+  { id:"00045", client:"Vins Saint-Émilion", designation:"Étiquettes 2024", transporteur:"Chronopost", priority:0, status:"prep", sortie:"2026-05-20", batDeadline:"2026-05-08" },
+  { id:"00046", client:"Vins Saint-Émilion", designation:"Étiquettes 2025", transporteur:"Chronopost", priority:1, status:"prep", sortie:"2026-05-22", batDeadline:"2026-05-10" },
+  { id:"00047", client:"Lycée Montaigne", designation:"Brochure rentrée", transporteur:null, priority:3, status:"shipped", sortie:"2026-05-05", batDeadline:"2026-04-25" },
+  { id:"00048", client:"Restaurant Le Petit Commerce", designation:"Cartes menu", transporteur:"GLS", priority:2, status:"invoiced", sortie:"2026-04-30", batDeadline:"2026-04-22" },
+  { id:"00049", client:"Bordeaux Métropole", designation:"Magazine n°47", transporteur:"DHL", priority:1, status:"todo", sortie:"2026-06-01", batDeadline:"2026-05-15" },
+  { id:"00050", client:"Bordeaux Métropole", designation:"Affiches campagne tri", transporteur:"DHL", priority:1, status:"prep", sortie:"2026-05-25", batDeadline:"2026-05-12" },
+  { id:"00051", client:"Maison Darricau", designation:"Coffrets cadeaux", transporteur:"Chronopost", priority:0, status:"todo", sortie:"2026-05-18", batDeadline:"2026-05-06" },
+  { id:"00052", client:"Editions Sud Ouest", designation:"Livre photo", transporteur:"DPD", priority:2, status:"ready", sortie:"2026-06-10", batDeadline:"2026-05-25" },
+  { id:"00053", client:"Cinémas UGC", designation:"Programme mai", transporteur:"GLS", priority:0, status:"shipped", sortie:"2026-04-28", batDeadline:"2026-04-18" },
+];
+
+const STATUS_OPTIONS = [
+  { value:"todo",     label:"À traiter",       dot:"status-todo" },
+  { value:"prep",     label:"En préparation",  dot:"status-prep" },
+  { value:"ready",    label:"Prêt à imprimer", dot:"status-ready" },
+  { value:"shipped",  label:"Parti",           dot:"status-shipped" },
+  { value:"invoiced", label:"Facturé",         dot:"status-invoiced" },
+];
+
+const PRIORITY_OPTIONS = [
+  { value:0, label:"Impératif" },
+  { value:1, label:"Important" },
+  { value:2, label:"Standard" },
+  { value:3, label:"Flexible" },
+];
+
+// ── State ───────────────────────────────────────────────────────────────────
+const state = {
+  search: "",
+  statuses: new Set(),
+  clients: new Set(),
+  carriers: new Set(),
+  priorities: new Set(),
+  jobIds: new Set(),
+  sortieFrom: "", sortieTo: "",
+  batFrom: "",    batTo: "",
+};
+
+// ── Filter bar render ───────────────────────────────────────────────────────
+function uniq(arr) { return [...new Set(arr)].filter(v => v !== null && v !== undefined && v !== ""); }
+
+function renderFilterBar() {
+  const bar = document.getElementById("filter-bar");
+  bar.innerHTML = "";
+
+  bar.appendChild(buildMultiSelect({
+    key: "statuses", label: "Statut",
+    options: STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label, dot: s.dot })),
+  }));
+  bar.appendChild(buildMultiSelect({
+    key: "clients", label: "Client",
+    options: uniq(MOCK_JOBS.map(j => j.client)).sort().map(c => ({ value: c, label: c })),
+    searchable: true,
+  }));
+  bar.appendChild(buildMultiSelect({
+    key: "carriers", label: "Transporteur",
+    options: [
+      ...uniq(MOCK_JOBS.map(j => j.transporteur)).sort().map(c => ({ value: c, label: c })),
+      { value: "__none__", label: "(Sans transporteur)" },
+    ],
+  }));
+  bar.appendChild(buildMultiSelect({
+    key: "priorities", label: "Priorité",
+    options: PRIORITY_OPTIONS.map(p => ({ value: String(p.value), label: p.label })),
+  }));
+  bar.appendChild(buildMultiSelect({
+    key: "jobIds", label: "N° dossier",
+    options: MOCK_JOBS.map(j => ({ value: j.id, label: j.id })),
+    searchable: true,
+  }));
+  bar.appendChild(buildDateRange({ keyFrom: "sortieFrom", keyTo: "sortieTo", label: "Date départ" }));
+  bar.appendChild(buildDateRange({ keyFrom: "batFrom", keyTo: "batTo", label: "Deadline BAT" }));
+
+  const reset = document.createElement("button");
+  reset.className = "reset-link";
+  reset.textContent = "Réinitialiser";
+  reset.addEventListener("click", () => {
+    state.statuses.clear(); state.clients.clear(); state.carriers.clear();
+    state.priorities.clear(); state.jobIds.clear();
+    state.sortieFrom = state.sortieTo = state.batFrom = state.batTo = "";
+    renderFilterBar(); renderResults();
+  });
+  reset.disabled = !hasAnyFilter();
+  bar.appendChild(reset);
+}
+
+function hasAnyFilter() {
+  return state.statuses.size + state.clients.size + state.carriers.size +
+         state.priorities.size + state.jobIds.size > 0 ||
+         state.sortieFrom || state.sortieTo || state.batFrom || state.batTo;
+}
+
+// ── Multi-select component ──────────────────────────────────────────────────
+function buildMultiSelect({ key, label, options, searchable }) {
+  const wrap = document.createElement("div");
+  wrap.className = "ms-wrap";
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "ms-trigger";
+  const selected = state[key];
+  if (selected.size > 0) trigger.classList.add("has-value");
+
+  const lbl = document.createElement("span");
+  lbl.className = "ms-label";
+  lbl.textContent = label;
+  trigger.appendChild(lbl);
+
+  if (selected.size > 0) {
+    const cnt = document.createElement("span");
+    cnt.className = "ms-count";
+    cnt.textContent = selected.size;
+    trigger.appendChild(cnt);
+    const x = document.createElement("span");
+    x.className = "ms-clear-btn";
+    x.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    x.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selected.clear(); renderFilterBar(); renderResults();
+    });
+    trigger.appendChild(x);
+  } else {
+    const chev = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    chev.setAttribute("viewBox", "0 0 24 24");
+    chev.innerHTML = '<polyline points="6 9 12 15 18 9" fill="none" stroke="currentColor" stroke-width="2"/>';
+    trigger.appendChild(chev);
+  }
+
+  let open = false;
+  let dropdown = null;
+  let searchTerm = "";
+
+  function close() {
+    open = false;
+    if (dropdown) { dropdown.remove(); dropdown = null; }
+    document.removeEventListener("mousedown", outside);
+  }
+  function outside(e) {
+    if (!wrap.contains(e.target)) close();
+  }
+  function renderDropdown() {
+    if (dropdown) dropdown.remove();
+    dropdown = document.createElement("div");
+    dropdown.className = "ms-dropdown";
+
+    if (searchable) {
+      const s = document.createElement("div");
+      s.className = "ms-search";
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.placeholder = "Rechercher…";
+      inp.value = searchTerm;
+      inp.addEventListener("input", (e) => {
+        searchTerm = e.target.value;
+        renderDropdown();
+        dropdown.querySelector("input").focus();
+      });
+      s.appendChild(inp);
+      dropdown.appendChild(s);
+    }
+
+    const list = document.createElement("div");
+    list.className = "ms-list";
+    const filtered = options.filter(o =>
+      !searchTerm || o.label.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+    if (filtered.length === 0) {
+      const e = document.createElement("div");
+      e.className = "ms-empty";
+      e.textContent = "Aucun résultat";
+      list.appendChild(e);
+    } else {
+      filtered.forEach(opt => {
+        const row = document.createElement("label");
+        row.className = "ms-option";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = selected.has(opt.value);
+        cb.addEventListener("change", () => {
+          if (cb.checked) selected.add(opt.value); else selected.delete(opt.value);
+          renderDropdown();
+          renderResults();
+          // refresh trigger visuals
+          renderFilterBar();
+          // Re-open after re-render
+          const newTrigger = document.querySelector(`[data-msk="${key}"]`);
+          if (newTrigger) newTrigger.click();
+        });
+        row.appendChild(cb);
+        if (opt.dot) {
+          const d = document.createElement("span");
+          d.className = "status-dot " + opt.dot;
+          row.appendChild(d);
+        }
+        const lab = document.createElement("span");
+        lab.className = "ms-option-label";
+        lab.textContent = opt.label;
+        row.appendChild(lab);
+        list.appendChild(row);
+      });
+    }
+    dropdown.appendChild(list);
+
+    const footer = document.createElement("div");
+    footer.className = "ms-footer";
+    const all = document.createElement("button");
+    all.textContent = "Tout sélect.";
+    all.addEventListener("click", (e) => {
+      e.stopPropagation();
+      filtered.forEach(o => selected.add(o.value));
+      renderFilterBar(); renderResults();
+    });
+    const none = document.createElement("button");
+    none.textContent = "Effacer";
+    none.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selected.clear();
+      renderFilterBar(); renderResults();
+    });
+    footer.appendChild(all); footer.appendChild(none);
+    dropdown.appendChild(footer);
+
+    wrap.appendChild(dropdown);
+  }
+
+  trigger.dataset.msk = key;
+  trigger.addEventListener("click", (e) => {
+    if (e.target.closest(".ms-clear-btn")) return;
+    if (open) { close(); return; }
+    open = true; renderDropdown();
+    setTimeout(() => document.addEventListener("mousedown", outside), 0);
+  });
+  wrap.appendChild(trigger);
+  return wrap;
+}
+
+// ── Date range component ────────────────────────────────────────────────────
+function buildDateRange({ keyFrom, keyTo, label }) {
+  const w = document.createElement("div");
+  w.className = "date-range";
+  if (state[keyFrom] || state[keyTo]) w.classList.add("has-value");
+
+  const lab = document.createElement("span");
+  lab.className = "date-range-label";
+  lab.textContent = label;
+  w.appendChild(lab);
+
+  const inA = document.createElement("input");
+  inA.type = "date"; inA.value = state[keyFrom] || "";
+  inA.addEventListener("change", (e) => { state[keyFrom] = e.target.value; renderFilterBar(); renderResults(); });
+  w.appendChild(inA);
+
+  const sep = document.createElement("span");
+  sep.className = "sep"; sep.textContent = "→";
+  w.appendChild(sep);
+
+  const inB = document.createElement("input");
+  inB.type = "date"; inB.value = state[keyTo] || "";
+  inB.addEventListener("change", (e) => { state[keyTo] = e.target.value; renderFilterBar(); renderResults(); });
+  w.appendChild(inB);
+
+  if (state[keyFrom] || state[keyTo]) {
+    const x = document.createElement("button");
+    x.className = "clear-x";
+    x.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    x.addEventListener("click", () => { state[keyFrom] = ""; state[keyTo] = ""; renderFilterBar(); renderResults(); });
+    w.appendChild(x);
+  }
+  return w;
+}
+
+// ── Results filtering & rendering ───────────────────────────────────────────
+function jobMatches(job) {
+  if (state.search) {
+    const t = state.search.toLowerCase();
+    const haystack = [job.id, job.client, job.designation, job.transporteur || ""].join(" ").toLowerCase();
+    if (!haystack.includes(t)) return false;
+  }
+  if (state.statuses.size && !state.statuses.has(job.status)) return false;
+  if (state.clients.size && !state.clients.has(job.client)) return false;
+  if (state.carriers.size) {
+    const v = job.transporteur ?? "__none__";
+    if (!state.carriers.has(v)) return false;
+  }
+  if (state.priorities.size && !state.priorities.has(String(job.priority))) return false;
+  if (state.jobIds.size && !state.jobIds.has(job.id)) return false;
+  if (state.sortieFrom && job.sortie < state.sortieFrom) return false;
+  if (state.sortieTo && job.sortie > state.sortieTo) return false;
+  if (state.batFrom && job.batDeadline < state.batFrom) return false;
+  if (state.batTo && job.batDeadline > state.batTo) return false;
+  return true;
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
+
+function renderRecap() {
+  const recap = document.getElementById("recap");
+  recap.innerHTML = "";
+
+  const groups = [];
+
+  function pushSetGroup(key, label, set, valueToOption) {
+    if (set.size === 0) return;
+    const values = [...set].map(v => ({ raw: v, ...valueToOption(v) }));
+    groups.push({ label, items: values.map(v => ({
+      raw: v.raw,
+      text: v.text,
+      dot: v.dot,
+      remove: () => { set.delete(v.raw); renderFilterBar(); renderResults(); },
+    })) });
+  }
+
+  pushSetGroup("statuses", "statut", state.statuses, (v) => {
+    const opt = STATUS_OPTIONS.find(s => s.value === v);
+    return { text: opt?.label ?? v, dot: opt?.dot };
+  });
+  pushSetGroup("clients", "client", state.clients, (v) => ({ text: v }));
+  pushSetGroup("carriers", "transporteur", state.carriers, (v) => ({
+    text: v === "__none__" ? "Sans transporteur" : v,
+  }));
+  pushSetGroup("priorities", "priorité", state.priorities, (v) => {
+    const opt = PRIORITY_OPTIONS.find(p => String(p.value) === v);
+    return { text: opt?.label ?? v };
+  });
+  pushSetGroup("jobIds", "n° dossier", state.jobIds, (v) => ({ text: v }));
+
+  function pushRangeGroup(label, fromKey, toKey) {
+    const from = state[fromKey], to = state[toKey];
+    if (!from && !to) return;
+    let text;
+    if (from && to)        text = `${fmtDate(from)} → ${fmtDate(to)}`;
+    else if (from)         text = `dès ${fmtDate(from)}`;
+    else                   text = `jusqu'au ${fmtDate(to)}`;
+    groups.push({ label, items: [{
+      text,
+      remove: () => { state[fromKey] = ""; state[toKey] = ""; renderFilterBar(); renderResults(); },
+    }] });
+  }
+  pushRangeGroup("date départ", "sortieFrom", "sortieTo");
+  pushRangeGroup("deadline BAT", "batFrom", "batTo");
+
+  if (groups.length === 0) {
+    recap.classList.add("empty");
+    return;
+  }
+  recap.classList.remove("empty");
+
+  groups.forEach((g, gi) => {
+    if (gi > 0) {
+      const sep = document.createElement("span");
+      sep.className = "recap-sep";
+      sep.textContent = "|";
+      recap.appendChild(sep);
+    }
+    const grp = document.createElement("span");
+    grp.className = "recap-group";
+
+    const k = document.createElement("span");
+    k.className = "recap-key";
+    k.textContent = g.label;
+    grp.appendChild(k);
+
+    g.items.forEach(item => {
+      const chip = document.createElement("span");
+      chip.className = "recap-chip";
+      if (item.dot) {
+        const d = document.createElement("span");
+        d.className = "swatch-dot " + item.dot;
+        chip.appendChild(d);
+      }
+      const t = document.createElement("span");
+      t.className = "recap-text";
+      t.textContent = item.text;
+      t.title = item.text;
+      chip.appendChild(t);
+      const x = document.createElement("button");
+      x.type = "button";
+      x.setAttribute("aria-label", `Retirer ${item.text}`);
+      x.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      x.addEventListener("click", item.remove);
+      chip.appendChild(x);
+      grp.appendChild(chip);
+    });
+    recap.appendChild(grp);
+  });
+}
+
+function renderResults() {
+  const filtered = MOCK_JOBS.filter(jobMatches);
+  document.getElementById("cnt-all").textContent = filtered.length;
+  document.getElementById("results-meta").textContent =
+    `${filtered.length} dossier${filtered.length > 1 ? "s" : ""} sur ${MOCK_JOBS.length}`;
+  renderRecap();
+
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  filtered.forEach(j => {
+    const tr = document.createElement("tr");
+    const status = STATUS_OPTIONS.find(s => s.value === j.status);
+    const prio = PRIORITY_OPTIONS.find(p => p.value === j.priority);
+    tr.innerHTML = `
+      <td>${j.id}</td>
+      <td>${j.client}</td>
+      <td>${j.designation}</td>
+      <td>${j.transporteur ?? '<span style="color: var(--flux-text-muted)">—</span>'}</td>
+      <td><span class="badge badge-prio-${j.priority}">${prio.label}</span></td>
+      <td><span class="status-dot ${status.dot}"></span>${status.label}</td>
+      <td>${fmtDate(j.sortie)}</td>
+      <td>${fmtDate(j.batDeadline)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Variant switcher ────────────────────────────────────────────────────────
+document.querySelectorAll(".panel-controls .swatch").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".panel-controls .swatch").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    const bar = document.getElementById("filter-bar");
+    if (b.dataset.variant === "grouped") {
+      bar.style.flexDirection = "column"; bar.style.alignItems = "flex-start";
+      // Wrap each row programmatically
+      bar.classList.add("grouped");
+    } else {
+      bar.style.flexDirection = "row"; bar.style.alignItems = "center";
+      bar.classList.remove("grouped");
+    }
+  });
+});
+
+document.getElementById("search").addEventListener("input", (e) => {
+  state.search = e.target.value; renderResults();
+});
+
+renderFilterBar();
+renderResults();
+</script>
+</body>
+</html>
