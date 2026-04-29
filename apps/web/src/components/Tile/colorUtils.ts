@@ -20,7 +20,15 @@ export interface ColorClasses {
 
 /**
  * Compute tile state from boolean flags.
- * Priority (highest wins): shipped > late > conflict > blocked > completed > default.
+ *
+ * Priority (highest wins): shipped > completed > late > conflict > blocked > default.
+ *
+ * Why `completed` outranks `late`/`conflict`/`blocked`: those three are
+ * warnings about work that still needs to happen — they're moot once the
+ * tile is reported done. A done tile must read as green so operators
+ * see "this one is fine, move on" instead of a stale red flag.
+ * `shipped` still wins because physical shipment is a stronger terminal
+ * state than completion.
  */
 export function computeTileState(
   isShipped: boolean,
@@ -30,10 +38,10 @@ export function computeTileState(
   isCompleted: boolean,
 ): TileState {
   if (isShipped) return 'shipped';
+  if (isCompleted) return 'completed';
   if (isLate) return 'late';
   if (hasConflict) return 'conflict';
   if (isBlocked) return 'blocked';
-  if (isCompleted) return 'completed';
   return 'default';
 }
 
