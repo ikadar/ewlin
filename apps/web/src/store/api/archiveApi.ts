@@ -43,6 +43,26 @@ export interface AuditListResponse {
   count: number;
 }
 
+/**
+ * Flat scenario row — used by tooling pages (capacity overrides) where
+ * the chef picks a scope from the full scenario population.
+ */
+export interface ScenarioListEntry {
+  id: string;
+  type: 'preprod' | 'prod' | 'simulation' | 'archive';
+  name: string | null;
+  parentScenarioId: string | null;
+  ttlExpiresAt: string | null;
+  promotedAt: string | null;
+  engineVersion: string | null;
+  createdAt: string;
+}
+
+export interface ScenarioListResponse {
+  scenarios: ScenarioListEntry[];
+  count: number;
+}
+
 export interface ArchiveListResponse {
   archives: ArchiveSummary[];
   count: number;
@@ -96,6 +116,15 @@ export const archiveApi = createApi({
       query: () => '/scenarios/audit',
       providesTags: [{ type: 'Audit', id: 'LIST' }],
     }),
+    /**
+     * Flat enumeration of every scenario row. Used by tooling pages
+     * that need to pick a scenario from the full population (capacity
+     * overrides, future per-scenario settings).
+     */
+    listAllScenarios: builder.query<ScenarioListResponse, void>({
+      query: () => '/scenarios',
+      providesTags: [{ type: 'Audit', id: 'LIST' }],
+    }),
     getArchive: builder.query<ArchiveDetail, string>({
       query: (id) => `/scenarios/archives/${id}`,
       providesTags: (_result, _err, id) => [{ type: 'Archive', id }],
@@ -131,5 +160,6 @@ export const {
   useGetArchivesQuery,
   useGetArchiveQuery,
   useGetAuditQuery,
+  useListAllScenariosQuery,
   useRestoreArchiveMutation,
 } = archiveApi;
