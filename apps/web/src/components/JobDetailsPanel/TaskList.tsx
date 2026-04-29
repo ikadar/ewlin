@@ -195,12 +195,17 @@ export function TaskList({
         && (task.manualDeparture || task.manualReturn);
       const effectivelyScheduled = isScheduled || hasManualDates;
 
+      // Priority mirrors components/Tile/colorUtils.ts:computeTileState:
+      // shipped > completed > late > conflict > default. `completed`
+      // outranks `late` and `conflict` because once execution is
+      // reported done, those warnings are moot — the tile must read
+      // green in both the planning grid and the JDP row.
       let tileState: 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
       if (!effectivelyScheduled) tileState = 'unplaced';
       else if (isJobShipped) tileState = 'shipped';
+      else if (isCompleted) tileState = 'completed';
       else if (isLate) tileState = 'late';
       else if (hasConflictFlag) tileState = 'conflict';
-      else if (isCompleted) tileState = 'completed';
       else tileState = 'default';
 
       return (
