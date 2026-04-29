@@ -55,6 +55,7 @@ import StatsPage from './pages/StatsPage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
+import { ArchivesPage } from './pages/ArchivesPage';
 
 /**
  * Application routes.
@@ -92,6 +93,10 @@ export function AppRoutes() {
 
         {/* Logistique — réceptions et expéditions de l'atelier (Phase 1) */}
         <Route path="/logistique" element={<LogistiquePage />} />
+
+        {/* Archives — frozen Prod history & restore (Phase 7) */}
+        <Route path="/archives" element={<ArchivesPage />} />
+        <Route path="/archives/:id" element={<ArchivesPage />} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

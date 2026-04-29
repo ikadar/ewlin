@@ -32,6 +32,7 @@ import { consoleApi } from './api/consoleApi';
 import { promotionApi } from './api/promotionApi';
 import { prodCompletionApi } from './api/prodCompletionApi';
 import { prodSnapshotApi } from './api/prodSnapshotApi';
+import { archiveApi } from './api/archiveApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -65,6 +66,7 @@ export const store = configureStore({
     [promotionApi.reducerPath]: promotionApi.reducer,
     [prodCompletionApi.reducerPath]: prodCompletionApi.reducer,
     [prodSnapshotApi.reducerPath]: prodSnapshotApi.reducer,
+    [archiveApi.reducerPath]: archiveApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -98,6 +100,7 @@ export const store = configureStore({
       .concat(promotionApi.middleware)
       .concat(prodCompletionApi.middleware)
       .concat(prodSnapshotApi.middleware)
+      .concat(archiveApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we
@@ -319,6 +322,19 @@ export {
   useGetProdSnapshotQuery,
   prodSnapshotApi,
 } from './api/prodSnapshotApi';
+
+export {
+  useGetArchivesQuery,
+  useGetArchiveQuery,
+  useRestoreArchiveMutation,
+  archiveApi,
+} from './api/archiveApi';
+export type {
+  ArchiveSummary,
+  ArchiveDetail,
+  ArchiveListResponse,
+  ArchiveRestoreResult,
+} from './api/archiveApi';
 
 export {
   useGetUsersQuery,

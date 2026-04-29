@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, Archive } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
@@ -33,7 +33,8 @@ export function Sidebar() {
   const isStationSchedule = location.pathname.startsWith('/stations');
   const isStats = location.pathname.startsWith('/stats');
   const isLogistique = location.pathname.startsWith('/logistique');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isArchives = location.pathname.startsWith('/archives');
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -101,6 +102,12 @@ export function Sidebar() {
             label="Statistiques"
             isActive={isStats}
             onClick={() => navigate('/stats')}
+          />
+          <SidebarButton
+            icon={Archive}
+            label="Archives"
+            isActive={isArchives}
+            onClick={() => navigate('/archives')}
           />
         </div>
 
