@@ -54,7 +54,6 @@ import {
   computeOperatorUnavailabilitySegments,
   computeOperatorOvertimeSegments,
 } from '../components/TimelineLens/unavailability';
-import { PlanningEnvHeader } from '../components/PlanningEnvHeader/PlanningEnvHeader';
 import type {
   Operator,
   TaskAssignment,
@@ -1153,7 +1152,6 @@ export default function OperatorSchedulePage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-    <PlanningEnvHeader />
     <div className="flex-1 flex overflow-hidden">
       {/* ---- Left sidebar: JobsList ---- */}
       {isSidebarVisible && (

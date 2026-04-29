@@ -49,7 +49,6 @@ import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyb
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
 import { Minimap } from './components/Minimap';
-import { PlanningEnvHeader } from './components/PlanningEnvHeader/PlanningEnvHeader';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -1934,8 +1933,6 @@ function AppContent() {
           <FluxPage backdrop />
         </div>
       ) : (
-      <div className="flex-1 flex flex-col overflow-hidden">
-      <PlanningEnvHeader />
       <div className="flex-1 flex overflow-hidden">
         {isSidebarVisible && (
           <div>
@@ -2059,7 +2056,6 @@ function AppContent() {
           </div>
           </div>
         </div>
-      </div>
       </div>
       )}
 

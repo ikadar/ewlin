@@ -8,6 +8,7 @@ import { useCommands } from './CommandPalette/useCommands';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AutoRecomputeProvider, useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
 import { ScenarioProvider } from '../contexts/ScenarioContext';
+import { EnvFloatingControls } from './EnvFloatingControls/EnvFloatingControls';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
 import type { CompactHorizon } from '../utils';
@@ -137,6 +138,11 @@ function RootLayoutInner() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Outlet />
       </div>
+
+      {/* Env switcher + Promouvoir CTA — global, visible on every page,
+          parked to the left of the Command Center FAB. Replaces the
+          per-page PlanningEnvHeader bandeau. */}
+      <EnvFloatingControls />
 
       {/* Floating command center button */}
       {!isOpen && (

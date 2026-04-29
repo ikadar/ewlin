@@ -82,7 +82,7 @@ test.describe('Versioning v1 — promotion flow', () => {
     await injectTestAuth(page, token);
     await page.goto('/');
 
-    const header = page.getByTestId('planning-env-header');
+    const header = page.getByTestId('env-floating-controls');
     await expect(header).toBeVisible();
 
     // Préprod tab is active by default
@@ -98,7 +98,7 @@ test.describe('Versioning v1 — promotion flow', () => {
     await injectTestAuth(page, token);
     await page.goto('/');
 
-    const header = page.getByTestId('planning-env-header');
+    const header = page.getByTestId('env-floating-controls');
     await header.getByRole('tab', { name: /^Prod$/ }).click();
 
     // URL gains ?env=prod
@@ -119,7 +119,7 @@ test.describe('Versioning v1 — promotion flow', () => {
     await seedInitialPromotion(token);
     await page.goto('/');
 
-    const header = page.getByTestId('planning-env-header');
+    const header = page.getByTestId('env-floating-controls');
     await header.getByTestId('promote-cta').click();
 
     const modal = page.getByTestId('promotion-modal');
@@ -134,7 +134,7 @@ test.describe('Versioning v1 — promotion flow', () => {
     await seedInitialPromotion(token); // ensure prod has a payload
     await page.goto('/');
 
-    const header = page.getByTestId('planning-env-header');
+    const header = page.getByTestId('env-floating-controls');
     await header.getByTestId('promote-cta').click();
 
     const dwellBtn = page.getByTestId('promotion-dwell-button');
@@ -162,7 +162,7 @@ test.describe('Versioning v1 — promotion flow', () => {
     await seedInitialPromotion(token);
     await page.goto('/');
 
-    const header = page.getByTestId('planning-env-header');
+    const header = page.getByTestId('env-floating-controls');
     await header.getByTestId('promote-cta').click();
 
     const dwellBtn = page.getByTestId('promotion-dwell-button');
