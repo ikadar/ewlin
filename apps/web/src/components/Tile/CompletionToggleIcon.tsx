@@ -14,17 +14,27 @@
 import { CheckCircle2, Circle } from 'lucide-react';
 import { useScenarioMode } from '../../contexts/ScenarioContext';
 import { useToggleProdCompletionMutation } from '../../store';
+import type { TileState } from './colorUtils';
 
 interface CompletionToggleIconProps {
   taskId: string;
   isCompleted: boolean;
+  /**
+   * Tile state (passed by the host so the icon can mirror "implicit
+   * completion" terminal states). When state === 'shipped', the icon
+   * shows as checked (green CheckCircle2) and becomes read-only — the
+   * job has physically left the workshop, no per-task toggle makes
+   * sense. Without this, shipped tiles render green but the rond stays
+   * empty, which the user finds inconsistent.
+   */
+  tileState?: TileState;
   /** Optional callback fired AFTER a successful toggle in prod mode (e.g. to invalidate the snapshot cache). */
   onToggled?: (newState: boolean) => void;
   /** Override the default icon dimensions (default: 'w-3 h-3' to match grid tiles). */
   iconClassName?: string;
 }
 
-export function CompletionToggleIcon({ taskId, isCompleted, onToggled, iconClassName = 'w-3 h-3' }: CompletionToggleIconProps) {
+export function CompletionToggleIcon({ taskId, isCompleted, tileState, onToggled, iconClassName = 'w-3 h-3' }: CompletionToggleIconProps) {
   const { mode } = useScenarioMode();
   const [toggleProdCompletion, { isLoading }] = useToggleProdCompletionMutation();
 
@@ -35,8 +45,10 @@ export function CompletionToggleIcon({ taskId, isCompleted, onToggled, iconClass
   // affordance that suggests they could fake it.
   if (mode !== 'prod') return null;
 
-  const interactive = true;
-  const Icon = isCompleted ? CheckCircle2 : Circle;
+  const isShipped = tileState === 'shipped';
+  const showChecked = isCompleted || isShipped;
+  const interactive = !isShipped;
+  const Icon = showChecked ? CheckCircle2 : Circle;
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,7 +62,7 @@ export function CompletionToggleIcon({ taskId, isCompleted, onToggled, iconClass
     }
   };
 
-  const colorClass = isCompleted
+  const colorClass = showChecked
     ? 'text-emerald-400 hover:text-emerald-300'
     : 'text-zinc-700 hover:text-zinc-400';
 

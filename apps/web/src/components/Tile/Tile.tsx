@@ -370,6 +370,7 @@ export const Tile = memo(function Tile({
             <CompletionToggleIcon
               taskId={assignment.taskId}
               isCompleted={isCompleted}
+              tileState={tileState}
             />
           )}
           <span

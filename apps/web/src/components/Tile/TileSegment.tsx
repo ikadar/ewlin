@@ -288,6 +288,7 @@ export function TileSegment({
             <CompletionToggleIcon
               taskId={taskId}
               isCompleted={tileState === 'completed'}
+              tileState={tileState as TileState}
             />
           )}
           {onTogglePin && assignmentId && (

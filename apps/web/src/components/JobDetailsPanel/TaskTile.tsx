@@ -288,6 +288,7 @@ export const TaskTile = memo(function TaskTile({
             <CompletionToggleIcon
               taskId={task.id}
               isCompleted={isCompleted}
+              tileState={tileState === 'unplaced' ? 'default' : tileState}
               iconClassName="w-3.5 h-3.5"
             />
             <span
