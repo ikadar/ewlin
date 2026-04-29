@@ -179,4 +179,10 @@ test.describe('Versioning v1 — promotion flow', () => {
     await expect(undoToast).toBeVisible({ timeout: 5_000 });
     await expect(undoToast.getByRole('button', { name: /Annuler/ })).toBeVisible();
   });
+
+  // Note on completion-toggle e2e: covered at unit level via
+  // `CompletionToggleIcon.test.tsx` (mocks the mutation hook + asserts the
+  // pointer-events / cursor / data-mode contract). A full browser-level
+  // test would require a populated grid (real placed assignments) which
+  // varies per dev DB state; skip here to keep the suite hermetic.
 });

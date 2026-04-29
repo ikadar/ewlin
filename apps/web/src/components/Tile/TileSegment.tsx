@@ -7,6 +7,7 @@
  */
 
 import { Pin } from 'lucide-react';
+import { CompletionToggleIcon } from './CompletionToggleIcon';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -283,6 +284,12 @@ export function TileSegment({
       >
         <div className="flex items-baseline gap-1.5">
         <div className="text-[11px] font-medium leading-tight truncate flex-1 min-w-0" style={{ color: colors.text }}>
+          {taskId && (
+            <CompletionToggleIcon
+              taskId={taskId}
+              isCompleted={tileState === 'completed'}
+            />
+          )}
           {onTogglePin && assignmentId && (
             <span
               onClick={(e) => {

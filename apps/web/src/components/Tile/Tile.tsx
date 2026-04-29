@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
+import { CompletionToggleIcon } from './CompletionToggleIcon';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { TileTooltip } from './TileTooltip';
@@ -53,6 +54,13 @@ export interface TileProps {
   displayMode?: 'produit' | 'tirage';
   /** Pre-computed Tirage label string (full label including prefix). Empty → Produit fallback. */
   tirageLabel?: string;
+  /**
+   * Pre-computed Produit-mode label. Appends the element name after the
+   * client for multi-element jobs (e.g. "JOB-123 · ACME · CAH1"); falls back
+   * to `{reference} · {client}` when the cache isn't supplying it (tests,
+   * older callsites).
+   */
+  produitLabel?: string;
   /** State-based tile color */
   tileState?: TileState;
   /** Comma-separated operator names assigned to this tile */
@@ -113,6 +121,7 @@ export const Tile = memo(function Tile({
   element,
   displayMode,
   tirageLabel,
+  produitLabel,
   tileState = 'default',
   operatorNames,
   overrideLeft,
@@ -351,6 +360,12 @@ export const Tile = memo(function Tile({
           className={`${colorClasses.text} text-[11px] font-medium leading-tight truncate`}
           data-testid="tile-content"
         >
+          {assignment.taskId && (
+            <CompletionToggleIcon
+              taskId={assignment.taskId}
+              isCompleted={isCompleted}
+            />
+          )}
           <span
             onClick={handleTogglePin}
             className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
@@ -386,7 +401,9 @@ export const Tile = memo(function Tile({
               </svg>
             </span>
           )}
-          {displayMode === 'tirage' && tirageLabel ? tirageLabel : `${job.reference} · ${job.client}`}
+          {displayMode === 'tirage' && tirageLabel
+            ? tirageLabel
+            : produitLabel ?? `${job.reference} · ${job.client}`}
         </div>
         {operatorNames && (
           <div className="text-[9px] text-zinc-400 truncate leading-tight mt-0.5">
@@ -437,6 +454,7 @@ function haveStatePropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.blockingInfo !== next.blockingInfo ||
     prev.displayMode !== next.displayMode ||
     prev.tirageLabel !== next.tirageLabel ||
+    prev.produitLabel !== next.produitLabel ||
     prev.tileState !== next.tileState ||
     prev.operatorNames !== next.operatorNames ||
     prev.sawtoothTop !== next.sawtoothTop ||

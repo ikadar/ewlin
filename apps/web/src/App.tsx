@@ -6,7 +6,6 @@ import { ZOOM_LEVELS } from './utils/zoom';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { GlobalToast } from './components/GlobalToast';
 import { MaintenanceState } from './components/MaintenanceState';
 import type { JcfElement } from './components';
 import { DEFAULT_ELEMENT } from './components';
@@ -26,8 +25,8 @@ import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCom
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
-import { Toast } from './components/Toast';
-import { useToast, useMassUnschedule } from './hooks';
+import { useMassUnschedule } from './hooks';
+import { useToast } from './hooks/useToast';
 import { useLiftAndRecompute } from './hooks/useLiftAndRecompute';
 import { useAutoRecomputeCtx } from './contexts/AutoRecomputeContext';
 import { runBackgroundLns } from './hooks/autoRecomputeRuntime';
@@ -50,6 +49,7 @@ import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyb
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
 import { Minimap } from './components/Minimap';
+import { PlanningEnvHeader } from './components/PlanningEnvHeader/PlanningEnvHeader';
 
 // Multi-day grid starts at 00:00 (midnight) for each day
 const START_HOUR = 0;
@@ -304,8 +304,7 @@ function AppContent() {
   const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
   const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
 
-  // v0.5.2: Toast notifications for errors
-  const { toast, showToast, hideToast } = useToast();
+  const { showToast } = useToast();
   const { theme } = useTheme();
 
   // v0.6.x: Auto-recompute orchestration lives at RootLayout level (see
@@ -1935,6 +1934,8 @@ function AppContent() {
           <FluxPage backdrop />
         </div>
       ) : (
+      <div className="flex-1 flex flex-col overflow-hidden">
+      <PlanningEnvHeader />
       <div className="flex-1 flex overflow-hidden">
         {isSidebarVisible && (
           <div>
@@ -2059,6 +2060,7 @@ function AppContent() {
           </div>
         </div>
       </div>
+      </div>
       )}
 
       {/* Instant selection ring via CSS selector (bypasses grid re-render) */}
@@ -2177,17 +2179,6 @@ function AppContent() {
         }))}
         initialClientName={jcfClient}
       />
-
-      {/* v0.5.2: Toast notifications for JCF errors */}
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        isVisible={toast.isVisible}
-        onDismiss={hideToast}
-      />
-
-      {/* v0.5.7: Global toast for API errors */}
-      <GlobalToast />
 
       {/* Mass unschedule confirmation dialog */}
       {massUnschedule.confirmState && (
