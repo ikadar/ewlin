@@ -49,6 +49,20 @@ function prepareHeaders(headers: Headers, { getState }: { getState: () => unknow
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // V1 versioning — when the URL says ?env=prod, every API call carries
+  // an X-Flux-Scenario: prod header. The PHP ProdReadOnlyGuardSubscriber
+  // reads this and rejects every mutating route except the allow-listed
+  // few (promotion, prod completion, auth). One header, one source of
+  // truth — the frontend doesn't need to gate each shortcut/button
+  // individually; anything that reaches the backend in prod and isn't
+  // allow-listed comes back as 403.
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('env') === 'prod') {
+      headers.set('X-Flux-Scenario', 'prod');
+    }
+  }
+
   return headers;
 }
 

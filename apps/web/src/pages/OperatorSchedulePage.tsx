@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import {
   useGetSnapshotQuery,
+  useGetProdSnapshotQuery,
   useComputeScheduleMutation,
   scheduleApi,
   useToggleCompletionMutation,
@@ -124,13 +125,23 @@ const defaultSnapshot: ScheduleSnapshot = {
 
 export default function OperatorSchedulePage() {
   const navigate = useNavigate();
-  const {
-    data: snapshotData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useGetSnapshotQuery();
+  // V1 versioning: in prod we read the frozen plan blob (merged with the
+  // live completion overlay) from /scenarios/prod/snapshot. In préprod we
+  // keep the regular live /schedule/snapshot. The two queries are gated
+  // via `skip` so only one fires at a time, and the consumer below picks
+  // whichever has data.
+  const { mode: scenarioModeForSnapshot } = useScenarioMode();
+  const preprodSnapshot = useGetSnapshotQuery(undefined, {
+    skip: scenarioModeForSnapshot === 'prod',
+  });
+  const prodSnapshot = useGetProdSnapshotQuery(undefined, {
+    skip: scenarioModeForSnapshot !== 'prod',
+  });
+  const snapshotData = scenarioModeForSnapshot === 'prod' ? prodSnapshot.data : preprodSnapshot.data;
+  const isLoading = scenarioModeForSnapshot === 'prod' ? prodSnapshot.isLoading : preprodSnapshot.isLoading;
+  const isError = scenarioModeForSnapshot === 'prod' ? prodSnapshot.isError : preprodSnapshot.isError;
+  const error = scenarioModeForSnapshot === 'prod' ? prodSnapshot.error : preprodSnapshot.error;
+  const refetch = scenarioModeForSnapshot === 'prod' ? prodSnapshot.refetch : preprodSnapshot.refetch;
 
   const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
   const [toggleCompletion] = useToggleCompletionMutation();

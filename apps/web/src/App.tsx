@@ -21,7 +21,7 @@ import { updateSnapshot } from './mock';
 import { buildSequenceIndexLookup } from './utils/safetyZone';
 import { StalenessBadge } from './components/StalenessBadge';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, useGetProdSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -233,13 +233,16 @@ function AppContent() {
   // v0.4.37: RTK Query for snapshot data
   // v0.5.1: Added loading and error state handling
   const dispatch = useAppDispatch();
-  const {
-    data: snapshotData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useGetSnapshotQuery();
+  // V1 versioning: prod reads the frozen blob via /scenarios/prod/snapshot;
+  // préprod keeps the live /schedule/snapshot. `skip` makes only one query
+  // active at a time. The consumer below picks the right one.
+  const preprodSnapshot = useGetSnapshotQuery(undefined, { skip: scenarioMode === 'prod' });
+  const prodSnapshot = useGetProdSnapshotQuery(undefined, { skip: scenarioMode !== 'prod' });
+  const snapshotData = scenarioMode === 'prod' ? prodSnapshot.data : preprodSnapshot.data;
+  const isLoading = scenarioMode === 'prod' ? prodSnapshot.isLoading : preprodSnapshot.isLoading;
+  const isError = scenarioMode === 'prod' ? prodSnapshot.isError : preprodSnapshot.isError;
+  const error = scenarioMode === 'prod' ? prodSnapshot.error : preprodSnapshot.error;
+  const refetch = scenarioMode === 'prod' ? prodSnapshot.refetch : preprodSnapshot.refetch;
 
   // v0.5.7: Global error handling - service unavailable state
   const isServiceUnavailable = useAppSelector(selectIsServiceUnavailable);
@@ -1293,7 +1296,13 @@ function AppContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot, scenarioMode, handleSmartCompact, handlePinAllJobTiles]);
+  // handleSmartCompact and handlePinAllJobTiles are declared further down
+  // and wrapped in useCallback — they're stable across renders so they
+  // can be omitted from this dep array. Including them would trip TS's
+  // "use before declaration" since the dep array is evaluated above
+  // their declaration site.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot, scenarioMode]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);

@@ -31,6 +31,7 @@ import { adminUserGroupApi } from './api/adminUserGroupApi';
 import { consoleApi } from './api/consoleApi';
 import { promotionApi } from './api/promotionApi';
 import { prodCompletionApi } from './api/prodCompletionApi';
+import { prodSnapshotApi } from './api/prodSnapshotApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -63,6 +64,7 @@ export const store = configureStore({
     [consoleApi.reducerPath]: consoleApi.reducer,
     [promotionApi.reducerPath]: promotionApi.reducer,
     [prodCompletionApi.reducerPath]: prodCompletionApi.reducer,
+    [prodSnapshotApi.reducerPath]: prodSnapshotApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -95,6 +97,7 @@ export const store = configureStore({
       .concat(consoleApi.middleware)
       .concat(promotionApi.middleware)
       .concat(prodCompletionApi.middleware)
+      .concat(prodSnapshotApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we
@@ -311,6 +314,11 @@ export {
   prodCompletionApi,
 } from './api/prodCompletionApi';
 export type { ProdCompletionToggleResult } from './api/prodCompletionApi';
+
+export {
+  useGetProdSnapshotQuery,
+  prodSnapshotApi,
+} from './api/prodSnapshotApi';
 
 export {
   useGetUsersQuery,
