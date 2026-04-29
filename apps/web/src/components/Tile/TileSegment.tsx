@@ -296,7 +296,7 @@ export function TileSegment({
                 e.stopPropagation();
                 onTogglePin(assignmentId);
               }}
-              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
+              className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
                 isPinned
                   ? 'text-amber-500 hover:text-amber-400'
                   : 'text-zinc-700 hover:text-zinc-400'
@@ -312,7 +312,7 @@ export function TileSegment({
                 e.stopPropagation();
                 onToggleFrozenOverride!(jobId!, sequenceIndex!, stationId!);
               } : undefined}
-              className={`p-1 -m-1 rounded shrink-0 inline-flex items-center align-middle mr-1 transition-colors ${
+              className={`snowflake-icon p-1 -m-1 rounded shrink-0 inline-flex items-center align-middle mr-1 transition-colors ${
                 canToggleFrozen ? 'pointer-events-auto cursor-pointer hover:bg-white/5' : 'pointer-events-none'
               } ${
                 isFrozenOverridden

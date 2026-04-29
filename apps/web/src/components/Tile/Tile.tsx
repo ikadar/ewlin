@@ -374,7 +374,7 @@ export const Tile = memo(function Tile({
           )}
           <span
             onClick={handleTogglePin}
-            className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
+            className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
               assignment.isPinned
                 ? 'text-amber-500 hover:text-amber-400'
                 : 'text-zinc-700 hover:text-zinc-400'
@@ -386,7 +386,7 @@ export const Tile = memo(function Tile({
           {inSafetyZone && (
             <span
               onClick={handleToggleFrozen}
-              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
+              className={`snowflake-icon p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
                 isFrozenOverridden
                   ? 'text-zinc-700 hover:text-zinc-400 opacity-60'
                   : 'text-sky-400 hover:text-sky-300'

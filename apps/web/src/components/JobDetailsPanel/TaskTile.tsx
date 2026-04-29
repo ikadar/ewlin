@@ -171,7 +171,7 @@ export const TaskTile = memo(function TaskTile({
         {assignment && (
           <span
             onClick={handleOutsourcedTogglePin}
-            className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+            className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
               isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'
             }`}
             title={isPinned ? 'Désépingler' : 'Épingler'}
@@ -292,7 +292,7 @@ export const TaskTile = memo(function TaskTile({
             />
             <span
               onClick={handleTogglePin}
-              className={`p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
+              className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
                 isPinned ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'
               }`}
               title={isPinned ? 'Désépingler' : 'Épingler'}

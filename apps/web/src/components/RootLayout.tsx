@@ -7,7 +7,7 @@ import { CommandCenterProvider, useCommandCenter } from './CommandPalette/Comman
 import { useCommands } from './CommandPalette/useCommands';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AutoRecomputeProvider, useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
-import { ScenarioProvider } from '../contexts/ScenarioContext';
+import { ScenarioProvider, useScenarioMode } from '../contexts/ScenarioContext';
 import { EnvFloatingControls } from './EnvFloatingControls/EnvFloatingControls';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
@@ -19,6 +19,10 @@ function RootLayoutInner() {
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
   const { toastMessage, dismissToast } = useMercureSubscription();
   const { showToast } = useAutoRecomputeCtx();
+  // The .env-readonly class on the shell drives the global CSS that
+  // hides planning-only affordances (pin, snowflake) when in prod mode.
+  // CompletionToggleIcon already gates itself in React.
+  const { mode: scenarioMode } = useScenarioMode();
 
   // Pipe Mercure real-time updates into the unified compute toaster
   // (top-right). Reset Mercure local state immediately so the next
@@ -133,7 +137,11 @@ function RootLayoutInner() {
   }, [isOpen, setIsOpen, navigate, allCommands, location.pathname]);
 
   return (
-    <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden">
+    <div
+      className={`h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden ${
+        scenarioMode === 'prod' ? 'env-readonly' : ''
+      }`}
+    >
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Outlet />
