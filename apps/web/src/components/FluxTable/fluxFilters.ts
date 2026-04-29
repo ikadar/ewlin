@@ -10,63 +10,87 @@ import type { FluxJob } from './fluxTypes';
 import { PREREQUISITE_BADGE_LABEL } from './fluxTypes';
 import { worstPrerequisiteStatus } from './fluxAggregation';
 
-// ── Synthetic job status (filter bar) ────────────────────────────────────────
-
-/** Synthetic job-level status surfaced in the "Statut" filter. */
-export type FluxJobStatus = 'todo' | 'prep' | 'ready' | 'shipped' | 'invoiced';
-
-export const FLUX_JOB_STATUS_LABEL: Record<FluxJobStatus, string> = {
-  todo:     'À traiter',
-  prep:     'En préparation',
-  ready:    'Prêt à imprimer',
-  shipped:  'Parti',
-  invoiced: 'Facturé',
-};
-
-const READY_BAT     = new Set(['bat_approved', 'none']);
-const READY_PAPIER  = new Set(['in_stock', 'delivered', 'none']);
-const READY_FORMES  = new Set(['in_stock', 'delivered', 'none']);
-const READY_PLAQUES = new Set(['ready', 'none']);
+// ── Operational job status (filter bar) ──────────────────────────────────────
 
 /**
- * Derive a single high-level status from a job's prerequisites and shipping state.
- * Order of precedence: invoiced > shipped > ready (all prereqs done) > prep (some done) > todo.
+ * Filterable health status for a job, derived from the schedule snapshot.
+ *
+ *   late      — listed in `lateJobIds` (deadline missed). Most severe.
+ *   conflict  — in `conflictJobIds` without being late.
+ *   planned   — has assignments and no conflict / no lateness.
+ *   unplanned — no station has been assigned yet.
+ *
+ * Archived jobs (shipped or invoiced) match no status filter — the
+ * "À facturer" tab is the dedicated entry point for end-of-flow follow-up.
  */
-export function deriveFluxJobStatus(job: FluxJob): FluxJobStatus {
-  if (job.facture.invoiced) return 'invoiced';
-  if (job.parti.shipped)    return 'shipped';
+export type FluxJobStatusFilter = 'late' | 'conflict' | 'planned' | 'unplanned';
 
-  const bat = job.elements.length > 1
-    ? worstPrerequisiteStatus(job.elements.map(e => e.bat))
-    : job.elements[0]!.bat;
-  const papier = job.elements.length > 1
-    ? worstPrerequisiteStatus(job.elements.map(e => e.papier))
-    : job.elements[0]!.papier;
-  const formes = job.elements.length > 1
-    ? worstPrerequisiteStatus(job.elements.map(e => e.formes))
-    : job.elements[0]!.formes;
-  const plaques = job.elements.length > 1
-    ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
-    : job.elements[0]!.plaques;
+export const FLUX_JOB_STATUS_FILTER_LABEL: Record<FluxJobStatusFilter, string> = {
+  late:      'En retard',
+  conflict:  'En conflit',
+  planned:   'Planifié',
+  unplanned: 'Non planifié',
+};
 
-  // A pristine job with no prereqs configured surfaces as "todo" — it needs
-  // attention even though every column is technically non-applicable.
-  if (bat === 'none' && papier === 'none' && formes === 'none' && plaques === 'none') {
-    return 'todo';
+export interface JobStatusContext {
+  /** Job UUIDs (or references) currently flagged late by the snapshot. */
+  lateJobIds: ReadonlySet<string>;
+  /** Job UUIDs (or references) currently flagged in conflict by the snapshot. */
+  conflictJobIds: ReadonlySet<string>;
+}
+
+const EMPTY_STATUS_CONTEXT: JobStatusContext = {
+  lateJobIds: new Set(),
+  conflictJobIds: new Set(),
+};
+
+function jobIsArchived(job: FluxJob): boolean {
+  return job.parti.shipped || job.facture.invoiced;
+}
+
+function jobIsLate(job: FluxJob, ctx: JobStatusContext): boolean {
+  const key = job.internalId ?? job.id;
+  if (ctx.lateJobIds.has(key)) return true;
+  // Mirror getFluxJobStatus semantics: any station in 'late' marks the job late.
+  return job.elements.some(el =>
+    Object.values(el.stations).some(s => s?.state === 'late'),
+  );
+}
+
+function jobHasConflict(job: FluxJob, ctx: JobStatusContext): boolean {
+  const key = job.internalId ?? job.id;
+  return ctx.conflictJobIds.has(key);
+}
+
+/**
+ * A job is planned as soon as one station has progressed past 'empty'.
+ * Sibling helper to "non planifié" = every station is still empty.
+ */
+export function jobIsPlanned(job: FluxJob): boolean {
+  return job.elements.some(el =>
+    Object.values(el.stations).some(s => s != null && s.state !== 'empty'),
+  );
+}
+
+/** Compact predicate used by both the filter and the recap line. */
+export function jobMatchesStatus(
+  job: FluxJob,
+  status: FluxJobStatusFilter,
+  ctx: JobStatusContext,
+): boolean {
+  // Archived jobs are out of scope — they belong to "À facturer" / closed work.
+  if (jobIsArchived(job)) return false;
+
+  const hasConflict = jobHasConflict(job, ctx);
+  const isLate      = jobIsLate(job, ctx);
+  const planned     = jobIsPlanned(job);
+
+  switch (status) {
+    case 'late':      return isLate;
+    case 'conflict':  return hasConflict && !isLate;
+    case 'planned':   return planned && !isLate && !hasConflict;
+    case 'unplanned': return !planned;
   }
-
-  const allReady =
-    READY_BAT.has(bat) && READY_PAPIER.has(papier) &&
-    READY_FORMES.has(formes) && READY_PLAQUES.has(plaques);
-  if (allReady) return 'ready';
-
-  // "todo" if every prerequisite is still at its earliest actionable state.
-  const stillTodo =
-    (bat === 'none' || bat === 'waiting_files') &&
-    (papier === 'none' || papier === 'to_order') &&
-    (formes === 'none' || formes === 'to_order') &&
-    (plaques === 'none' || plaques === 'to_make');
-  return stillTodo ? 'todo' : 'prep';
 }
 
 // ── Filter criteria ──────────────────────────────────────────────────────────
@@ -74,8 +98,11 @@ export function deriveFluxJobStatus(job: FluxJob): FluxJobStatus {
 /** Sentinel value used to filter jobs without a transporter. */
 export const CARRIER_NONE = '__none__';
 
+/** Boolean filter cell value — used for Parti / Facturé. */
+export type YesNoFilter = 'yes' | 'no';
+
 export interface FluxFilters {
-  statuses: ReadonlySet<FluxJobStatus>;
+  statuses: ReadonlySet<FluxJobStatusFilter>;
   clients: ReadonlySet<string>;
   /** Carrier name, or `CARRIER_NONE` for jobs without a transporter. */
   carriers: ReadonlySet<string>;
@@ -89,6 +116,10 @@ export interface FluxFilters {
   /** ISO YYYY-MM-DD bounds (inclusive) on the date portion of `batDeadline`. */
   batFrom: string | null;
   batTo: string | null;
+  /** Shipped/parti — empty = no filter, both = pass-through. */
+  shipped: ReadonlySet<YesNoFilter>;
+  /** Invoiced/facturé. */
+  invoiced: ReadonlySet<YesNoFilter>;
 }
 
 export const EMPTY_FLUX_FILTERS: FluxFilters = {
@@ -101,12 +132,15 @@ export const EMPTY_FLUX_FILTERS: FluxFilters = {
   sortieTo: null,
   batFrom: null,
   batTo: null,
+  shipped: new Set(),
+  invoiced: new Set(),
 };
 
 export function hasActiveFilters(f: FluxFilters): boolean {
   return f.statuses.size > 0 || f.clients.size > 0 || f.carriers.size > 0 ||
     f.priorities.size > 0 || f.jobIds.size > 0 ||
-    !!f.sortieFrom || !!f.sortieTo || !!f.batFrom || !!f.batTo;
+    !!f.sortieFrom || !!f.sortieTo || !!f.batFrom || !!f.batTo ||
+    f.shipped.size > 0 || f.invoiced.size > 0;
 }
 
 function isoDatePart(iso: string | null): string | null {
@@ -114,8 +148,18 @@ function isoDatePart(iso: string | null): string | null {
 }
 
 /** AND across distinct filters; OR within each multi-value filter. */
-export function filterByCriteria(job: FluxJob, f: FluxFilters): boolean {
-  if (f.statuses.size > 0 && !f.statuses.has(deriveFluxJobStatus(job))) return false;
+export function filterByCriteria(
+  job: FluxJob,
+  f: FluxFilters,
+  ctx: JobStatusContext = EMPTY_STATUS_CONTEXT,
+): boolean {
+  if (f.statuses.size > 0) {
+    let matchesAny = false;
+    for (const s of f.statuses) {
+      if (jobMatchesStatus(job, s, ctx)) { matchesAny = true; break; }
+    }
+    if (!matchesAny) return false;
+  }
   if (f.clients.size > 0 && !f.clients.has(job.client)) return false;
   if (f.carriers.size > 0) {
     const v = job.transporteur ?? CARRIER_NONE;
@@ -131,6 +175,15 @@ export function filterByCriteria(job: FluxJob, f: FluxFilters): boolean {
   const bat = isoDatePart(job.batDeadline);
   if (f.batFrom && (!bat || bat < f.batFrom)) return false;
   if (f.batTo && (!bat || bat > f.batTo)) return false;
+
+  if (f.shipped.size > 0) {
+    const v: YesNoFilter = job.parti.shipped ? 'yes' : 'no';
+    if (!f.shipped.has(v)) return false;
+  }
+  if (f.invoiced.size > 0) {
+    const v: YesNoFilter = job.facture.invoiced ? 'yes' : 'no';
+    if (!f.invoiced.has(v)) return false;
+  }
 
   return true;
 }
@@ -260,13 +313,14 @@ export function computeTabCounts(
   jobs: FluxJob[],
   search: string,
   filters: FluxFilters = EMPTY_FLUX_FILTERS,
+  ctx: JobStatusContext = EMPTY_STATUS_CONTEXT,
 ): Record<TabId, number> {
   const counts: Record<TabId, number> = {
     all: 0, bat: 0, papier: 0, formes: 0, plaques: 0, soustraitance: 0, 'a-facturer': 0,
   };
   for (const job of jobs) {
     if (!filterBySearch(job, search)) continue;
-    if (!filterByCriteria(job, filters)) continue;
+    if (!filterByCriteria(job, filters, ctx)) continue;
     for (const tab of TAB_IDS) {
       if (filterByTab(job, tab)) {
         counts[tab]++;

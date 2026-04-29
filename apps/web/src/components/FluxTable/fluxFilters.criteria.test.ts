@@ -2,12 +2,16 @@ import { describe, it, expect } from 'vitest';
 import {
   CARRIER_NONE,
   EMPTY_FLUX_FILTERS,
-  deriveFluxJobStatus,
   filterByCriteria,
   hasActiveFilters,
+  jobIsPlanned,
+  jobMatchesStatus,
   type FluxFilters,
+  type JobStatusContext,
 } from './fluxFilters';
 import type { FluxElement, FluxJob } from './fluxTypes';
+
+const EMPTY_CTX: JobStatusContext = { lateJobIds: new Set(), conflictJobIds: new Set() };
 
 function elem(overrides: Partial<FluxElement> = {}): FluxElement {
   return {
@@ -26,6 +30,7 @@ function elem(overrides: Partial<FluxElement> = {}): FluxElement {
 function job(overrides: Partial<FluxJob> = {}): FluxJob {
   return {
     id: '00042',
+    internalId: 'job-uuid-00042',
     client: 'Ducros',
     referent: null,
     designation: 'Cartes 500',
@@ -42,48 +47,90 @@ function job(overrides: Partial<FluxJob> = {}): FluxJob {
   };
 }
 
-describe('deriveFluxJobStatus', () => {
-  it('returns invoiced when the job is invoiced', () => {
-    expect(deriveFluxJobStatus(job({ facture: { invoiced: true, date: null } }))).toBe('invoiced');
+describe('jobIsPlanned', () => {
+  it('is false when every station is empty', () => {
+    expect(jobIsPlanned(job())).toBe(false);
   });
 
-  it('returns shipped when the job is shipped but not invoiced', () => {
-    expect(deriveFluxJobStatus(job({ parti: { shipped: true, date: null } }))).toBe('shipped');
-  });
-
-  it('returns ready when all prerequisites are done and not yet shipped', () => {
+  it('is true when at least one station has a non-empty state', () => {
     const j = job({
-      elements: [elem({ bat: 'bat_approved', papier: 'in_stock', formes: 'in_stock', plaques: 'ready' })],
+      elements: [elem({ stations: { 'cat-1': { state: 'planned' } } })],
     });
-    expect(deriveFluxJobStatus(j)).toBe('ready');
+    expect(jobIsPlanned(j)).toBe(true);
   });
 
-  it('returns todo when nothing has been started yet', () => {
-    expect(deriveFluxJobStatus(job())).toBe('todo');
-  });
-
-  it('returns prep when at least one prerequisite is in progress', () => {
-    const j = job({ elements: [elem({ bat: 'bat_sent' })] });
-    expect(deriveFluxJobStatus(j)).toBe('prep');
-  });
-
-  it('aggregates worst status across multiple elements', () => {
+  it('is true when a station is in-progress', () => {
     const j = job({
-      elements: [
-        elem({ bat: 'bat_approved', papier: 'in_stock', formes: 'in_stock', plaques: 'ready' }),
-        elem({ bat: 'waiting_files', papier: 'to_order', formes: 'none', plaques: 'to_make' }),
-      ],
+      elements: [elem({ stations: { 'cat-1': { state: 'in-progress', progress: 30 } } })],
     });
-    // The second element is still pending → not ready, but partial work elsewhere
-    expect(deriveFluxJobStatus(j)).toBe('todo');
+    expect(jobIsPlanned(j)).toBe(true);
+  });
+});
+
+describe('jobMatchesStatus', () => {
+  it('returns false for archived jobs across every status', () => {
+    const shipped = job({ parti: { shipped: true, date: null } });
+    const invoiced = job({ facture: { invoiced: true, date: null } });
+    for (const s of ['conflict', 'late', 'planned', 'unplanned'] as const) {
+      expect(jobMatchesStatus(shipped, s, EMPTY_CTX)).toBe(false);
+      expect(jobMatchesStatus(invoiced, s, EMPTY_CTX)).toBe(false);
+    }
   });
 
-  it('precedence: invoiced wins over a still-pending prerequisite', () => {
+  it('matches conflict for jobs in conflictJobIds', () => {
+    const ctx: JobStatusContext = {
+      lateJobIds: new Set(),
+      conflictJobIds: new Set(['job-uuid-00042']),
+    };
+    expect(jobMatchesStatus(job(), 'conflict', ctx)).toBe(true);
+  });
+
+  it('matches late for jobs in lateJobIds and not in conflict', () => {
+    const ctx: JobStatusContext = {
+      lateJobIds: new Set(['job-uuid-00042']),
+      conflictJobIds: new Set(),
+    };
+    expect(jobMatchesStatus(job(), 'late', ctx)).toBe(true);
+  });
+
+  it('a conflict-and-late job matches late but NOT conflict (precedence)', () => {
+    const ctx: JobStatusContext = {
+      lateJobIds: new Set(['job-uuid-00042']),
+      conflictJobIds: new Set(['job-uuid-00042']),
+    };
+    expect(jobMatchesStatus(job(), 'late', ctx)).toBe(true);
+    expect(jobMatchesStatus(job(), 'conflict', ctx)).toBe(false);
+  });
+
+  it('matches planned for jobs with stations and no conflict/lateness', () => {
     const j = job({
-      elements: [elem({ bat: 'waiting_files' })],
-      facture: { invoiced: true, date: null },
+      elements: [elem({ stations: { 'cat-1': { state: 'planned' } } })],
     });
-    expect(deriveFluxJobStatus(j)).toBe('invoiced');
+    expect(jobMatchesStatus(j, 'planned', EMPTY_CTX)).toBe(true);
+  });
+
+  it('does not match planned when the job is late', () => {
+    const j = job({
+      elements: [elem({ stations: { 'cat-1': { state: 'planned' } } })],
+    });
+    const ctx: JobStatusContext = {
+      lateJobIds: new Set(['job-uuid-00042']),
+      conflictJobIds: new Set(),
+    };
+    expect(jobMatchesStatus(j, 'planned', ctx)).toBe(false);
+    expect(jobMatchesStatus(j, 'late', ctx)).toBe(true);
+  });
+
+  it('matches unplanned for jobs with no station progress', () => {
+    expect(jobMatchesStatus(job(), 'unplanned', EMPTY_CTX)).toBe(true);
+  });
+
+  it('considers a station in late state as planned (not unplanned)', () => {
+    const j = job({
+      elements: [elem({ stations: { 'cat-1': { state: 'late' } } })],
+    });
+    expect(jobMatchesStatus(j, 'unplanned', EMPTY_CTX)).toBe(false);
+    expect(jobMatchesStatus(j, 'late', EMPTY_CTX)).toBe(true);
   });
 });
 
@@ -108,12 +155,12 @@ describe('filterByCriteria', () => {
     expect(filterByCriteria(job(), EMPTY_FLUX_FILTERS)).toBe(true);
   });
 
-  it('filters by status (synthetic)', () => {
-    const todo = job();
-    const shipped = job({ parti: { shipped: true, date: null } });
-    const f: FluxFilters = { ...EMPTY_FLUX_FILTERS, statuses: new Set(['shipped']) };
-    expect(filterByCriteria(shipped, f)).toBe(true);
-    expect(filterByCriteria(todo, f)).toBe(false);
+  it('filters by status with context (planned)', () => {
+    const planned   = job({ elements: [elem({ stations: { 'cat-1': { state: 'planned' } } })] });
+    const unplanned = job();
+    const f: FluxFilters = { ...EMPTY_FLUX_FILTERS, statuses: new Set(['planned']) };
+    expect(filterByCriteria(planned, f, EMPTY_CTX)).toBe(true);
+    expect(filterByCriteria(unplanned, f, EMPTY_CTX)).toBe(false);
   });
 
   it('filters by client (OR within filter)', () => {
@@ -172,6 +219,17 @@ describe('filterByCriteria', () => {
     const fMiss: FluxFilters = { ...EMPTY_FLUX_FILTERS, batFrom: '2026-03-11' };
     expect(filterByCriteria(j, fHit)).toBe(true);
     expect(filterByCriteria(j, fMiss)).toBe(false);
+  });
+
+  it('OR-combines status values within the same filter', () => {
+    const planned   = job({ elements: [elem({ stations: { 'cat-1': { state: 'planned' } } })] });
+    const unplanned = job();
+    const f: FluxFilters = {
+      ...EMPTY_FLUX_FILTERS,
+      statuses: new Set(['planned', 'unplanned']),
+    };
+    expect(filterByCriteria(planned, f, EMPTY_CTX)).toBe(true);
+    expect(filterByCriteria(unplanned, f, EMPTY_CTX)).toBe(true);
   });
 
   it('AND-combines distinct filters', () => {

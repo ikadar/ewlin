@@ -1,23 +1,28 @@
 import { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import {
   CARRIER_NONE,
   EMPTY_FLUX_FILTERS,
-  FLUX_JOB_STATUS_LABEL,
+  FLUX_JOB_STATUS_FILTER_LABEL,
   hasActiveFilters,
   type FluxFilters,
-  type FluxJobStatus,
+  type FluxJobStatusFilter,
+  type YesNoFilter,
 } from '@/components/FluxTable/fluxFilters';
 import type { FluxJob } from '@/components/FluxTable/fluxTypes';
 import { FluxMultiSelect, type FluxMultiSelectOption } from './FluxMultiSelect';
 import { FluxDateRangeFilter } from './FluxDateRangeFilter';
 
-const STATUS_OPTIONS: ReadonlyArray<FluxMultiSelectOption<FluxJobStatus>> = [
-  { value: 'todo',     label: FLUX_JOB_STATUS_LABEL.todo,     dotClassName: 'bg-red-400' },
-  { value: 'prep',     label: FLUX_JOB_STATUS_LABEL.prep,     dotClassName: 'bg-orange-400' },
-  { value: 'ready',    label: FLUX_JOB_STATUS_LABEL.ready,    dotClassName: 'bg-blue-400' },
-  { value: 'shipped',  label: FLUX_JOB_STATUS_LABEL.shipped,  dotClassName: 'bg-green-500' },
-  { value: 'invoiced', label: FLUX_JOB_STATUS_LABEL.invoiced, dotClassName: 'bg-purple-400' },
+// Status → operational dot:
+//   red    = late      — deadline missed, customer impact
+//   yellow = conflict  — planning issue to resolve
+//   blue   = planned   — has assignments and no issues
+//   grey   = unplanned — not yet placed in the schedule
+const STATUS_OPTIONS: ReadonlyArray<FluxMultiSelectOption<FluxJobStatusFilter>> = [
+  { value: 'late',      label: FLUX_JOB_STATUS_FILTER_LABEL.late,      dotClassName: 'bg-red-500' },
+  { value: 'conflict',  label: FLUX_JOB_STATUS_FILTER_LABEL.conflict,  dotClassName: 'bg-yellow-400' },
+  { value: 'planned',   label: FLUX_JOB_STATUS_FILTER_LABEL.planned,   dotClassName: 'bg-blue-500' },
+  { value: 'unplanned', label: FLUX_JOB_STATUS_FILTER_LABEL.unplanned, dotClassName: 'bg-zinc-500' },
 ];
 
 const PRIORITY_LABELS: Record<number, string> = {
@@ -33,6 +38,13 @@ const PRIORITY_OPTIONS: ReadonlyArray<FluxMultiSelectOption<number>> = [
   { value: 2, label: PRIORITY_LABELS[2]! },
   { value: 3, label: PRIORITY_LABELS[3]! },
 ];
+
+const YES_NO_OPTIONS: ReadonlyArray<FluxMultiSelectOption<YesNoFilter>> = [
+  { value: 'yes', label: 'Oui' },
+  { value: 'no',  label: 'Non' },
+];
+
+const YES_NO_LABEL: Record<YesNoFilter, string> = { yes: 'Oui', no: 'Non' };
 
 interface FluxFilterBarProps {
   /** Source of truth for the dynamic option lists (clients, carriers, ids). */
@@ -116,13 +128,26 @@ export function FluxFilterBar({ jobs, filters, onChange }: FluxFilterBarProps) {
           to={filters.batTo}
           onChange={(from, to) => onChange({ ...filters, batFrom: from, batTo: to })}
         />
+        <FluxMultiSelect
+          label="Parti"
+          options={YES_NO_OPTIONS}
+          values={filters.shipped}
+          onChange={s => onChange({ ...filters, shipped: s })}
+        />
+        <FluxMultiSelect
+          label="Facturé"
+          options={YES_NO_OPTIONS}
+          values={filters.invoiced}
+          onChange={s => onChange({ ...filters, invoiced: s })}
+        />
         <button
           type="button"
           onClick={handleReset}
           disabled={!active}
-          className="ml-auto text-[11px] text-flux-text-tertiary hover:text-flux-text-primary underline underline-offset-2 disabled:opacity-40 disabled:no-underline disabled:cursor-default px-1 py-0.5"
+          className="ml-auto inline-flex items-center gap-1 text-[11px] text-flux-text-tertiary hover:text-flux-text-primary px-2 py-1 rounded hover:bg-flux-hover disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-default"
         >
-          Réinitialiser
+          <RotateCcw className="w-3 h-3" />
+          <span>Réinitialiser</span>
         </button>
       </div>
 
@@ -163,7 +188,7 @@ function FluxFilterRecap({ filters, onChange }: RecapProps) {
       key: 'statuses',
       label: 'statut',
       chips: [...filters.statuses].map(s => ({
-        text: FLUX_JOB_STATUS_LABEL[s],
+        text: FLUX_JOB_STATUS_FILTER_LABEL[s],
         dotClassName: STATUS_OPTIONS.find(o => o.value === s)?.dotClassName,
         onRemove: () => {
           const next = new Set(filters.statuses);
@@ -258,6 +283,36 @@ function FluxFilterRecap({ filters, onChange }: RecapProps) {
     });
   }
 
+  if (filters.shipped.size > 0) {
+    groups.push({
+      key: 'shipped',
+      label: 'parti',
+      chips: [...filters.shipped].map(v => ({
+        text: YES_NO_LABEL[v],
+        onRemove: () => {
+          const next = new Set(filters.shipped);
+          next.delete(v);
+          onChange({ ...filters, shipped: next });
+        },
+      })),
+    });
+  }
+
+  if (filters.invoiced.size > 0) {
+    groups.push({
+      key: 'invoiced',
+      label: 'facturé',
+      chips: [...filters.invoiced].map(v => ({
+        text: YES_NO_LABEL[v],
+        onRemove: () => {
+          const next = new Set(filters.invoiced);
+          next.delete(v);
+          onChange({ ...filters, invoiced: next });
+        },
+      })),
+    });
+  }
+
   if (groups.length === 0) return null;
 
   return (
@@ -298,6 +353,6 @@ function FluxFilterRecap({ filters, onChange }: RecapProps) {
 
 function rangeText(from: string | null, to: string | null): string {
   if (from && to) return `${fmtIsoToShort(from)} → ${fmtIsoToShort(to)}`;
-  if (from)       return `dès ${fmtIsoToShort(from)}`;
+  if (from)       return `à partir du ${fmtIsoToShort(from)}`;
   return `jusqu'au ${fmtIsoToShort(to!)}`;
 }

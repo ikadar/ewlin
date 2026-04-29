@@ -357,13 +357,13 @@ const FluxTableRow = memo(function FluxTableRow({
   // Job-level status for dot + row tint
   const jobStatus = getFluxJobStatus(job, ctx.lateJobIds, ctx.conflictJobIds);
 
-  // Row background tint: subtle rgba on <tr>, opaque mix on sticky cells
-  // flux-elevated = rgb(36,36,36). We blend the status color at ~5%.
-  const ROW_TINT: Record<string, { tr: string; sticky: string }> = {
-    late:     { tr: 'var(--flux-late-row-bg)', sticky: 'var(--flux-late-sticky-bg)' },
+  // Row background tint: only conflict / late get a colored row — planned and
+  // unplanned rows render flat, the dot alone conveys their status.
+  const ROW_TINT: Partial<Record<typeof jobStatus, { tr: string; sticky: string }>> = {
     conflict: { tr: 'var(--flux-conflict-row-bg)', sticky: 'var(--flux-conflict-sticky-bg)' },
+    late:     { tr: 'var(--flux-late-row-bg)',     sticky: 'var(--flux-late-sticky-bg)' },
   };
-  const tint = jobStatus ? ROW_TINT[jobStatus] : null;
+  const tint = ROW_TINT[jobStatus] ?? null;
 
   const cellBase = `${stickyCell} px-4 py-0 text-sm text-flux-text-secondary`;
   const stickyBg = tint ? { backgroundColor: tint.sticky } : undefined;

@@ -57,7 +57,9 @@ html {
   --flux-frost-glow:      rgba(56, 189, 248, 0.45);
   --flux-frost-intensity: 0.5;
 
-  /* Late/conflict row tints (dark mode) */
+  /* Operational row tints (dark mode):
+   *   late = red (deadline missed = most severe), conflict = yellow.
+   *   Planned and unplanned rows have no tint. */
   --flux-late-row-bg: rgba(248,113,113,0.06);
   --flux-late-sticky-bg: rgb(49,39,39);
   --flux-conflict-row-bg: rgba(251,191,36,0.06);
@@ -615,7 +617,7 @@ html.light .dl-bat-j2      { color: #c2410c !important; }  /* orange-700 */
 html.light .dl-bat-j1      { color: #c2410c !important; }  /* orange-700 */
 html.light .dl-bat-overdue { color: #b91c1c !important; }  /* red-700 */
 
-/* Late/conflict row tints — lighter on mauve bg for readability */
+/* Operational row tints (light mode): late = red, conflict = yellow */
 html.light {
   --flux-late-row-bg: rgba(220,38,38,0.08);
   --flux-late-sticky-bg: rgba(220,38,38,0.08);

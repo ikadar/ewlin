@@ -87,13 +87,21 @@ export function sortStationDataBySeverity(data: FluxStationData[]): FluxStationD
 
 // ── Job-level status ─────────────────────────────────────────────────────
 
-/** Job-level problem indicator for the Flux table row. */
-export type FluxJobStatus = 'late' | 'conflict' | null;
+/**
+ * Operational job status surfaced as a dot in the table and as a filter value.
+ *
+ *   late      — listed in lateJobIds (deadline missed). Most severe.
+ *   conflict  — in conflictJobIds without being late.
+ *   planned   — has at least one station with non-empty state, no issue.
+ *   unplanned — every station is still empty.
+ */
+export type FluxJobStatus = 'late' | 'conflict' | 'planned' | 'unplanned';
 
 /**
- * Derives the job-level problem status from station data and schedule snapshot.
- * A job is "late" if ANY station has state === 'late' OR it appears in lateJobIds.
- * Conflict detection uses conflictJobIds (excluding DeadlineConflict).
+ * Derives the job-level operational status from station data and schedule snapshot.
+ *
+ * Precedence: late > conflict > planned > unplanned. The `late` station-state
+ * fallback keeps the row tinted even before the snapshot's lateJobIds is up to date.
  */
 export function getFluxJobStatus(
   job: FluxJob,
@@ -103,8 +111,11 @@ export function getFluxJobStatus(
   const jobKey = job.internalId ?? job.id;
   const isLate = job.elements.some(el =>
     Object.values(el.stations).some(s => s?.state === 'late'),
-  ) || lateJobIds?.has(jobKey);
+  ) || (lateJobIds?.has(jobKey) ?? false);
   if (isLate) return 'late';
   if (conflictJobIds?.has(jobKey)) return 'conflict';
-  return null;
+  const planned = job.elements.some(el =>
+    Object.values(el.stations).some(s => s != null && s.state !== 'empty'),
+  );
+  return planned ? 'planned' : 'unplanned';
 }

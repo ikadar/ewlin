@@ -105,24 +105,31 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     }
   }, [sortColumn]);
 
+  // Status context shared by the criteria filter and the table — derived
+  // once so both surfaces agree on what "planifié" / "en retard" means.
+  const statusContext = useMemo(
+    () => ({ lateJobIds, conflictJobIds }),
+    [lateJobIds, conflictJobIds],
+  );
+
   // Filtered + sorted jobs: tab filter → search → criteria → sort
   const filteredJobs = useMemo(
     () => sortFluxJobs(
       jobs.filter(job =>
         filterByTab(job, activeTab) &&
         filterBySearch(job, search) &&
-        filterByCriteria(job, filters)
+        filterByCriteria(job, filters, statusContext)
       ),
       sortColumn,
       sortDirection,
     ),
-    [jobs, activeTab, search, filters, sortColumn, sortDirection],
+    [jobs, activeTab, search, filters, statusContext, sortColumn, sortDirection],
   );
 
   // Tab counts: recalculated based on current search, filters, and job state
   const tabCounts = useMemo(
-    () => computeTabCounts(jobs, search, filters),
-    [jobs, search, filters],
+    () => computeTabCounts(jobs, search, filters, statusContext),
+    [jobs, search, filters, statusContext],
   );
 
   // Focused job ID for visual highlight (Alt+↑/↓)

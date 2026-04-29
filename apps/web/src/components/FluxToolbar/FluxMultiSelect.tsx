@@ -151,33 +151,33 @@ export function FluxMultiSelect<V extends string | number>({
           data-testid={`flux-filter-${tid}-dropdown`}
         >
           {searchable && (
-            <div className="p-2 border-b border-flux-border">
+            <div className="p-3 border-b border-flux-border">
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Rechercher…"
-                className="w-full px-2 py-1 text-xs bg-flux-base border border-flux-border-light rounded text-flux-text-primary outline-none focus:border-blue-500"
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-[3px] px-[7px] py-[5px] text-[13px] leading-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           )}
 
           <div className="overflow-y-auto py-1 flex-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-3 text-xs text-flux-text-muted text-center">Aucun résultat</div>
+              <div className="px-3 py-3 text-sm text-flux-text-muted text-center">Aucun résultat</div>
             ) : filtered.map(opt => {
               const checked = values.has(opt.value);
               return (
                 <label
                   key={String(opt.value)}
-                  className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-flux-hover text-xs text-flux-text-primary"
+                  className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-flux-hover text-sm text-flux-text-primary"
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggle(opt.value)}
-                    className="w-3.5 h-3.5 accent-blue-500 cursor-pointer flex-shrink-0"
+                    className="w-3.5 h-3.5 rounded border border-flux-border-light bg-flux-base accent-blue-500 cursor-pointer flex-shrink-0"
                   />
                   {opt.dotClassName && (
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${opt.dotClassName}`} />

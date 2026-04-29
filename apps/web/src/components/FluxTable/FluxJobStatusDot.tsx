@@ -1,22 +1,22 @@
 import { memo } from 'react';
 import type { FluxJobStatus } from './fluxAggregation';
 
-const STATUS_CONFIG: Record<Exclude<FluxJobStatus, null>, { color: string; label: string }> = {
-  late:     { color: 'rgb(248 113 113)', label: 'En retard' },   // red-400
-  conflict: { color: 'rgb(251 191 36)',  label: 'Conflit' },     // amber-400
+const STATUS_CONFIG: Record<FluxJobStatus, { color: string; label: string }> = {
+  late:      { color: 'rgb(239 68 68)',   label: 'En retard' },     // red-500
+  conflict:  { color: 'rgb(250 204 21)',  label: 'En conflit' },    // yellow-400
+  planned:   { color: 'rgb(59 130 246)',  label: 'Planifié' },      // blue-500
+  unplanned: { color: 'rgb(113 113 122)', label: 'Non planifié' },  // zinc-500
 };
 
 /**
- * Small colored dot indicating job-level status (late / conflict).
- * Renders inline before the job ID in the Flux table.
+ * Small colored dot indicating job-level status (conflict / late / planned /
+ * unplanned). Renders inline before the job ID in the Flux table.
  */
 export const FluxJobStatusDot = memo(function FluxJobStatusDot({
   status,
 }: {
   status: FluxJobStatus;
 }) {
-  if (!status) return null;
-
   const { color, label } = STATUS_CONFIG[status];
 
   return (
