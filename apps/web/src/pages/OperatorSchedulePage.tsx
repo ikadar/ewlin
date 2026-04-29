@@ -34,6 +34,7 @@ import {
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
 import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
+import { useScenarioMode } from '../contexts/ScenarioContext';
 import { getTasksForJob } from '../utils';
 import { getProduitLabel } from '../utils/tileLabelResolver';
 import { getErrorMessage } from '../store/api/errorNormalization';
@@ -617,6 +618,10 @@ export default function OperatorSchedulePage() {
 
   // ---- Keyboard shortcuts (harmonized with station schedule) ----
   const orderedJobIds = useMemo(() => snapshot.jobs.map(j => j.id), [snapshot.jobs]);
+  // V1 versioning: in prod every planning mutation must be blocked.
+  // The current scenario mode gates the mutating keyboard shortcuts
+  // below (compute, selective compute, pin-all, lift+replan, etc.).
+  const { mode: scenarioMode } = useScenarioMode();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -677,6 +682,7 @@ export default function OperatorSchedulePage() {
       // ---- Ctrl+Alt+C: smart compaction ----
       if (isCtrlAltLetter(e, 'c')) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         setIsSmartCompactOpen(true);
         return;
       }
@@ -701,6 +707,7 @@ export default function OperatorSchedulePage() {
       // Phase-2 LNS runs in the background through the shared runtime.
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         void liftAndRecompute({
           snapshot,
           onDone: (result) => {
@@ -714,6 +721,7 @@ export default function OperatorSchedulePage() {
       // ---- Alt+P: selective compute (selected job) ----
       if (isAltLetter(e, 'p')) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         if (selectedJobId) {
           handleComputeJob(selectedJobId);
         }
@@ -722,6 +730,7 @@ export default function OperatorSchedulePage() {
 
       // ---- Alt+F: pin/unpin all tiles for selected job ----
       if (isAltLetter(e, 'f') && selectedJobId) {
+        if (scenarioMode === 'prod') { e.preventDefault(); return; }
         e.preventDefault();
         handlePinAllJobTiles();
         return;
@@ -783,6 +792,7 @@ export default function OperatorSchedulePage() {
     massUnschedule, handleComputeIncremental, handleComputeJob,
     handleClearJobAssignments, handlePinAllJobTiles, handleZoomChange,
     autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot,
+    scenarioMode,
   ]);
 
   // ---- Now line ----

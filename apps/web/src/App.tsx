@@ -46,6 +46,7 @@ import { transformJcfToRequest, transformJcfElementToRequest } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
 import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
+import { useScenarioMode } from './contexts/ScenarioContext';
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
 import { Minimap } from './components/Minimap';
@@ -225,6 +226,10 @@ function sequenceDslToCategories(
 
 // Inner App component that uses drag state context
 function AppContent() {
+  // V1 versioning: every planning mutation must be blocked in prod.
+  // The keyboard handler reads this and short-circuits compute /
+  // pin-all / lift-and-replan / unschedule when scenarioMode === 'prod'.
+  const { mode: scenarioMode } = useScenarioMode();
   // v0.4.37: RTK Query for snapshot data
   // v0.5.1: Added loading and error state handling
   const dispatch = useAppDispatch();
@@ -1188,6 +1193,7 @@ function AppContent() {
       // Ctrl+Alt+C: smart compaction
       if (isCtrlAltLetter(e, 'c')) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         handleSmartCompact();
         return;
       }
@@ -1197,6 +1203,7 @@ function AppContent() {
       // Effectively a global re-plan of the free portion of the schedule.
       if (isCtrlAltLetter(e, 'p')) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         void liftAndRecompute({
           snapshot,
           onDone: (result) => {
@@ -1217,6 +1224,7 @@ function AppContent() {
       // Ctrl+Alt+Z: mass unschedule all clearable tiles
       if (isCtrlAltLetter(e, 'z')) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         massUnschedule.trigger();
         return;
       }
@@ -1224,6 +1232,7 @@ function AppContent() {
       // Alt+F: toggle pin on all placed tiles for selected job (Figer)
       if (isAltLetter(e, 'f') && selectedJobId) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         handlePinAllJobTiles();
         return;
       }
@@ -1231,6 +1240,7 @@ function AppContent() {
       // Alt+Z: clear all tiles for selected job
       if (isAltLetter(e, 'z') && selectedJobId) {
         e.preventDefault();
+        if (scenarioMode === 'prod') return;
         handleClearJobAssignments();
         return;
       }
@@ -1283,7 +1293,7 @@ function AppContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot]);
+  }, [selectedJobId, isJcfModalOpen, orderedJobIds, selectedJob, pixelsPerHour, gridStartDate, effectiveCollapses, setSelectedJobId, setDisplayMode, isCommandPaletteOpen, handleEditJob, handleZoomChange, handleClearJobAssignments, massUnschedule.trigger, autoRecompute, liftAndRecompute, snapshot, invalidateSnapshot, scenarioMode, handleSmartCompact, handlePinAllJobTiles]);
 
   // Handle grid background click (deselect job)
   const handleDeselect = useCallback(() => setSelectedJobId(null), [setSelectedJobId]);
