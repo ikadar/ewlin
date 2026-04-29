@@ -52,10 +52,36 @@ export const promotionApi = createApi({
     promote: builder.mutation<PromotionResult, void>({
       query: () => ({ url: '/promotion', method: 'POST' }),
       invalidatesTags: ['Promotion'],
+      // The prod snapshot cache lives in a separate RTK Query slice
+      // (prodSnapshotApi) — it doesn't see our 'Promotion' tag. Without
+      // the cross-API invalidation below, the prod view keeps serving
+      // the previous blob from cache after a successful promotion.
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          const { prodSnapshotApi } = await import('./prodSnapshotApi');
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+          const { scheduleApi } = await import('./scheduleApi');
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          // promotion failed — nothing to invalidate
+        }
+      },
     }),
     undoPromotion: builder.mutation<PromotionUndoResult, void>({
       query: () => ({ url: '/promotion/undo', method: 'POST' }),
       invalidatesTags: ['Promotion'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          const { prodSnapshotApi } = await import('./prodSnapshotApi');
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+          const { scheduleApi } = await import('./scheduleApi');
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          // undo failed — keep current cache
+        }
+      },
     }),
   }),
 });
