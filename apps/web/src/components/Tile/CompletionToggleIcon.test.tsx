@@ -35,12 +35,10 @@ describe('CompletionToggleIcon', () => {
     setMode.mockClear();
   });
 
-  it('is non-interactive in préprod (pointer-events:none)', () => {
+  it('renders nothing in préprod (icon hidden entirely)', () => {
     currentMode = 'preprod';
     renderIcon({ taskId: 't1', isCompleted: false });
-    const toggle = screen.getByTestId('tile-completion-toggle');
-    expect(toggle.className).toMatch(/pointer-events-none/);
-    expect(toggle.getAttribute('data-mode')).toBe('preprod');
+    expect(screen.queryByTestId('tile-completion-toggle')).toBeNull();
   });
 
   it('is interactive in prod (cursor pointer + clickable)', () => {
@@ -52,10 +50,11 @@ describe('CompletionToggleIcon', () => {
     expect(toggle.getAttribute('data-mode')).toBe('prod');
   });
 
-  it('does NOT call the mutation on click in préprod', () => {
+  it('does NOT render in préprod (so click cannot fire)', () => {
     currentMode = 'preprod';
     renderIcon({ taskId: 't1', isCompleted: false });
-    fireEvent.click(screen.getByTestId('tile-completion-toggle'));
+    // No element to click — the icon is not in the DOM in préprod.
+    expect(screen.queryByTestId('tile-completion-toggle')).toBeNull();
     expect(mockToggleProdCompletion).not.toHaveBeenCalled();
   });
 
@@ -67,8 +66,8 @@ describe('CompletionToggleIcon', () => {
     expect(mockToggleProdCompletion).toHaveBeenCalledWith('t1');
   });
 
-  it('reflects the completion state via data-completed', () => {
-    currentMode = 'preprod';
+  it('reflects the completion state via data-completed (in prod)', () => {
+    currentMode = 'prod';
     const { rerender } = renderIcon({ taskId: 't1', isCompleted: false });
     expect(screen.getByTestId('tile-completion-toggle').getAttribute('data-completed')).toBe('false');
 

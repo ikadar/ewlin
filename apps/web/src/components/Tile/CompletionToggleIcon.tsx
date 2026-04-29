@@ -28,7 +28,14 @@ export function CompletionToggleIcon({ taskId, isCompleted, onToggled, iconClass
   const { mode } = useScenarioMode();
   const [toggleProdCompletion, { isLoading }] = useToggleProdCompletionMutation();
 
-  const interactive = mode === 'prod';
+  // Visibility rule (V1 versioning): the completion check is meaningful
+  // only in the prod view, where operators actually report execution
+  // truth. In préprod the icon is hidden entirely — the chef sees the
+  // implicit completion via tile colour (state='completed') but has no
+  // affordance that suggests they could fake it.
+  if (mode !== 'prod') return null;
+
+  const interactive = true;
   const Icon = isCompleted ? CheckCircle2 : Circle;
 
   const handleClick = async (e: React.MouseEvent) => {

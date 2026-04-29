@@ -32,15 +32,19 @@ export function EnvFloatingControls() {
         data-testid="env-floating-controls"
       >
         {mode === 'preprod' && (
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="px-3 py-1.5 rounded-full text-[11px] bg-emerald-600 text-white border border-emerald-500 hover:bg-emerald-500 shadow-lg flex items-center gap-1.5 transition"
-            title="Promouvoir préprod → prod (Alt+Shift+P)"
-            data-testid="promote-cta"
-          >
-            <Rocket size={12} /> Promouvoir
-          </button>
+          // Wrapped in the same p-0.5 + border + backdrop-blur shell as
+          // the toggle so the two pills are visually the same height.
+          <div className="bg-zinc-900/90 backdrop-blur-sm rounded-full p-0.5 border border-zinc-800 shadow-lg">
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="px-2.5 py-1 rounded-full text-[11px] bg-emerald-600 text-white hover:bg-emerald-500 flex items-center gap-1.5 transition"
+              title="Promouvoir préprod → prod (Alt+Shift+P)"
+              data-testid="promote-cta"
+            >
+              <Rocket size={12} /> Promouvoir
+            </button>
+          </div>
         )}
         <div
           className="flex items-center bg-zinc-900/90 backdrop-blur-sm rounded-full p-0.5 gap-0.5 border border-zinc-800 shadow-lg"
