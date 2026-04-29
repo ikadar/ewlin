@@ -35,6 +35,7 @@ import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
 import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
 import { getTasksForJob } from '../utils';
+import { getProduitLabel } from '../utils/tileLabelResolver';
 import { getErrorMessage } from '../store/api/errorNormalization';
 import { ZOOM_LEVELS } from '../utils/zoom';
 import {
@@ -53,6 +54,7 @@ import {
   computeOperatorUnavailabilitySegments,
   computeOperatorOvertimeSegments,
 } from '../components/TimelineLens/unavailability';
+import { PlanningEnvHeader } from '../components/PlanningEnvHeader/PlanningEnvHeader';
 import type {
   Operator,
   TaskAssignment,
@@ -81,7 +83,8 @@ import { useSetSafetyOverrideMutation } from '../store';
 import { OperatorHeader } from '../components/OperatorHeaders';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
-import { useVirtualScroll, isAssignmentVisible, useMassUnschedule, useToast } from '../hooks';
+import { useVirtualScroll, isAssignmentVisible, useMassUnschedule } from '../hooks';
+import { useToast } from '../hooks/useToast';
 import { useLiftAndRecompute } from '../hooks/useLiftAndRecompute';
 import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
 import { ComputeModal } from '../components/ComputeModal/ComputeModal';
@@ -307,6 +310,14 @@ export default function OperatorSchedulePage() {
     () => new Map(snapshot.elements.map((e) => [e.id, e])),
     [snapshot.elements],
   );
+
+  // Per-job element count — drives whether the produit label includes the
+  // element name (multi-element only, mirrors getProduitLabel convention).
+  const elementCountByJobId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of snapshot.elements) m.set(e.jobId, (m.get(e.jobId) ?? 0) + 1);
+    return m;
+  }, [snapshot.elements]);
 
   const taskMap = useMemo(() => {
     const m = new Map<string, (typeof snapshot.tasks)[number]>();
@@ -906,7 +917,7 @@ export default function OperatorSchedulePage() {
           : { overrideLeft: '40px', overrideWidth: 'calc(100% - 44px)' };
       const svgWidth = slice.position === 'full' ? colWidth : Math.floor(colWidth * 0.48);
 
-      const label = `${job.reference} · ${job.client}`;
+      const label = getProduitLabel(job, element, elementCountByJobId.get(job.id) ?? 1);
       const setupMinutes = task.duration?.setupMinutes ?? 0;
       const taskStart = assignment ? new Date(assignment.scheduledStart) : null;
       const setupWindow = setupMinutes > 0 && taskStart
@@ -943,6 +954,7 @@ export default function OperatorSchedulePage() {
   }, [
     lens.state.activeColumnId, lensActiveSlices, lensRange.gridStartMs, selectedJobId,
     taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now,
+    elementCountByJobId,
   ]);
 
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1078,7 +1090,7 @@ export default function OperatorSchedulePage() {
     // SVG width must match the actual rendered width
     const svgWidth = slice.position === 'full' ? colWidth : Math.floor(colWidth * 0.48);
 
-    const label = `${job.reference} · ${job.client}`;
+    const label = getProduitLabel(job, element, elementCountByJobId.get(job.id) ?? 1);
 
     // Build the setup window (wall-clock start of the task's first tile
     // + setupMinutes). The engine's scheduled_start is the task's global
@@ -1141,6 +1153,7 @@ export default function OperatorSchedulePage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+    <PlanningEnvHeader />
     <div className="flex-1 flex overflow-hidden">
       {/* ---- Left sidebar: JobsList ---- */}
       {isSidebarVisible && (

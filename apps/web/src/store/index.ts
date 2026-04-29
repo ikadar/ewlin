@@ -29,6 +29,8 @@ import { authApi } from './api/authApi';
 import { adminUserApi } from './api/adminUserApi';
 import { adminUserGroupApi } from './api/adminUserGroupApi';
 import { consoleApi } from './api/consoleApi';
+import { promotionApi } from './api/promotionApi';
+import { prodCompletionApi } from './api/prodCompletionApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -59,6 +61,8 @@ export const store = configureStore({
     [adminUserApi.reducerPath]: adminUserApi.reducer,
     [adminUserGroupApi.reducerPath]: adminUserGroupApi.reducer,
     [consoleApi.reducerPath]: consoleApi.reducer,
+    [promotionApi.reducerPath]: promotionApi.reducer,
+    [prodCompletionApi.reducerPath]: prodCompletionApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -89,6 +93,8 @@ export const store = configureStore({
       .concat(adminUserApi.middleware)
       .concat(adminUserGroupApi.middleware)
       .concat(consoleApi.middleware)
+      .concat(promotionApi.middleware)
+      .concat(prodCompletionApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we
@@ -287,6 +293,24 @@ export type {
 } from './api/logisticsApi';
 
 export { useLoginMutation, useGetMeQuery, authApi } from './api/authApi';
+
+export {
+  useGetPromotionPreviewQuery,
+  usePromoteMutation,
+  useUndoPromotionMutation,
+  promotionApi,
+} from './api/promotionApi';
+export type {
+  PromotionPreview,
+  PromotionResult,
+  PromotionUndoResult,
+} from './api/promotionApi';
+
+export {
+  useToggleProdCompletionMutation,
+  prodCompletionApi,
+} from './api/prodCompletionApi';
+export type { ProdCompletionToggleResult } from './api/prodCompletionApi';
 
 export {
   useGetUsersQuery,

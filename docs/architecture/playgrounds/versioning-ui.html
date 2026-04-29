@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Versioning UI Playground — Flux Scheduler</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'system-ui', 'sans-serif'] } } } };
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    /* Match apps/web base font: 13px */
+    html { font-size: 13px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; }
+
+    .smooth { transition: background-color 200ms ease, opacity 200ms ease, border-color 200ms ease; }
+
+    /* Read-only mode hides planning-only affordances */
+    .env-readonly .pin-toggle,
+    .env-readonly .snowflake-icon { display: none !important; }
+    .env-readonly .planning-grid-tile { cursor: default; }
+
+    /* Completion icon: frozen mirror in préprod, interactive in prod.
+       Reason: completion is execution truth, operators report it from the
+       prod (Focus) view; the préprod display is a read-only projection. */
+    .completion-toggle { cursor: default; }
+    .completion-toggle:hover { transform: none; }
+    .env-readonly .completion-toggle { cursor: pointer; }
+    .env-readonly .completion-toggle:hover { transform: scale(1.15); transition: transform 100ms ease-out; }
+
+    /* Dwell button fill */
+    .dwell-fill { width: 0%; transition: width 1.2s linear; }
+    .dwell-fill.is-active { width: 100%; }
+
+    /* Mock tile gradients (mirror real Tile color states) */
+    .mock-tile {
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid #334155;
+    }
+    .mock-tile-completed {
+      background: linear-gradient(180deg, #064e3b 0%, #022c22 100%);
+      border: 1px solid #047857;
+    }
+    .mock-tile-late {
+      background: linear-gradient(180deg, #7f1d1d 0%, #3f0f0f 100%);
+      border: 1px solid #b91c1c;
+    }
+
+    /* Sync toast slide-in */
+    @keyframes slide-in-down { from { transform: translateY(-8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .sync-toast-anim { animation: slide-in-down 200ms ease-out; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased">
+
+  <!-- Top hairline (color per env) -->
+  <div id="env-hairline" class="fixed top-0 left-0 right-0 z-50 smooth"></div>
+
+  <!-- App shell : global Sidebar (chrome inchangé) + main column (mock OperatorSchedulePage) -->
+  <div id="app-shell" class="h-screen flex">
+
+    <!-- ── Global sidebar — env-agnostic ── -->
+    <aside class="w-14 border-r border-zinc-800 flex flex-col items-center py-3 gap-1.5 shrink-0 bg-zinc-950">
+      <div class="w-9 h-9 rounded-md bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 font-semibold">F</div>
+      <div class="h-px w-8 bg-zinc-800 my-1"></div>
+
+      <button class="w-10 h-9 flex items-center justify-center rounded-md bg-zinc-800/60 text-zinc-100" title="Ordonnancement opérateurs">
+        <i data-lucide="users" class="w-4 h-4"></i>
+      </button>
+      <button class="w-10 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-zinc-900" title="Stations">
+        <i data-lucide="printer" class="w-4 h-4"></i>
+      </button>
+      <button class="w-10 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-zinc-900" title="Flux">
+        <i data-lucide="list-todo" class="w-4 h-4"></i>
+      </button>
+      <button class="w-10 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-zinc-900" title="Stats">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+      </button>
+      <button class="w-10 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-zinc-900" title="Logistique">
+        <i data-lucide="truck" class="w-4 h-4"></i>
+      </button>
+
+      <div class="flex-1"></div>
+
+      <button class="w-10 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-zinc-900" title="Paramètres">
+        <i data-lucide="settings" class="w-4 h-4"></i>
+      </button>
+      <div class="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 mt-1">JP</div>
+    </aside>
+
+    <!-- ── Main column = mock OperatorSchedulePage ── -->
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+
+      <!-- Mini-header local : env toggle + status + Promouvoir CTA -->
+      <header id="planning-env-header" class="h-9 border-b border-zinc-800 flex items-center px-3 gap-2 shrink-0 bg-zinc-950 smooth">
+
+        <!-- Préprod | Prod toggle -->
+        <div id="env-toggle" class="flex bg-zinc-900 rounded-md p-0.5 gap-0.5 text-[11px] border border-zinc-800">
+          <button id="env-toggle-preprod" data-env="preprod" class="px-2.5 py-1 rounded-md flex items-center gap-1.5 smooth">
+            <i data-lucide="layers" class="w-3 h-3"></i> Préprod
+          </button>
+          <button id="env-toggle-prod" data-env="prod" class="px-2.5 py-1 rounded-md flex items-center gap-1.5 smooth">
+            <i data-lucide="lock" class="w-3 h-3"></i> Prod
+          </button>
+        </div>
+
+        <!-- Pending changes hint (preprod with uncommitted) -->
+        <span id="pending-dot" class="hidden items-center gap-1 text-[10px] text-amber-400 ml-1">
+          <i data-lucide="circle-dot" class="w-2.5 h-2.5"></i>
+          <span>changements non promus</span>
+        </span>
+
+        <!-- Read-only label (prod) -->
+        <span id="readonly-label" class="hidden items-center gap-1 text-[10px] text-zinc-500 ml-1">
+          <i data-lucide="lock" class="w-3 h-3"></i>
+          <span>plan engagé · seul l'avancement est éditable</span>
+        </span>
+
+        <div class="flex-1"></div>
+
+        <!-- Promouvoir CTA (preprod only) -->
+        <button id="promote-cta" class="px-2.5 py-1 rounded-md text-[11px] bg-emerald-600/15 text-emerald-300 border border-emerald-600/30 hover:bg-emerald-600/25 flex items-center gap-1.5 disabled:opacity-30 disabled:hover:bg-emerald-600/15 disabled:cursor-not-allowed">
+          <i data-lucide="rocket" class="w-3 h-3"></i> Promouvoir
+        </button>
+      </header>
+
+      <!-- Mock OperatorSchedulePage content -->
+      <div class="flex-1 flex overflow-hidden">
+
+        <!-- JobsList sidebar mock -->
+        <aside class="w-56 border-r border-zinc-800 overflow-y-auto p-2 shrink-0 bg-zinc-950">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider px-1 mb-1.5 flex items-center justify-between">
+            <span>Jobs</span><span class="font-mono">209</span>
+          </div>
+          <div class="space-y-0.5">
+            <div class="px-2 py-1.5 rounded-md bg-zinc-900 text-[12px] flex items-center gap-1.5 cursor-default">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+              <span class="font-mono text-[10px] text-zinc-400">2451</span>
+              <span class="truncate">Brochure 8pp</span>
+            </div>
+            <div class="px-2 py-1.5 rounded-md hover:bg-zinc-900/50 text-[12px] flex items-center gap-1.5 cursor-default">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
+              <span class="font-mono text-[10px] text-zinc-400">2452</span>
+              <span class="truncate">Catalogue A4</span>
+            </div>
+            <div class="px-2 py-1.5 rounded-md hover:bg-zinc-900/50 text-[12px] flex items-center gap-1.5 cursor-default">
+              <span class="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0"></span>
+              <span class="font-mono text-[10px] text-zinc-400">2453</span>
+              <span class="truncate">Affiche 70×100</span>
+            </div>
+            <div class="px-2 py-1.5 rounded-md hover:bg-zinc-900/50 text-[12px] flex items-center gap-1.5 cursor-default">
+              <span class="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0"></span>
+              <span class="font-mono text-[10px] text-zinc-400">2454</span>
+              <span class="truncate">Dépliant 4pp</span>
+            </div>
+            <div class="px-2 py-1.5 rounded-md hover:bg-zinc-900/50 text-[12px] flex items-center gap-1.5 cursor-default">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0"></span>
+              <span class="font-mono text-[10px] text-zinc-400">2455</span>
+              <span class="truncate">Plaquette en retard</span>
+            </div>
+            <div class="px-2 py-1.5 rounded-md hover:bg-zinc-900/50 text-[12px] flex items-center gap-1.5 cursor-default text-zinc-500">
+              <span class="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0"></span>
+              <span class="font-mono text-[10px]">…</span>
+              <span class="truncate">+ 203 autres</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Grid area -->
+        <main id="planning-grid" class="flex-1 overflow-auto smooth relative">
+          <!-- Operator headers (sticky top) -->
+          <div class="flex sticky top-0 z-30 bg-zinc-900 border-b border-zinc-800">
+            <div class="w-12 shrink-0 bg-zinc-900 border-r border-zinc-800"></div>
+            <div class="flex gap-2 px-3 py-2">
+              <div class="w-44 shrink-0 text-xs">
+                <div class="font-medium">Marc D.</div>
+                <div class="text-[10px] text-zinc-500">offset 8c · 06h-14h</div>
+              </div>
+              <div class="w-44 shrink-0 text-xs">
+                <div class="font-medium">Sophie L.</div>
+                <div class="text-[10px] text-zinc-500">offset 4c · 14h-22h</div>
+              </div>
+              <div class="w-44 shrink-0 text-xs">
+                <div class="font-medium">Julien M.</div>
+                <div class="text-[10px] text-zinc-500">façonnage · 06h-14h</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="flex">
+            <!-- Timeline column -->
+            <div class="w-12 shrink-0 border-r border-zinc-900 text-[10px] text-zinc-600 sticky left-0 z-20 bg-zinc-950">
+              <div class="h-12 px-1 text-right py-1 border-b border-zinc-900">14h</div>
+              <div class="h-12 px-1 text-right py-1 border-b border-zinc-900">16h</div>
+              <div class="h-12 px-1 text-right py-1 border-b border-zinc-900">18h</div>
+              <div class="h-12 px-1 text-right py-1 border-b border-zinc-900">20h</div>
+              <div class="h-12 px-1 text-right py-1 border-b border-zinc-900">22h</div>
+            </div>
+
+            <!-- Operator columns -->
+            <div class="flex gap-2 px-3 py-2">
+              <!-- Marc D. -->
+              <div class="w-44 shrink-0 space-y-1.5 relative">
+                <!-- Tile: completed (Brochure 8pp) -->
+                <div class="planning-grid-tile mock-tile-completed rounded-md p-2">
+                  <div class="flex items-center gap-1 mb-1 text-emerald-100">
+                    <button class="completion-toggle p-0.5 -m-0.5 text-emerald-300 transition" data-completed="true" data-tile="2451" title="Terminé (visible · prod-écrit)">
+                      <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+                    </button>
+                    <button class="pin-toggle p-0.5 -m-0.5 text-zinc-700 hover:text-zinc-400 transition pointer-events-auto" data-pinned="false" title="Épingler">
+                      <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                    <span class="text-[10px] text-emerald-200 font-mono ml-0.5">JOB-2451</span>
+                  </div>
+                  <div class="text-[11px] font-medium">Brochure 8pp · ST3</div>
+                  <div class="text-[10px] text-emerald-200/70">14:00 → 16:30 · terminé</div>
+                </div>
+                <!-- Tile: in-progress in safety zone (Catalogue A4) -->
+                <div class="planning-grid-tile mock-tile rounded-md p-2 ring-2 ring-blue-500/40">
+                  <div class="flex items-center gap-1 mb-1">
+                    <button class="completion-toggle p-0.5 -m-0.5 text-zinc-700 transition" data-completed="false" data-tile="2452" title="Avancement · éditable depuis vue Prod">
+                      <i data-lucide="circle" class="w-3 h-3"></i>
+                    </button>
+                    <button class="pin-toggle p-0.5 -m-0.5 text-amber-500 hover:text-amber-400 transition pointer-events-auto" data-pinned="true" title="Désépingler">
+                      <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                    <button class="snowflake-icon p-0.5 -m-0.5 text-sky-400 hover:text-sky-300 transition pointer-events-auto" title="Frozen safety zone">
+                      <svg viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3"><path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z"/></svg>
+                    </button>
+                    <span class="text-[10px] text-blue-300 font-mono ml-0.5">JOB-2452</span>
+                  </div>
+                  <div class="text-[11px] font-medium flex items-center gap-1">
+                    Catalogue A4 · ST1
+                    <i data-lucide="play-circle" class="w-3 h-3 text-blue-300"></i>
+                  </div>
+                  <div class="text-[10px] text-zinc-400">16:30 → 18:45 · en cours</div>
+                </div>
+                <!-- Tile: pinned (Affiche) -->
+                <div class="planning-grid-tile mock-tile rounded-md p-2 mt-12">
+                  <div class="flex items-center gap-1 mb-1">
+                    <button class="completion-toggle p-0.5 -m-0.5 text-zinc-700 transition" data-completed="false" data-tile="2453" title="Avancement · éditable depuis vue Prod">
+                      <i data-lucide="circle" class="w-3 h-3"></i>
+                    </button>
+                    <button class="pin-toggle p-0.5 -m-0.5 text-amber-500 hover:text-amber-400 transition pointer-events-auto" data-pinned="true" title="Désépingler">
+                      <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                    <span class="text-[10px] text-zinc-400 font-mono ml-0.5">JOB-2453</span>
+                  </div>
+                  <div class="text-[11px] font-medium">Affiche 70×100</div>
+                  <div class="text-[10px] text-zinc-400">19:00 → 20:30 · épinglé</div>
+                </div>
+              </div>
+
+              <!-- Sophie L. -->
+              <div class="w-44 shrink-0 space-y-1.5">
+                <div class="planning-grid-tile mock-tile rounded-md p-2 mt-12">
+                  <div class="flex items-center gap-1 mb-1">
+                    <button class="completion-toggle p-0.5 -m-0.5 text-zinc-700 transition" data-completed="false" data-tile="2454" title="Avancement · éditable depuis vue Prod">
+                      <i data-lucide="circle" class="w-3 h-3"></i>
+                    </button>
+                    <button class="pin-toggle p-0.5 -m-0.5 text-zinc-700 hover:text-zinc-400 transition pointer-events-auto" data-pinned="false" title="Épingler">
+                      <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                    <span class="text-[10px] text-zinc-400 font-mono ml-0.5">JOB-2454</span>
+                  </div>
+                  <div class="text-[11px] font-medium">Dépliant 4pp · ST2</div>
+                  <div class="text-[10px] text-zinc-400">15:30 → 17:00</div>
+                </div>
+                <div class="planning-grid-tile mock-tile-late rounded-md p-2 mt-12">
+                  <div class="flex items-center gap-1 mb-1 text-rose-100">
+                    <button class="completion-toggle p-0.5 -m-0.5 text-zinc-700 transition" data-completed="false" data-tile="2455" title="Avancement · éditable depuis vue Prod">
+                      <i data-lucide="circle" class="w-3 h-3"></i>
+                    </button>
+                    <button class="pin-toggle p-0.5 -m-0.5 text-zinc-700 hover:text-zinc-400 transition pointer-events-auto" data-pinned="false" title="Épingler">
+                      <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                    <span class="text-[10px] text-rose-200 font-mono ml-0.5">JOB-2455</span>
+                    <i data-lucide="alert-triangle" class="w-3 h-3 text-rose-300 ml-auto"></i>
+                  </div>
+                  <div class="text-[11px] font-medium">Plaquette · retard 1h12</div>
+                  <div class="text-[10px] text-rose-300">19:30 → 21:00</div>
+                </div>
+              </div>
+
+              <!-- Julien M. -->
+              <div class="w-44 shrink-0 space-y-1.5">
+                <div class="planning-grid-tile mock-tile rounded-md p-2 mt-24">
+                  <div class="flex items-center gap-1 mb-1">
+                    <button class="completion-toggle p-0.5 -m-0.5 text-zinc-700 transition" data-completed="false" data-tile="2451j" title="Avancement · éditable depuis vue Prod">
+                      <i data-lucide="circle" class="w-3 h-3"></i>
+                    </button>
+                    <button class="pin-toggle p-0.5 -m-0.5 text-zinc-700 hover:text-zinc-400 transition pointer-events-auto" data-pinned="false" title="Épingler">
+                      <i data-lucide="pin" class="w-3 h-3"></i>
+                    </button>
+                    <span class="text-[10px] text-zinc-400 font-mono ml-0.5">JOB-2451</span>
+                  </div>
+                  <div class="text-[11px] font-medium">Brochure 8pp · façonnage</div>
+                  <div class="text-[10px] text-zinc-400">17:00 → 18:30</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Floating Command Center FAB -->
+    <button class="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg flex items-center justify-center" aria-label="Open command center" title="Alt+K">
+      <i data-lucide="square-slash" class="w-6 h-6"></i>
+    </button>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────────
+       PROMOTION MODAL
+       ──────────────────────────────────────────────────────── -->
+  <div id="promotion-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
+    <div class="bg-zinc-950 rounded-lg border border-zinc-800 w-full max-w-[1100px] max-h-[85vh] flex flex-col shadow-2xl">
+
+      <header class="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-md bg-emerald-600/15 border border-emerald-600/30 flex items-center justify-center">
+            <i data-lucide="rocket" class="w-4 h-4 text-emerald-300"></i>
+          </div>
+          <div>
+            <div class="text-sm font-medium">Promouvoir préprod → prod</div>
+            <div class="text-[11px] text-zinc-500">L'ancienne prod est conservée 5 minutes en undo</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Prod actuelle</div>
+            <div class="text-xs text-zinc-300">29/04/2026 14:18</div>
+          </div>
+          <button id="promotion-close" class="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- KPI strip — 2 tiles -->
+      <div class="px-5 py-3 border-b border-zinc-800 grid grid-cols-2 gap-3 shrink-0">
+        <div class="bg-zinc-900 rounded-md p-3 border border-zinc-800">
+          <div class="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">
+            <i data-lucide="circle-dot" class="w-3 h-3 text-zinc-300"></i> Jobs planifiés
+          </div>
+          <div class="flex items-baseline gap-3">
+            <div class="text-2xl font-semibold text-zinc-100">142</div>
+            <div class="flex items-center gap-1 text-xs text-emerald-400">
+              <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+              <span class="font-mono">+12</span>
+              <span class="text-[10px] text-zinc-500 font-sans">vs prod actuelle (130)</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-zinc-900 rounded-md p-3 border border-zinc-800">
+          <div class="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">
+            <i data-lucide="alert-triangle" class="w-3 h-3 text-rose-400"></i> Jobs en retard
+          </div>
+          <div class="flex items-baseline gap-3">
+            <div class="text-2xl font-semibold text-rose-300">9</div>
+            <div class="flex items-center gap-1 text-xs text-emerald-400">
+              <i data-lucide="trending-down" class="w-3.5 h-3.5"></i>
+              <span class="font-mono">−4</span>
+              <span class="text-[10px] text-zinc-500 font-sans">vs prod actuelle (13)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff list -->
+      <div class="flex-1 overflow-y-auto" id="promotion-diff-list"></div>
+
+      <!-- Footer with dwell-confirm -->
+      <footer class="px-5 py-3.5 border-t border-zinc-800 flex items-center justify-between shrink-0 gap-3">
+        <div class="text-[11px] text-zinc-500 flex items-center gap-1.5">
+          <i data-lucide="undo-2" class="w-3 h-3"></i>
+          <span>Annulation possible 5 minutes après promotion</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="promotion-cancel" class="px-3 py-1.5 rounded-md text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800">Annuler</button>
+          <button id="promotion-dwell" class="relative px-4 py-1.5 rounded-md text-xs bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-1.5 overflow-hidden select-none">
+            <div id="promotion-dwell-fill" class="absolute inset-0 bg-violet-400 dwell-fill"></div>
+            <i data-lucide="rocket" class="w-3.5 h-3.5 relative"></i>
+            <span class="relative">Maintenir pour promouvoir</span>
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Undo toast -->
+  <div id="undo-toast" class="hidden fixed top-4 right-4 z-40 w-[380px]">
+    <div class="bg-zinc-900 rounded-md border-l-4 border-l-emerald-500 border border-zinc-800 shadow-xl p-3.5">
+      <div class="flex items-start gap-2.5">
+        <div class="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center shrink-0 mt-0.5">
+          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-300"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium text-zinc-100">Promotion effectuée</div>
+          <div class="text-[11px] text-zinc-500 mt-0.5">Ancienne prod : 29/04 14:18 (récupérable)</div>
+        </div>
+        <button id="undo-toast-action" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 shrink-0">
+          <i data-lucide="undo-2" class="w-3 h-3"></i>
+          <span>Annuler</span>
+          <span id="undo-toast-countdown" class="font-mono text-zinc-400 ml-0.5">5:00</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync toast (dual-write demo when completing in prod view) -->
+  <div id="sync-toast" class="hidden fixed top-4 right-4 z-40 w-[340px]">
+    <div class="bg-zinc-900 rounded-md border-l-4 border-l-blue-500 border border-zinc-800 shadow-xl p-3 sync-toast-anim">
+      <div class="flex items-start gap-2.5">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-blue-300 shrink-0 mt-0.5"></i>
+        <div class="flex-1 min-w-0">
+          <div class="text-[11px] font-medium text-zinc-100" id="sync-toast-title">JOB-2452 marqué terminé</div>
+          <div class="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-1">
+            <span>Mis à jour dans</span>
+            <span class="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[9px]">prod</span>
+            <i data-lucide="arrow-right" class="w-2.5 h-2.5"></i>
+            <span class="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[9px]">préprod</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mock controls (playground only) -->
+  <aside id="control-panel" class="fixed bottom-4 left-4 z-40 w-[280px] bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl text-xs">
+    <header class="px-3 py-2 border-b border-zinc-700 flex items-center gap-2 bg-zinc-950 rounded-t-lg">
+      <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-violet-400"></i>
+      <span class="font-medium text-zinc-300">Mock controls</span>
+      <span class="text-[10px] text-zinc-500 ml-auto">v1 · préprod + prod</span>
+    </header>
+
+    <div class="p-3 space-y-3">
+      <div>
+        <div class="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">Environnement</div>
+        <div class="grid grid-cols-2 gap-1">
+          <button data-env="preprod" class="env-btn px-2 py-1.5 rounded-md border text-[11px] flex items-center gap-1.5">
+            <i data-lucide="layers" class="w-3 h-3"></i> Préprod
+          </button>
+          <button data-env="prod" class="env-btn px-2 py-1.5 rounded-md border text-[11px] flex items-center gap-1.5">
+            <i data-lucide="lock" class="w-3 h-3"></i> Prod
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label class="flex items-center justify-between gap-2">
+          <span class="text-[11px] text-zinc-300">Changements non promus</span>
+          <button id="toggle-unpromoted" class="relative inline-flex h-5 w-9 rounded-full transition">
+            <span id="toggle-unpromoted-knob" class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-zinc-300 transition"></span>
+          </button>
+        </label>
+      </div>
+
+      <div class="space-y-1.5 pt-1 border-t border-zinc-800">
+        <button id="open-promotion-modal" class="w-full px-2.5 py-1.5 rounded-md bg-emerald-600/15 text-emerald-300 border border-emerald-600/30 hover:bg-emerald-600/25 flex items-center justify-center gap-1.5 text-[11px]">
+          <i data-lucide="rocket" class="w-3 h-3"></i> Modale promotion
+        </button>
+        <button id="trigger-undo-toast" class="w-full px-2.5 py-1.5 rounded-md bg-blue-600/15 text-blue-300 border border-blue-600/30 hover:bg-blue-600/25 flex items-center justify-center gap-1.5 text-[11px]">
+          <i data-lucide="undo-2" class="w-3 h-3"></i> Toast undo (5 min)
+        </button>
+      </div>
+
+      <div class="text-[10px] text-zinc-600 leading-relaxed pt-1 border-t border-zinc-800">
+        Tests visuels :<br>
+        a · rond complétion en 1ère position (avant pin/flocon)<br>
+        b · préprod : rond visible mais figé (cursor default, click no-op)<br>
+        c · prod : pin et flocon disparaissent, seul rond reste<br>
+        d · prod : rond cliquable, hover scale, sync toast<br>
+        e · promotion : KPI 2 tuiles, dwell 1.2s
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    // ────────────────────────────────────────────────────────────
+    // STATE
+    // ────────────────────────────────────────────────────────────
+    const state = {
+      env: 'preprod',          // 'preprod' | 'prod'
+      hasUnpromoted: true,
+      showPromotionModal: false,
+      undoSecondsRemaining: 0,
+    };
+
+    const ENV_CONFIG = {
+      preprod: {
+        hairlineHeight: '0', hairlineColor: 'transparent',
+        toggleActive: 'preprod',
+        showPromote: true, showReadonly: false,
+        gridReadOnly: false,
+      },
+      prod: {
+        hairlineHeight: '2px', hairlineColor: 'rgba(212, 212, 216, 0.7)',
+        toggleActive: 'prod',
+        showPromote: false, showReadonly: true,
+        gridReadOnly: true,
+      },
+    };
+
+    // ────────────────────────────────────────────────────────────
+    // RENDER
+    // ────────────────────────────────────────────────────────────
+    function render() {
+      const cfg = ENV_CONFIG[state.env];
+
+      const hairline = document.getElementById('env-hairline');
+      hairline.style.height = cfg.hairlineHeight;
+      hairline.style.backgroundColor = cfg.hairlineColor;
+
+      const tPreprod = document.getElementById('env-toggle-preprod');
+      const tProd = document.getElementById('env-toggle-prod');
+      const baseClass = 'px-2.5 py-1 rounded-md flex items-center gap-1.5 smooth';
+      const activeClass = 'bg-zinc-800 text-zinc-100';
+      const inactiveClass = 'text-zinc-500 hover:text-zinc-300';
+      tPreprod.className = `${baseClass} ${cfg.toggleActive === 'preprod' ? activeClass : inactiveClass}`;
+      tProd.className = `${baseClass} ${cfg.toggleActive === 'prod' ? activeClass : inactiveClass}`;
+
+      document.getElementById('pending-dot').style.display =
+        (state.env === 'preprod' && state.hasUnpromoted) ? 'flex' : 'none';
+      document.getElementById('readonly-label').style.display = cfg.showReadonly ? 'flex' : 'none';
+
+      const promoteBtn = document.getElementById('promote-cta');
+      promoteBtn.style.display = cfg.showPromote ? 'flex' : 'none';
+      const promoteEnabled = cfg.showPromote && state.hasUnpromoted;
+      promoteBtn.disabled = !promoteEnabled;
+      promoteBtn.title = promoteEnabled
+        ? 'Promouvoir préprod → prod (Alt+Shift+P)'
+        : 'Aucune modification depuis la dernière promotion';
+
+      // Read-only mode: hide pin + snowflake via CSS class
+      document.getElementById('app-shell').classList.toggle('env-readonly', cfg.gridReadOnly);
+
+      lucide.createIcons();
+
+      // Control panel buttons
+      document.querySelectorAll('.env-btn').forEach(btn => {
+        const isActive = btn.dataset.env === state.env;
+        btn.className = `env-btn px-2 py-1.5 rounded-md border text-[11px] flex items-center gap-1.5 ${isActive ? 'bg-violet-600/20 border-violet-500/50 text-violet-200' : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`;
+      });
+
+      // Unpromoted toggle visual
+      const knob = document.getElementById('toggle-unpromoted-knob');
+      const tg = document.getElementById('toggle-unpromoted');
+      if (state.hasUnpromoted) {
+        knob.style.transform = 'translateX(16px)';
+        tg.classList.add('bg-violet-600');
+        tg.classList.remove('bg-zinc-700');
+      } else {
+        knob.style.transform = 'translateX(0)';
+        tg.classList.remove('bg-violet-600');
+        tg.classList.add('bg-zinc-700');
+      }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // PROMOTION DIFF MOCK
+    // ────────────────────────────────────────────────────────────
+    const MOCK_DIFF = [
+      { ref: 'JOB-2451', label: 'Brochure 8pp · 2500 ex.', impact: 'high', changes: [ { type: 'move', from: 'Heidelberg XL106 #2', to: 'Heidelberg XL106 #1', delta: '−2h' } ]},
+      { ref: 'JOB-2452', label: 'Catalogue A4 · 8000 ex.', impact: 'high', changes: [
+        { type: 'move', from: 'Komori GL40 #1', to: 'Heidelberg XL106 #1', delta: '−3h15' },
+        { type: 'move', from: 'Massicot Polar', to: 'Massicot Polar (créneau 14h)', delta: '+45min' } ]},
+      { ref: 'JOB-2453', label: 'Affiche 70×100 · 1200 ex.', impact: 'medium', changes: [ { type: 'add', target: 'Plieuse Stahl', delta: '20:00 → 21:30' } ]},
+      { ref: 'JOB-2454', label: 'Dépliant 4pp · 4500 ex.', impact: 'medium', changes: [ { type: 'move', from: 'Komori GL40 #1', to: 'Komori GL40 #2', delta: '−1h' } ]},
+      { ref: 'JOB-2461', label: 'Brochure 16pp · 1500 ex.', impact: 'low', changes: [ { type: 'add', target: 'Heidelberg XL106 #1', delta: '14h00' } ]},
+      { ref: 'JOB-2462', label: 'Affiche 50×70 · 800 ex.', impact: 'low', changes: [ { type: 'add', target: 'Heidelberg XL106 #2', delta: '15h30' } ]},
+      { ref: 'JOB-2463', label: 'Carte de visite · 200 ex.', impact: 'low', changes: [ { type: 'remove', target: 'Heidelberg XL106 #1', reason: 'annulé client' } ]},
+      { ref: 'JOB-2464', label: 'Plaquette commerciale · 3000 ex.', impact: 'medium', changes: [ { type: 'move', from: 'Komori GL40 #2', to: 'Heidelberg XL106 #2', delta: '−1h45' } ]},
+      { ref: 'JOB-2465', label: 'Étui pliant · 5000 ex.', impact: 'low', changes: [ { type: 'add', target: 'Heidelberg XL106 #1', delta: '21h30' } ]},
+      { ref: 'JOB-2466', label: 'Couverture cartonnée · 600 ex.', impact: 'high', changes: [ { type: 'remove', target: 'Komori GL40 #1', reason: 'BAT non reçu' } ]},
+      { ref: 'JOB-2467', label: 'Flyer recto/verso · 12000 ex.', impact: 'low', changes: [ { type: 'move', from: 'Heidelberg XL106 #1', to: 'Heidelberg XL106 #2', delta: '+30min' } ]},
+      { ref: 'JOB-2468', label: 'Livret formation · 400 ex.', impact: 'low', changes: [ { type: 'remove', target: 'Komori GL40 #2', reason: 'reporté semaine 19' } ]},
+    ];
+
+    function renderPromotionDiff() {
+      const list = document.getElementById('promotion-diff-list');
+      list.innerHTML = '';
+      MOCK_DIFF.forEach((job, idx) => {
+        const isExpanded = idx < 5;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'border-b border-zinc-900 last:border-b-0';
+        const header = document.createElement('button');
+        header.className = 'w-full flex items-center justify-between px-5 py-2.5 hover:bg-zinc-900/50 transition text-left';
+        const impactColor = { high: 'bg-rose-400', medium: 'bg-amber-400', low: 'bg-zinc-500' }[job.impact];
+        header.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full ${impactColor} shrink-0"></span>
+            <span class="text-[11px] font-mono text-zinc-400 shrink-0">${job.ref}</span>
+            <span class="text-xs text-zinc-200 truncate">${job.label}</span>
+            <span class="text-[10px] text-zinc-500 shrink-0">${job.changes.length} modif${job.changes.length > 1 ? 's' : ''}</span>
+          </div>
+          <i data-lucide="chevron-${isExpanded ? 'up' : 'down'}" class="w-3.5 h-3.5 text-zinc-500 shrink-0"></i>
+        `;
+        wrapper.appendChild(header);
+        const body = document.createElement('div');
+        body.className = `px-5 pb-2.5 pl-12 space-y-1 ${isExpanded ? '' : 'hidden'}`;
+        job.changes.forEach(ch => {
+          const row = document.createElement('div');
+          row.className = 'text-[11px] flex items-center gap-2';
+          if (ch.type === 'move') {
+            row.innerHTML = `<i data-lucide="move-right" class="w-3 h-3 text-blue-400 shrink-0"></i>
+              <span class="text-zinc-400">${ch.from}</span>
+              <i data-lucide="arrow-right" class="w-2.5 h-2.5 text-zinc-600"></i>
+              <span class="text-zinc-200">${ch.to}</span>
+              <span class="text-zinc-500 ml-auto font-mono">${ch.delta}</span>`;
+          } else if (ch.type === 'add') {
+            row.innerHTML = `<i data-lucide="plus" class="w-3 h-3 text-emerald-400 shrink-0"></i>
+              <span class="text-zinc-200">${ch.target}</span>
+              <span class="text-zinc-500 ml-auto font-mono">${ch.delta || ''}</span>`;
+          } else {
+            row.innerHTML = `<i data-lucide="minus" class="w-3 h-3 text-rose-400 shrink-0"></i>
+              <span class="text-zinc-200">${ch.target}</span>
+              <span class="text-zinc-500 ml-auto italic">${ch.reason || ''}</span>`;
+          }
+          body.appendChild(row);
+        });
+        wrapper.appendChild(body);
+        header.addEventListener('click', () => {
+          body.classList.toggle('hidden');
+          const chev = header.querySelector('[data-lucide]');
+          chev.setAttribute('data-lucide', body.classList.contains('hidden') ? 'chevron-down' : 'chevron-up');
+          lucide.createIcons();
+        });
+        list.appendChild(wrapper);
+      });
+      lucide.createIcons();
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // PROMOTION MODAL
+    // ────────────────────────────────────────────────────────────
+    function openPromotionModal() {
+      state.showPromotionModal = true;
+      document.getElementById('promotion-modal').classList.remove('hidden');
+      renderPromotionDiff();
+      lucide.createIcons();
+    }
+    function closePromotionModal() {
+      state.showPromotionModal = false;
+      document.getElementById('promotion-modal').classList.add('hidden');
+      cancelDwell();
+    }
+
+    let dwellTimeout = null;
+    function startDwell() {
+      const fill = document.getElementById('promotion-dwell-fill');
+      fill.classList.add('is-active');
+      dwellTimeout = setTimeout(() => {
+        closePromotionModal();
+        triggerUndoToast();
+      }, 1200);
+    }
+    function cancelDwell() {
+      const fill = document.getElementById('promotion-dwell-fill');
+      fill.classList.remove('is-active');
+      if (dwellTimeout) { clearTimeout(dwellTimeout); dwellTimeout = null; }
+    }
+
+    let undoInterval = null;
+    function triggerUndoToast() {
+      state.undoSecondsRemaining = 300;
+      document.getElementById('undo-toast').classList.remove('hidden');
+      updateUndoCountdown();
+      if (undoInterval) clearInterval(undoInterval);
+      undoInterval = setInterval(() => {
+        state.undoSecondsRemaining--;
+        updateUndoCountdown();
+        if (state.undoSecondsRemaining <= 0) dismissUndoToast();
+      }, 1000);
+    }
+    function updateUndoCountdown() {
+      const m = Math.floor(state.undoSecondsRemaining / 60);
+      const s = state.undoSecondsRemaining % 60;
+      document.getElementById('undo-toast-countdown').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    }
+    function dismissUndoToast() {
+      state.undoSecondsRemaining = 0;
+      document.getElementById('undo-toast').classList.add('hidden');
+      if (undoInterval) { clearInterval(undoInterval); undoInterval = null; }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // TILE INTERACTIONS — pin + completion (the dual-write demo)
+    // ────────────────────────────────────────────────────────────
+    let syncToastTimeout = null;
+    function showSyncToast(jobRef) {
+      const toast = document.getElementById('sync-toast');
+      document.getElementById('sync-toast-title').textContent = `${jobRef} marqué terminé`;
+      toast.classList.remove('hidden');
+      const inner = toast.querySelector('.sync-toast-anim');
+      inner.style.animation = 'none';
+      void inner.offsetHeight;
+      inner.style.animation = '';
+      if (syncToastTimeout) clearTimeout(syncToastTimeout);
+      syncToastTimeout = setTimeout(() => { toast.classList.add('hidden'); }, 2500);
+    }
+
+    function wireTileControls() {
+      // Pin toggle (preprod only — hidden in prod via CSS)
+      document.querySelectorAll('.pin-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const wasPinned = btn.dataset.pinned === 'true';
+          const newState = !wasPinned;
+          btn.dataset.pinned = String(newState);
+          btn.className = `pin-toggle p-0.5 -m-0.5 transition pointer-events-auto ${newState ? 'text-amber-500 hover:text-amber-400' : 'text-zinc-700 hover:text-zinc-400'}`;
+          btn.title = newState ? 'Désépingler' : 'Épingler';
+          lucide.createIcons();
+        });
+      });
+
+      // Completion toggle — interactive ONLY in prod view.
+      // In préprod the rond is a frozen mirror (read-only display): the chef
+      // can see what operators have reported but cannot fake completion.
+      // Reason: completion = execution truth, not a planning decision.
+      document.querySelectorAll('.completion-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (state.env !== 'prod') return; // frozen mirror in préprod
+          const wasCompleted = btn.dataset.completed === 'true';
+          const newState = !wasCompleted;
+          btn.dataset.completed = String(newState);
+          const icon = btn.querySelector('[data-lucide]');
+          icon.setAttribute('data-lucide', newState ? 'check-circle-2' : 'circle');
+          btn.className = `completion-toggle p-0.5 -m-0.5 transition ${newState ? 'text-emerald-300' : 'text-zinc-700'}`;
+          btn.title = newState ? 'Terminé · clic pour annuler' : 'Marquer terminé';
+          lucide.createIcons();
+          const tile = btn.dataset.tile.replace('j', '');
+          showSyncToast(`JOB-${tile}`);
+        });
+      });
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // EVENT WIRING
+    // ────────────────────────────────────────────────────────────
+    function setEnv(env) { state.env = env; render(); }
+
+    document.getElementById('env-toggle-preprod').addEventListener('click', () => setEnv('preprod'));
+    document.getElementById('env-toggle-prod').addEventListener('click', () => setEnv('prod'));
+
+    document.querySelectorAll('.env-btn').forEach(btn => {
+      btn.addEventListener('click', () => setEnv(btn.dataset.env));
+    });
+
+    document.getElementById('toggle-unpromoted').addEventListener('click', () => {
+      state.hasUnpromoted = !state.hasUnpromoted;
+      render();
+    });
+
+    document.getElementById('open-promotion-modal').addEventListener('click', openPromotionModal);
+    document.getElementById('promote-cta').addEventListener('click', () => {
+      if (!document.getElementById('promote-cta').disabled) openPromotionModal();
+    });
+    document.getElementById('promotion-close').addEventListener('click', closePromotionModal);
+    document.getElementById('promotion-cancel').addEventListener('click', closePromotionModal);
+
+    const dwellBtn = document.getElementById('promotion-dwell');
+    dwellBtn.addEventListener('mousedown', startDwell);
+    dwellBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startDwell(); });
+    dwellBtn.addEventListener('mouseup', cancelDwell);
+    dwellBtn.addEventListener('mouseleave', cancelDwell);
+    dwellBtn.addEventListener('touchend', cancelDwell);
+    dwellBtn.addEventListener('touchcancel', cancelDwell);
+
+    document.getElementById('trigger-undo-toast').addEventListener('click', triggerUndoToast);
+    document.getElementById('undo-toast-action').addEventListener('click', dismissUndoToast);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.altKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setEnv(state.env === 'prod' ? 'preprod' : 'prod');
+      }
+      if (e.key === 'Escape' && state.showPromotionModal) closePromotionModal();
+      if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        if (state.env === 'preprod' && state.hasUnpromoted) openPromotionModal();
+      }
+    });
+
+    function boot() {
+      lucide.createIcons();
+      render();
+      wireTileControls();
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot);
+    } else {
+      boot();
+    }
+  </script>
+</body>
+</html>

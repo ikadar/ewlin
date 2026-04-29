@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { SquareSlash } from 'lucide-react';
 import { Sidebar } from './Sidebar/Sidebar';
-import { Toast } from './Toast/Toast';
 import { CommandPalette } from './CommandPalette/CommandPalette';
 import { CommandCenterProvider, useCommandCenter } from './CommandPalette/CommandCenterContext';
 import { useCommands } from './CommandPalette/useCommands';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { AutoRecomputeProvider } from '../contexts/AutoRecomputeContext';
+import { AutoRecomputeProvider, useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
+import { ScenarioProvider } from '../contexts/ScenarioContext';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
 import type { CompactHorizon } from '../utils';
@@ -17,6 +17,16 @@ function RootLayoutInner() {
   const location = useLocation();
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
   const { toastMessage, dismissToast } = useMercureSubscription();
+  const { showToast } = useAutoRecomputeCtx();
+
+  // Pipe Mercure real-time updates into the unified compute toaster
+  // (top-right). Reset Mercure local state immediately so the next
+  // event re-fires the effect even if the message string is identical.
+  useEffect(() => {
+    if (!toastMessage) return;
+    showToast({ type: 'info', title: toastMessage });
+    dismissToast();
+  }, [toastMessage, showToast, dismissToast]);
 
   const chordPendingRef = useRef<'compact' | 'placement' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,14 +158,6 @@ function RootLayoutInner() {
         jobs={jobs}
         onSelectJob={onSelectJob}
       />
-
-      {/* Mercure real-time update toast */}
-      <Toast
-        type="info"
-        message={toastMessage ?? ''}
-        isVisible={!!toastMessage}
-        onDismiss={dismissToast}
-      />
     </div>
   );
 }
@@ -169,7 +171,9 @@ export function RootLayout() {
     <ThemeProvider>
       <CommandCenterProvider>
         <AutoRecomputeProvider>
-          <RootLayoutInner />
+          <ScenarioProvider>
+            <RootLayoutInner />
+          </ScenarioProvider>
         </AutoRecomputeProvider>
       </CommandCenterProvider>
     </ThemeProvider>
