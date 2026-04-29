@@ -13,6 +13,7 @@ import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import {
   aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
+  narrowDayScheduleByQualifiedOperators,
 } from '../../utils/operatorTileSlices';
 import {
   computeTileDataCache,
@@ -247,6 +248,11 @@ export function FocusStationColumn({
     const startDay = visibleDayRange.start;
     const endDay = Math.min(visibleDayRange.end, dayCount - 1);
     const operators = snapshot.operators;
+    const qualifiedOps = operators.filter((op) =>
+      op.skills?.some(
+        (s) => s.stationId === station.id && (s.proficiency ?? 0) > 0,
+      ),
+    );
     for (let d = startDay; d <= endDay; d++) {
       const currentDate = new Date(gridStartDate.getTime() + d * 24 * 60 * 60 * 1000);
       const baseSchedule = getStationDaySchedule(station, currentDate);
@@ -255,9 +261,12 @@ export function FocusStationColumn({
         station.id,
         currentDate,
       );
-      const daySchedule = overtimePeriods.length === 0
+      const withOvertime = overtimePeriods.length === 0
         ? baseSchedule
         : mergeDayScheduleWithOvertimePeriods(baseSchedule, overtimePeriods);
+      const daySchedule = operators.length === 0
+        ? withOvertime
+        : narrowDayScheduleByQualifiedOperators(withOvertime, qualifiedOps, currentDate);
       const yOffset = d * 24 * pixelsPerHour;
 
       if (overtimePeriods.length > 0) {
@@ -324,6 +333,7 @@ export function FocusStationColumn({
             isBlocked={cached.blocked}
             blockingInfo={cached.blockingInfo}
             tirageLabel={cached.tirageLabel}
+            produitLabel={cached.produitLabel}
             operatorNames={cached.operatorNames}
             sawtoothTop={interrupt?.top}
             sawtoothBottom={interrupt?.bottom}

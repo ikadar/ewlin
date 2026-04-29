@@ -4,6 +4,7 @@ import {
   getOperatorOvertimePeriodsForDay,
   aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
+  narrowDayScheduleByQualifiedOperators,
 } from '../../utils/operatorTileSlices';
 import { getStationDayScheduleForDate } from '../../utils/stationSchedule';
 
@@ -96,11 +97,19 @@ export function computeStationUnavailabilitySegments(
   rangeEndMs: number,
   operators: readonly Operator[] = [],
 ): UnavailabilitySegment[] {
+  const qualified = operators.filter((op) =>
+    op.skills?.some(
+      (s) => s.stationId === station.id && (s.proficiency ?? 0) > 0,
+    ),
+  );
   return iterateDays(rangeStartMs, rangeEndMs, (d) => {
     const base = getStationDaySchedule(station, d);
     if (operators.length === 0) return base;
     const overtime = aggregateOperatorOvertimePeriodsForStationDay(operators, station.id, d);
-    return overtime.length === 0 ? base : mergeDayScheduleWithOvertimePeriods(base, overtime);
+    const withOvertime = overtime.length === 0
+      ? base
+      : mergeDayScheduleWithOvertimePeriods(base, overtime);
+    return narrowDayScheduleByQualifiedOperators(withOvertime, qualified, d);
   });
 }
 

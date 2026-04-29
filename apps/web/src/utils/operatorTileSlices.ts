@@ -233,6 +233,78 @@ export function mergeDayScheduleWithOvertimePeriods(
   };
 }
 
+/**
+ * Narrow a station's day schedule to the intersection with the union of
+ * qualified operators' availability for that day.
+ *
+ * A station is only physically workable when at least one qualified
+ * operator can run it. The PHP API and the Rust engine both honour this
+ * via separate availability checks; the StationColumn overlay used to
+ * compute hatching purely from `station.operatingSchedule`, so a press
+ * with a single qualified operator looked "open" past that operator's
+ * shift end. This helper closes the gap, mirroring the engine's
+ * effective-availability semantics.
+ *
+ * Empty `qualifiedOperators` collapses to non-operating: nobody can
+ * conduct the press, so every minute of the day is unworkable.
+ */
+export function narrowDayScheduleByQualifiedOperators(
+  base: DaySchedule,
+  qualifiedOperators: readonly Operator[],
+  date: Date,
+): DaySchedule {
+  if (qualifiedOperators.length === 0) return { isOperating: false, slots: [] };
+  if (!base.isOperating || base.slots.length === 0) return base;
+
+  // Union of operator availabilities expressed as [startMin, endMin) ranges.
+  const opRanges: Array<[number, number]> = [];
+  for (const op of qualifiedOperators) {
+    const sched = getOperatorDaySchedule(op, date);
+    if (!sched.isOperating) continue;
+    for (const slot of sched.slots) {
+      const startMin =
+        parseInt(slot.start.slice(0, 2), 10) * 60 + parseInt(slot.start.slice(3, 5), 10);
+      const endMin = slot.end === '24:00'
+        ? 24 * 60
+        : parseInt(slot.end.slice(0, 2), 10) * 60 + parseInt(slot.end.slice(3, 5), 10);
+      if (endMin > startMin) opRanges.push([startMin, endMin]);
+    }
+  }
+  if (opRanges.length === 0) return { isOperating: false, slots: [] };
+  opRanges.sort((a, b) => a[0] - b[0]);
+  const opUnion: Array<[number, number]> = [];
+  for (const r of opRanges) {
+    const last = opUnion[opUnion.length - 1];
+    if (!last || last[1] < r[0]) opUnion.push([...r]);
+    else last[1] = Math.max(last[1], r[1]);
+  }
+
+  // Intersect each base slot with the union of operator ranges.
+  const toHm = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const narrowed: { start: string; end: string }[] = [];
+  for (const slot of base.slots) {
+    const slotStart =
+      parseInt(slot.start.slice(0, 2), 10) * 60 + parseInt(slot.start.slice(3, 5), 10);
+    const slotEnd = slot.end === '24:00'
+      ? 24 * 60
+      : parseInt(slot.end.slice(0, 2), 10) * 60 + parseInt(slot.end.slice(3, 5), 10);
+    for (const [oStart, oEnd] of opUnion) {
+      const s = Math.max(slotStart, oStart);
+      const e = Math.min(slotEnd, oEnd);
+      if (e > s) {
+        narrowed.push({
+          start: toHm(s),
+          end: e === 24 * 60 ? '24:00' : toHm(e),
+        });
+      }
+    }
+  }
+
+  if (narrowed.length === 0) return { isOperating: false, slots: [] };
+  return { isOperating: true, slots: narrowed };
+}
+
 function narrowByAbsences(
   base: DaySchedule,
   absences: Absence[] | null | undefined,

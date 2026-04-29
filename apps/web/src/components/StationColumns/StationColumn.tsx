@@ -9,6 +9,7 @@ import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import {
   aggregateOperatorOvertimePeriodsForStationDay,
   mergeDayScheduleWithOvertimePeriods,
+  narrowDayScheduleByQualifiedOperators,
 } from '../../utils/operatorTileSlices';
 import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
@@ -168,7 +169,25 @@ export const StationColumn = memo(function StationColumn({
     () => aggregateOperatorOvertimePeriodsForStationDay(effectiveOperators, station.id, today),
     [effectiveOperators, station.id, today],
   );
-  const daySchedule = getDaySchedule(station, effectiveDayOfWeek, today, todayOvertimePeriods);
+  // Operators with a positive-proficiency skill on this station. The
+  // station is only physically workable when at least one of them is
+  // available; the unavailability overlay below intersects the station's
+  // operating schedule with their union to mirror the engine's gating.
+  const qualifiedOperators = useMemo(
+    () =>
+      effectiveOperators.length === 0
+        ? null
+        : effectiveOperators.filter((op) =>
+            op.skills?.some(
+              (s) => s.stationId === station.id && (s.proficiency ?? 0) > 0,
+            ),
+          ),
+    [effectiveOperators, station.id],
+  );
+  const baseDaySchedule = getDaySchedule(station, effectiveDayOfWeek, today, todayOvertimePeriods);
+  const daySchedule = qualifiedOperators === null
+    ? baseDaySchedule
+    : narrowDayScheduleByQualifiedOperators(baseDaySchedule, qualifiedOperators, today);
 
   // Calculate total height — collapse-aware: each band trades real height for its heightPx
   const totalHeight = useMemo(() => {
@@ -257,12 +276,19 @@ export const StationColumn = memo(function StationColumn({
               station.id,
               currentDate,
             );
-            const dayScheduleForDay = getDaySchedule(
+            const baseScheduleForDay = getDaySchedule(
               station,
               dayOfWeekForDay,
               currentDate,
               overtimePeriods,
             );
+            const dayScheduleForDay = qualifiedOperators === null
+              ? baseScheduleForDay
+              : narrowDayScheduleByQualifiedOperators(
+                  baseScheduleForDay,
+                  qualifiedOperators,
+                  currentDate,
+                );
             const dayYOffset = effectiveCollapses.length === 0
               ? dayIndex * 24 * pixelsPerHour
               : timeToYPosition(currentDate, startHour, pixelsPerHour, gridStartDate, effectiveCollapses);
