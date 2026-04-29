@@ -33,6 +33,7 @@ import { promotionApi } from './api/promotionApi';
 import { prodCompletionApi } from './api/prodCompletionApi';
 import { prodSnapshotApi } from './api/prodSnapshotApi';
 import { archiveApi } from './api/archiveApi';
+import { simulationApi } from './api/simulationApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -67,6 +68,7 @@ export const store = configureStore({
     [prodCompletionApi.reducerPath]: prodCompletionApi.reducer,
     [prodSnapshotApi.reducerPath]: prodSnapshotApi.reducer,
     [archiveApi.reducerPath]: archiveApi.reducer,
+    [simulationApi.reducerPath]: simulationApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -101,6 +103,7 @@ export const store = configureStore({
       .concat(prodCompletionApi.middleware)
       .concat(prodSnapshotApi.middleware)
       .concat(archiveApi.middleware)
+      .concat(simulationApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we
@@ -338,6 +341,20 @@ export type {
   AuditEntry,
   AuditListResponse,
 } from './api/archiveApi';
+
+export {
+  useGetSimulationsQuery,
+  useGetSimulationQuery,
+  useForkSimulationMutation,
+  useDeleteSimulationMutation,
+  simulationApi,
+} from './api/simulationApi';
+export type {
+  SimulationSummary,
+  SimulationDetail,
+  SimulationListResponse,
+  ForkSimulationArgs,
+} from './api/simulationApi';
 
 export {
   useGetUsersQuery,

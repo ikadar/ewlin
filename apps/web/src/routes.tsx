@@ -57,6 +57,8 @@ import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
 import { ArchivesPage } from './pages/ArchivesPage';
 import { AuditPage } from './pages/AuditPage';
+import { SimulationsPage } from './pages/SimulationsPage';
+import { SimulationDetailPage } from './pages/SimulationDetailPage';
 
 /**
  * Application routes.
@@ -101,6 +103,10 @@ export function AppRoutes() {
 
         {/* Audit — chronological journal of every Prod plan (Phase 9) */}
         <Route path="/audit" element={<AuditPage />} />
+
+        {/* Simulations — read-only Préprod forks for ADV / what-if (Phase 6) */}
+        <Route path="/simulations" element={<SimulationsPage />} />
+        <Route path="/simulations/:id" element={<SimulationDetailPage />} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

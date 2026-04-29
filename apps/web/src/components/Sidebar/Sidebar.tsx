@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, Archive, ClipboardCheck } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, Archive, ClipboardCheck, FlaskConical } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
@@ -35,7 +35,8 @@ export function Sidebar() {
   const isLogistique = location.pathname.startsWith('/logistique');
   const isArchives = location.pathname.startsWith('/archives');
   const isAudit = location.pathname.startsWith('/audit');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && !isAudit && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isSimulations = location.pathname.startsWith('/simulations');
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && !isAudit && !isSimulations && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -115,6 +116,12 @@ export function Sidebar() {
             label="Journal d'audit"
             isActive={isAudit}
             onClick={() => navigate('/audit')}
+          />
+          <SidebarButton
+            icon={FlaskConical}
+            label="Simulations"
+            isActive={isSimulations}
+            onClick={() => navigate('/simulations')}
           />
         </div>
 
