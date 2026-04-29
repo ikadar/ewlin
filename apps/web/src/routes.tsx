@@ -56,6 +56,7 @@ import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
 import { ArchivesPage } from './pages/ArchivesPage';
+import { AuditPage } from './pages/AuditPage';
 
 /**
  * Application routes.
@@ -97,6 +98,9 @@ export function AppRoutes() {
         {/* Archives — frozen Prod history & restore (Phase 7) */}
         <Route path="/archives" element={<ArchivesPage />} />
         <Route path="/archives/:id" element={<ArchivesPage />} />
+
+        {/* Audit — chronological journal of every Prod plan (Phase 9) */}
+        <Route path="/audit" element={<AuditPage />} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

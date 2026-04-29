@@ -63,6 +63,11 @@ export const promotionApi = createApi({
           dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
           const { scheduleApi } = await import('./scheduleApi');
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          const { archiveApi } = await import('./archiveApi');
+          dispatch(archiveApi.util.invalidateTags([
+            { type: 'Archive', id: 'LIST' },
+            { type: 'Audit', id: 'LIST' },
+          ]));
         } catch {
           // promotion failed — nothing to invalidate
         }
@@ -78,6 +83,10 @@ export const promotionApi = createApi({
           dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
           const { scheduleApi } = await import('./scheduleApi');
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          const { archiveApi } = await import('./archiveApi');
+          dispatch(archiveApi.util.invalidateTags([
+            { type: 'Audit', id: 'LIST' },
+          ]));
         } catch {
           // undo failed — keep current cache
         }

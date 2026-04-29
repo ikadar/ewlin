@@ -326,6 +326,7 @@ export {
 export {
   useGetArchivesQuery,
   useGetArchiveQuery,
+  useGetAuditQuery,
   useRestoreArchiveMutation,
   archiveApi,
 } from './api/archiveApi';
@@ -334,6 +335,8 @@ export type {
   ArchiveDetail,
   ArchiveListResponse,
   ArchiveRestoreResult,
+  AuditEntry,
+  AuditListResponse,
 } from './api/archiveApi';
 
 export {

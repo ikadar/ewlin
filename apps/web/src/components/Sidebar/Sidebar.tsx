@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, Archive } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, Archive, ClipboardCheck } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
@@ -34,7 +34,8 @@ export function Sidebar() {
   const isStats = location.pathname.startsWith('/stats');
   const isLogistique = location.pathname.startsWith('/logistique');
   const isArchives = location.pathname.startsWith('/archives');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isAudit = location.pathname.startsWith('/audit');
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && !isAudit && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -108,6 +109,12 @@ export function Sidebar() {
             label="Archives"
             isActive={isArchives}
             onClick={() => navigate('/archives')}
+          />
+          <SidebarButton
+            icon={ClipboardCheck}
+            label="Journal d'audit"
+            isActive={isAudit}
+            onClick={() => navigate('/audit')}
           />
         </div>
 

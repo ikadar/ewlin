@@ -151,6 +151,14 @@ pub struct ScheduleResult {
     /// task's actual end tick — no PHP-side recomputation needed.
     #[serde(default)]
     pub outsourced_assignments: Vec<OutsourcedAssignment>,
+    /// Engine identity stamped on every response. PHP captures it on
+    /// the live Preprod row at compute time and copies it onto Prod at
+    /// promotion time, giving every promoted plan a permanent reference
+    /// to the engine binary that produced it (ISO audit requirement).
+    /// Sourced from the `flux-scheduler` crate version at compile time;
+    /// future revisions can append a build-sha if reproducibility needs
+    /// require it.
+    pub engine_version: String,
 }
 
 /// One placed outsourced step, ready for PHP-side persistence verbatim.

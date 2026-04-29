@@ -388,6 +388,7 @@ fn compute_inner(
         compute_time_ms,
         tick_minutes,
         outsourced_assignments,
+        engine_version: env!("CARGO_PKG_VERSION").to_string(),
     }
 }
 
