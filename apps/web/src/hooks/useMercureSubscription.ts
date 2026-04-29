@@ -47,7 +47,7 @@ export function useMercureSubscription(): MercureSubscription {
 
     eventSource.onmessage = (event: MessageEvent) => {
       try {
-        JSON.parse(event.data) as { type: string };
+        const payload = JSON.parse(event.data) as { type: string; reference?: string };
 
         // Skip invalidation if this client just mutated (mute window active)
         if (isMercureMuted()) {
@@ -56,7 +56,15 @@ export function useMercureSubscription(): MercureSubscription {
 
         dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
         dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
-        setToastMessage('Planning mis à jour');
+
+        // V1.x Phase 5 — surface a more specific toast when the event is
+        // a JobBecamePlannable transition. Operators care to know that a
+        // new job just landed in préprod (reservoir → préprod sync hook).
+        if (payload.type === 'JobBecamePlannable' && payload.reference) {
+          setToastMessage(`+1 nouveau job ajouté à la préprod : ${payload.reference}`);
+        } else {
+          setToastMessage('Planning mis à jour');
+        }
       } catch {
         // Ignore malformed messages
       }
