@@ -311,19 +311,28 @@ export function FocusStationColumn({
           data-testid="hour-grid-line"
         />
       ))}
-      {stationAssignments.map((assignment) => {
+      {stationAssignments.flatMap((assignment) => {
         const cached = tileDataCache.get(assignment.id);
-        if (!cached) return null;
+        if (!cached) return [];
         const interrupt = taskInterruption.get(assignment.id);
-        return (
+        // Render N tiles when the engine chunk-split this task to route
+        // around an obstacle. Single-segment fallback preserves the default
+        // continuous rendering for normal tasks.
+        const segments = cached.chunks ?? [{
+          top: cached.top,
+          height: cached.height,
+          calageGeometries: cached.calageGeometries,
+        }];
+        return segments.map((seg, i) => (
           <Tile
-            key={assignment.id}
+            key={cached.chunks ? `${assignment.id}-chunk-${i}` : assignment.id}
             assignment={assignment}
             task={cached.task}
             job={cached.job}
             element={cached.element}
-            top={cached.top}
-            height={cached.height}
+            top={seg.top}
+            height={seg.height}
+            calageGeometries={seg.calageGeometries}
             similarityResults={cached.similarityResults}
             similarityScore={cached.similarityScore}
             category={cached.category}
@@ -338,7 +347,7 @@ export function FocusStationColumn({
             sawtoothTop={interrupt?.top}
             sawtoothBottom={interrupt?.bottom}
           />
-        );
+        ));
       })}
     </div>
   );

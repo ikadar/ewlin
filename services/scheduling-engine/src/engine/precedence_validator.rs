@@ -363,6 +363,7 @@ mod tests {
             effective_productivity: 1.0,
             is_masked_time: false,
             recalages: vec![],
+            active_windows: None,
         }
     }
 

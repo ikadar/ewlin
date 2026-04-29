@@ -196,12 +196,26 @@ pub fn lns_improve(
         );
         total_iters += new_i;
 
-        let improved = is_strictly_better(&new_s, &best_stats_ref);
+        // Hard reject any FBI result that violates the station-capacity
+        // invariant. Single-iteration FBI inside LNS occasionally leaves
+        // residual overlaps when a long task spans a closure (the
+        // station_active counter does not cover every traversed tick),
+        // and those overlaps then survive bulkReplace persistence as
+        // visually superposed tiles. A schedule with overlaps is
+        // structurally invalid — never accept it regardless of stats.
+        let overlap_count = count_station_overlaps(&new_a);
+        let improved = overlap_count == 0 && is_strictly_better(&new_s, &best_stats_ref);
 
-        eprintln!("[LNS] iter {}: destroy={} sacrifice={} → {} late (best={}) calage(sum {}, mean {:.1}, med {:.1})",
+        eprintln!("[LNS] iter {}: destroy={} sacrifice={} → {} late (best={}) overlaps={} calage(sum {}, mean {:.1}, med {:.1})",
             iteration, n_destroy, n_sacrifice,
             new_s.late_job_count, best_stats_ref.late_job_count,
+            overlap_count,
             new_s.calage_bonus_sum, new_s.calage_bonus_mean, new_s.calage_bonus_median);
+
+        if overlap_count > 0 {
+            eprintln!("[LNS] iter {}: REJECTED — repair produced {} station overlap(s); keeping previous best",
+                iteration, overlap_count);
+        }
 
         super::emit(progress, ProgressEvent::LnsIteration {
             iteration: iteration as u32 + 1,
@@ -300,6 +314,58 @@ pub(crate) fn is_strictly_better(candidate: &ScheduleStats, reference: &Schedule
     any_strict
 }
 
+/// Count pairs of assignments on the same station whose **active** time
+/// ranges overlap. Zero means the schedule respects the station-capacity
+/// invariant; any positive value is a structural defect.
+///
+/// "Active" here means: an assignment with `active_windows = Some(ws)` is
+/// considered to occupy the union of `ws` rather than the
+/// `[scheduled_start, scheduled_end)` envelope. This prevents false
+/// positives when the forward pass chunk-splits a long task to route
+/// around a pin: the merged envelope visually covers the pin, but the
+/// task is genuinely inactive during the gap and should not count as a
+/// capacity violation. An assignment with `active_windows = None` falls
+/// back to the envelope, which is correct because that representation
+/// implies the task is continuous.
+///
+/// Used by LNS as a hard-reject filter on FBI single-iteration repair
+/// outputs. The forward-pass should never produce overlaps under multi-
+/// iteration FBI, but with a single iteration (LNS hot path) residuals
+/// occasionally slip through.
+///
+/// String comparison is sound for the engine's ISO-8601 timestamps:
+/// `forward_pass` emits them in a single timezone offset, so lexical
+/// sort matches chronological sort.
+fn count_station_overlaps(assignments: &[ComputedAssignment]) -> usize {
+    // Expand each assignment to its active intervals. A None active_windows
+    // expands to a single interval = the envelope.
+    let mut by_station: std::collections::HashMap<&str, Vec<(&str, &str)>> =
+        std::collections::HashMap::new();
+    for a in assignments {
+        let entry = by_station.entry(a.station_id.as_str()).or_default();
+        match a.active_windows.as_ref() {
+            Some(windows) if !windows.is_empty() => {
+                for w in windows {
+                    entry.push((w.start.as_str(), w.end.as_str()));
+                }
+            }
+            _ => {
+                entry.push((a.scheduled_start.as_str(), a.scheduled_end.as_str()));
+            }
+        }
+    }
+    let mut count = 0usize;
+    for items in by_station.values_mut() {
+        items.sort_by(|a, b| a.0.cmp(b.0));
+        for w in items.windows(2) {
+            if w[1].0 < w[0].1 {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,5 +422,147 @@ mod tests {
         let cand = make_stats(3, 100, 50.0, 50.0);
         let refr = make_stats(3, 100, 50.0, 50.0);
         assert!(!is_strictly_better(&cand, &refr));
+    }
+
+    fn make_assignment(station_id: &str, start: &str, end: &str) -> ComputedAssignment {
+        ComputedAssignment {
+            task_id: format!("t-{}-{}", station_id, start),
+            station_id: station_id.to_string(),
+            scheduled_start: start.to_string(),
+            scheduled_end: end.to_string(),
+            operators: Vec::new(),
+            setup_end: None,
+            is_degraded: false,
+            effective_productivity: 1.0,
+            is_masked_time: false,
+            recalages: Vec::new(),
+            active_windows: None,
+        }
+    }
+
+    fn make_assignment_with_windows(
+        station_id: &str,
+        start: &str,
+        end: &str,
+        windows: Vec<(&str, &str)>,
+    ) -> ComputedAssignment {
+        let mut a = make_assignment(station_id, start, end);
+        a.active_windows = Some(
+            windows
+                .into_iter()
+                .map(|(s, e)| crate::model::schedule::PhaseSegment {
+                    start: s.to_string(),
+                    end: e.to_string(),
+                })
+                .collect(),
+        );
+        a
+    }
+
+    #[test]
+    fn overlap_count_empty_is_zero() {
+        assert_eq!(count_station_overlaps(&[]), 0);
+    }
+
+    #[test]
+    fn overlap_count_disjoint_same_station_is_zero() {
+        let a = vec![
+            make_assignment("s1", "2026-04-30T08:00:00+02:00", "2026-04-30T09:00:00+02:00"),
+            make_assignment("s1", "2026-04-30T09:00:00+02:00", "2026-04-30T10:00:00+02:00"),
+        ];
+        assert_eq!(count_station_overlaps(&a), 0);
+    }
+
+    #[test]
+    fn overlap_count_overlapping_same_station_is_one() {
+        let a = vec![
+            make_assignment("s1", "2026-04-30T08:00:00+02:00", "2026-04-30T10:00:00+02:00"),
+            make_assignment("s1", "2026-04-30T09:00:00+02:00", "2026-04-30T11:00:00+02:00"),
+        ];
+        assert_eq!(count_station_overlaps(&a), 1);
+    }
+
+    #[test]
+    fn overlap_count_overlapping_different_stations_is_zero() {
+        let a = vec![
+            make_assignment("s1", "2026-04-30T08:00:00+02:00", "2026-04-30T10:00:00+02:00"),
+            make_assignment("s2", "2026-04-30T09:00:00+02:00", "2026-04-30T11:00:00+02:00"),
+        ];
+        assert_eq!(count_station_overlaps(&a), 0);
+    }
+
+    #[test]
+    fn overlap_count_long_task_engulfing_short_task_detected() {
+        // Reproduces the field-observed pattern: a 12h task overlaps a
+        // shorter task that starts moments later on the same station.
+        let a = vec![
+            make_assignment("G37", "2026-04-30T06:15:00+02:00", "2026-04-30T18:15:00+02:00"),
+            make_assignment("G37", "2026-04-30T06:30:00+02:00", "2026-04-30T09:00:00+02:00"),
+        ];
+        assert_eq!(count_station_overlaps(&a), 1);
+    }
+
+    #[test]
+    fn overlap_count_overnight_traversal_with_morning_overlap() {
+        // Long task spanning a night closure, short task placed after the
+        // morning reopen but before the long task ends.
+        let a = vec![
+            make_assignment("Duplo10P", "2026-04-30T09:15:00+02:00", "2026-05-01T08:00:00+02:00"),
+            make_assignment("Duplo10P", "2026-04-30T09:30:00+02:00", "2026-04-30T11:00:00+02:00"),
+        ];
+        assert_eq!(count_station_overlaps(&a), 1);
+    }
+
+    #[test]
+    fn overlap_count_envelope_around_pin_is_not_an_overlap() {
+        // The bug we are fixing: a chunk-split long task with two windows
+        // around a safety-zone pin. The envelope visually covers the pin,
+        // but the task is genuinely inactive during the gap. The pin is a
+        // real assignment (None active_windows = continuous). Expected: 0.
+        let mut long_task = make_assignment_with_windows(
+            "754",
+            "2026-04-30T07:00:00+02:00",
+            "2026-04-30T18:15:00+02:00",
+            vec![
+                ("2026-04-30T07:00:00+02:00", "2026-04-30T07:15:00+02:00"),
+                ("2026-04-30T09:45:00+02:00", "2026-04-30T18:15:00+02:00"),
+            ],
+        );
+        long_task.task_id = "long".into();
+        let mut pin = make_assignment(
+            "754",
+            "2026-04-30T07:15:00+02:00",
+            "2026-04-30T09:45:00+02:00",
+        );
+        pin.task_id = "pin".into();
+        let a = vec![long_task, pin];
+        assert_eq!(count_station_overlaps(&a), 0);
+    }
+
+    #[test]
+    fn overlap_count_chunk_window_actually_overlapping_pin_is_detected() {
+        // Same shape as above but with a chunk that genuinely overlaps the
+        // pin (engine bug). The fix must NOT silence this — the active
+        // window itself overlaps the pin.
+        let mut long_task = make_assignment_with_windows(
+            "754",
+            "2026-04-30T07:00:00+02:00",
+            "2026-04-30T18:15:00+02:00",
+            vec![
+                ("2026-04-30T07:00:00+02:00", "2026-04-30T08:00:00+02:00"),
+                ("2026-04-30T08:30:00+02:00", "2026-04-30T18:15:00+02:00"),
+            ],
+        );
+        long_task.task_id = "long".into();
+        let mut pin = make_assignment(
+            "754",
+            "2026-04-30T07:30:00+02:00",
+            "2026-04-30T09:00:00+02:00",
+        );
+        pin.task_id = "pin".into();
+        let a = vec![long_task, pin];
+        // Pin overlaps both windows of long_task. After sort by start:
+        //   [07:00..08:00) [07:30..09:00) [08:30..18:15) → 2 adjacent overlaps.
+        assert_eq!(count_station_overlaps(&a), 2);
     }
 }

@@ -492,24 +492,52 @@ export function computeTileSlices(
 ): TileSlice[] {
   if (assignments.length === 0) return [];
 
-  const entries = assignments.map(a => {
-    const opRef = a.operators?.find(o => o.operatorId === operator.id);
+  // One TaskAssignment can list the same operator across multiple
+  // non-contiguous `from/to` windows — e.g. an operator who launches
+  // press A (11:00-11:15), runs press B in between, then comes back to A
+  // (13:30-13:45) appears twice in A.operators. Earlier code used `find`
+  // which dropped every entry past the first; the operator's column was
+  // missing the late comeback and visually overlapped the side trip on
+  // press B (which actually fits in the gap).
+  // Fix: emit one `entry` per operator window, all sharing the same
+  // assignment id but each with its own [startMs, endMs]. The downstream
+  // boundary/overlap algorithm treats them as independent slices, so
+  // adjacent windows naturally interleave with windows of other tasks
+  // on the same operator without false overlaps.
+  const entries = assignments.flatMap(a => {
     const assignStart = new Date(a.scheduledStart).getTime();
     const assignEnd = new Date(a.scheduledEnd).getTime();
-    const opFrom = opRef?.from ? new Date(opRef.from).getTime() : assignStart;
-    const opTo = opRef?.to ? new Date(opRef.to).getTime() : assignEnd;
-    return {
-      id: a.id,
-      taskId: a.taskId,
-      startMs: opFrom,
-      endMs: opTo,
-      assignStartMs: assignStart,
-      assignEndMs: assignEnd,
-      relayBefore: opFrom > assignStart + 30000,
-      relayAfter: opTo < assignEnd - 30000,
-      isMasked: a.isMaskedTime ?? false,
-      assignment: a,
-    };
+    const opEntries = (a.operators ?? []).filter(o => o.operatorId === operator.id);
+    if (opEntries.length === 0) {
+      return [{
+        id: a.id,
+        taskId: a.taskId,
+        startMs: assignStart,
+        endMs: assignEnd,
+        assignStartMs: assignStart,
+        assignEndMs: assignEnd,
+        relayBefore: false,
+        relayAfter: false,
+        isMasked: a.isMaskedTime ?? false,
+        assignment: a,
+      }];
+    }
+    return opEntries.map(opRef => {
+      const opFrom = opRef.from ? new Date(opRef.from).getTime() : assignStart;
+      const opTo = opRef.to ? new Date(opRef.to).getTime() : assignEnd;
+      return {
+        id: a.id,
+        taskId: a.taskId,
+        startMs: opFrom,
+        endMs: opTo,
+        assignStartMs: assignStart,
+        assignEndMs: assignEnd,
+        relayBefore: opFrom > assignStart + 30000,
+        relayAfter: opTo < assignEnd - 30000,
+        isMasked: a.isMaskedTime ?? false,
+        assignment: a,
+      };
+    });
   });
 
   const boundarySet = new Set<number>();
@@ -557,7 +585,19 @@ export function computeTileSlices(
   const finalSlices: TileSlice[] = [];
 
   for (const slice of rawSlices) {
-    const entry = entries.find(e => e.id === slice.assignmentId);
+    // With multiple operator entries per assignment (interleaved windows),
+    // we must pick the entry whose [startMs, endMs] window covers this
+    // slice — not just any entry sharing the assignment id. Falling back
+    // to id-only `find` would return the FIRST window, so a slice that
+    // belongs to a later window would inherit the wrong startMs/endMs and
+    // the relay-before/after detection would misfire.
+    const sliceFromMs = slice.from.getTime();
+    const sliceToMs = slice.to.getTime();
+    const entry = entries.find(e =>
+      e.id === slice.assignmentId &&
+      e.startMs <= sliceFromMs + 30_000 &&
+      e.endMs >= sliceToMs - 30_000,
+    ) ?? entries.find(e => e.id === slice.assignmentId);
     const gaps = findOperatorGaps(operator, slice.from, slice.to);
     const ss = slice.from.getTime();
     const se = slice.to.getTime();

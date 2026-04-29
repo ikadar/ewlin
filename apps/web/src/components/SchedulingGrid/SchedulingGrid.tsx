@@ -536,30 +536,33 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     if (!lens.state.activeColumnId) return null;
     const originMs = lensRange.gridStartMs;
     const noop = () => { /* interactions disabled inside the lens */ };
-    return lensActiveAssignments.map((a) => {
+    return lensActiveAssignments.flatMap((a) => {
       const cached = tileDataCache.get(a.id);
-      if (!cached) return null;
+      if (!cached) return [];
       // Station-view tiles are always backed by internal tasks — outsourced
       // assignments are filtered out earlier in assignmentsByStation.
-      if (!isInternalTask(cached.task)) return null;
+      if (!isInternalTask(cached.task)) return [];
       const interrupt = taskInterruption.get(a.id);
-      const top =
-        ((new Date(a.scheduledStart).getTime() - originMs) / 3_600_000) *
-        LENS_PIXELS_PER_HOUR;
-      // Lens is a linear (non-collapsed) magnified view — height is the raw
-      // wall-clock span at LENS_PIXELS_PER_HOUR. No collapse math here.
-      const lensHeight =
-        ((new Date(a.scheduledEnd).getTime() - new Date(a.scheduledStart).getTime()) / 3_600_000) *
-        LENS_PIXELS_PER_HOUR;
-      return (
+      // Lens is a linear (non-collapsed) magnified view — heights are the raw
+      // wall-clock spans at LENS_PIXELS_PER_HOUR. When activeWindows are
+      // present, project each window directly (no collapse math).
+      const projectLinear = (start: string, end: string) => {
+        const top = ((new Date(start).getTime() - originMs) / 3_600_000) * LENS_PIXELS_PER_HOUR;
+        const height = ((new Date(end).getTime() - new Date(start).getTime()) / 3_600_000) * LENS_PIXELS_PER_HOUR;
+        return { top, height };
+      };
+      const segments = a.activeWindows && a.activeWindows.length >= 2
+        ? a.activeWindows.map((w, i) => ({ key: `lens-${a.id}-chunk-${i}`, ...projectLinear(w.start, w.end) }))
+        : [{ key: `lens-${a.id}`, ...projectLinear(a.scheduledStart, a.scheduledEnd) }];
+      return segments.map((seg) => (
         <Tile
-          key={`lens-${a.id}`}
+          key={seg.key}
           assignment={a}
           task={cached.task}
           job={cached.job}
           element={cached.element}
-          top={top}
-          height={lensHeight}
+          top={seg.top}
+          height={seg.height}
           isSelected={false}
           similarityResults={cached.similarityResults}
           similarityScore={cached.similarityScore}
@@ -573,13 +576,14 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           blockingInfo={cached.blockingInfo}
           displayMode={displayMode}
           tirageLabel={cached.tirageLabel}
+          produitLabel={cached.produitLabel}
           operatorNames={cached.operatorNames}
           sawtoothTop={interrupt?.top}
           sawtoothBottom={interrupt?.bottom}
           overrideLeft={`40px`}
           overrideWidth={`calc(100% - 44px)`}
         />
-      );
+      ));
     });
   }, [lens.state.activeColumnId, lensActiveAssignments, tileDataCache, taskInterruption, lensRange.gridStartMs, displayMode]);
 
@@ -837,9 +841,9 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                   collapses={effectiveCollapses}
                   operators={operators}
                 >
-                  {stationAssignments.map((assignment) => {
+                  {stationAssignments.flatMap((assignment) => {
                     const cached = tileDataCache.get(assignment.id);
-                    if (!cached) return null;
+                    if (!cached) return [];
                     const interrupt = taskInterruption.get(assignment.id);
                     const sequenceIndex = sequenceIndexByTaskId?.get(cached.task.id);
                     const inZone = isInSafetyZone(
@@ -849,16 +853,26 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                       && overrideLookup.get(
                         makeSafetyKey(cached.job.id, sequenceIndex, cached.task.stationId),
                       ) === true;
-                    return (
+                    // When the engine chunk-split this task to route around an
+                    // obstacle (typically a safety-zone-frozen pin), render one
+                    // independent <Tile> per active window. All chunks share
+                    // the same data-task-id, so hover/selection style propagates
+                    // via the existing CSS rule on [data-task-id="..."].
+                    const segments = cached.chunks ?? [{
+                      top: cached.top,
+                      height: cached.height,
+                      calageGeometries: cached.calageGeometries,
+                    }];
+                    return segments.map((seg, i) => (
                       <Tile
-                        key={assignment.id}
+                        key={cached.chunks ? `${assignment.id}-chunk-${i}` : assignment.id}
                         assignment={assignment}
                         task={cached.task}
                         job={cached.job}
                         element={cached.element}
-                        top={cached.top}
-                        height={cached.height}
-                        calageGeometries={cached.calageGeometries}
+                        top={seg.top}
+                        height={seg.height}
+                        calageGeometries={seg.calageGeometries}
                         isSelected={selectedJobId === cached.jobId}
                         similarityResults={cached.similarityResults}
                         similarityScore={cached.similarityScore}
@@ -873,6 +887,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         blockingInfo={cached.blockingInfo}
                         displayMode={displayMode}
                         tirageLabel={cached.tirageLabel}
+                        produitLabel={cached.produitLabel}
                         operatorNames={cached.operatorNames}
                         sawtoothTop={interrupt?.top}
                         sawtoothBottom={interrupt?.bottom}
@@ -881,7 +896,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         sequenceIndex={sequenceIndex}
                         onToggleFrozenOverride={onToggleFrozenOverride}
                       />
-                    );
+                    ));
                   })}
                 </StationColumn>
               );

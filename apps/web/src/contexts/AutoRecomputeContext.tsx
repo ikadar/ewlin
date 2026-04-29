@@ -16,7 +16,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
 import type { ScheduleSnapshot } from '@flux/types';
-import type { ComputeScheduleResult } from '../store';
+import {
+  useAppDispatch,
+  useAppSelector,
+  selectCurrentError,
+  clearError,
+  type ComputeScheduleResult,
+} from '../store';
 import { useAutoRecompute, useComputeToaster } from '../hooks';
 import {
   useComputeReportStream,
@@ -195,8 +201,29 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
       {/* Toast stack rendered at root so it survives route changes. */}
       <ComputeToastStack toasts={computeToaster.toasts} onDismiss={computeToaster.dismiss} />
       <ComputeReportToast state={reportStream.state} onDismiss={reportStream.clear} />
+      <GlobalErrorBridge />
     </AutoRecomputeContext.Provider>
   );
+}
+
+/**
+ * Pipes Redux global errors into the compute toaster.
+ * Skips 409 (validation — handled inline by forms) and 503 (handled
+ * by <MaintenanceState />).
+ */
+function GlobalErrorBridge() {
+  const dispatch = useAppDispatch();
+  const currentError = useAppSelector(selectCurrentError);
+  const { showToast } = useAutoRecomputeCtx();
+
+  useEffect(() => {
+    if (!currentError) return;
+    if (currentError.status === 409 || currentError.status === 503) return;
+    showToast({ type: 'error', title: currentError.message });
+    dispatch(clearError());
+  }, [currentError, dispatch, showToast]);
+
+  return null;
 }
 
 /**

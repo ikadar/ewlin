@@ -660,6 +660,61 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
             .flat_map(|c| c.recalages.iter().cloned())
             .collect();
 
+        // Active-window decomposition: expose the union of each chunk's
+        // own active windows so the UI knows where the task is genuinely
+        // active vs. suspended. Falls back to a chunk's [scheduled_start,
+        // scheduled_end] when that chunk has no per-tick decomposition
+        // (e.g. pinned task whose advance bypassed `tick_operator_log`).
+        //
+        // Without this, the merged envelope visually overlaps any tile
+        // the forward pass routed around — most commonly a safety-zone-
+        // frozen pin sitting inside the long task's wall-clock span. The
+        // UI renders one tile per active window; gaps between them stay
+        // empty (or hidden by the collapse-aware projection when they
+        // fall on a closure band).
+        let mut merged_windows: Vec<crate::model::schedule::PhaseSegment> = Vec::new();
+        for c in &chunks {
+            match c.active_windows.as_ref() {
+                Some(ws) if !ws.is_empty() => {
+                    for w in ws {
+                        merged_windows.push(w.clone());
+                    }
+                }
+                _ => {
+                    merged_windows.push(crate::model::schedule::PhaseSegment {
+                        start: c.scheduled_start.clone(),
+                        end: c.scheduled_end.clone(),
+                    });
+                }
+            }
+        }
+        let active_windows = if merged_windows.len() >= 2 {
+            // Sort by start then collapse adjacent / overlapping segments
+            // so consumers don't have to deal with redundant micro-gaps
+            // that arise when a chunk-split task crosses a closure inside
+            // a tick-log run.
+            merged_windows.sort_by(|a, b| a.start.cmp(&b.start));
+            let mut collapsed: Vec<crate::model::schedule::PhaseSegment> = Vec::new();
+            for w in merged_windows {
+                if let Some(last) = collapsed.last_mut() {
+                    if last.end >= w.start {
+                        if w.end > last.end {
+                            last.end = w.end;
+                        }
+                        continue;
+                    }
+                }
+                collapsed.push(w);
+            }
+            if collapsed.len() >= 2 {
+                Some(collapsed)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         result.push(ComputedAssignment {
             task_id: original_task_id,
             station_id: first.station_id.clone(),
@@ -671,6 +726,7 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
             effective_productivity: avg_productivity,
             is_masked_time,
             recalages: merged_recalages,
+            active_windows,
         });
     }
 

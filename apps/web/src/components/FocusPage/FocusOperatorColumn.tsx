@@ -15,6 +15,7 @@ import {
 } from '../../utils/operatorTileSlices';
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
+import { getProduitLabel } from '../../utils/tileLabelResolver';
 
 export interface FocusOperatorColumnProps {
   operator: Operator;
@@ -74,6 +75,11 @@ export function FocusOperatorColumn({
     () => new Map(snapshot.elements.map((e) => [e.id, e])),
     [snapshot.elements],
   );
+  const elementCountByJobId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of snapshot.elements) m.set(e.jobId, (m.get(e.jobId) ?? 0) + 1);
+    return m;
+  }, [snapshot.elements]);
   const jobMap = useMemo(() => new Map(snapshot.jobs.map((j) => [j.id, j])), [snapshot.jobs]);
   const stationMap = useMemo(
     () => new Map(snapshot.stations.map((s) => [s.id, s])),
@@ -179,7 +185,7 @@ export function FocusOperatorColumn({
           <TileSegment
             key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
             segmentKey={`${slice.assignmentId}-${slice.from.getTime()}`}
-            label={`${job.reference} · ${job.client}`}
+            label={getProduitLabel(job, element, elementCountByJobId.get(job.id) ?? 1)}
             stationName={station?.name}
             top={top}
             height={height}

@@ -1561,6 +1561,194 @@ pub fn run_forward_pass(
         }
     }
 
+    // ============================================================
+    // DIAGNOSTIC: post-hoc analysis of unplaced actions.
+    //
+    // Gated by FLUX_DIAG_UNPLACED=1 env var so it stays silent
+    // by default. Each unplaced action gets one line listing the
+    // dominant blocker (BAT floor, predecessor cascade, station
+    // occupied, no-window) measured by sampling ~100 candidate
+    // ticks against the FINAL grid state.
+    //
+    // Used to confirm the "tier-0 mutual blocking" hypothesis:
+    // if `station_busy_no_preempt` dominates for an impératif
+    // (priority=0) action, that action lost the placement race
+    // because every candidate slot was held by another tier-0
+    // action and preemption refused (priority equal, not strictly
+    // higher).
+    // ============================================================
+    if std::env::var("FLUX_DIAG_UNPLACED").is_ok() {
+        let unplaced_indices: Vec<usize> = actions
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| a.start_tick.is_none())
+            .map(|(i, _)| i)
+            .collect();
+
+        if !unplaced_indices.is_empty() {
+            eprintln!(
+                "[UNPLACED-DIAG] analyzing {} unplaced actions",
+                unplaced_indices.len()
+            );
+            for i in &unplaced_indices {
+                let action = &actions[*i];
+                let earliest_t = action
+                    .earliest_start_tick
+                    .unwrap_or(now_tick)
+                    .max(now_tick);
+                let scan_horizon = grid.num_ticks.min(earliest_t.saturating_add(20_000));
+                let span = scan_horizon.saturating_sub(earliest_t);
+                let step = (span / 100).max(1);
+
+                let pred_unplaced = action
+                    .predecessor_idx
+                    .map(|p| actions[p].start_tick.is_none())
+                    .unwrap_or(false);
+                let addl_pred_unplaced_count = action
+                    .additional_predecessors
+                    .iter()
+                    .filter(|&&(p, _)| actions[p].start_tick.is_none())
+                    .count();
+
+                let mut samples = 0u32;
+                let mut bat_blocked = 0u32;
+                let mut pred_not_done = 0u32;
+                let mut addl_pred_not_done = 0u32;
+                let mut station_busy_pin = 0u32;
+                let mut station_busy_no_preempt = 0u32;
+                let mut station_busy_could_preempt = 0u32;
+                let mut window_too_small = 0u32;
+                let mut sample_occupant_priorities: std::collections::HashMap<u8, u32> =
+                    std::collections::HashMap::new();
+                let mut sample_occupant_jobs: std::collections::HashMap<String, u32> =
+                    std::collections::HashMap::new();
+
+                let mut t = earliest_t;
+                while t < scan_horizon {
+                    samples += 1;
+                    if let Some(est) = action.earliest_start_tick {
+                        if t < est {
+                            bat_blocked += 1;
+                            t += step;
+                            continue;
+                        }
+                    }
+                    if let Some(pred_idx) = action.predecessor_idx {
+                        match actions[pred_idx].end_tick {
+                            Some(end) => {
+                                let floor = end + action.predecessor_gap_ticks as usize;
+                                if floor > t {
+                                    pred_not_done += 1;
+                                    t += step;
+                                    continue;
+                                }
+                            }
+                            None => {
+                                pred_not_done += 1;
+                                t += step;
+                                continue;
+                            }
+                        }
+                    }
+                    let addl_done = action.additional_predecessors.iter().all(|&(p, gap)| {
+                        actions[p]
+                            .end_tick
+                            .map_or(false, |e| e + gap as usize <= t)
+                    });
+                    if !addl_done {
+                        addl_pred_not_done += 1;
+                        t += step;
+                        continue;
+                    }
+                    match grid.station_action_at(action.station_idx, t) {
+                        None => {
+                            // Station free at this tick — check the chunk-mini window.
+                            let scoring_slack = action.last as i64 - t as i64 - action.art as i64;
+                            let needed = action.art.max(1) as usize;
+                            let probe = needed.min(60);
+                            let win = available_work_window(
+                                grid,
+                                operator_skills,
+                                operator_availability,
+                                actions,
+                                action.deadline_priority,
+                                scoring_slack,
+                                action.station_idx,
+                                t,
+                                probe,
+                            );
+                            if win < probe {
+                                window_too_small += 1;
+                            }
+                        }
+                        Some(occ) if occ == usize::MAX => {
+                            station_busy_pin += 1;
+                        }
+                        Some(occ) if occ < actions.len() => {
+                            let occ_priority = actions[occ].deadline_priority;
+                            *sample_occupant_priorities.entry(occ_priority).or_insert(0) += 1;
+                            *sample_occupant_jobs
+                                .entry(actions[occ].job_id.clone())
+                                .or_insert(0) += 1;
+                            if action.deadline_priority < occ_priority {
+                                station_busy_could_preempt += 1;
+                            } else {
+                                station_busy_no_preempt += 1;
+                            }
+                        }
+                        Some(_) => {
+                            station_busy_pin += 1;
+                        }
+                    }
+                    t += step;
+                }
+
+                let top_occupant_jobs: Vec<String> = {
+                    let mut v: Vec<(String, u32)> = sample_occupant_jobs.into_iter().collect();
+                    v.sort_by(|a, b| b.1.cmp(&a.1));
+                    v.into_iter()
+                        .take(3)
+                        .map(|(j, c)| format!("{}×{}", j, c))
+                        .collect()
+                };
+                let occupant_priority_hist: Vec<String> = {
+                    let mut v: Vec<(u8, u32)> = sample_occupant_priorities.into_iter().collect();
+                    v.sort_by_key(|(p, _)| *p);
+                    v.into_iter()
+                        .map(|(p, c)| format!("p{}={}", p, c))
+                        .collect()
+                };
+
+                eprintln!(
+                    "[UNPLACED-DIAG] task={} job={} station={} priority={} last={} art={} original_art={} pinned={} bat_floor={:?} pred_idx={:?} pred_unplaced={} addl_preds={} addl_pred_unplaced={} | samples={} bat={} pred={} addl_pred={} occ_no_preempt={} occ_could_preempt={} occ_pinned={} window_short={} | occupant_pri_hist=[{}] top_occupants=[{}]",
+                    action.task_id,
+                    action.job_id,
+                    action.station_idx,
+                    action.deadline_priority,
+                    action.last,
+                    action.art,
+                    action.original_art,
+                    action.is_pinned,
+                    action.earliest_start_tick,
+                    action.predecessor_idx,
+                    pred_unplaced,
+                    action.additional_predecessors.len(),
+                    addl_pred_unplaced_count,
+                    samples,
+                    bat_blocked,
+                    pred_not_done,
+                    addl_pred_not_done,
+                    station_busy_no_preempt,
+                    station_busy_could_preempt,
+                    station_busy_pin,
+                    window_too_small,
+                    occupant_priority_hist.join(","),
+                    top_occupant_jobs.join(","),
+                );
+            }
+        }
+    }
+
     assignments
 }
 
@@ -2502,10 +2690,25 @@ fn pre_place_pinned_actions(
             // "user-pinned, honour it"; that rationale predates the
             // overtime channel and no longer applies.
             if ops.is_empty() {
+                // Fallback: when find_operators_for_station yields nothing
+                // (no idle qualified op, no eligible pair candidate), pick
+                // a qualified+available op who is ALSO genuinely idle on
+                // this tick. The earlier version omitted the idle check,
+                // which silently double-booked an operator already
+                // running another safety-zone-frozen pin on a different
+                // station — the operator-view then rendered overlapping
+                // tiles for the same person at the same minute.
+                //
+                // If even this filtered set is empty, leave `ops` empty:
+                // the tile renders operator-less and surfaces the gap so
+                // the user can add overtime / unpin / shift the task —
+                // strictly better than ghost-assigning a person who is
+                // physically busy elsewhere.
                 let mut fallback: Vec<(usize, f64)> = operator_skills
                     .iter()
                     .enumerate()
                     .filter(|(op, _)| operator_availability.is_available(*op, t))
+                    .filter(|(op, _)| grid.operator_is_idle(*op, t))
                     .filter_map(|(op, skills)| {
                         skills
                             .iter()
@@ -2616,6 +2819,26 @@ fn build_assignment_for(
         })
         .collect();
 
+    // Active-window decomposition: derive from `tick_operator_log` which
+    // records exactly which ticks the action was productive on. When the
+    // action engulfs a pin or sits across a closure, productive ticks are
+    // non-contiguous — we group consecutive ticks into runs and emit one
+    // PhaseSegment per run. Single-run actions get `None` (continuous, the
+    // envelope already represents them faithfully). Multi-run actions get
+    // `Some(...)` so the UI can render one tile per active window and any
+    // tile that the engine routed around (pin, etc.) stays visible in the
+    // gap.
+    //
+    // tick_operator_log entries are pushed in tick order by the main
+    // forward-pass loop and by pre_place_pinned_actions; sort defensively
+    // because additive events from `find_operators_for_station` are not
+    // guaranteed monotonic across resume edges.
+    let active_windows = derive_active_windows_from_log(
+        &action.tick_operator_log,
+        tick_minutes,
+        start_date,
+    );
+
     ComputedAssignment {
         task_id: action.task_id.clone(),
         station_id: format!("station_idx:{}", station_idx),
@@ -2627,7 +2850,62 @@ fn build_assignment_for(
         effective_productivity: (avg_productivity * 100.0).round() / 100.0,
         is_masked_time: false, // Set in post-processing by compute()
         recalages,
+        active_windows,
     }
+}
+
+/// Group the ticks in `tick_operator_log` into contiguous runs and emit one
+/// `PhaseSegment` per run (start = run-start tick × tick_minutes,
+/// end = (run-end+1) × tick_minutes). Two ticks are "contiguous" if they
+/// differ by exactly 1 — closure ticks are never recorded, so a closure-
+/// induced gap naturally breaks the run.
+///
+/// Returns `None` when there are 0 or 1 distinct runs (continuous action,
+/// retro-compatible behaviour). Returns `Some(runs)` when there are ≥2
+/// runs, signalling to the UI that the envelope `[scheduled_start,
+/// scheduled_end]` contains gaps where the action was inactive.
+fn derive_active_windows_from_log(
+    tick_operator_log: &[(usize, Vec<usize>)],
+    tick_minutes: u32,
+    start_date: NaiveDate,
+) -> Option<Vec<crate::model::schedule::PhaseSegment>> {
+    if tick_operator_log.is_empty() {
+        return None;
+    }
+    // Collect distinct ticks in sorted order. Defensive: dedup + sort even
+    // though the producer typically pushes in monotonic order.
+    let mut ticks: Vec<usize> = tick_operator_log.iter().map(|(t, _)| *t).collect();
+    ticks.sort_unstable();
+    ticks.dedup();
+
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    let mut run_start = ticks[0];
+    let mut run_end = ticks[0];
+    for &t in &ticks[1..] {
+        if t == run_end + 1 {
+            run_end = t;
+        } else {
+            runs.push((run_start, run_end));
+            run_start = t;
+            run_end = t;
+        }
+    }
+    runs.push((run_start, run_end));
+
+    if runs.len() < 2 {
+        return None;
+    }
+    Some(
+        runs.into_iter()
+            .map(|(s, e)| crate::model::schedule::PhaseSegment {
+                start: super::format_minutes(s as u64 * tick_minutes as u64, start_date),
+                // Each tick covers [t, t+1) in tick-space; the assignment's
+                // wall-clock end of a productive run is therefore at
+                // (run_end + 1) × tick_minutes.
+                end: super::format_minutes((e as u64 + 1) * tick_minutes as u64, start_date),
+            })
+            .collect(),
+    )
 }
 
 

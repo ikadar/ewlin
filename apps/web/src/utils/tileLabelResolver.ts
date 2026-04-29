@@ -38,6 +38,24 @@ export function getDefaultCategoryWidth(categoryName: string): number | null {
 }
 
 /**
+ * Compute the Produit-mode tile label.
+ *
+ * Appends the element name (e.g. "CAH1") after the client when the parent job
+ * has more than one element — single-element jobs get the legacy
+ * `{reference} · {client}` form to avoid the noise of trivial element names
+ * like "ELT".
+ */
+export function getProduitLabel(
+  job: Job,
+  element: Element | undefined,
+  jobElementsCount: number,
+): string {
+  return element && jobElementsCount > 1
+    ? `${job.reference} · ${job.client} · ${element.name}`
+    : `${job.reference} · ${job.client}`;
+}
+
+/**
  * Compute the Tirage-mode tile label for a given element.
  *
  * Returns a string like `"{reference} • {content}"` for single-element jobs,

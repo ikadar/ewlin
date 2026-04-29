@@ -76,7 +76,12 @@ export const addOperatorAbsenceTool: ToolDefinition = {
       .string()
       .optional()
       .describe("Heure HH:MM à laquelle finit l'absence le dernier jour. Défaut: 23:59."),
-    reason: z.string().optional().describe('Motif optionnel.'),
+    reason: z
+      .string()
+      .min(3)
+      .describe(
+        "Motif requis (ex 'Visite médicale', 'Congé'). Si l'utilisateur ne précise pas, demande-lui via ask_user.",
+      ),
   }),
   handler: async (input, ctx) => {
     if (!isIsoDate(input.fromDate) || !isIsoDate(input.toDate)) {
@@ -89,7 +94,7 @@ export const addOperatorAbsenceTool: ToolDefinition = {
     const endTime = input.endTime ?? '23:59';
     const startAt = combineDateAndTime(input.fromDate, startTime);
     const endAt = combineDateAndTime(input.toDate, endTime);
-    const reasonText = input.reason ?? null;
+    const reasonText = input.reason;
 
     const newAbsence: AbsenceLike = { startAt, endAt, reason: reasonText };
 

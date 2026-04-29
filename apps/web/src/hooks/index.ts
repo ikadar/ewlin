@@ -10,7 +10,11 @@ export type { UseLazyLoadSuggestionsResult } from './useLazyLoadSuggestions';
 export { useSessionLearning } from './useSessionLearning';
 export type { SessionLearningState, SessionLearningActions } from './useSessionLearning';
 
-export { useToast } from './useToast';
+// NOTE: useToast is intentionally NOT re-exported here.
+// It depends on AutoRecomputeContext, which itself imports from
+// '../hooks' — re-exporting here closes a circular module cycle
+// that crashes the bundle with a TDZ error at load time. Import
+// the hook directly from './useToast' instead.
 
 export { useDebouncedValue } from './useDebouncedValue';
 

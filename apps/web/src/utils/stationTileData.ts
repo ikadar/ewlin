@@ -12,7 +12,7 @@ import { compareSimilarity, computeTileState } from '../components/Tile';
 import { timeToYPosition } from '../components/TimelineColumn';
 import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { getPrerequisiteBlockingInfo } from './prerequisites';
-import { getTirageLabel } from './tileLabelResolver';
+import { getTirageLabel, getProduitLabel } from './tileLabelResolver';
 import { computeSimilarityScore } from './similarityScore';
 
 /**
@@ -31,6 +31,21 @@ export interface CalageGeometry {
   height: number;
 }
 
+/**
+ * One sub-tile rendering geometry. Used when an assignment has been
+ * chunk-split by the engine to route around an obstacle (typically a
+ * safety-zone-frozen pin) inside its wall-clock envelope. Each chunk is
+ * rendered as its own independent `<Tile>` so the gap between chunks is
+ * naturally visible — without this, the merged envelope would visually
+ * cover whatever sits in the gap.
+ */
+export interface ChunkGeometry {
+  top: number;
+  height: number;
+  /** calageGeometries clipped to this chunk's bounds. */
+  calageGeometries: readonly CalageGeometry[];
+}
+
 export interface CachedTileData {
   jobId: string;
   element: Element | undefined;
@@ -44,6 +59,14 @@ export interface CachedTileData {
    * Each entry is already clamped within the tile's rendered bounds.
    */
   calageGeometries: readonly CalageGeometry[];
+  /**
+   * When the engine reports `assignment.activeWindows` (≥2 entries), this
+   * field holds one geometry per window. Consumers render N independent
+   * tiles instead of a single envelope so the gap stays visible.
+   * Undefined for normal continuous tiles — the default `top`/`height`
+   * apply.
+   */
+  chunks?: ChunkGeometry[];
   similarityResults: ReturnType<typeof compareSimilarity> | undefined;
   /** Practicity score vs the previous tile on this station (Phase 2). */
   similarityScore: SimilarityScore | undefined;
@@ -54,6 +77,13 @@ export interface CachedTileData {
   blocked: boolean;
   blockingInfo: ReturnType<typeof getPrerequisiteBlockingInfo> | undefined;
   tirageLabel: string | undefined;
+  /**
+   * Produit-mode label. Appends the element name (e.g. "CAH1") after the
+   * client for multi-element jobs; falls back to `{reference} · {client}`
+   * for single-element jobs to avoid the noise of trivial element names
+   * like "ELT".
+   */
+  produitLabel: string;
   pixelsPerHour: number;
   operatorNames: string | undefined;
 }
@@ -153,6 +183,39 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
         if (rcGeom) calageGeometries.push({ kind: 'recalage', ...rcGeom });
       }
 
+      // Active-window decomposition: when the engine reports ≥2 active
+      // sub-windows, we render one independent <Tile> per window instead
+      // of a single envelope. Each chunk gets its own (top, height)
+      // computed through the same collapse-aware projection used for the
+      // envelope, plus the slice of calageGeometries that falls inside
+      // that chunk's vertical bounds.
+      let chunks: ChunkGeometry[] | undefined;
+      const activeWindows = assignment.activeWindows;
+      if (activeWindows && activeWindows.length >= 2) {
+        chunks = [];
+        for (const w of activeWindows) {
+          const chunkTop = timeToYPosition(new Date(w.start), startHour, pixelsPerHour, startDate, collapses);
+          const chunkBottom = timeToYPosition(new Date(w.end), startHour, pixelsPerHour, startDate, collapses);
+          const chunkHeight = Math.max(chunkBottom - chunkTop, 1);
+          // Clip the assignment-level calage geometries to this chunk by
+          // re-anchoring on chunkTop and dropping anything outside [0, h].
+          const chunkCalageGeoms: CalageGeometry[] = [];
+          for (const g of calageGeometries) {
+            // g.top is relative to the envelope's top; convert to absolute Y,
+            // then re-anchor on chunkTop and clamp.
+            const absTop = top + g.top;
+            const absBottom = absTop + g.height;
+            const localTop = Math.max(0, absTop - chunkTop);
+            const localBottom = Math.min(chunkHeight, absBottom - chunkTop);
+            const localH = localBottom - localTop;
+            if (localH > 0) {
+              chunkCalageGeoms.push({ kind: g.kind, top: localTop, height: localH });
+            }
+          }
+          chunks.push({ top: chunkTop, height: chunkHeight, calageGeometries: chunkCalageGeoms });
+        }
+      }
+
       let similarityResults: ReturnType<typeof compareSimilarity> | undefined = undefined;
       let similarityScore: SimilarityScore | undefined = undefined;
       if (index > 0 && element?.spec) {
@@ -170,6 +233,8 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       const rawTirageLabel = category && element
         ? getTirageLabel(category.name, element, job, jobElements, taskMap, assemblyStationIds)
         : '';
+
+      const produitLabel = getProduitLabel(job, element, jobElements.length);
 
       const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
@@ -189,6 +254,7 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
       cache.set(assignment.id, {
         jobId: job.id, element, task, job, top, height,
         calageGeometries,
+        chunks,
         similarityResults,
         similarityScore,
         category,
@@ -196,6 +262,7 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
         blocked: blocking?.blocked ?? false,
         blockingInfo: blocking?.blockingInfo,
         tirageLabel: rawTirageLabel || undefined,
+        produitLabel,
         pixelsPerHour,
         operatorNames,
       });

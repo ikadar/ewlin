@@ -1,68 +1,29 @@
 /**
- * useToast Hook
+ * useToast — thin facade over the unified compute toaster.
  *
- * Manages toast notification state.
+ * Routes the legacy `showToast(message, type?)` API through the
+ * top-right ComputeToastStack so the app has a single notification
+ * surface (no more bottom-right blocks clashing with the FAB).
  *
- * @see docs/releases/v0.5.2-assignment-operations.md
+ * Must be called below <AutoRecomputeProvider> (mounted in RootLayout).
  */
 
-import { useState, useCallback } from 'react';
-import type { ToastType } from '../components/Toast';
+import { useCallback } from 'react';
+import { useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
 
-interface ToastState {
-  isVisible: boolean;
-  message: string;
-  type: ToastType;
-}
+export type ToastType = 'info' | 'success' | 'error';
 
 interface UseToastReturn {
-  /** Current toast state */
-  toast: ToastState;
-  /** Show a toast with the given message and type */
   showToast: (message: string, type?: ToastType) => void;
-  /** Hide the current toast */
-  hideToast: () => void;
 }
 
-/**
- * Hook for managing toast notification state.
- *
- * @example
- * ```tsx
- * const { toast, showToast, hideToast } = useToast();
- *
- * // Show error
- * showToast('Erreur de planification', 'error');
- *
- * // In render
- * <Toast {...toast} onDismiss={hideToast} />
- * ```
- */
 export function useToast(): UseToastReturn {
-  const [toast, setToast] = useState<ToastState>({
-    isVisible: false,
-    message: '',
-    type: 'error',
-  });
-
-  const showToast = useCallback((message: string, type: ToastType = 'error') => {
-    setToast({
-      isVisible: true,
-      message,
-      type,
-    });
-  }, []);
-
-  const hideToast = useCallback(() => {
-    setToast((prev) => ({
-      ...prev,
-      isVisible: false,
-    }));
-  }, []);
-
-  return {
-    toast,
-    showToast,
-    hideToast,
-  };
+  const { showToast: emit } = useAutoRecomputeCtx();
+  const showToast = useCallback(
+    (message: string, type: ToastType = 'error') => {
+      emit({ type, title: message });
+    },
+    [emit],
+  );
+  return { showToast };
 }

@@ -190,6 +190,25 @@ pub struct ComputedAssignment {
     /// Empty when the action never triggered peremption.
     #[serde(default)]
     pub recalages: Vec<PhaseSegment>,
+    /// Optional active-window decomposition of the assignment.
+    ///
+    /// `None` (default) means the task is active continuously from
+    /// `scheduled_start` to `scheduled_end`. The UI renders one solid tile.
+    ///
+    /// `Some(windows)` means the task was chunk-split during scheduling and
+    /// is active *only* during these sub-windows. The complement of the
+    /// union of windows inside `[scheduled_start, scheduled_end)` is a gap
+    /// where the station was working on something else (typically a
+    /// safety-zone-frozen pin that the forward pass routed around). The UI
+    /// must render only the active windows so the gap is visible — without
+    /// this, the merged envelope visually overlaps the pin tile.
+    ///
+    /// Set by `merge_chunk_assignments` only when there are ≥2 chunks. If
+    /// the gap between chunks falls entirely on closures (night, weekend),
+    /// the field stays `None`: the collapse-aware UI projection already
+    /// hides those bands and a continuous envelope renders correctly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_windows: Option<Vec<PhaseSegment>>,
 }
 
 /// A generic phase window within an assignment, used today for re-calage

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Element, Task, Job } from '@flux/types';
-import { getTirageLabel, getDefaultCategoryWidth } from './tileLabelResolver';
+import { getTirageLabel, getDefaultCategoryWidth, getProduitLabel } from './tileLabelResolver';
 
 // --- Fixtures ---
 
@@ -95,6 +95,27 @@ describe('getDefaultCategoryWidth', () => {
 
   it('returns null for conditionnement', () => {
     expect(getDefaultCategoryWidth('Conditionnement')).toBeNull();
+  });
+});
+
+// --- getProduitLabel ---
+
+describe('getProduitLabel', () => {
+  it('omits element name for single-element jobs', () => {
+    const job = makeJob('JOB-001');
+    const elt = makeElement('e1', 'ELT');
+    expect(getProduitLabel(job, elt, 1)).toBe('JOB-001 · Client SA');
+  });
+
+  it('appends element name after client for multi-element jobs', () => {
+    const job = makeJob('JOB-001');
+    const elt = makeElement('e1', 'CAH1');
+    expect(getProduitLabel(job, elt, 3)).toBe('JOB-001 · Client SA · CAH1');
+  });
+
+  it('falls back to reference + client when element is undefined', () => {
+    const job = makeJob('JOB-001');
+    expect(getProduitLabel(job, undefined, 5)).toBe('JOB-001 · Client SA');
   });
 });
 
