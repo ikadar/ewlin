@@ -73,13 +73,11 @@ export function CompletionToggleIcon({ taskId, isCompleted, tileState, onToggled
         interactive ? 'pointer-events-auto cursor-pointer hover:bg-white/5' : 'pointer-events-none'
       } ${colorClass}`}
       title={
-        interactive
-          ? isCompleted
-            ? 'Avancement · cliquer pour annuler'
-            : 'Avancement · cliquer pour marquer terminé'
+        isShipped
+          ? 'Complétion implicite via expédition'
           : isCompleted
-            ? 'Terminé (modifiable depuis la vue Prod)'
-            : 'Avancement (modifiable depuis la vue Prod)'
+            ? 'Terminé · cliquer pour annuler'
+            : 'Cliquer pour marquer terminé'
       }
       data-testid="tile-completion-toggle"
       data-task-id={taskId}
