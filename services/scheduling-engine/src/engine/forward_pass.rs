@@ -1714,7 +1714,26 @@ fn assign_action_at_tick(
     let is_continuation = actions[action_idx].start_tick.is_some()
         && actions[action_idx].end_tick.is_none()
         && actions[action_idx].art > 0;
-    if is_continuation {
+    // Only re-evaluate the chunk-mini guard on a *true* resume — a tick
+    // that follows a gap (closure, end-of-shift, missing operator). The
+    // scoring loop already validated chunk-mini at the start, so a tick
+    // that immediately follows a productive one is part of the same
+    // accepted chunk and must be allowed to advance. Re-checking on
+    // every consecutive tick is broken: the available window shrinks
+    // by one tick per advance, so an action that started in a window
+    // of exactly `chunk_mini_ticks` would stall its own setup at tick
+    // 3 — leaving an orphan partial-setup stint (e.g. Ryobi 528 4424
+    // posed 10 min of setup at 13:15-13:25 then stalled until next-day
+    // 07:00, instead of consuming all 9 ticks up to the shop close at
+    // 14:00). The micro-gap-between-pins case the guard was written
+    // for is naturally a *resume*: the action stalled while the pin
+    // owned the cells, then the gap appeared — `tick_operator_log`'s
+    // last entry won't be `t - 1` and the check fires as before.
+    let resuming_after_gap = match actions[action_idx].tick_operator_log.last() {
+        Some(&(last_t, _)) => last_t + 1 < t,
+        None => true,
+    };
+    if is_continuation && resuming_after_gap {
         let action = &actions[action_idx];
         let setup_floor =
             (attrs.chunk_mini_setup_multiplier * action.setup_ticks as f64).ceil() as u32;
@@ -3245,6 +3264,116 @@ mod peremption_tests {
             actions[0].pending_recalage,
             "post-setup peremption flags pending_recalage for the next productive tick"
         );
+    }
+
+    /// Regression: the continuation chunk-mini guard was firing on every
+    /// consecutive tick of an in-progress action, not just on resumes
+    /// after a gap. Concrete failure on Ryobi 528 / job 4424 (Michelin):
+    /// scoring accepted a start at 13:15 because the 9-tick window
+    /// (13:15-14:00, 5-min ticks) ≥ chunk_mini=8 ticks. After 2 advance
+    /// ticks the residual window (7 ticks) dropped below chunk_mini=8,
+    /// so the guard stalled the 3rd tick — leaving an orphan 10-min
+    /// partial-setup stint that peremption then redid the next morning,
+    /// burning 35 minutes of free Tanchot time. With the fix, the guard
+    /// only re-evaluates after a real gap (tick_operator_log's last
+    /// entry isn't t-1), so consecutive advances are allowed to
+    /// consume the entire accepted window.
+    #[test]
+    fn consecutive_continuation_skips_chunk_mini_guard() {
+        use chrono::NaiveDate;
+        // Ryobi-528-shaped (5-min ticks): setup=3, run=12, task_total=15.
+        // chunk_mini = max(2*3, ceil(0.5*15)) = max(6, 8) = 8 ticks.
+        let setup_ticks = 3u32;
+        let run_ticks = 12u32;
+
+        let mut action = make_action(setup_ticks, run_ticks, 0, setup_ticks + run_ticks, 0);
+        action.task_total_ticks = setup_ticks + run_ticks;
+        action.chain_remaining_art = action.art;
+        // Mark already-started so subsequent ticks go through the
+        // continuation path the guard is supposed to gate.
+        action.start_tick = Some(0);
+
+        let attrs = StationAttrs {
+            attention_full: 1.0,
+            attention_run: 1.0,
+            max_run_attention: 1.0,
+            masked_time_enabled: false,
+            peremption_ticks: 24,
+            max_operators: 1,
+            max_chunk_ticks: 72,
+            chunk_mini_setup_multiplier: 2.0,
+            chunk_mini_task_percentage: 0.5,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        };
+
+        // Operator 0 available for exactly 9 consecutive ticks (0..=8),
+        // then off — mirrors Tanchot's last 9 ticks before end-of-shift.
+        let num_ticks = 20;
+        let availability_window = 9usize;
+        let mut availability = OperatorAvailability::new(
+            1, num_ticks, 5,
+            NaiveDate::from_ymd_opt(2026, 4, 29).unwrap(),
+            vec![OperatorScheduleData {
+                schedules: None,
+                reference_week: None,
+                absences: Vec::new(),
+                overtimes: Vec::new(),
+            }],
+        );
+        for t in 0..num_ticks {
+            while availability.data.get(0).map_or(0, |v| v.len()) <= t {
+                let _ = availability.data.get_mut(0).map(|v| v.push(false));
+            }
+            if let Some(v) = availability.data.get_mut(0) {
+                v[t] = t < availability_window;
+            }
+        }
+
+        let mut grid = ScheduleGrid::new(1, 1, num_ticks, 5);
+        let mut actions = vec![action];
+        let skills = vec![vec![(0usize, 1.0f64)]];
+        let groups = vec![vec![]];
+        let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
+
+        // Place tick 0 and follow the action through the consecutive
+        // window. Every tick in [0, 9) must succeed; ticks at and after
+        // the operator-off boundary stall via the empty-operators path,
+        // not the chunk-mini guard.
+        let mut placed = 0usize;
+        for t in 0..availability_window {
+            let outcome = assign_action_at_tick(
+                &mut grid,
+                &mut actions,
+                0,
+                t,
+                std::slice::from_ref(&attrs),
+                &skills,
+                &mut availability,
+                &groups,
+                &station_to_group,
+                5,
+                num_ticks,
+            );
+            match outcome {
+                AssignOutcome::Assigned(ref ops) => {
+                    advance_action_at_tick(
+                        &mut actions, 0, t, &grid, &groups, &skills,
+                        std::slice::from_ref(&attrs), ops,
+                    );
+                    placed += 1;
+                }
+                AssignOutcome::Stalled => break,
+                _ => break,
+            }
+        }
+        assert_eq!(
+            placed, availability_window,
+            "expected {} consecutive productive ticks; got {} (chunk-mini guard fired mid-chunk)",
+            availability_window, placed
+        );
+        assert_eq!(actions[0].eat, availability_window as u32);
+        assert!(actions[0].setup_end_tick.is_some(), "setup must have completed in-window");
     }
 }
 
