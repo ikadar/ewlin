@@ -22,7 +22,7 @@ export const prodCompletionApi = createApi({
   endpoints: (builder) => ({
     toggleProdCompletion: builder.mutation<ProdCompletionToggleResult, string>({
       query: (taskId) => ({
-        url: `/api/v1/scenarios/prod/completion/${encodeURIComponent(taskId)}`,
+        url: `/scenarios/prod/completion/${encodeURIComponent(taskId)}`,
         method: 'POST',
       }),
       invalidatesTags: ['ProdSnapshot'],

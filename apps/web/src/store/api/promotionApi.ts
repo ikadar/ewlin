@@ -46,15 +46,15 @@ export const promotionApi = createApi({
   tagTypes: ['Promotion'],
   endpoints: (builder) => ({
     getPromotionPreview: builder.query<PromotionPreview, void>({
-      query: () => '/api/v1/promotion/preview',
+      query: () => '/promotion/preview',
       providesTags: ['Promotion'],
     }),
     promote: builder.mutation<PromotionResult, void>({
-      query: () => ({ url: '/api/v1/promotion', method: 'POST' }),
+      query: () => ({ url: '/promotion', method: 'POST' }),
       invalidatesTags: ['Promotion'],
     }),
     undoPromotion: builder.mutation<PromotionUndoResult, void>({
-      query: () => ({ url: '/api/v1/promotion/undo', method: 'POST' }),
+      query: () => ({ url: '/promotion/undo', method: 'POST' }),
       invalidatesTags: ['Promotion'],
     }),
   }),
