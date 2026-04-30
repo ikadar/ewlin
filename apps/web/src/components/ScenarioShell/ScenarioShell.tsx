@@ -6,14 +6,14 @@
  * `realBaseQuery`, which sets `X-Flux-Scenario: <uuid>` on every API
  * call, so the entire page tree reads/writes scoped to the fork.
  *
- * Visual contract: violet bandeau on top so the chef *always* knows
- * they're not in Préprod, plus a 5-entry sidebar that limits the
- * surface to what's editable in a branch (planning op, planning
- * stations, flux, stations config, opérateurs config).
+ * Visual contract: violet glow on the viewport edges (CSS
+ * `.scenario-shell-glow`) is the *exclusive* marker for fork mode —
+ * the chef knows they're outside Préprod without reading any label.
+ * The actions (merge / delete) live in a bottom-right dock card
+ * (variant D), aligned graphically with the Préprod/Prod dock.
  */
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, GitMerge, Trash2 } from 'lucide-react';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AutoRecomputeProvider } from '../../contexts/AutoRecomputeContext';
 import { ScenarioProvider } from '../../contexts/ScenarioContext';
@@ -23,6 +23,7 @@ import {
   useDeleteSimulationMutation,
 } from '../../store';
 import { ScenarioSidebar } from './ScenarioSidebar';
+import { ScenarioDockCard } from './ScenarioDockCard';
 import { MergePreviewDialog } from './MergePreviewDialog';
 
 function ScenarioShellInner() {
@@ -60,64 +61,18 @@ function ScenarioShellInner() {
     navigate('/scenarios');
   };
 
-  const isMerged = scenario.mergedAt !== null;
-
   return (
-    <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
-      <header className="bg-violet-950/40 border-b border-violet-700/40 px-4 py-2 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/scenarios')}
-          className="w-8 h-8 flex items-center justify-center rounded-md text-violet-300 hover:bg-violet-900/40"
-          aria-label="Retour à la liste des scénarios"
-          data-testid="scenario-shell-back"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <FlaskConical size={16} className="text-violet-300 shrink-0" />
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-violet-100 truncate flex items-center gap-2">
-              <span>Scénario · {scenario.name ?? '(sans nom)'}</span>
-              {isMerged && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-600/20 border border-emerald-600/40 text-emerald-300">
-                  Mergé
-                </span>
-              )}
-            </div>
-            <div className="text-[10px] text-violet-400">
-              Forké de la préprod{scenario.parentScenarioId ? '' : ' (lineage manquante)'} · les modifications restent locales tant qu'on ne merge pas
-            </div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] bg-zinc-900/60 hover:bg-rose-950/50 hover:text-rose-300 border border-zinc-800 text-zinc-300"
-          title="Supprimer ce scénario"
-        >
-          <Trash2 size={11} />
-          Supprimer
-        </button>
-        <button
-          type="button"
-          onClick={() => setMergeOpen(true)}
-          disabled={isMerged}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-          title={isMerged ? 'Déjà mergé' : 'Replayer les modifications dans la préprod'}
-          data-testid="scenario-merge-trigger"
-        >
-          <GitMerge size={13} />
-          Promouvoir vers préprod
-        </button>
-      </header>
-
-      <div className="flex-1 flex overflow-hidden">
-        <ScenarioSidebar scenarioId={id} currentPath={location.pathname} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Outlet />
-        </div>
+    <div className="h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden scenario-shell-glow">
+      <ScenarioSidebar scenarioId={id} currentPath={location.pathname} />
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <Outlet />
       </div>
+
+      <ScenarioDockCard
+        scenario={scenario}
+        onDelete={handleDelete}
+        onPromote={() => setMergeOpen(true)}
+      />
 
       <MergePreviewDialog
         open={mergeOpen}

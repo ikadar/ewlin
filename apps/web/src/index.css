@@ -399,6 +399,52 @@ html.light [data-testid^="tile-"][data-job-id] {
   50% { opacity: 0.6; }
 }
 
+/* ══════════════════════════════════════════════════════════
+   FAB dock cards — pulse rings on the primary action
+   (Promote prod / Promote scenario)
+   ══════════════════════════════════════════════════════════ */
+@keyframes pulse-emerald-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+.env-promote-pulse {
+  animation: pulse-emerald-ring 2s infinite;
+}
+
+@keyframes pulse-violet-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(167, 139, 250, 0); }
+}
+.scenario-promote-pulse {
+  animation: pulse-violet-ring 2s infinite;
+}
+
+/* Scenario shell viewport — distinctive violet glow on edges so the
+   chef knows they're inside a fork without a top banner. */
+.scenario-shell-glow {
+  position: relative;
+}
+.scenario-shell-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow:
+    inset 0 0 0 2px rgba(167, 139, 250, 0.35),
+    inset 0 0 40px rgba(167, 139, 250, 0.1);
+}
+.scenario-shell-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse at top left, rgba(167, 139, 250, 0.08), transparent 35%),
+    radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.08), transparent 35%);
+}
+
 /* Global cursor during pick mode */
 body.pick-mode-active {
   cursor: grabbing !important;

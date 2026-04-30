@@ -6,7 +6,7 @@
  * sense from inside a fork.
  */
 import { useNavigate } from 'react-router-dom';
-import { Users, CalendarDays, TowerControl, Cog, UserCog } from 'lucide-react';
+import { Users, CalendarDays, TowerControl, Cog, UserCog, ArrowLeft } from 'lucide-react';
 import { SidebarButton } from '../Sidebar/SidebarButton';
 
 interface ScenarioSidebarProps {
@@ -26,11 +26,18 @@ export function ScenarioSidebar({ scenarioId, currentPath }: ScenarioSidebarProp
 
   return (
     <nav
-      className="w-14 shrink-0 bg-violet-950/30 border-r border-violet-900/40 h-full"
+      className="w-14 shrink-0 bg-violet-950/30 border-r border-violet-900/40 h-full relative z-10"
       aria-label="Scenario navigation"
       data-testid="scenario-sidebar"
     >
       <div className="h-full flex flex-col items-center py-3 gap-2">
+        <SidebarButton
+          icon={ArrowLeft}
+          label="Retour à la liste des scénarios"
+          onClick={() => navigate('/scenarios')}
+          testId="scenario-shell-back"
+        />
+        <div className="my-2 w-6 border-t border-violet-900/40" />
         <SidebarButton
           icon={Users}
           label="Planning opérateurs"
