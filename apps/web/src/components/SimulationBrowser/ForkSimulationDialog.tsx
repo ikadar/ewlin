@@ -1,9 +1,15 @@
 /**
  * Fork-confirmation dialog. Captures the simulation's name and TTL,
  * confirms with a single button (no dwell — forks are non-destructive).
+ *
+ * The name input pre-fills with a fun random name ("petite girafe
+ * bleue", "grand dauphin mignon"…) so the chef doesn't have to invent
+ * a label for every quick fork. A small dice button next to the
+ * input re-rolls; typing replaces it with whatever the chef wants.
  */
 import { useEffect, useState } from 'react';
-import { FlaskConical, X } from 'lucide-react';
+import { FlaskConical, X, Dices } from 'lucide-react';
+import { generateScenarioName } from '../../utils/scenarioNameGenerator';
 
 interface ForkSimulationDialogProps {
   open: boolean;
@@ -17,7 +23,7 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
 
   useEffect(() => {
     if (!open) return;
-    setName('');
+    setName(generateScenarioName());
     setTtlHours(24);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -68,16 +74,28 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
         <div className="px-5 py-4 space-y-3">
           <label className="block">
             <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Nom</span>
-            <input
-              type="text"
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex. ADV — pic septembre +20%"
-              className="mt-1 w-full px-3 py-2 rounded-md text-xs bg-zinc-900 border border-zinc-800 focus:border-violet-500 focus:outline-none"
-              maxLength={120}
-              data-testid="fork-name-input"
-            />
+            <div className="mt-1 flex gap-1.5">
+              <input
+                type="text"
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex. ADV — pic septembre +20%"
+                className="flex-1 px-3 py-2 rounded-md text-xs bg-zinc-900 border border-zinc-800 focus:border-violet-500 focus:outline-none"
+                maxLength={120}
+                data-testid="fork-name-input"
+              />
+              <button
+                type="button"
+                onClick={() => setName(generateScenarioName())}
+                className="px-2 rounded-md text-zinc-400 bg-zinc-900 border border-zinc-800 hover:text-violet-300 hover:border-violet-600/40 transition-colors"
+                title="Tirer un autre nom au sort"
+                aria-label="Tirer un nouveau nom au hasard"
+                data-testid="fork-name-reroll"
+              >
+                <Dices size={14} />
+              </button>
+            </div>
           </label>
           <label className="block">
             <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Auto-supprimée après (heures)</span>
