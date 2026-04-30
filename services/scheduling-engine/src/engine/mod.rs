@@ -365,20 +365,33 @@ fn compute_inner(
         });
     }
 
-    // Recompute stats from the FINAL assignments (after merge + post-processing)
-    // so that stats.lateJobCount matches what the validation-service sees.
-    let stats = recompute_stats_from_assignments(&assignments, &request.jobs, tick_minutes, start_date);
-
-    let compute_time_ms = start_time.elapsed().as_millis() as u64;
-
-    emit(progress, ProgressEvent::EngineDone { compute_time_ms });
-
+    // Build outsourced assignments BEFORE the stats pass so the lateness
+    // recomputation can see ST scheduledEnds. Without this, an ST step
+    // returning after the deadline (e.g. PLIAGE Aller-simple, 8 JO) was
+    // invisible to stats.lateJobCount even though SnapshotBuilder
+    // (which iterates the persisted Schedule.assignments where PHP has
+    // merged both halves) catches it — leaving the toast at "100 % à
+    // l'heure" while the JDP painted the row red.
     let outsourced_assignments = build_outsourced_assignments(
         &request.jobs,
         &assignments,
         start_date,
         tick_minutes,
     );
+
+    // Recompute stats from the FINAL assignments (after merge + post-processing)
+    // so that stats.lateJobCount matches what the validation-service sees.
+    let stats = recompute_stats_from_assignments(
+        &assignments,
+        &outsourced_assignments,
+        &request.jobs,
+        tick_minutes,
+        start_date,
+    );
+
+    let compute_time_ms = start_time.elapsed().as_millis() as u64;
+
+    emit(progress, ProgressEvent::EngineDone { compute_time_ms });
 
     ScheduleResult {
         assignments,
@@ -1230,10 +1243,12 @@ pub(crate) fn compute_calage_stats_from_actions(actions: &[Action]) -> (u64, f64
 
 /// Recompute stats from the FINAL assignments (after merge + post-processing).
 /// Uses the same logic as the validation-service: compare each assignment's
-/// scheduledEnd against the job's deadline. This ensures stats.lateJobCount
-/// matches what the validation-service reports.
+/// scheduledEnd against the job's deadline. Both internal (`assignments`)
+/// and outsourced (`outsourced_assignments`) ends contribute, mirroring the
+/// merged `Schedule.assignments` JSON the validation-service reads.
 fn recompute_stats_from_assignments(
     assignments: &[ComputedAssignment],
+    outsourced_assignments: &[OutsourcedAssignment],
     jobs: &[JobInput],
     tick_minutes: u32,
     start_date: chrono::NaiveDate,
@@ -1266,15 +1281,32 @@ fn recompute_stats_from_assignments(
         .map(|j| (j.id.as_str(), j.deadline_priority))
         .collect();
 
-    // Find max end per job from assignments (using scheduledEnd datetime strings)
+    // Find max end per job from assignments (using scheduledEnd datetime strings).
+    // Both halves contribute: an ST Aller-simple ending after the deadline must
+    // bump the job's max_end so per-job lateness is detected even when every
+    // internal task fits inside the window.
     let mut job_max_end_minutes: HashMap<String, u64> = HashMap::new();
+    let bump_max_end = |
+        job_max_end_minutes: &mut HashMap<String, u64>,
+        job_id: &str,
+        end_mins: u64,
+    | {
+        let entry = job_max_end_minutes.entry(job_id.to_string()).or_insert(0);
+        if end_mins > *entry {
+            *entry = end_mins;
+        }
+    };
     for a in assignments {
         if let Some(job_id) = task_to_job.get(&a.task_id) {
             if let Some(end_mins) = parse_datetime_to_minutes(&a.scheduled_end, start_date) {
-                let entry = job_max_end_minutes.entry(job_id.clone()).or_insert(0);
-                if end_mins > *entry {
-                    *entry = end_mins;
-                }
+                bump_max_end(&mut job_max_end_minutes, job_id, end_mins);
+            }
+        }
+    }
+    for o in outsourced_assignments {
+        if let Some(job_id) = task_to_job.get(&o.task_id) {
+            if let Some(end_mins) = parse_datetime_to_minutes(&o.scheduled_end, start_date) {
+                bump_max_end(&mut job_max_end_minutes, job_id, end_mins);
             }
         }
     }
@@ -1286,10 +1318,26 @@ fn recompute_stats_from_assignments(
     let mut total_lateness_minutes: u64 = 0;
     let mut deadline_violations: u32 = 0;
 
-    // Per-task lateness
+    // Per-task lateness — internal half
     for a in assignments {
         if let Some(job_id) = task_to_job.get(&a.task_id) {
             if let Some(end_mins) = parse_datetime_to_minutes(&a.scheduled_end, start_date) {
+                if let Some(&deadline_mins) = job_deadlines.get(job_id) {
+                    if end_mins > deadline_mins {
+                        deadline_violations += 1;
+                        late_task_count += 1;
+                        total_lateness_minutes += end_mins - deadline_mins;
+                    }
+                }
+            }
+        }
+    }
+    // Per-task lateness — outsourced half (Aller-simple PLIAGE etc. routinely
+    // misses the deadline by transit days when the upstream task is placed
+    // too close to it).
+    for o in outsourced_assignments {
+        if let Some(job_id) = task_to_job.get(&o.task_id) {
+            if let Some(end_mins) = parse_datetime_to_minutes(&o.scheduled_end, start_date) {
                 if let Some(&deadline_mins) = job_deadlines.get(job_id) {
                     if end_mins > deadline_mins {
                         deadline_violations += 1;
