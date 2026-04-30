@@ -139,7 +139,7 @@ function RootLayoutInner() {
   return (
     <div
       className={`h-screen bg-zinc-950 text-zinc-100 flex overflow-hidden ${
-        scenarioMode === 'prod' ? 'env-readonly' : ''
+        scenarioMode === 'prod' ? 'env-readonly prod-shell-glow' : ''
       }`}
     >
       <Sidebar />

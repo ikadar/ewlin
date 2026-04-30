@@ -26,8 +26,11 @@ export function EnvFloatingControls() {
   const isPreprod = mode === 'preprod';
   const isProd = mode === 'prod';
 
-  const cardBorder = isProd ? 'border-emerald-800/40' : 'border-zinc-800';
-  const cardShadow = isProd ? 'shadow-emerald-950/30' : 'shadow-zinc-950/60';
+  // Prod = amber (locked / engagé en atelier), pas emerald qui reste
+  // exclusivement réservé aux ACTIONS positives (bouton Promouvoir).
+  // L'état "prod" est un état de prudence, pas un état de succès.
+  const cardBorder = isProd ? 'border-amber-700/40' : 'border-zinc-800';
+  const cardShadow = isProd ? 'shadow-amber-950/30' : 'shadow-zinc-950/60';
 
   return (
     <>
@@ -58,11 +61,11 @@ export function EnvFloatingControls() {
             onClick={() => setMode('prod')}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] transition ${
               isProd
-                ? 'bg-emerald-950/40 text-emerald-100 font-medium'
+                ? 'bg-amber-950/40 text-amber-100 font-medium'
                 : 'text-zinc-500 hover:bg-zinc-900/40 hover:text-zinc-300'
             }`}
           >
-            <Lock size={12} className={isProd ? 'text-emerald-300' : ''} strokeWidth={isProd ? 2.5 : 2} />
+            <Lock size={12} className={isProd ? 'text-amber-300' : ''} strokeWidth={isProd ? 2.5 : 2} />
             Prod
           </button>
         </div>
