@@ -22,14 +22,24 @@ export class PhpClient {
   constructor(
     private readonly baseUrl: string,
     private readonly jwt: string,
+    /**
+     * Optional X-Flux-Scenario header value, mirroring what the frontend
+     * `realBaseQuery` sets from the URL. Without this, every PHP write
+     * silently lands in Préprod even when the user is acting from a fork.
+     */
+    private readonly scenarioId: string | null = null,
   ) {}
 
   private headers(): Record<string, string> {
-    return {
+    const h: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
       Authorization: `Bearer ${this.jwt}`,
     };
+    if (this.scenarioId) {
+      h['X-Flux-Scenario'] = this.scenarioId;
+    }
+    return h;
   }
 
   async get<T>(path: string): Promise<T> {

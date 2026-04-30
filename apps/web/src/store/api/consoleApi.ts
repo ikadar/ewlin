@@ -9,6 +9,7 @@
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { AuthState } from '../slices/authSlice';
+import { resolveScenarioHeader } from './realBaseQuery';
 
 // ----------------------------------------------------------------------------
 // Wire types — must stay in sync with services/console-service/src/llm/loop.ts
@@ -116,6 +117,13 @@ const consoleBaseQuery = fetchBaseQuery({
     const token = (getState() as { auth: AuthState }).auth?.token;
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
+    }
+    // Without this, /console/apply silently writes to Préprod even when
+    // the chef is acting from inside a fork — the PUT succeeds but the
+    // mutation lands on the wrong scenario, which the UI doesn't show.
+    const scenario = resolveScenarioHeader();
+    if (scenario !== null) {
+      headers.set('X-Flux-Scenario', scenario);
     }
     return headers;
   },

@@ -26,3 +26,16 @@ export function requireJwt(req: FastifyRequest, reply: FastifyReply): string | n
   }
   return jwt;
 }
+
+/**
+ * Extracts the X-Flux-Scenario header value if present. The frontend sets
+ * this from the URL (`/scenarios/:uuid/*` or `?env=prod`). We forward it
+ * verbatim to the PHP API so multi-step actions stay scoped to the active
+ * fork instead of leaking into Préprod.
+ */
+export function extractScenario(req: FastifyRequest): string | null {
+  const header = req.headers['x-flux-scenario'];
+  if (typeof header !== 'string') return null;
+  const trimmed = header.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}

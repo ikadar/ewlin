@@ -15,7 +15,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Config } from '../../config.js';
 import { runExecuteLoop } from '../../llm/loop.js';
-import { requireJwt } from '../auth.js';
+import { extractScenario, requireJwt } from '../auth.js';
 
 // The conversation is opaque to us — it's whatever the previous /execute
 // returned in conversationAfter. We just round-trip it back to Anthropic.
@@ -51,6 +51,7 @@ export async function registerExecuteRoute(app: FastifyInstance, config: Config)
         prompt: parsed.data.prompt,
         conversation: parsed.data.conversation as Parameters<typeof runExecuteLoop>[0]['conversation'],
         jwt,
+        scenarioId: extractScenario(request),
         config,
         dryRun: true,
       });

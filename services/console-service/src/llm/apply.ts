@@ -40,12 +40,14 @@ export interface ApplyPlanArgs {
   narration: string;
   actions: ApplyAction[];
   jwt: string;
+  /** X-Flux-Scenario header value forwarded to the PHP API. */
+  scenarioId?: string | null;
   config: Config;
 }
 
 export async function applyPlan(args: ApplyPlanArgs): Promise<ApplyResult> {
   const todayIso = todayIsoUtc();
-  const php = new PhpClient(args.config.phpApiUrl, args.jwt);
+  const php = new PhpClient(args.config.phpApiUrl, args.jwt, args.scenarioId ?? null);
   const ctx: ToolContext = { php, dryRun: false, todayIso };
 
   const results: ApplyActionResult[] = [];

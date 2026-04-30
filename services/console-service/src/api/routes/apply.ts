@@ -12,7 +12,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Config } from '../../config.js';
 import { applyPlan } from '../../llm/apply.js';
-import { requireJwt } from '../auth.js';
+import { extractScenario, requireJwt } from '../auth.js';
 
 const actionSchema = z.object({
   tool: z.string().min(1),
@@ -45,6 +45,7 @@ export async function registerApplyRoute(app: FastifyInstance, config: Config): 
         narration: parsed.data.narration,
         actions: parsed.data.actions,
         jwt,
+        scenarioId: extractScenario(request),
         config,
       });
       return reply.send(result);

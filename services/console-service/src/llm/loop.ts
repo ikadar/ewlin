@@ -121,6 +121,8 @@ export interface RunExecuteLoopArgs {
   prompt: string;
   conversation: ConversationMessage[];
   jwt: string;
+  /** X-Flux-Scenario header value forwarded to the PHP API. */
+  scenarioId?: string | null;
   config: Config;
   dryRun: boolean;
   /** Override the PhpClient (for tests). Production callers omit this. */
@@ -218,7 +220,7 @@ export async function runExecuteLoop(args: RunExecuteLoopArgs): Promise<ExecuteR
     };
   }
   const { client: llm, model: llmModel } = built;
-  const php = args.php ?? new PhpClient(args.config.phpApiUrl, args.jwt);
+  const php = args.php ?? new PhpClient(args.config.phpApiUrl, args.jwt, args.scenarioId ?? null);
   const ctx: ToolContext = { php, dryRun: args.dryRun, todayIso };
 
   // The conversation we feed Anthropic on every turn. Starts with the prior
