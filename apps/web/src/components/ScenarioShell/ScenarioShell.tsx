@@ -12,12 +12,16 @@
  * The actions (merge / delete) live in a bottom-right dock card
  * (variant D), aligned graphically with the Préprod/Prod dock.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { SquareSlash } from 'lucide-react';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AutoRecomputeProvider } from '../../contexts/AutoRecomputeContext';
 import { ScenarioProvider } from '../../contexts/ScenarioContext';
-import { CommandCenterProvider } from '../CommandPalette/CommandCenterContext';
+import { CommandCenterProvider, useCommandCenter } from '../CommandPalette/CommandCenterContext';
+import { CommandPalette } from '../CommandPalette/CommandPalette';
+import { useCommands } from '../CommandPalette/useCommands';
+import { detectKeyboardLayout, isAltLetter } from '../../utils/keyboardLayout';
 import {
   useGetSimulationQuery,
   useDeleteSimulationMutation,
@@ -33,11 +37,63 @@ function ScenarioShellInner() {
   const { data: scenario, isLoading } = useGetSimulationQuery(id ?? '', { skip: !id });
   const [deleteSimulation] = useDeleteSimulationMutation();
   const [mergeOpen, setMergeOpen] = useState(false);
+  const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
 
   // Bail if URL is malformed — back to the list.
   useEffect(() => {
     if (!id) navigate('/scenarios');
   }, [id, navigate]);
+
+  // Shared palette commands, scoped to the active fork. Navigation
+  // targets stay under /scenarios/:id so the chef never silently
+  // exits the fork via the palette. onNewJob is a no-op because the
+  // JCF route is not yet mounted under the scenario shell.
+  const sharedCommands = useCommands({
+    onNavigateScheduler: useCallback(() => { if (id) navigate(`/scenarios/${id}`); }, [navigate, id]),
+    onNavigateFlux: useCallback(() => { if (id) navigate(`/scenarios/${id}/flux`); }, [navigate, id]),
+    onNewJob: useCallback(() => {}, []),
+    onSearchJobs: useCallback(() => { if (id) navigate(`/scenarios/${id}/flux`); }, [navigate, id]),
+    onSmartCompact: useCallback(() => {}, []),
+    onEvaluateSchedule: useCallback(() => {}, []),
+  });
+
+  const allCommands = useMemo(() => {
+    if (pageCommands.length === 0) return sharedCommands;
+    const pageIds = new Set(pageCommands.map(c => c.id));
+    const filtered = sharedCommands.filter(c => !pageIds.has(c.id));
+    return [...filtered, ...pageCommands];
+  }, [sharedCommands, pageCommands]);
+
+  // Mirror RootLayout's Alt+K / Alt+X / Alt+P shortcuts so the
+  // palette (and the AI console nested in it) is reachable inside
+  // a fork. Chord shortcuts (Alt+P S / L, Alt+C 1..5) intentionally
+  // omitted for now — page commands are still clickable from the
+  // palette UI.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      detectKeyboardLayout(e);
+      if (isOpen) return;
+      if (!id) return;
+
+      if (isAltLetter(e, 'k')) {
+        e.preventDefault();
+        setIsOpen(true);
+        return;
+      }
+      if (isAltLetter(e, 'x')) {
+        e.preventDefault();
+        navigate(`/scenarios/${id}/flux`);
+        return;
+      }
+      if (isAltLetter(e, 'p') && location.pathname !== `/scenarios/${id}`) {
+        e.preventDefault();
+        navigate(`/scenarios/${id}`);
+        return;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, setIsOpen, navigate, location.pathname, id]);
 
   if (!id || isLoading || !scenario) {
     return (
@@ -80,6 +136,25 @@ function ScenarioShellInner() {
         scenarioName={scenario.name ?? id}
         onClose={() => setMergeOpen(false)}
         onMerged={handleMerged}
+      />
+
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+          aria-label="Open command center"
+          data-testid="command-center-fab"
+        >
+          <SquareSlash size={24} />
+        </button>
+      )}
+
+      <CommandPalette
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        commands={allCommands}
+        jobs={jobs}
+        onSelectJob={onSelectJob}
       />
     </div>
   );
