@@ -241,7 +241,7 @@ export function ScenariosPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-flux-border">
+                  <tbody>
                     {scenarios.map((scenario, idx) => (
                       <ScenarioRow
                         key={scenario.id}
@@ -337,20 +337,24 @@ function ScenarioRow({
   const merged = scenario.mergedAt !== null;
   const hasMods = scenario.modificationCount > 0;
 
+  // Row classes verbatim from FluxTable :
+  //   border-b border-flux-border + group + transition-colors +
+  //   cursor-pointer + hover:bg-flux-hover. Focus = ring inset
+  //   indigo, fixed height 2.25rem, cells px-4 py-0 text-sm.
+  const cellBase = 'px-4 py-0 text-sm text-flux-text-secondary';
+  const rowClass = `border-b border-flux-border group transition-colors cursor-pointer hover:bg-flux-hover${focused ? ' ring-1 ring-inset ring-indigo-500/40' : ''}`;
+  const rowBg = focused ? 'rgba(99,102,241,0.08)' : undefined;
+
   return (
     <tr
-      className={`group ${focused ? 'bg-flux-hover/40' : 'hover:bg-flux-hover/20'} transition-colors`}
+      className={rowClass}
+      style={{ height: '2.25rem', backgroundColor: rowBg }}
+      onClick={onOpen}
       data-testid={`scenario-row-${scenario.id}`}
     >
-      <td className="px-4 py-2.5">
+      <td className={`${cellBase} text-flux-text-primary font-medium`}>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="text-flux-text-primary hover:text-violet-300 text-left truncate"
-          >
-            {scenario.name ?? '(sans nom)'}
-          </button>
+          <span className="truncate">{scenario.name ?? '(sans nom)'}</span>
           {merged && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-600/20 border border-emerald-600/40 text-emerald-300" title={`Mergé ${formatStamp(scenario.mergedAt)}`}>
               <Check size={10} />
@@ -359,9 +363,9 @@ function ScenarioRow({
           )}
         </div>
       </td>
-      <td className="px-4 py-2.5 text-flux-text-secondary">{formatStamp(scenario.createdAt)}</td>
-      <td className="px-4 py-2.5 text-flux-text-secondary">{formatStamp(scenario.lastTouchedAt)}</td>
-      <td className="px-4 py-2.5">
+      <td className={cellBase}>{formatStamp(scenario.createdAt)}</td>
+      <td className={cellBase}>{formatStamp(scenario.lastTouchedAt)}</td>
+      <td className={cellBase}>
         <span
           className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
             ttl.expired
@@ -373,7 +377,7 @@ function ScenarioRow({
           {ttl.label}
         </span>
       </td>
-      <td className="px-4 py-2.5 text-right">
+      <td className={`${cellBase} text-right`}>
         {hasMods ? (
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-600/15 border border-violet-600/30 text-violet-300">
             Δ {scenario.modificationCount}
@@ -382,7 +386,7 @@ function ScenarioRow({
           <span className="text-[10px] text-flux-text-muted">—</span>
         )}
       </td>
-      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+      <td className={`${cellBase} text-right whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-2">
           {hasMods && !merged && (
             <button
