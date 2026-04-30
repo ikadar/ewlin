@@ -59,7 +59,7 @@ feat/fix/refactor/docs: Short description
 
 Longer description if needed.
 
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 ```
 
 ## Playwright tests — STRICT RULES

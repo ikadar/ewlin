@@ -185,6 +185,13 @@ export function FocusOperatorColumn({
           <TileSegment
             key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
             segmentKey={`${slice.assignmentId}-${slice.from.getTime()}`}
+            // taskId enables the CompletionToggleIcon inside TileSegment.
+            // In prod scenario mode the icon is interactive (the operator
+            // ticks the tile to report execution truth); in préprod it
+            // self-hides. Without taskId here, focus-operator tiles had no
+            // affordance to report completion at all.
+            taskId={slice.taskId}
+            assignmentId={slice.assignmentId}
             label={getProduitLabel(job, element, elementCountByJobId.get(job.id) ?? 1)}
             stationName={station?.name}
             top={top}

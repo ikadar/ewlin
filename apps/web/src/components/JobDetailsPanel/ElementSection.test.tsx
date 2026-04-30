@@ -81,7 +81,7 @@ describe('ElementSection', () => {
     expect(screen.queryByText('après')).not.toBeInTheDocument();
   });
 
-  it('bypasses card + header for single-element jobs', () => {
+  it('renders single-element jobs with the same card frame as multi-element', () => {
     const element = createElement({ name: 'ELT' });
 
     render(
@@ -90,7 +90,33 @@ describe('ElementSection', () => {
       </ElementSection>
     );
 
-    expect(screen.queryByText('ELT')).not.toBeInTheDocument();
+    expect(screen.getByText('ELT')).toBeInTheDocument();
     expect(screen.getByTestId('child')).toBeInTheDocument();
+  });
+
+  it('falls back to "Élément unique" when single-element has no name', () => {
+    const element = createElement({ name: '' });
+
+    render(
+      <ElementSection element={element} allElements={[element]} isSingleElement>
+        <div data-testid="child">Task content</div>
+      </ElementSection>
+    );
+
+    expect(screen.getByText('Élément unique')).toBeInTheDocument();
+    expect(screen.getByTestId('child')).toBeInTheDocument();
+  });
+
+  it('keeps element name as-is for multi-element jobs even when empty', () => {
+    const element = createElement({ name: '' });
+
+    render(
+      <ElementSection element={element} allElements={[element]}>
+        <div>tile</div>
+      </ElementSection>
+    );
+
+    // Multi-element with no name should NOT use the single-element fallback.
+    expect(screen.queryByText('Élément unique')).not.toBeInTheDocument();
   });
 });

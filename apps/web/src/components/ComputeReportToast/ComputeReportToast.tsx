@@ -15,7 +15,14 @@ import { CheckCircle2, Loader2, X, AlertCircle } from 'lucide-react';
 import type { ComputeReportState, ComputeReportLateJob } from '../../hooks/useComputeReportStream';
 import type { ScheduleSnapshot } from '@flux/types';
 import type { ComputeScheduleResult } from '../../store';
+import { useGetSnapshotQuery } from '../../store';
 import { getJobIdForTask } from '../../utils/taskHelpers';
+
+// Conflict types that the FluxTable's "Conflits" chip surfaces — must
+// stay aligned with `apps/web/src/pages/FluxPage.tsx` (lines 70–83).
+// DeadlineConflict is excluded because it overlaps with "En retard";
+// ApprovalGateConflict is excluded because it surfaces via the BAT lane.
+const NON_LATE_CONFLICT_EXCLUSIONS = new Set(['DeadlineConflict', 'ApprovalGateConflict']);
 
 interface Props {
   state: ComputeReportState;
@@ -84,17 +91,27 @@ function buildPriorityBreakdown(
 export const ComputeReportToast = memo(function ComputeReportToast({ state, onDismiss }: Props) {
   const { phase, mode, jobId, snapshot, steps, elapsedMs, result, error, lateJobs } = state;
 
+  // Subscribe to the live snapshot so the conflict count reflects the
+  // post-compute validation (engine result doesn't carry conflicts —
+  // they're enriched server-side by the validation-service after the
+  // mutation invalidates the Snapshot tag).
+  const { data: liveSnapshot } = useGetSnapshotQuery();
+  const nonLateConflictCount = liveSnapshot
+    ? liveSnapshot.conflicts.filter((c) => !NON_LATE_CONFLICT_EXCLUSIONS.has(c.type)).length
+    : 0;
+
   const hasLate = lateJobs.length > 0;
   const hasWarnings = !!result?.warnings?.length;
+  const hasConflicts = nonLateConflictCount > 0;
 
-  // Auto-dismiss when done with no late jobs AND no warnings — keep the
-  // toast visible so the user notices a pin displacement / unplaced task /
-  // other engine warning that wouldn't otherwise surface.
+  // Auto-dismiss when done with NO late jobs, NO warnings, AND NO conflicts —
+  // any of these signals is something the user must see, so we keep the
+  // toast pinned until they dismiss it manually.
   useEffect(() => {
-    if (phase !== 'done' || hasLate || hasWarnings) return;
+    if (phase !== 'done' || hasLate || hasWarnings || hasConflicts) return;
     const timer = setTimeout(onDismiss, AUTO_DISMISS_NO_LATE_MS);
     return () => clearTimeout(timer);
-  }, [phase, hasLate, hasWarnings, onDismiss]);
+  }, [phase, hasLate, hasWarnings, hasConflicts, onDismiss]);
 
   if (phase === 'idle') return null;
 
@@ -175,7 +192,7 @@ export const ComputeReportToast = memo(function ComputeReportToast({ state, onDi
         {phase === 'done' && result && snapshot && (
           isSelective && targetJob
             ? <SelectiveSection hasLate={hasLate} lateJob={lateJobs[0] ?? null} result={result} targetRef={targetJob.reference} />
-            : <FullSection snapshot={snapshot} result={result} lateJobs={lateJobs} />
+            : <FullSection snapshot={snapshot} result={result} lateJobs={lateJobs} conflictCount={nonLateConflictCount} />
         )}
       </div>
     </div>
@@ -254,10 +271,12 @@ function FullSection({
   snapshot,
   result,
   lateJobs,
+  conflictCount,
 }: {
   snapshot: ScheduleSnapshot;
   result: ComputeScheduleResult;
   lateJobs: ComputeReportLateJob[];
+  conflictCount: number;
 }) {
   // Denominator must be placed jobs only — counting unplaced jobs as
   // "on time" silently inflates the ratio. Uses the engine's fresh
@@ -288,6 +307,11 @@ function FullSection({
 
       <div className="flex gap-3.5 mt-2 text-[10.5px] text-flux-text-muted">
         <span>{result.stats.scheduledTasks}/{result.stats.totalTasks} tâches placées</span>
+        {conflictCount > 0 && (
+          <span className="text-amber-400 font-medium">
+            {conflictCount} conflit{conflictCount > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       {/* Priority breakdown */}

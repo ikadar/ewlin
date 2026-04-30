@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { ThemeProvider } from '../../contexts/ThemeContext';
+import { ScenarioProvider } from '../../contexts/ScenarioContext';
 import { useMercureSubscription } from '../../hooks/useMercureSubscription';
 
 function FocusLayoutInner() {
@@ -19,11 +20,18 @@ function FocusLayoutInner() {
  * FocusLayout — minimal layout for /focus/* routes.
  * No sidebar, no command palette, no command-center FAB —
  * intentionally stripped so the mobile-first focus view stays distraction-free.
+ *
+ * ScenarioProvider is mounted here (mirroring RootLayout) so any tile
+ * inside /focus/* can call `useScenarioMode()` — notably the
+ * CompletionToggleIcon embedded in TileSegment, which the operator uses
+ * to mark execution truth from the focus view.
  */
 export function FocusLayout() {
   return (
     <ThemeProvider>
-      <FocusLayoutInner />
+      <ScenarioProvider defaultMode="prod">
+        <FocusLayoutInner />
+      </ScenarioProvider>
     </ThemeProvider>
   );
 }

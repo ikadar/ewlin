@@ -26,6 +26,7 @@ import { stationApi } from '../api/stationApi';
 import { stationCategoryApi } from '../api/stationCategoryApi';
 import { providerApi } from '../api/providerApi';
 import { fluxApi } from '../api/fluxApi';
+import { scheduleApi } from '../api/scheduleApi';
 
 type TriggerFn = (reason: string) => void;
 
@@ -58,7 +59,15 @@ type AutoRecomputeEndpointName =
   | Extract<keyof typeof providerApi.endpoints,
       'createProvider' | 'updateProvider' | 'deleteProvider'>
   // Element prerequisite status — flipping to Ready unblocks held tasks.
-  | Extract<keyof typeof fluxApi.endpoints, 'updateElementPrerequisite'>;
+  | Extract<keyof typeof fluxApi.endpoints, 'updateElementPrerequisite'>
+  // Same intent via the JDP/schedule path (different optimistic-update
+  // pattern but identical effect on the engine view: paperStatus /
+  // batStatus / plateStatus / formeStatus changes shift the per-task
+  // earliestStartTick floor).
+  | Extract<keyof typeof scheduleApi.endpoints, 'updateElementStatus'>
+  // Paper lead-time hours — the global floor that gates tasks whose
+  // element has paperStatus not Ready. Reducing it can unblock work.
+  | Extract<keyof typeof scheduleApi.endpoints, 'updatePaperLeadTime'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -87,6 +96,8 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updateProvider',
   'deleteProvider',
   'updateElementPrerequisite',
+  'updateElementStatus',
+  'updatePaperLeadTime',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {

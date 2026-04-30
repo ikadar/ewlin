@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useGetSnapshotQuery } from '../store';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useGetSnapshotQuery, useGetProdSnapshotQuery } from '../store';
+import { useScenarioMode } from '../contexts/ScenarioContext';
 import { TimelineColumn } from '../components/TimelineColumn';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
 import { DateStrip } from '../components/DateStrip/DateStrip';
@@ -25,7 +26,20 @@ export interface FocusPageProps {
 export default function FocusPage({ mode }: FocusPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: snapshot, isLoading, isError, refetch } = useGetSnapshotQuery();
+  const location = useLocation();
+  // Mirror OperatorSchedulePage: in prod, read the engaged Prod snapshot
+  // (`/scenarios/prod/snapshot`). In préprod, read the live `/schedule/snapshot`.
+  // Without this gating the focus view silently shows préprod data even when
+  // the URL says `?env=prod` — the X-Flux-Scenario header is sent, but the
+  // preprod endpoint does not redirect, so the consumer must pick the right
+  // query.
+  const { mode: scenarioMode } = useScenarioMode();
+  const preprodSnapshot = useGetSnapshotQuery(undefined, { skip: scenarioMode === 'prod' });
+  const prodSnapshot = useGetProdSnapshotQuery(undefined, { skip: scenarioMode !== 'prod' });
+  const snapshot = scenarioMode === 'prod' ? prodSnapshot.data : preprodSnapshot.data;
+  const isLoading = scenarioMode === 'prod' ? prodSnapshot.isLoading : preprodSnapshot.isLoading;
+  const isError = scenarioMode === 'prod' ? prodSnapshot.isError : preprodSnapshot.isError;
+  const refetch = scenarioMode === 'prod' ? prodSnapshot.refetch : preprodSnapshot.refetch;
   const scrollRef = useRef<HTMLDivElement>(null);
   // Callback-ref state: the scroll container mounts only after the
   // `if (isLoading) return <LoadingSpinner/>` gate below, which is after these
@@ -183,9 +197,9 @@ export default function FocusPage({ mode }: FocusPageProps) {
 
   const handleSelect = useCallback(
     (kind: FocusKind, newId: string) => {
-      navigate(`/focus/${kind}/${newId}`);
+      navigate(`/focus/${kind}/${newId}${location.search}`);
     },
-    [navigate],
+    [navigate, location.search],
   );
 
   if (isLoading) {

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JDP — Indicateurs gates inline (C-family)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    html { font-size: 13px; }
+
+    /* Custom tooltip — appears on hover via .group-hover:opacity-100 */
+    .tip {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgb(24 24 27);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+      border-radius: 4px;
+      padding: 6px 9px;
+      min-width: 160px;
+      max-width: 220px;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 100ms ease-out, transform 100ms ease-out;
+      transform: translate(-50%, -3px);
+    }
+    .tip-host:hover .tip {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    .tip::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%) rotate(45deg);
+      width: 8px; height: 8px;
+      background: rgb(24 24 27);
+      border-left: 1px solid rgba(255,255,255,0.10);
+      border-top: 1px solid rgba(255,255,255,0.10);
+    }
+    .tip-title { font-size: 10.5px; font-weight: 600; color: rgb(244 244 245); }
+    .tip-meta  { font-size: 10.5px; color: rgb(161 161 170); margin-top: 2px; }
+    .tip-row + .tip-row { margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.06); }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen px-8 py-10">
+
+<div class="max-w-[1200px] mx-auto">
+  <header class="mb-8">
+    <h1 class="text-2xl font-semibold">JDP — Indicateurs gates <em>inline</em></h1>
+    <p class="text-zinc-400 mt-2 text-[13px] leading-relaxed">
+      Cinq variantes denses (zéro vertical ajouté), positionnées juste après le
+      nom de l'élément. Tooltip custom au hover (pas le <code>title=""</code>
+      natif) avec libellé + date <em>floor</em>.
+    </p>
+    <div class="mt-4 flex items-center gap-6 flex-wrap">
+      <div class="inline-flex rounded border border-white/10 overflow-hidden text-[12px]">
+        <button data-variant="V1" class="variant-btn px-3 py-1.5 hover:bg-white/5">V1 · Pastille</button>
+        <button data-variant="V2" class="variant-btn px-3 py-1.5 hover:bg-white/5 border-l border-white/10">V2 · Lettre pleine</button>
+        <button data-variant="V3" class="variant-btn px-3 py-1.5 hover:bg-white/5 border-l border-white/10">V3 · Icône pleine</button>
+        <button data-variant="V4" class="variant-btn px-3 py-1.5 hover:bg-white/5 border-l border-white/10">V4 · Pill texte</button>
+        <button data-variant="V5" class="variant-btn px-3 py-1.5 hover:bg-white/5 border-l border-white/10">V5 · Outline lettre</button>
+      </div>
+      <label class="text-[12px] text-zinc-300 inline-flex items-center gap-2">
+        <input id="toggle-relative" type="checkbox" class="accent-amber-500" />
+        Floor relatif (<em>+1j 6h</em>)
+      </label>
+      <label class="text-[12px] text-zinc-300 inline-flex items-center gap-2">
+        <input id="toggle-pulse" type="checkbox" class="accent-amber-500" />
+        Pulse animé (attire l'œil sur les <em>blocking</em>)
+      </label>
+    </div>
+  </header>
+
+  <!-- Two-column layout: live JDP + small comparison strip -->
+  <div class="grid grid-cols-[300px_1fr] gap-10">
+
+    <!-- Left: live JDP using selected variant -->
+    <section>
+      <h2 class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">JDP — variante active</h2>
+      <div id="jdp-live" class="bg-zinc-900 border border-white/5 rounded p-2.5 w-[300px]"></div>
+      <p class="mt-3 text-[11px] text-zinc-500 leading-relaxed">
+        Survole les pastilles/badges pour voir le tooltip custom. Le JAQUETTE
+        cumule BAT + Papier — son rendu doit rester lisible.
+      </p>
+    </section>
+
+    <!-- Right: side-by-side strip of all 5 variants on the same element -->
+    <section>
+      <h2 class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Comparaison côte à côte (élément JAQUETTE — BAT + Papier)</h2>
+      <div id="strip" class="grid grid-cols-5 gap-2"></div>
+
+      <h2 class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mt-8 mb-3">Comparaison côte à côte (élément BANDEAU — Papier ordered seul)</h2>
+      <div id="strip2" class="grid grid-cols-5 gap-2"></div>
+
+      <h2 class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mt-8 mb-3">Comparaison côte à côte (élément INTÉRIEUR — BAT seul)</h2>
+      <div id="strip3" class="grid grid-cols-5 gap-2"></div>
+    </section>
+
+  </div>
+
+  <footer class="mt-12 text-[12px] text-zinc-500 leading-relaxed border-t border-white/5 pt-6">
+    <p class="mb-2"><strong class="text-zinc-300">Cohérence sémantique des couleurs :</strong></p>
+    <ul class="list-disc pl-5 space-y-1.5">
+      <li><span class="inline-block w-2.5 h-2.5 rounded bg-red-500 mr-1 align-middle"></span><strong class="text-red-400">Rouge</strong> · Papier <code>to_order</code> — pas même commandé, blocage critique.</li>
+      <li><span class="inline-block w-2.5 h-2.5 rounded bg-amber-500 mr-1 align-middle"></span><strong class="text-amber-400">Ambre</strong> · BAT pending OU Papier <code>ordered</code> — en attente externe normale.</li>
+      <li>Si BAT et Papier sont tous deux ambre, on stack 2 indicateurs ambre côte à côte (V1 — V5 le gèrent tous).</li>
+      <li>Pas d'indicateur si <code>ready</code> (rien à signaler = la valeur par défaut, pas de pollution visuelle).</li>
+    </ul>
+  </footer>
+
+</div>
+
+<script>
+  // ============== DATA ==============
+  const ELEMENTS = [
+    { name: 'COUVERTURE', precedence: null,                 bat: null, paper: null,
+      tasks: [{ name: 'Impression', station: 'Heidelberg XL75', dur: '2h45' }] },
+
+    { name: 'INTÉRIEUR',  precedence: null,                 bat: { deadline: '12/05', deadlineRel: '+2j' }, paper: null,
+      tasks: [
+        { name: 'Impression', station: 'Heidelberg XL75', dur: '4h10' },
+        { name: 'Pliage',     station: 'Stahl Ti52',      dur: '1h30' },
+      ] },
+
+    { name: 'CALAGE',     precedence: ['INTÉRIEUR'],         bat: null,
+      paper: { state: 'to_order', floor: '02/05 14h', floorRel: '+1j 6h' },
+      tasks: [{ name: 'Calage', station: 'Roland 700', dur: '3h00' }] },
+
+    { name: 'BANDEAU',    precedence: null,                 bat: null,
+      paper: { state: 'ordered', floor: '04/05 09h', floorRel: '+3j 1h' },
+      tasks: [{ name: 'Impression', station: 'Heidelberg XL75', dur: '1h20' }] },
+
+    { name: 'JAQUETTE',   precedence: null,                 bat: { deadline: '12/05', deadlineRel: '+2j' },
+      paper: { state: 'to_order', floor: '02/05 14h', floorRel: '+1j 6h' },
+      tasks: [
+        { name: 'Impression', station: 'Heidelberg XL75', dur: '2h00' },
+        { name: 'Pelliculage', station: 'STE Pelliculage', dur: '6h00' },
+      ] },
+
+    { name: 'CARTONNAGE', precedence: ['INTÉRIEUR', 'JAQUETTE'], bat: null, paper: null,
+      tasks: [{ name: 'Encollage', station: 'Kolbus DA260', dur: '5h30' }] },
+  ];
+
+  let currentVariant = 'V1';
+  let useRelative = false;
+  let usePulse = false;
+
+  // ============== TOOLTIP CONTENT (shared by all variants) ==============
+  function tipContent(bat, paper) {
+    const rows = [];
+    if (bat) {
+      const date = useRelative ? bat.deadlineRel : `D.L. ${bat.deadline}`;
+      rows.push(`
+        <div class="tip-row">
+          <div class="tip-title text-amber-300">BAT en attente</div>
+          <div class="tip-meta">${date}</div>
+        </div>`);
+    }
+    if (paper) {
+      const isBlocking = paper.state === 'to_order';
+      const lbl = paper.state === 'to_order' ? 'Papier à commander' : 'Papier en commande';
+      const cls = isBlocking ? 'text-red-300' : 'text-amber-300';
+      const date = useRelative ? paper.floorRel : `au plus tôt ${paper.floor}`;
+      rows.push(`
+        <div class="tip-row">
+          <div class="tip-title ${cls}">${lbl}</div>
+          <div class="tip-meta">${date}</div>
+        </div>`);
+    }
+    return `<div class="tip">${rows.join('')}</div>`;
+  }
+
+  // helper for color: BAT and Paper-ordered = amber, Paper to_order = red
+  function gateColor(kind, paper) {
+    if (kind === 'bat') return 'amber';
+    if (paper.state === 'to_order') return 'red';
+    return 'amber';
+  }
+
+  // ============== VARIANT RENDERERS ==============
+  // Each renders the inline indicator block (after the element name).
+  // Builds 1 indicator per active gate, shares 1 tooltip per indicator.
+
+  function renderIndicators(el, variant) {
+    const slots = [];
+    if (el.bat)   slots.push({ kind: 'bat',   color: 'amber',                                tipContent: tipContent(el.bat, null) });
+    if (el.paper) slots.push({ kind: 'paper', color: gateColor('paper', el.paper),           tipContent: tipContent(null, el.paper) });
+    if (!slots.length) return '';
+
+    const renderSlot = (s) => {
+      const pulseClass = usePulse && s.color === 'red' ? 'animate-pulse' : '';
+      switch (variant) {
+        case 'V1': // tiny dot
+          return `
+            <span class="tip-host relative inline-flex items-center">
+              <span class="inline-block w-[6px] h-[6px] rounded-full bg-${s.color}-400 shadow-[0_0_5px_rgba(251,191,36,0.5)] ${s.color==='red' ? 'shadow-[0_0_5px_rgba(248,113,113,0.55)]' : ''} ${pulseClass}"></span>
+              ${s.tipContent}
+            </span>`;
+        case 'V2': // filled letter badge
+          return `
+            <span class="tip-host relative inline-flex items-center">
+              <span class="inline-flex items-center justify-center w-[14px] h-[14px] rounded-[3px] bg-${s.color}-500/85 text-zinc-950 text-[8.5px] font-bold leading-none ${pulseClass}">
+                ${s.kind === 'bat' ? 'B' : 'P'}
+              </span>
+              ${s.tipContent}
+            </span>`;
+        case 'V3': // filled icon badge
+          const ico = s.kind === 'bat'
+            ? '<svg viewBox="0 0 24 24" class="w-[10px] h-[10px]" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>'
+            : '<svg viewBox="0 0 24 24" class="w-[10px] h-[10px]" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+          return `
+            <span class="tip-host relative inline-flex items-center">
+              <span class="inline-flex items-center justify-center w-[14px] h-[14px] rounded-[3px] bg-${s.color}-500/85 text-zinc-950 ${pulseClass}">
+                ${ico}
+              </span>
+              ${s.tipContent}
+            </span>`;
+        case 'V4': // mini-pill text
+          const lbl = s.kind === 'bat' ? 'BAT' : 'PAP';
+          return `
+            <span class="tip-host relative inline-flex items-center">
+              <span class="inline-flex items-center px-1 py-px rounded-[3px] bg-${s.color}-500/15 border border-${s.color}-500/40 text-${s.color}-300 text-[9px] font-bold tracking-wider leading-none ${pulseClass}">
+                ${lbl}
+              </span>
+              ${s.tipContent}
+            </span>`;
+        case 'V5': // outlined letter
+          return `
+            <span class="tip-host relative inline-flex items-center">
+              <span class="inline-flex items-center justify-center w-[14px] h-[14px] rounded-full border-[1.5px] border-${s.color}-400/80 text-${s.color}-300 text-[9px] font-bold leading-none ${pulseClass}">
+                ${s.kind === 'bat' ? 'B' : 'P'}
+              </span>
+              ${s.tipContent}
+            </span>`;
+      }
+    };
+
+    return `<span class="ml-1.5 inline-flex items-center gap-1">${slots.map(renderSlot).join('')}</span>`;
+  }
+
+  // ============== ELEMENT CARD RENDERER ==============
+  function precedenceHtml(precedence) {
+    if (!precedence || !precedence.length) return '';
+    return `
+      <div class="ml-auto flex items-center gap-[3px] shrink-0">
+        <span class="italic text-[9.5px] text-zinc-600 tracking-[0.03em] mr-px">après</span>
+        ${precedence.map(p => `
+          <span class="inline-flex items-center px-1.5 py-px rounded-[3px] text-[9.5px] font-medium bg-white/[0.04] border border-white/5 text-zinc-400">
+            ${p}
+          </span>`).join('')}
+      </div>`;
+  }
+  function tilesHtml(tasks) {
+    return tasks.map(t => `
+      <div class="bg-zinc-800/60 border border-white/5 rounded-[3px] px-2 py-1 flex items-center gap-2 text-[11px]">
+        <span class="text-zinc-200 font-medium truncate">${t.name}</span>
+        <span class="text-zinc-500 text-[10px] truncate ml-auto">${t.station}</span>
+        <span class="text-zinc-400 font-mono shrink-0">${t.dur}</span>
+      </div>
+    `).join('');
+  }
+  function renderCard(el, variant) {
+    return `
+      <div class="bg-white/[0.015] border border-white/5 p-2.5 mb-2.5 rounded-none">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-[10.5px] font-bold tracking-[0.08em] uppercase text-zinc-200 truncate min-w-0">${el.name}</span>
+          ${renderIndicators(el, variant)}
+          ${precedenceHtml(el.precedence)}
+        </div>
+        <div class="space-y-1">${tilesHtml(el.tasks)}</div>
+      </div>`;
+  }
+
+  // ============== TOP-LEVEL RENDER ==============
+  function renderJdpLive() {
+    document.getElementById('jdp-live').innerHTML = ELEMENTS.map(el => renderCard(el, currentVariant)).join('');
+  }
+
+  function renderStrip(elementIdx, containerId) {
+    const el = ELEMENTS[elementIdx];
+    const variants = ['V1', 'V2', 'V3', 'V4', 'V5'];
+    document.getElementById(containerId).innerHTML = variants.map(v => `
+      <div class="bg-zinc-900 border border-white/5 rounded p-2 flex flex-col gap-1.5">
+        <span class="text-[9px] uppercase tracking-wider text-zinc-600 font-semibold">${v}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-[10.5px] font-bold tracking-[0.08em] uppercase text-zinc-200">${el.name}</span>
+          ${renderIndicators(el, v)}
+        </div>
+      </div>`).join('');
+  }
+
+  function refreshVariantButtons() {
+    document.querySelectorAll('.variant-btn').forEach(b => {
+      const active = b.dataset.variant === currentVariant;
+      b.classList.toggle('bg-amber-500/15', active);
+      b.classList.toggle('text-amber-300', active);
+      b.classList.toggle('text-zinc-400', !active);
+    });
+  }
+
+  function renderAll() {
+    refreshVariantButtons();
+    renderJdpLive();
+    renderStrip(4, 'strip');   // JAQUETTE = both gates
+    renderStrip(3, 'strip2');  // BANDEAU = paper ordered only
+    renderStrip(1, 'strip3');  // INTÉRIEUR = BAT only
+  }
+
+  document.querySelectorAll('.variant-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentVariant = btn.dataset.variant;
+      renderAll();
+    });
+  });
+  document.getElementById('toggle-relative').addEventListener('change', e => {
+    useRelative = e.target.checked;
+    renderAll();
+  });
+  document.getElementById('toggle-pulse').addEventListener('change', e => {
+    usePulse = e.target.checked;
+    renderAll();
+  });
+
+  renderAll();
+</script>
+</body>
+</html>

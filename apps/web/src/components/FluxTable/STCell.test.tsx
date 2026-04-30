@@ -69,43 +69,24 @@ describe('STCell — status rendering', () => {
   });
 });
 
-// ── Click cycle ──────────────────────────────────────────────────────────────
+// ── Read-only status indicator (clickability removed) ───────────────────────
 
-describe('STCell — click cycle (pending → progress → done → pending)', () => {
-  it('pending → progress: calls onUpdateSTStatus with progress', () => {
+describe('STCell — read-only status indicator', () => {
+  it('clicking the status indicator does not trigger onUpdateSTStatus', () => {
     const onUpdate = vi.fn();
     const task = makeTask({ status: 'pending' });
     render(<STCell tasks={[task]} onUpdateSTStatus={onUpdate} />);
 
     fireEvent.click(screen.getByTestId('st-toggle-task-001'));
-    expect(onUpdate).toHaveBeenCalledWith('task-001', 'progress');
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
-  it('progress → done: calls onUpdateSTStatus with done', () => {
-    const onUpdate = vi.fn();
+  it('renders a non-button element so accessibility tree treats it as static', () => {
     const task = makeTask({ status: 'progress' });
-    render(<STCell tasks={[task]} onUpdateSTStatus={onUpdate} />);
+    render(<STCell tasks={[task]} onUpdateSTStatus={vi.fn()} />);
 
-    fireEvent.click(screen.getByTestId('st-toggle-task-001'));
-    expect(onUpdate).toHaveBeenCalledWith('task-001', 'done');
-  });
-
-  it('done → pending: calls onUpdateSTStatus with pending (cycle wraps)', () => {
-    const onUpdate = vi.fn();
-    const task = makeTask({ status: 'done' });
-    render(<STCell tasks={[task]} onUpdateSTStatus={onUpdate} />);
-
-    fireEvent.click(screen.getByTestId('st-toggle-task-001'));
-    expect(onUpdate).toHaveBeenCalledWith('task-001', 'pending');
-  });
-
-  it('passes correct taskId on click', () => {
-    const onUpdate = vi.fn();
-    const task = makeTask({ taskId: 'task-xyz-999', status: 'pending' });
-    render(<STCell tasks={[task]} onUpdateSTStatus={onUpdate} />);
-
-    fireEvent.click(screen.getByTestId('st-toggle-task-xyz-999'));
-    expect(onUpdate).toHaveBeenCalledWith('task-xyz-999', 'progress');
+    const indicator = screen.getByTestId('st-toggle-task-001');
+    expect(indicator.tagName).toBe('SPAN');
   });
 });
 
@@ -125,7 +106,7 @@ describe('STCell — multiple tasks', () => {
     expect(screen.getByText('SIPAP · Pelliculage mat')).toBeInTheDocument();
   });
 
-  it('calls onUpdateSTStatus with the correct taskId when clicking the second task', () => {
+  it('clicks on multi-task cells remain no-ops', () => {
     const onUpdate = vi.fn();
     const tasks: FluxOutsourcingTask[] = [
       { taskId: 't1', actionType: 'Vernis UV', providerName: 'Faco 37', status: 'pending' },
@@ -133,9 +114,9 @@ describe('STCell — multiple tasks', () => {
     ];
     render(<STCell tasks={tasks} onUpdateSTStatus={onUpdate} />);
 
+    fireEvent.click(screen.getByTestId('st-toggle-t1'));
     fireEvent.click(screen.getByTestId('st-toggle-t2'));
-    expect(onUpdate).toHaveBeenCalledWith('t2', 'done');
-    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });
 

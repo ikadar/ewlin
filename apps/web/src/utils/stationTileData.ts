@@ -113,8 +113,13 @@ export interface ComputeTileDataCacheInput {
   pixelsPerHour: number;
   startDate?: Date;
   now: Date;
-  /** Optional list of collapse bands — when present, tile `top` uses the piecewise time→Y mapping. */
-  collapses?: readonly Collapse[];
+  /**
+   * Collapse bands list. REQUIRED — pass `[]` for contexts without bands
+   * (focus view, single-day callers). Mirrors `timeToYPosition` so a
+   * forgotten argument surfaces as a TypeScript error rather than a runtime
+   * `undefined.length` crash inside the inner `timeToYPosition` calls.
+   */
+  collapses: readonly Collapse[];
 }
 
 /**

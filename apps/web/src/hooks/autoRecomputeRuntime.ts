@@ -22,6 +22,7 @@
  */
 
 import type { ComputeScheduleResult } from '../store';
+import { resolveScenarioHeader } from '../store/api/realBaseQuery';
 
 export type AutoRecomputeEvent =
   | 'started'
@@ -197,12 +198,14 @@ async function runPhase2Lns(
 
   try {
     const token = localStorage.getItem('flux_auth_token') ?? '';
+    const scenarioHeader = resolveScenarioHeader();
     const response = await fetch('/api/v1/schedule/compute-lns/stream', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(scenarioHeader ? { 'X-Flux-Scenario': scenarioHeader } : {}),
       },
       body: JSON.stringify({ mode: 'full' }),
       signal: controller.signal,

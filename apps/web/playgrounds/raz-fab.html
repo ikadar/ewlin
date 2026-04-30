@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAZ — FAB + modale</title>
+  <style>
+    /* === Flux design tokens === */
+    :root {
+      --color-flux-base:           rgb(15 15 15);
+      --color-flux-surface:        rgb(26 26 26);
+      --color-flux-elevated:       rgb(36 36 36);
+      --color-flux-hover:          rgb(44 44 44);
+      --color-flux-border:         rgb(42 42 42);
+      --color-flux-border-light:   rgb(58 58 58);
+      --color-flux-text-primary:   rgb(245 245 245);
+      --color-flux-text-secondary: rgb(209 209 209);
+      --color-flux-text-tertiary:  rgb(161 161 161);
+      --color-flux-text-muted:     rgb(128 128 128);
+
+      --zinc-950: rgb(9 9 11);
+      --zinc-900: rgb(24 24 27);
+      --zinc-800: rgb(39 39 42);
+
+      /* RAZ red — same shade hierarchy as violet-600/500/400 used by PromotionDwellButton */
+      --red-600: rgb(220 38 38);  /* idle (= violet-600) */
+      --red-500: rgb(239 68 68);  /* hover (= violet-500) */
+      --red-400: rgb(248 113 113); /* fill bar (= violet-400) */
+      --red-300: rgb(252 165 165);
+      --red-700: rgb(185 28 28);
+
+      --emerald-600: rgb(5 150 105);
+      --emerald-300: rgb(110 231 183);
+
+      --radius-2xl: 16px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+
+      --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.7);
+      --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+
+      /* PromotionDwellButton constant (locked, do not vary) */
+      --hold-duration: 1200ms;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: var(--color-flux-base);
+      color: var(--color-flux-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px; line-height: 1.5;
+      overflow: hidden;
+    }
+    code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      grid-template-rows: 1fr auto;
+      height: 100vh;
+    }
+
+    /* === controls === */
+    aside.controls {
+      background: var(--color-flux-surface);
+      border-right: 1px solid var(--color-flux-border);
+      overflow-y: auto;
+      padding: 14px;
+      grid-row: 1 / 3;
+    }
+    aside h1 {
+      font-size: 14px; margin: 0 0 4px 0;
+      color: var(--color-flux-text-primary);
+    }
+    aside .lede {
+      color: var(--color-flux-text-tertiary);
+      font-size: 11px;
+      margin: 0 0 14px 0;
+      line-height: 1.45;
+    }
+    .locked-note {
+      background: rgb(76 29 149 / 0.18);
+      border: 1px solid rgb(167 139 250 / 0.3);
+      color: rgb(196 181 253);
+      border-radius: var(--radius-md);
+      padding: 7px 10px;
+      font-size: 10.5px;
+      line-height: 1.5;
+      margin: 0 0 14px 0;
+    }
+    .locked-note code {
+      color: rgb(221 214 254);
+      background: rgb(76 29 149 / 0.4);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    section {
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--color-flux-border);
+    }
+    section:last-child { border-bottom: none; }
+    section h2 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-flux-text-muted);
+      margin: 0 0 8px 0;
+      font-weight: 600;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    section h2 .scope-tag {
+      background: var(--color-flux-elevated);
+      color: var(--color-flux-text-tertiary);
+      border: 1px solid var(--color-flux-border);
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+
+    .seg {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+      gap: 4px;
+    }
+    .seg button {
+      background: var(--color-flux-elevated);
+      color: var(--color-flux-text-tertiary);
+      border: 1px solid var(--color-flux-border);
+      border-radius: var(--radius-md);
+      padding: 6px;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 100ms;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .seg button:hover {
+      color: var(--color-flux-text-primary);
+      border-color: var(--color-flux-border-light);
+      background: var(--color-flux-hover);
+    }
+    .seg button.active {
+      background: var(--red-600);
+      color: white;
+      border-color: var(--red-700);
+    }
+    .seg button svg { width: 14px; height: 14px; }
+    .seg button.icon-seg-btn { aspect-ratio: 1; }
+    .seg button.icon-seg-btn svg { width: 16px; height: 16px; }
+
+    .preset-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .preset-list button {
+      background: var(--color-flux-elevated);
+      color: var(--color-flux-text-secondary);
+      border: 1px solid var(--color-flux-border);
+      border-radius: var(--radius-md);
+      padding: 7px 8px;
+      font-size: 10.5px;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+    }
+    .preset-list button:hover {
+      border-color: var(--red-700);
+      color: var(--color-flux-text-primary);
+    }
+    .preset-list .preset-name {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 1px;
+      color: var(--color-flux-text-primary);
+    }
+    .preset-list .preset-desc {
+      display: block;
+      color: var(--color-flux-text-muted);
+      font-size: 9.5px;
+    }
+
+    /* === preview === */
+    main.preview {
+      grid-column: 2; grid-row: 1;
+      display: flex; flex-direction: column;
+      background: var(--color-flux-base);
+      position: relative;
+      overflow: hidden;
+    }
+    .preview-toolbar {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--color-flux-border);
+      display: flex; align-items: center; gap: 10px;
+      background: var(--color-flux-surface);
+      font-size: 11px;
+      color: var(--color-flux-text-tertiary);
+    }
+    .preview-toolbar .keycap {
+      display: inline-flex; align-items: center; gap: 2px;
+      padding: 1px 5px;
+      background: var(--color-flux-elevated);
+      border: 1px solid var(--color-flux-border);
+      border-radius: 3px;
+      font-family: ui-monospace, monospace;
+      font-size: 10px;
+      color: var(--color-flux-text-secondary);
+    }
+    .preview-toolbar .feedback {
+      margin-left: auto;
+      color: var(--red-400);
+      font-family: ui-monospace, monospace;
+    }
+
+    .mock-workspace { flex: 1; position: relative; overflow: hidden; }
+    .mock-grid {
+      position: absolute; inset: 0;
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      align-content: start;
+    }
+    .mock-grid .row-label {
+      color: var(--color-flux-text-muted);
+      font-size: 10px;
+      padding: 4px 8px;
+      border-right: 1px solid var(--color-flux-border);
+      border-bottom: 1px solid var(--color-flux-border);
+      font-family: ui-monospace, monospace;
+    }
+    .mock-grid .row-cells {
+      position: relative;
+      border-bottom: 1px solid var(--color-flux-border);
+      height: 30px;
+    }
+    .mock-grid .tile {
+      position: absolute; top: 4px; bottom: 4px;
+      border-radius: 3px;
+      background: linear-gradient(180deg, rgb(59 130 246 / 0.30), rgb(59 130 246 / 0.18));
+      border: 1px solid rgb(59 130 246 / 0.55);
+      font-family: ui-monospace, monospace;
+      font-size: 9.5px;
+      color: var(--color-flux-text-secondary);
+      padding: 0 5px;
+      display: flex; align-items: center; gap: 3px;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    .mock-grid .tile.completed {
+      background: linear-gradient(180deg, rgb(5 150 105 / 0.18), rgb(5 150 105 / 0.08));
+      border-color: rgb(5 150 105 / 0.4);
+      color: var(--emerald-300);
+      opacity: 0.85;
+    }
+
+    .legend {
+      position: absolute; bottom: 14px; left: 16px;
+      background: rgb(9 9 11 / 0.85);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      border: 1px solid var(--zinc-800);
+      border-radius: var(--radius-md);
+      padding: 7px 10px;
+      font-size: 10px;
+      color: var(--color-flux-text-tertiary);
+      font-family: ui-monospace, monospace;
+      line-height: 1.7;
+      pointer-events: none;
+    }
+    .legend .lk {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 2px; margin-right: 4px; vertical-align: middle;
+      border: 1px solid;
+    }
+
+    /* === FAB === */
+    .fab-wrap {
+      position: absolute; z-index: 10;
+      pointer-events: none;
+    }
+    .fab-wrap.pos-bottom-right { bottom: 20px; right: 20px; }
+    .fab-wrap.pos-bottom-center { bottom: 20px; left: 50%; transform: translateX(-50%); }
+    .fab-wrap.pos-top-right { top: 64px; right: 20px; }
+
+    .fab {
+      pointer-events: auto;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-family: inherit; font-weight: 500;
+      border: 1px solid;
+      box-shadow: var(--shadow-2xl);
+      user-select: none;
+      transition: transform 80ms, box-shadow 200ms, background 150ms;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .fab:hover { transform: translateY(-1px); }
+    .fab:active { transform: translateY(0); }
+    .fab svg { stroke-width: 2; }
+
+    .fab.shape-circle {
+      border-radius: 999px;
+      padding: 0;
+    }
+    .fab.shape-circle.sz-40 { width: 40px; height: 40px; }
+    .fab.shape-circle.sz-44 { width: 44px; height: 44px; }
+    .fab.shape-circle.sz-48 { width: 48px; height: 48px; }
+    .fab.shape-circle.sz-56 { width: 56px; height: 56px; }
+    .fab.shape-circle.sz-40 svg { width: 16px; height: 16px; }
+    .fab.shape-circle.sz-44 svg { width: 18px; height: 18px; }
+    .fab.shape-circle.sz-48 svg { width: 20px; height: 20px; }
+    .fab.shape-circle.sz-56 svg { width: 22px; height: 22px; }
+    .fab.shape-circle .label { display: none; }
+
+    .fab.shape-pill {
+      border-radius: var(--radius-md);
+      gap: 8px; padding: 0 14px;
+      font-size: 12px;
+    }
+    .fab.shape-pill.sz-40 { height: 40px; }
+    .fab.shape-pill.sz-44 { height: 44px; font-size: 13px; }
+    .fab.shape-pill.sz-48 { height: 48px; font-size: 13px; }
+    .fab.shape-pill.sz-56 { height: 56px; font-size: 14px; padding: 0 18px; }
+    .fab.shape-pill svg { width: 16px; height: 16px; }
+    .fab.shape-pill .label {
+      display: inline; font-weight: 600; letter-spacing: 0.04em;
+    }
+
+    .fab.shape-card {
+      border-radius: var(--radius-2xl);
+      gap: 10px; padding: 10px 14px;
+      flex-direction: row; text-align: left;
+      min-width: 160px;
+    }
+    .fab.shape-card svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .fab.shape-card .label {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+    }
+    .fab.shape-card .label .lab-main { font-size: 12px; font-weight: 600; }
+    .fab.shape-card .label .lab-sub { font-size: 10px; opacity: 0.7; font-weight: 400; }
+
+    .fab.col-red { background: var(--red-600); border-color: var(--red-700); color: white; }
+    .fab.col-red:hover { background: var(--red-500); }
+    .fab.col-zinc {
+      background: rgb(9 9 11 / 0.85);
+      border-color: var(--zinc-800);
+      color: var(--red-400);
+    }
+    .fab.col-zinc:hover {
+      background: rgb(24 24 27 / 0.92);
+      border-color: var(--red-700);
+    }
+    .fab.col-outline {
+      background: rgb(9 9 11 / 0.6);
+      border-color: var(--red-700);
+      color: var(--red-400);
+    }
+    .fab.col-outline:hover { background: rgb(69 10 10 / 0.4); color: var(--red-300); }
+
+    @keyframes pulse-red-ring {
+      0%, 100% { box-shadow: 0 0 0 0 rgb(239 68 68 / 0.55), var(--shadow-2xl); }
+      50%      { box-shadow: 0 0 0 8px rgb(239 68 68 / 0), var(--shadow-2xl); }
+    }
+    .fab.pulsing { animation: pulse-red-ring 1.6s ease-out 3; }
+
+    /* === modal overlay === */
+    .modal-backdrop {
+      position: absolute; inset: 0;
+      background: rgb(0 0 0 / 0.55);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      z-index: 20;
+      display: none;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.visible { display: flex; }
+    .modal-backdrop.style-bottom-sheet {
+      align-items: flex-end;
+    }
+
+    .modal {
+      background: var(--color-flux-elevated);
+      border: 1px solid var(--color-flux-border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px 18px;
+      width: min(92%, 28rem);
+      box-shadow: var(--shadow-2xl);
+      animation: modal-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .modal-backdrop.style-bottom-sheet .modal {
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      width: min(96%, 36rem);
+      animation: sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    @keyframes modal-in {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes sheet-in {
+      from { transform: translateY(40px); opacity: 0.5; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal h3 {
+      font-size: 14px; font-weight: 600;
+      margin: 0 0 4px 0;
+      color: var(--color-flux-text-primary);
+    }
+    .modal .sub {
+      margin: 0 0 12px 0;
+      font-size: 12px;
+      color: var(--color-flux-text-tertiary);
+    }
+    .modal .count-line {
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+      color: var(--color-flux-text-primary);
+      margin: 0 0 14px 0;
+    }
+
+    .modal .options {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-bottom: 18px;
+    }
+    .modal .options label {
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--color-flux-text-secondary);
+      padding: 4px 0;
+    }
+    .modal .options input { margin: 0; accent-color: var(--red-600); }
+
+    .modal-actions {
+      display: flex; gap: 10px;
+      justify-content: flex-end;
+    }
+    .btn-cancel {
+      background: transparent;
+      border: 1px solid var(--color-flux-border);
+      color: var(--color-flux-text-secondary);
+      border-radius: var(--radius-md);
+      padding: 6px 16px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 120ms;
+    }
+    .btn-cancel:hover { background: var(--color-flux-hover); }
+
+    /* ===========================================================
+       HOLD-TO-CONFIRM BUTTON
+       Mirrors PromotionDwellButton EXACTLY (apps/web/src/components/PromotionModal/PromotionDwellButton.tsx)
+       The only diff with the source is the color: violet-{600,500,400} → red-{600,500,400}
+       Everything else (shape, padding, font-size, font-weight, hold duration, fill animation,
+       cancel triggers) is byte-equivalent.
+       =========================================================== */
+    .btn-hold {
+      position: relative;
+      background: var(--red-600);              /* = bg-violet-600 */
+      color: white;
+      border: none;
+      border-radius: var(--radius-md);          /* = rounded-md */
+      padding: 6px 16px;                        /* = px-4 py-1.5 */
+      font-size: 11px;                          /* = text-xs */
+      font-weight: 500;                         /* = font-medium */
+      font-family: inherit;
+      cursor: pointer;
+      overflow: hidden;
+      isolation: isolate;
+      user-select: none;
+      transition: background 100ms;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-hold:hover { background: var(--red-500); }   /* = hover:bg-violet-500 */
+    .btn-hold .fill {
+      position: absolute;
+      inset: 0;
+      background: var(--red-400);                /* = bg-violet-400 */
+      width: 0%;
+      transition: width 0ms linear;
+      z-index: -1;
+    }
+    .btn-hold.holding .fill {
+      transition-duration: var(--hold-duration); /* 1200ms — locked */
+      width: 100%;
+    }
+    .btn-hold .lab {
+      display: inline-flex; align-items: center; gap: 6px;
+      position: relative; z-index: 1;
+    }
+    .btn-hold .lab svg { width: 14px; height: 14px; }   /* = size={14} */
+
+    /* === toast === */
+    .toast-area {
+      position: absolute;
+      top: 64px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      pointer-events: none;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+    }
+    .toast {
+      background: var(--color-flux-elevated);
+      border: 1px solid var(--color-flux-border);
+      border-left: 3px solid var(--emerald-600);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--color-flux-text-primary);
+      box-shadow: var(--shadow-xl);
+      pointer-events: auto;
+      animation: toast-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1.2), toast-out 200ms ease-in 2.5s forwards;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toast.minimal {
+      background: rgb(0 0 0 / 0.85);
+      border: 1px solid var(--zinc-800);
+      border-left: 1px solid var(--zinc-800);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 11px;
+    }
+    .toast .count { font-family: ui-monospace, monospace; font-weight: 600; }
+    @keyframes toast-in {
+      from { transform: translateY(-6px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes toast-out {
+      to { transform: translateY(-6px); opacity: 0; }
+    }
+
+    /* === prompt === */
+    footer.prompt-bar {
+      grid-column: 2; grid-row: 2;
+      background: var(--color-flux-surface);
+      border-top: 1px solid var(--color-flux-border);
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+      max-height: 220px;
+    }
+    .prompt-bar pre {
+      margin: 0; padding: 10px 12px;
+      background: var(--color-flux-base);
+      border: 1px solid var(--color-flux-border);
+      border-radius: var(--radius-md);
+      color: var(--color-flux-text-secondary);
+      font-size: 11px;
+      line-height: 1.55;
+      max-height: 190px; overflow-y: auto;
+      white-space: pre-wrap; word-wrap: break-word;
+    }
+    .prompt-bar button {
+      background: var(--red-600);
+      color: white;
+      border: 1px solid var(--red-700);
+      border-radius: var(--radius-md);
+      padding: 7px 14px;
+      font-size: 12px; font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      align-self: flex-start;
+    }
+    .prompt-bar button:hover { background: var(--red-500); }
+    .prompt-bar button.copied {
+      background: var(--emerald-600);
+      border-color: var(--emerald-600);
+    }
+  </style>
+</head>
+<body>
+  <!-- Lucide SVG sprite (lucide-static v0.560 paths) -->
+  <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <symbol id="i-trash2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        <line x1="10" x2="10" y1="11" y2="17"/>
+        <line x1="14" x2="14" y1="11" y2="17"/>
+      </symbol>
+      <symbol id="i-eraser" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
+        <path d="M22 21H7"/>
+        <path d="m5 11 9 9"/>
+      </symbol>
+      <symbol id="i-rotate-ccw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </symbol>
+      <symbol id="i-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v10"/>
+        <path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>
+      </symbol>
+      <symbol id="i-bomb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="13" r="9"/>
+        <path d="M14.35 4.65 16.3 2.7a2.41 2.41 0 0 1 3.4 0l1.6 1.6a2.4 2.4 0 0 1 0 3.4l-1.95 1.95"/>
+        <path d="m22 2-1.5 1.5"/>
+      </symbol>
+      <symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+        <path d="M21 3v5h-5"/>
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+        <path d="M3 21v-5h5"/>
+      </symbol>
+      <symbol id="i-brush" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/>
+        <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>
+      </symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+        <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="app">
+    <!-- Controls -->
+    <aside class="controls">
+      <h1>RAZ — FAB + modale</h1>
+      <p class="lede">FAB et <code>Ctrl+Alt+Z</code> ouvrent la même modale. Le bouton "Maintenir pour effacer" est un clone du <code>PromotionDwellButton</code>.</p>
+
+      <div class="locked-note">
+        <strong>Verrouillé (clone PromotionDwellButton)</strong> · durée <code>1200ms</code> · fill <code>red-400</code> · cancel <code>mouseup/leave/touchend</code> · <code>1px py-1.5 rounded-md text-xs</code> · pas de hint, pas de countdown, pas de variant.
+        <br/><br/>
+        <strong>Sweep fantômes</strong> · invisible, à chaque action. Pas mentionné dans la modale ni le toast.
+      </div>
+
+      <section>
+        <h2>Presets</h2>
+        <div class="preset-list">
+          <button data-preset="discreet"><span class="preset-name">Discret</span><span class="preset-desc">circle 44 zinc, modale center</span></button>
+          <button data-preset="aligned"><span class="preset-name">Aligné dock</span><span class="preset-desc">card, bottom-sheet</span></button>
+          <button data-preset="loud"><span class="preset-name">Loud</span><span class="preset-desc">pill 48 rouge</span></button>
+          <button data-preset="compact"><span class="preset-name">Compact</span><span class="preset-desc">circle 40 zinc, top-right</span></button>
+        </div>
+      </section>
+
+      <section>
+        <h2>FAB shape</h2>
+        <div class="seg" id="shape-seg">
+          <button data-val="circle">cercle</button>
+          <button data-val="pill">pill +RAZ</button>
+          <button data-val="card">card</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Position</h2>
+        <div class="seg" id="pos-seg">
+          <button data-val="bottom-right">↘ bot-right</button>
+          <button data-val="bottom-center">↓ bot-center</button>
+          <button data-val="top-right">↗ top-right</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Icône lucide</h2>
+        <div class="seg" id="icon-seg">
+          <button data-val="trash2" class="icon-seg-btn" title="Trash2"><svg><use href="#i-trash2"/></svg></button>
+          <button data-val="eraser" class="icon-seg-btn" title="Eraser"><svg><use href="#i-eraser"/></svg></button>
+          <button data-val="rotate-ccw" class="icon-seg-btn" title="RotateCcw"><svg><use href="#i-rotate-ccw"/></svg></button>
+          <button data-val="power" class="icon-seg-btn" title="Power"><svg><use href="#i-power"/></svg></button>
+          <button data-val="bomb" class="icon-seg-btn" title="Bomb"><svg><use href="#i-bomb"/></svg></button>
+          <button data-val="refresh-cw" class="icon-seg-btn" title="RefreshCw"><svg><use href="#i-refresh-cw"/></svg></button>
+          <button data-val="brush" class="icon-seg-btn" title="Brush"><svg><use href="#i-brush"/></svg></button>
+          <button data-val="sparkles" class="icon-seg-btn" title="Sparkles"><svg><use href="#i-sparkles"/></svg></button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Taille</h2>
+        <div class="seg" id="size-seg">
+          <button data-val="40">40</button>
+          <button data-val="44">44</button>
+          <button data-val="48">48</button>
+          <button data-val="56">56</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Couleur</h2>
+        <div class="seg" id="color-seg">
+          <button data-val="red">red-600</button>
+          <button data-val="zinc">zinc-950</button>
+          <button data-val="outline">outline</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Style modale</h2>
+        <div class="seg" id="modal-style-seg">
+          <button data-val="center">center</button>
+          <button data-val="bottom-sheet">bottom sheet</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Ctrl+Alt+Z</h2>
+        <div class="seg" id="shortcut-seg">
+          <button data-val="open">ouvre la modale</button>
+          <button data-val="open-focus">ouvre + focus btn</button>
+          <button data-val="pulse">pulse FAB d'abord</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Toast</h2>
+        <div class="seg" id="toast-seg">
+          <button data-val="simple">simple</button>
+          <button data-val="minimal">pill minimal</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Preview -->
+    <main class="preview">
+      <div class="preview-toolbar">
+        <span>Click le FAB pour ouvrir · raccourci</span>
+        <span class="keycap">⌃</span><span class="keycap">⌥</span><span class="keycap">Z</span>
+        <span class="feedback" id="shortcut-feedback"></span>
+      </div>
+      <div class="mock-workspace" id="workspace">
+        <div class="mock-grid" id="grid"></div>
+        <div class="legend">
+          <div><span class="lk" style="background:rgb(59 130 246/0.4); border-color:rgb(59 130 246/0.55)"></span> tuile planifiée</div>
+          <div><span class="lk" style="background:rgb(5 150 105/0.3); border-color:rgb(5 150 105/0.4)"></span> complétée (préservée)</div>
+        </div>
+
+        <div class="fab-wrap pos-bottom-right" id="fab-wrap">
+          <button class="fab" id="fab" aria-label="RAZ – ouvrir la confirmation">
+            <svg id="fab-svg"><use id="fab-icon-use" href="#i-trash2"/></svg>
+            <span class="label">
+              <span class="lab-main">RAZ</span>
+              <span class="lab-sub">Ctrl+Alt+Z</span>
+            </span>
+          </button>
+        </div>
+      </div>
+      <div class="toast-area" id="toast-area"></div>
+
+      <!-- THE MODAL -->
+      <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal">
+          <h3>Effacer toutes les tuiles</h3>
+          <p class="sub">Les tuiles complétées sont toujours conservées.</p>
+          <p class="count-line"><span id="count-tiles">301</span> tuile(s) à effacer</p>
+
+          <!-- Opt-out checkboxes — pre-checked by default -->
+          <div class="options">
+            <label><input type="checkbox" id="opt-inprog" checked /><span>Inclure les tuiles en cours d'exécution</span></label>
+            <label><input type="checkbox" id="opt-pinned" checked /><span>Inclure les tuiles épinglées</span></label>
+            <label><input type="checkbox" id="opt-frozen" checked /><span>Inclure les tuiles avec flocon actif (safety zone)</span></label>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-cancel" id="modal-cancel">Annuler</button>
+            <button class="btn-hold" id="btn-hold" type="button">
+              <span class="fill"></span>
+              <span class="lab">
+                <svg><use id="btn-icon-use" href="#i-trash2"/></svg>
+                Maintenir pour effacer
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="prompt-bar">
+      <pre id="prompt"></pre>
+      <button id="copy">Copy prompt</button>
+    </footer>
+  </div>
+
+  <script>
+    // ───────────────── State ─────────────────
+    const DEFAULTS = {
+      shape: 'circle',
+      position: 'bottom-right',
+      icon: 'trash2',
+      size: 44,
+      color: 'zinc',
+      modalStyle: 'center',
+      shortcut: 'open-focus',
+      toast: 'simple',
+    };
+    const state = { ...DEFAULTS };
+
+    const PRESETS = {
+      discreet: {
+        shape: 'circle', position: 'bottom-right', icon: 'trash2', size: 44, color: 'zinc',
+        modalStyle: 'center', shortcut: 'open-focus', toast: 'simple',
+      },
+      aligned: {
+        shape: 'card', position: 'bottom-right', icon: 'trash2', size: 48, color: 'zinc',
+        modalStyle: 'bottom-sheet', shortcut: 'open-focus', toast: 'simple',
+      },
+      loud: {
+        shape: 'pill', position: 'bottom-right', icon: 'trash2', size: 48, color: 'red',
+        modalStyle: 'center', shortcut: 'open-focus', toast: 'simple',
+      },
+      compact: {
+        shape: 'circle', position: 'top-right', icon: 'trash2', size: 40, color: 'zinc',
+        modalStyle: 'center', shortcut: 'open-focus', toast: 'minimal',
+      },
+    };
+
+    const $ = id => document.getElementById(id);
+    const fab = $('fab');
+    const fabWrap = $('fab-wrap');
+    const fabIconUse = $('fab-icon-use');
+    const btnIconUse = $('btn-icon-use');
+    const modalBackdrop = $('modal-backdrop');
+    const btnHold = $('btn-hold');
+    const toastArea = $('toast-area');
+    const promptEl = $('prompt');
+    const copyBtn = $('copy');
+    const shortcutFeedback = $('shortcut-feedback');
+
+    // ───────────────── Mock grid ─────────────────
+    const STATIONS = ['754', 'GTO', 'Heidelberg', 'Horizon', 'Typo PF', 'P137', 'MBO', 'Cond.'];
+    const MOCK_TILES = [
+      [
+        { kind: 'tile', label: 'ABEILLE 0034', left: 12, width: 16 },
+        { kind: 'tile', label: 'IMPRITEXTE', left: 32, width: 14 },
+        { kind: 'tile completed', label: 'COVEA', left: 50, width: 11 },
+        { kind: 'tile', label: 'EDIPOST', left: 64, width: 16 },
+      ],
+      [
+        { kind: 'tile', label: 'IMPRITEXTE', left: 8, width: 22 },
+        { kind: 'tile', label: 'FUZEAU 8P', left: 33, width: 11 },
+        { kind: 'tile', label: 'PBO ELT', left: 47, width: 14 },
+      ],
+      [
+        { kind: 'tile completed', label: 'S.EDITIONS', left: 5, width: 22 },
+        { kind: 'tile', label: 'ABEILLE 0011', left: 32, width: 22 },
+      ],
+      [
+        { kind: 'tile', label: 'EKIDOM', left: 10, width: 9 },
+        { kind: 'tile', label: 'ABEILLE 0034', left: 24, width: 13 },
+      ],
+      [
+        { kind: 'tile', label: 'Typo Pf 0034', left: 18, width: 18 },
+        { kind: 'tile', label: 'HACHETTE', left: 41, width: 22 },
+      ],
+      [
+        { kind: 'tile', label: 'ABEILLE 0034', left: 22, width: 8 },
+        { kind: 'tile', label: 'P137 SOGEC', left: 33, width: 10 },
+      ],
+      [{ kind: 'tile', label: 'CAPELLE', left: 8, width: 26 }],
+      [{ kind: 'tile', label: 'COND. 0034', left: 38, width: 20 }],
+    ];
+
+    function buildGrid() {
+      const grid = $('grid');
+      grid.innerHTML = '';
+      STATIONS.forEach((name, i) => {
+        const lab = document.createElement('div');
+        lab.className = 'row-label';
+        lab.textContent = name;
+        const cells = document.createElement('div');
+        cells.className = 'row-cells';
+        const tiles = MOCK_TILES[i] ?? [];
+        tiles.forEach(t => {
+          const el = document.createElement('div');
+          el.className = `tile ${t.kind}`;
+          el.style.left = t.left + '%';
+          el.style.width = t.width + '%';
+          const labEl = document.createElement('span');
+          labEl.textContent = t.label;
+          el.appendChild(labEl);
+          cells.appendChild(el);
+        });
+        grid.appendChild(lab);
+        grid.appendChild(cells);
+      });
+    }
+
+    // ───────────────── Render ─────────────────
+    function applyPreset(name) {
+      const p = PRESETS[name];
+      if (!p) return;
+      Object.assign(state, p);
+      syncControls();
+      render();
+    }
+    function syncControls() {
+      [
+        ['shape-seg', state.shape],
+        ['pos-seg', state.position],
+        ['icon-seg', state.icon],
+        ['size-seg', String(state.size)],
+        ['color-seg', state.color],
+        ['modal-style-seg', state.modalStyle],
+        ['shortcut-seg', state.shortcut],
+        ['toast-seg', state.toast],
+      ].forEach(([id, val]) => {
+        const seg = $(id);
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === val));
+      });
+    }
+    function render() {
+      fabWrap.className = 'fab-wrap pos-' + state.position;
+      fab.className = ['fab', 'shape-' + state.shape, 'sz-' + state.size, 'col-' + state.color].join(' ');
+      fabIconUse.setAttribute('href', '#i-' + state.icon);
+      btnIconUse.setAttribute('href', '#i-' + state.icon);
+      updatePrompt();
+    }
+
+    // ───────────────── Modal open/close ─────────────────
+    function openModal({ focusBtn = false, pulseFirst = false } = {}) {
+      if (pulseFirst) {
+        fab.classList.add('pulsing');
+        setTimeout(() => {
+          fab.classList.remove('pulsing');
+          openModal({ focusBtn });
+        }, 1700);
+        return;
+      }
+      modalBackdrop.className = 'modal-backdrop visible style-' + state.modalStyle;
+      // Reset opt-out checkboxes to default-checked on every open
+      ['inprog', 'pinned', 'frozen'].forEach(k => { $('opt-' + k).checked = true; });
+      if (focusBtn) {
+        setTimeout(() => btnHold.focus(), 50);
+      }
+    }
+    function closeModal() {
+      modalBackdrop.classList.remove('visible');
+      cancelHold();
+    }
+    fab.addEventListener('click', () => {
+      openModal({ focusBtn: state.shortcut === 'open-focus' });
+    });
+    modalBackdrop.addEventListener('click', e => { if (e.target === modalBackdrop) closeModal(); });
+    $('modal-cancel').addEventListener('click', closeModal);
+
+    // ───────────────── Hold-to-confirm — exact PromotionDwellButton parity ─────────────────
+    let holdTimer = null;
+    function startHold(e) {
+      if (holdTimer !== null) return;
+      e.preventDefault();
+      btnHold.classList.add('holding');
+      holdTimer = setTimeout(() => {
+        completeHold();
+      }, 1200); // locked
+    }
+    function cancelHold() {
+      if (holdTimer !== null) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      btnHold.classList.remove('holding');
+    }
+    function completeHold() {
+      cancelHold();
+      closeModal();
+      fireToast();
+    }
+
+    btnHold.addEventListener('mousedown', startHold);
+    btnHold.addEventListener('touchstart', startHold, { passive: false });
+    btnHold.addEventListener('mouseup', cancelHold);
+    btnHold.addEventListener('mouseleave', cancelHold);
+    btnHold.addEventListener('touchend', cancelHold);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modalBackdrop.classList.contains('visible')) closeModal();
+    });
+
+    // ───────────────── Shortcut Ctrl+Alt+Z ─────────────────
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.altKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        triggerShortcut();
+      }
+    });
+    function triggerShortcut() {
+      shortcutFeedback.textContent = `→ ${state.shortcut}`;
+      setTimeout(() => { shortcutFeedback.textContent = ''; }, 1400);
+      if (state.shortcut === 'open') {
+        openModal({ focusBtn: false });
+      } else if (state.shortcut === 'open-focus') {
+        openModal({ focusBtn: true });
+      } else if (state.shortcut === 'pulse') {
+        openModal({ focusBtn: true, pulseFirst: true });
+      }
+    }
+
+    // ───────────────── Toast (no ghost mention) ─────────────────
+    function fireToast() {
+      const tiles = 301;
+      const t = document.createElement('div');
+      t.className = 'toast ' + state.toast;
+      if (state.toast === 'minimal') {
+        t.innerHTML = `<span class="count">${tiles}</span> effacé`;
+      } else {
+        t.innerHTML = `<svg width="14" height="14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--emerald-300)"><use href="#i-check"/></svg> <span><span class="count">${tiles}</span> tuile(s) effacée(s)</span>`;
+      }
+      toastArea.appendChild(t);
+      setTimeout(() => t.remove(), 3200);
+    }
+
+    // ───────────────── Wire up ─────────────────
+    function bindSeg(id, key, transform) {
+      const seg = $(id);
+      seg.querySelectorAll('button').forEach(b => {
+        b.addEventListener('click', () => {
+          state[key] = transform ? transform(b.dataset.val) : b.dataset.val;
+          syncControls(); render();
+        });
+      });
+    }
+    bindSeg('shape-seg', 'shape');
+    bindSeg('pos-seg', 'position');
+    bindSeg('icon-seg', 'icon');
+    bindSeg('size-seg', 'size', v => parseInt(v, 10));
+    bindSeg('color-seg', 'color');
+    bindSeg('modal-style-seg', 'modalStyle');
+    bindSeg('shortcut-seg', 'shortcut');
+    bindSeg('toast-seg', 'toast');
+
+    document.querySelectorAll('[data-preset]').forEach(b => {
+      b.addEventListener('click', () => applyPreset(b.dataset.preset));
+    });
+
+    // ───────────────── Prompt ─────────────────
+    const SHAPE_LABEL = {
+      circle: 'a circular icon-only FAB (rounded-full, no text)',
+      pill: 'a pill button with the lucide icon and the text "RAZ" (rounded-md)',
+      card: 'a small floating card with icon, "RAZ" label, and "Ctrl+Alt+Z" sublabel — visually consistent with EnvFloatingControls and ScenarioDockCard',
+    };
+    const POSITION_LABEL = {
+      'bottom-right': 'bottom-20 right-20 (clear of EnvFloatingControls / ScenarioDockCard)',
+      'bottom-center': 'bottom-center of the schedule grid',
+      'top-right': 'top-right of the toolbar area',
+    };
+    const ICON_LABEL = {
+      'trash2': '<Trash2 /> from lucide-react',
+      'eraser': '<Eraser /> from lucide-react',
+      'rotate-ccw': '<RotateCcw /> from lucide-react',
+      'power': '<Power /> from lucide-react',
+      'bomb': '<Bomb /> from lucide-react',
+      'refresh-cw': '<RefreshCw /> from lucide-react',
+      'brush': '<Brush /> from lucide-react',
+      'sparkles': '<Sparkles /> from lucide-react',
+    };
+    const COLOR_LABEL = {
+      red: 'solid red-600 with red-700 border',
+      zinc: 'translucent zinc-950/85 with backdrop-blur and red-400 icon — same surface treatment as EnvFloatingControls / ScenarioDockCard',
+      outline: 'outline only — zinc-950/60 with red-700 border and red-400 icon',
+    };
+    const MODAL_STYLE_LABEL = {
+      'center': 'a centered modal (current MassUnscheduleDialog placement)',
+      'bottom-sheet': 'a bottom-sheet sliding up from the page bottom',
+    };
+    const SHORTCUT_LABEL = {
+      'open': 'opens the modal',
+      'open-focus': 'opens the modal AND focuses the hold-to-confirm button (so the user can hold Space to commit, just like clicking it)',
+      'pulse': 'pulses the FAB three times to signal where the action lives, then opens the modal with the button focused',
+    };
+    const TOAST_LABEL = {
+      simple: 'a one-line toast with a check icon: "X tuile(s) effacée(s)"',
+      minimal: 'a minimal pill toast: "X effacé"',
+    };
+
+    function updatePrompt() {
+      const lines = [];
+      lines.push("Replace MassUnscheduleDialog with a FAB + an updated modal whose confirm button is a hold-to-confirm clone of PromotionDwellButton.");
+      lines.push("");
+      lines.push("Hard requirements (do not deviate):");
+      lines.push("- The hold-to-confirm button is BYTE-EQUIVALENT to PromotionDwellButton (apps/web/src/components/PromotionModal/PromotionDwellButton.tsx). Same hold duration (1200ms), same fill animation (transition-[width] ease-linear), same cancel triggers (mouseup, mouseleave, touchend), same px-4 py-1.5 rounded-md text-xs font-medium, same icon size 14px. ONLY THE COLOR CHANGES: violet-600/500/400 → red-600/500/400. Reuse the component if practical (lift to a shared <DwellButton color=\"red|violet\" />); otherwise duplicate it verbatim.");
+      lines.push("- No tooltip, no \"maintenir Xs\" hint, no countdown, no shake, no ring variant. The fill bar IS the entire feedback.");
+      lines.push("- The orphan-assignment sweep happens silently on every clear. Never mention ghosts in the modal copy or the toast. The backend already gates the sweep on (includeInProgress && includePinned && includeFrozen) — keep this gate; just remove fuseSplits from the gate (split notion is obsolete).");
+      lines.push("");
+      lines.push("FAB (entry point only — no hold here):");
+      lines.push(`- Shape: ${SHAPE_LABEL[state.shape]}.`);
+      lines.push(`- Position: ${POSITION_LABEL[state.position]}.`);
+      lines.push(`- Icon: ${ICON_LABEL[state.icon]} (size=${state.shape === 'circle' ? (state.size <= 44 ? 16 : 18) : 16}px).`);
+      lines.push(`- Size: ${state.size}px.`);
+      lines.push(`- Color: ${COLOR_LABEL[state.color]}.`);
+      lines.push(`- onClick: opens the modal.`);
+      lines.push("");
+      lines.push("Modal:");
+      lines.push(`- Style: ${MODAL_STYLE_LABEL[state.modalStyle]}.`);
+      lines.push(`- Title: "Effacer toutes les tuiles".`);
+      lines.push(`- Subline: "Les tuiles complétées sont toujours conservées."`);
+      lines.push(`- Count line: "{N} tuile(s) à effacer" (from snapshot — no ghost count, that's silent).`);
+      lines.push(`- Three OPT-OUT checkboxes, ALL pre-checked on every modal open:`);
+      lines.push(`  • "Inclure les tuiles en cours d'exécution" (checked)`);
+      lines.push(`  • "Inclure les tuiles épinglées" (checked)`);
+      lines.push(`  • "Inclure les tuiles avec flocon actif (safety zone)" (checked)`);
+      lines.push(`- The fuseSplits checkbox is REMOVED. The split notion is obsolete and must not appear anywhere.`);
+      lines.push(`- Tokens: bg-flux-elevated + border-flux-border + accent-red-600 (same as the current MassUnscheduleDialog).`);
+      lines.push("");
+      lines.push("Hold-to-confirm \"Maintenir pour effacer\" button (the destructive action — INSIDE the modal):");
+      lines.push("- Visual: PromotionDwellButton clone, color = red-{600,500,400} instead of violet.");
+      lines.push("- Icon: <Trash2 size={14} />.");
+      lines.push("- Label: \"Maintenir pour effacer\" (mirrors \"Maintenir pour promouvoir\").");
+      lines.push("- Hold duration: 1200ms (constant, do not vary).");
+      lines.push("- Cancel on: mouseup, mouseleave, touchend (same as source).");
+      lines.push("");
+      lines.push("Ctrl+Alt+Z shortcut:");
+      lines.push(`- ${SHORTCUT_LABEL[state.shortcut]}.`);
+      lines.push("");
+      lines.push("Confirmation toast:");
+      lines.push(`- Show ${TOAST_LABEL[state.toast]}. NEVER mention swept ghosts.`);
+      lines.push("");
+      lines.push("Wiring:");
+      lines.push("- Default invocation: DELETE /api/v1/schedule/assignments?includeInProgress=1&includePinned=1&includeFrozen=1 (orphan sweep gate fires silently).");
+      lines.push("- When the user unchecks a box, omit the corresponding flag (matches the existing backend gate). The sweep then does not fire — by design.");
+      lines.push("- BACKEND: drop fuseSplits from the controller (the split notion is obsolete). The sweepOrphans gate becomes (includeInProgress && includePinned && includeFrozen). Update UnassignmentService::unassignAll signature accordingly. Update the existing PHPUnit test to drop the fuseSplits parameter.");
+      lines.push("- New components: apps/web/src/components/RazFab/RazFab.tsx (entry point) and an updated MassUnscheduleDialog.tsx with the hold-to-confirm button replacing the current \"Tout effacer\" click button.");
+      lines.push("- Reuse useMassUnschedule. The hold completion calls confirm() like the existing 'Tout effacer' click does today.");
+      lines.push("- Mount the FAB at App.tsx and OperatorSchedulePage.tsx alongside the existing MassUnscheduleDialog mount points (App.tsx:2199 / OperatorSchedulePage.tsx:1347).");
+      lines.push("- Update the Ctrl+Alt+Z handler at App.tsx:1227-1233 according to the chosen behaviour above.");
+      promptEl.textContent = lines.join('\n');
+    }
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(promptEl.textContent);
+        copyBtn.textContent = 'Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy prompt';
+          copyBtn.classList.remove('copied');
+        }, 1200);
+      } catch {
+        copyBtn.textContent = 'Copy failed';
+      }
+    });
+
+    // ───────────────── init ─────────────────
+    buildGrid();
+    syncControls();
+    render();
+  </script>
+</body>
+</html>

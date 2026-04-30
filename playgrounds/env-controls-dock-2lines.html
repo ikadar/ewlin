@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Env dock — 2 lignes vs 3 lignes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, sans-serif; }
+    @keyframes pulse-emerald { 0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.45)} 50%{box-shadow:0 0 0 6px rgba(16,185,129,0)} }
+    .pulse-emerald { animation: pulse-emerald 2s infinite; }
+    .demo-frame {
+      background: linear-gradient(135deg, #18181b 0%, #0a0a0b 100%);
+      padding: 24px;
+      border-radius: 8px;
+      min-height: 220px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+    }
+    .demo-frame.prod {
+      box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
+      background: linear-gradient(180deg, #18181b 80%, rgba(16, 185, 129, 0.04) 100%), linear-gradient(135deg, #18181b 0%, #0a0a0b 100%);
+    }
+    .col-label { font-size: 10px; color: rgba(244, 244, 245, 0.5); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  </style>
+</head>
+<body class="bg-zinc-900 text-zinc-200 p-6">
+  <div class="max-w-6xl mx-auto space-y-10">
+    <header>
+      <h1 class="text-lg font-semibold text-zinc-100">Env dock card · 3 lignes vs 2 lignes</h1>
+      <p class="text-xs text-zinc-500 mt-1">
+        Comparatif côte-à-côte. Chaque colonne montre l'état <strong>préprod</strong> en haut et <strong>prod</strong> en bas.
+        Largeur fixée à 280 px partout pour que le verdict porte sur la hauteur, pas l'occupation.
+      </p>
+    </header>
+
+    <!-- ============================================================== -->
+    <!-- COMPARATIVE GRID                                                 -->
+    <!-- ============================================================== -->
+    <section class="grid grid-cols-3 gap-5">
+      <!-- ============== COL A : 3 lignes (référence) ============== -->
+      <div>
+        <div class="col-label">A · 3 lignes (référence)</div>
+
+        <!-- Préprod 3-line -->
+        <div class="demo-frame mb-5">
+          <div class="w-[280px] rounded-2xl bg-zinc-950/85 border border-zinc-800 backdrop-blur-md shadow-2xl shadow-zinc-950/60 overflow-hidden">
+            <div class="px-4 py-2.5 bg-zinc-900/70 border-b border-zinc-800 flex items-center gap-2">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-zinc-300"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"></path></svg>
+              <div class="min-w-0">
+                <div class="text-[11px] font-medium text-zinc-100 truncate">Préprod</div>
+                <div class="text-[9px] text-zinc-500 uppercase tracking-wider">Workspace éditable</div>
+              </div>
+            </div>
+            <div class="px-2 pt-2">
+              <div class="flex p-0.5 rounded-md bg-zinc-900 border border-zinc-800">
+                <button class="flex-1 h-7 rounded text-[10px] font-medium bg-zinc-800 text-zinc-100">Préprod</button>
+                <button class="flex-1 h-7 rounded text-[10px] font-medium text-zinc-500">Prod</button>
+              </div>
+            </div>
+            <div class="p-2">
+              <button class="pulse-emerald w-full flex items-center justify-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white text-[11px] font-medium">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 21h6"></path><path d="M6 12h12"></path><path d="M14 6l4 6-4 6"></path></svg>
+                Promouvoir préprod → prod
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prod 3-line -->
+        <div class="demo-frame prod">
+          <div class="w-[280px] rounded-2xl bg-zinc-950/85 border border-emerald-800/40 backdrop-blur-md shadow-2xl shadow-emerald-950/30 overflow-hidden">
+            <div class="px-4 py-2.5 bg-emerald-950/30 border-b border-emerald-800/30 flex items-center gap-2">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-emerald-300"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <div class="min-w-0">
+                <div class="text-[11px] font-medium text-emerald-100 truncate">Prod · plan vivant</div>
+                <div class="text-[9px] text-emerald-400/80 uppercase tracking-wider">Engagé en atelier</div>
+              </div>
+            </div>
+            <div class="px-2 pt-2">
+              <div class="flex p-0.5 rounded-md bg-zinc-900 border border-zinc-800">
+                <button class="flex-1 h-7 rounded text-[10px] font-medium text-zinc-500">Préprod</button>
+                <button class="flex-1 h-7 rounded text-[10px] font-medium bg-emerald-700/30 text-emerald-100">Prod</button>
+              </div>
+            </div>
+            <div class="p-2">
+              <div class="w-full flex items-center justify-center gap-1.5 h-9 rounded-md text-[10px] text-zinc-500 italic">Pour éditer, bascule en préprod</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[10px] text-zinc-500 mt-3">Header explicite + toggle distinct + action. Plus aéré, le sous-titre porte le statut.</p>
+      </div>
+
+      <!-- ============== COL B : 2 lignes "toggle = header" ============== -->
+      <div>
+        <div class="col-label">B · 2 lignes — toggle EST le header</div>
+
+        <!-- Préprod 2-line variant B -->
+        <div class="demo-frame mb-5">
+          <div class="w-[280px] rounded-2xl bg-zinc-950/85 border border-zinc-800 backdrop-blur-md shadow-2xl shadow-zinc-950/60 overflow-hidden">
+            <!-- Toggle-header -->
+            <div class="flex border-b border-zinc-800">
+              <button class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-zinc-900/70 text-zinc-100 text-[11px] font-medium">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-zinc-300"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"></path></svg>
+                Préprod
+              </button>
+              <button class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-zinc-500 hover:bg-zinc-900/40 text-[11px]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Prod
+              </button>
+            </div>
+            <div class="p-2">
+              <button class="pulse-emerald w-full flex items-center justify-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white text-[11px] font-medium">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 21h6"></path><path d="M6 12h12"></path><path d="M14 6l4 6-4 6"></path></svg>
+                Promouvoir préprod → prod
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prod 2-line variant B -->
+        <div class="demo-frame prod">
+          <div class="w-[280px] rounded-2xl bg-zinc-950/85 border border-emerald-800/40 backdrop-blur-md shadow-2xl shadow-emerald-950/30 overflow-hidden">
+            <div class="flex border-b border-emerald-800/30">
+              <button class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-zinc-500 hover:bg-zinc-900/40 text-[11px]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"></path></svg>
+                Préprod
+              </button>
+              <button class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-950/40 text-emerald-100 text-[11px] font-medium">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-emerald-300"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Prod
+              </button>
+            </div>
+            <div class="p-2">
+              <div class="w-full flex items-center justify-center gap-1.5 h-9 rounded-md text-[10px] text-zinc-500 italic">Pour éditer, bascule en préprod</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[10px] text-zinc-500 mt-3">Le toggle prend toute la largeur. La couleur du header dit l'env actif. <strong>Sous-titre perdu</strong> mais l'info "où je suis" est plus directe (le côté allumé du toggle).</p>
+      </div>
+
+      <!-- ============== COL C : 2 lignes "header chevron-switch" ============== -->
+      <div>
+        <div class="col-label">C · 2 lignes — header + chevron switch</div>
+
+        <!-- Préprod 2-line variant C -->
+        <div class="demo-frame mb-5">
+          <div class="w-[280px] rounded-2xl bg-zinc-950/85 border border-zinc-800 backdrop-blur-md shadow-2xl shadow-zinc-950/60 overflow-hidden">
+            <button class="w-full px-4 py-2.5 bg-zinc-900/70 border-b border-zinc-800 flex items-center gap-2 hover:bg-zinc-900 group">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-zinc-300"><path d="M9 11l3 3 8-8"></path><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"></path></svg>
+              <span class="text-[11px] font-medium text-zinc-100">Préprod</span>
+              <span class="text-[10px] text-zinc-500 ml-auto group-hover:text-zinc-300 flex items-center gap-1">basculer en prod
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path></svg>
+              </span>
+            </button>
+            <div class="p-2">
+              <button class="pulse-emerald w-full flex items-center justify-center gap-1.5 h-9 rounded-md bg-emerald-600 text-white text-[11px] font-medium">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 21h6"></path><path d="M6 12h12"></path><path d="M14 6l4 6-4 6"></path></svg>
+                Promouvoir préprod → prod
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prod 2-line variant C -->
+        <div class="demo-frame prod">
+          <div class="w-[280px] rounded-2xl bg-zinc-950/85 border border-emerald-800/40 backdrop-blur-md shadow-2xl shadow-emerald-950/30 overflow-hidden">
+            <button class="w-full px-4 py-2.5 bg-emerald-950/30 border-b border-emerald-800/30 flex items-center gap-2 hover:bg-emerald-950/50 group">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-emerald-300"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span class="text-[11px] font-medium text-emerald-100">Prod</span>
+              <span class="text-[10px] text-emerald-400/70 ml-auto group-hover:text-emerald-300 flex items-center gap-1">basculer en préprod
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+              </span>
+            </button>
+            <div class="p-2">
+              <div class="w-full flex items-center justify-center gap-1.5 h-9 rounded-md text-[10px] text-zinc-500 italic">Pour éditer, bascule en préprod</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[10px] text-zinc-500 mt-3">Le header complet est cliquable pour basculer. L'env actif est nommé clairement, la flèche dit <em>"il existe une autre face"</em>. Plus calme que B, mais l'env inactif n'est pas montré.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VERDICT TABLE                                                  -->
+    <!-- ============================================================== -->
+    <section class="rounded-lg border border-zinc-800 overflow-hidden">
+      <table class="w-full text-xs">
+        <thead class="bg-zinc-900/60">
+          <tr class="text-[10px] text-zinc-500 uppercase tracking-wider">
+            <th class="px-3 py-2 text-left">Critère</th>
+            <th class="px-3 py-2 text-left">A · 3 lignes</th>
+            <th class="px-3 py-2 text-left">B · toggle = header</th>
+            <th class="px-3 py-2 text-left">C · chevron switch</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-900">
+          <tr><td class="px-3 py-2 text-zinc-400">Hauteur</td><td class="px-3 py-2">~108 px</td><td class="px-3 py-2 text-emerald-300">~84 px</td><td class="px-3 py-2 text-emerald-300">~84 px</td></tr>
+          <tr><td class="px-3 py-2 text-zinc-400">Sous-titre statut</td><td class="px-3 py-2 text-emerald-300">visible</td><td class="px-3 py-2 text-rose-300">supprimé</td><td class="px-3 py-2 text-rose-300">supprimé</td></tr>
+          <tr><td class="px-3 py-2 text-zinc-400">Env inactif visible</td><td class="px-3 py-2 text-emerald-300">oui (toggle)</td><td class="px-3 py-2 text-emerald-300">oui (toggle)</td><td class="px-3 py-2 text-amber-300">non (juste un lien)</td></tr>
+          <tr><td class="px-3 py-2 text-zinc-400">Bascule</td><td class="px-3 py-2">1 clic ciblé sur l'onglet</td><td class="px-3 py-2">1 clic gros (moitié de carte)</td><td class="px-3 py-2">1 clic sur header entier</td></tr>
+          <tr><td class="px-3 py-2 text-zinc-400">Confusion possible</td><td class="px-3 py-2">faible</td><td class="px-3 py-2">non</td><td class="px-3 py-2">"basculer en prod" pourrait se lire comme "promouvoir"</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="text-[11px] text-zinc-500 space-y-1 pt-4 border-t border-zinc-800">
+      <p>Mon avis : <strong>B</strong> est le meilleur compromis si tu veux du 2-lignes. Le toggle plein-largeur sert de header coloré ET de sélecteur ; pas de risque de confusion comme C ; les 24 px gagnés sont notables sur un FAB.</p>
+      <p>L'argument pour <strong>A</strong> reste le sous-titre — utile pour rappeler "Engagé en atelier" quand on est en prod (instinctif pour garder le bon réflexe de prudence).</p>
+      <p>Le scénario shell continue d'utiliser la version 3 lignes (header avec nom de la branche + sous-titre + actions) car la branche A NE SE TOGGLE PAS — il n'y a rien à mettre dans un toggle.</p>
+    </footer>
+  </div>
+</body>
+</html>

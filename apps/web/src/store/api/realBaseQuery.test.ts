@@ -2,8 +2,8 @@
  * Tests for realBaseQuery.ts - Real API configuration
  */
 
-import { describe, it, expect } from 'vitest';
-import { __testing__ } from './realBaseQuery';
+import { describe, it, expect, afterEach } from 'vitest';
+import { __testing__, resolveScenarioHeader } from './realBaseQuery';
 
 const { getApiBaseUrl, prepareHeaders } = __testing__;
 
@@ -52,6 +52,54 @@ describe('realBaseQuery', () => {
       const headers = new Headers();
       const result = prepareHeaders(headers, { getState: mockGetState });
       expect(result.get('Authorization')).toBeNull();
+    });
+  });
+
+  describe('resolveScenarioHeader', () => {
+    const originalLocation = window.location;
+
+    function stubLocation(pathname: string, search = '') {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...originalLocation, pathname, search },
+      });
+    }
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    });
+
+    it('returns scenario UUID for /scenarios/:uuid path', () => {
+      stubLocation('/scenarios/12345678-1234-1234-1234-123456789abc/stations');
+      expect(resolveScenarioHeader()).toBe('12345678-1234-1234-1234-123456789abc');
+    });
+
+    it('returns UUID even when path ends right after the segment', () => {
+      stubLocation('/scenarios/12345678-1234-1234-1234-123456789abc');
+      expect(resolveScenarioHeader()).toBe('12345678-1234-1234-1234-123456789abc');
+    });
+
+    it("returns 'prod' when ?env=prod is set on a non-scenario path", () => {
+      stubLocation('/', '?env=prod');
+      expect(resolveScenarioHeader()).toBe('prod');
+    });
+
+    it("scenario path wins over ?env=prod when both are present", () => {
+      stubLocation('/scenarios/12345678-1234-1234-1234-123456789abc/flux', '?env=prod');
+      expect(resolveScenarioHeader()).toBe('12345678-1234-1234-1234-123456789abc');
+    });
+
+    it('returns null on plain preprod path', () => {
+      stubLocation('/');
+      expect(resolveScenarioHeader()).toBeNull();
+    });
+
+    it('returns null when path mentions scenarios without a UUID', () => {
+      stubLocation('/scenarios');
+      expect(resolveScenarioHeader()).toBeNull();
     });
   });
 });

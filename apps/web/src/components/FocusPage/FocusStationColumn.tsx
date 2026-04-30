@@ -211,6 +211,7 @@ export function FocusStationColumn({
         pixelsPerHour,
         startDate: gridStartDate,
         now,
+        collapses: [],
       }),
     [
       station.id,

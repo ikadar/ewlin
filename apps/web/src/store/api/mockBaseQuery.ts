@@ -1078,12 +1078,12 @@ const handleClearJobAssignments: MockRouteHandler = async (args: FetchArgs) => {
  *
  * Query params:
  * - includeInProgress=1: also clear tiles intersecting with NOW
- * - fuseSplits=1: fuse split tile groups back into single tasks after clearing
+ * - includePinned=1: also clear pinned tiles
+ * - includeFrozen=1: also clear safety-zone-frozen tiles
  */
 const handleClearAllAssignments: MockRouteHandler = async (args: FetchArgs) => {
   const url = new URL(args.url, 'http://localhost');
   const includeInProgress = url.searchParams.get('includeInProgress') === '1';
-  const fuseSplits = url.searchParams.get('fuseSplits') === '1';
 
   const currentSnapshot = getSnapshot();
   const now = new Date().toISOString();
@@ -1112,36 +1112,7 @@ const handleClearAllAssignments: MockRouteHandler = async (args: FetchArgs) => {
     (a: TaskAssignment) => !outsourcedToRemove.has(a.taskId)
   );
 
-  updateSnapshot((snapshot) => {
-    const updated = { ...snapshot, assignments: remainingAssignments };
-
-    // Fuse split groups where ALL parts have been cleared
-    if (fuseSplits) {
-      const splitGroups = new Map<string, string[]>();
-      for (const task of updated.tasks) {
-        if (task.type === 'Internal') {
-          const it = task as InternalTask;
-          if (it.splitGroupId) {
-            const group = splitGroups.get(it.splitGroupId) || [];
-            group.push(it.id);
-            splitGroups.set(it.splitGroupId, group);
-          }
-        }
-      }
-      for (const [, memberIds] of splitGroups) {
-        // Only fuse if ALL members are unassigned (none remain in assignments)
-        const anyStillAssigned = memberIds.some((id) =>
-          updated.assignments.some((a: TaskAssignment) => a.taskId === id)
-        );
-        if (!anyStillAssigned) {
-          const restoredId = generateId();
-          applyFuseToSnapshot(updated as ScheduleSnapshot, { taskId: memberIds[0], restoredId, now });
-        }
-      }
-    }
-
-    return updated;
-  });
+  updateSnapshot((snapshot) => ({ ...snapshot, assignments: remainingAssignments }));
 
   return { data: { unassignedCount: clearableTaskIds.size } };
 };

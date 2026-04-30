@@ -1,4 +1,6 @@
+import { Trash2 } from 'lucide-react';
 import type { MassUnscheduleState } from '../hooks/useMassUnschedule';
+import { DwellButton } from './DwellButton/DwellButton';
 
 interface Props {
   state: MassUnscheduleState;
@@ -45,15 +47,6 @@ export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDi
           <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
             <input
               type="checkbox"
-              checked={state.fuseSplits}
-              onChange={(e) => onUpdate((prev) => prev ? { ...prev, fuseSplits: e.target.checked } : prev)}
-              className="accent-red-600"
-            />
-            Fusionner les tuiles splittées
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-            <input
-              type="checkbox"
               checked={state.includePinned}
               onChange={(e) => onUpdate((prev) => prev ? { ...prev, includePinned: e.target.checked } : prev)}
               className="accent-red-600"
@@ -70,15 +63,18 @@ export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDi
             Inclure les tuiles avec flocon actif (safety zone)
           </label>
         </div>
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 items-center">
           <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
                   onClick={onDismiss}>
             Annuler
           </button>
-          <button className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
-                  onClick={onConfirm}>
-            Tout effacer
-          </button>
+          <DwellButton
+            color="red"
+            icon={Trash2}
+            label="Maintenir pour effacer"
+            onConfirmed={onConfirm}
+            testId="mass-unschedule-dwell-button"
+          />
         </div>
       </div>
     </div>

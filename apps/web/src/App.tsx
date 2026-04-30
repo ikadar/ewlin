@@ -21,7 +21,7 @@ import { updateSnapshot } from './mock';
 import { buildSequenceIndexLookup } from './utils/safetyZone';
 import { StalenessBadge } from './components/StalenessBadge';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, useGetProdSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, useGetProdSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useGetPaperLeadTimeQuery, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -34,6 +34,7 @@ import { computeCollapses } from './utils/computeCollapses';
 import type { Collapse } from './components/SchedulingGrid/collapseConfig';
 import { yPositionToTime } from './components/DragPreview/snapUtils';
 import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
+import { RazFab } from './components/RazFab/RazFab';
 import { getErrorMessage } from './store/api/errorNormalization';
 import { useAppDispatch } from './store';
 import { fluxApi } from './store/api/fluxApi';
@@ -246,6 +247,10 @@ function AppContent() {
 
   // v0.5.7: Global error handling - service unavailable state
   const isServiceUnavailable = useAppSelector(selectIsServiceUnavailable);
+
+  // Paper lead-time (shop-wide). Used by the JDP to display the gate
+  // pill tooltip when an element has paperStatus not Ready.
+  const { data: paperLeadTime } = useGetPaperLeadTimeQuery();
 
   // Helper to trigger refetch after local updateSnapshot calls
   // This bridges the gap between the mock layer and RTK Query cache
@@ -1114,7 +1119,7 @@ function AppContent() {
     try {
       const result = await massUnschedule.confirm();
       if (result) {
-        showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
+        showToast(`${result.unassignedCount} effacé`, 'success');
       }
     } catch (error) {
       showToast(getErrorMessage(error));
@@ -1980,6 +1985,7 @@ function AppContent() {
           providers={snapshot.providers}
           activeTaskId={undefined}
           conflictTaskIds={conflictTaskIds}
+          paperLeadTimeHours={paperLeadTime?.hours}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onClose={() => setSelectedJobId(null)}
@@ -2194,6 +2200,12 @@ function AppContent() {
         }))}
         initialClientName={jcfClient}
       />
+
+      {/* RAZ FAB — entry point for the mass-unschedule flow.
+          Hidden in prod scenario mode (matches the Ctrl+Alt+Z guard above). */}
+      {scenarioMode !== 'prod' && (
+        <RazFab onClick={massUnschedule.trigger} />
+      )}
 
       {/* Mass unschedule confirmation dialog */}
       {massUnschedule.confirmState && (

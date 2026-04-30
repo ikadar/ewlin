@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import type { Station, StationCategory } from '@flux/types';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
@@ -54,6 +54,7 @@ export function StationHeader({
   displayMode: _displayMode,
   category,
 }: StationHeaderProps) {
+  const location = useLocation();
   // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
   const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
 
@@ -82,7 +83,7 @@ export function StationHeader({
         )}
         <StationSettingsButton stationId={station.id} stationLabel={station.name} />
         <Link
-          to={`/focus/station/${station.id}`}
+          to={`/focus/station/${station.id}${location.search}`}
           aria-label={`Ouvrir la vue focus de ${station.name}`}
           className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
           data-testid={`station-header-focus-link-${station.id}`}

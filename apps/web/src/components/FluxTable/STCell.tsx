@@ -130,10 +130,13 @@ export const STCell = memo(function STCell({ tasks, onUpdateSTStatus }: STCellPr
             onMouseLeave={hideTooltip}
             data-testid={`st-line-${task.taskId}`}
           >
-            <button
+            {/* Read-only status indicator (clickability removed per UX decision).
+                Status is now driven exclusively by upstream signals — schedule
+                completion, manual logistics flow — not by direct toggling
+                from the Flux dashboard. */}
+            <span
               className={`st-${task.status}`}
-              style={{ display: 'flex', flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-              onClick={() => onUpdateSTStatus(task.taskId, nextSTStatus(task.status))}
+              style={{ display: 'flex', flexShrink: 0 }}
               aria-label={`${label}: ${task.status}`}
               data-testid={`st-toggle-${task.taskId}`}
               data-status={task.status}
@@ -141,7 +144,7 @@ export const STCell = memo(function STCell({ tasks, onUpdateSTStatus }: STCellPr
               {task.status === 'pending'  && <PendingIcon />}
               {task.status === 'progress' && <ProgressIcon />}
               {task.status === 'done'     && <DoneIcon />}
-            </button>
+            </span>
             <span className="st-label">{label}</span>
           </div>
         );

@@ -571,14 +571,9 @@ const FluxTableRow = memo(function FluxTableRow({
         )}
       </td>
 
-      {/* Parti — clickable toggle */}
+      {/* Parti — read-only display (clickability removed per UX decision) */}
       <td className="px-2 py-0 whitespace-nowrap">
-        <button
-          type="button"
-          className="flex items-center gap-1.5 cursor-pointer hover:opacity-80"
-          onClick={() => ctx.onToggleShipped?.(job.internalId, !job.parti.shipped)}
-          title={job.parti.shipped ? 'Marquer comme non expédié' : 'Marquer comme expédié'}
-        >
+        <span className="flex items-center gap-1.5">
           {job.parti.shipped ? (
             <>
               <CircleCheck className="w-4 h-4 text-emerald-500" strokeWidth={2} />
@@ -591,7 +586,7 @@ const FluxTableRow = memo(function FluxTableRow({
           ) : (
             <Circle className="w-4 h-4 text-zinc-600" strokeWidth={2} />
           )}
-        </button>
+        </span>
       </td>
 
       {/* Facturé — clickable toggle */}

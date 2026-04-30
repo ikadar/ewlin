@@ -61,6 +61,13 @@ export interface JobDetailsPanelProps {
   snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
   /** Callback to scroll the operator grid to a specific operator slice */
   onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
+  /**
+   * Paper lead-time hours (shop-wide setting), shown in the Papier pill
+   * tooltip when an element has paperStatus not Ready. Pass through from
+   * the consuming page that already holds Redux state — keeps this
+   * component free of store dependencies and unit-test-friendly.
+   */
+  paperLeadTimeHours?: number;
 }
 
 /** Format a datetime as DD/MM/YYYY a HHhMM */
@@ -119,6 +126,7 @@ export function JobDetailsPanel({
   onSelectJob,
   snapshotOperators,
   onJumpToOperatorSlice,
+  paperLeadTimeHours,
 }: JobDetailsPanelProps) {
   // Memoize data filtering for this job
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
@@ -341,6 +349,7 @@ export function JobDetailsPanel({
         tasks={jobTasks}
         elements={jobElements}
         job={job}
+        paperLeadTimeHours={paperLeadTimeHours}
         assignments={jobAssignments}
         stations={stations}
         categories={categories}

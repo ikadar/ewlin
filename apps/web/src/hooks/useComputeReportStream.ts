@@ -11,7 +11,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ScheduleSnapshot } from '@flux/types';
+import { getDeadlineDate, SHIPPING_DEPARTURE_HOUR } from '@flux/types';
 import type { ComputeScheduleResult } from '../store';
+import { resolveScenarioHeader } from '../store/api/realBaseQuery';
 import { getJobIdForTask } from '../utils/taskHelpers';
 
 export type ComputeReportMode = 'full' | 'selective' | 'incremental';
@@ -54,13 +56,41 @@ const INITIAL_STATE: ComputeReportState = {
   lateJobs: [],
 };
 
+/**
+ * Mirror of validation-service `identifyLateJobs` (services/validation-service/
+ * src/routes/enrich.ts) so the toast's "à l'heure" ratio agrees with the
+ * FluxTable's "En retard" chip — both must apply the same three checks.
+ *
+ * Uses `result.assignments` for fresh end timestamps but falls back to the
+ * pre-compute snapshot for `isCompleted` (compute never mutates completion).
+ */
 function findLateJobs(
   snapshot: ScheduleSnapshot,
   result: ComputeScheduleResult,
 ): ComputeReportLateJob[] {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(SHIPPING_DEPARTURE_HOUR, 0, 0, 0);
+
+  // Both halves of the engine response feed the lateness mirror. The
+  // internal `assignments` array carries machine-bound tasks; the
+  // outsourced `outsourcedAssignments` array carries ST steps (PLIAGE
+  // Aller-simple etc.) whose return date can land after the deadline
+  // even when every internal task fits inside it. PHP merges both into
+  // the persisted Schedule.assignments map, so SnapshotBuilder catches
+  // ST lateness — but if the toast only reads `result.assignments`, it
+  // happily reports "100 % à l'heure" while the JDP renders the row red.
   const endByTask = new Map<string, string>();
   for (const a of result.assignments) {
     if (a.scheduledEnd) endByTask.set(a.taskId, a.scheduledEnd);
+  }
+  for (const o of result.outsourcedAssignments ?? []) {
+    if (o.scheduledEnd) endByTask.set(o.taskId, o.scheduledEnd);
+  }
+
+  const completionByTask = new Map<string, boolean>();
+  for (const a of snapshot.assignments) {
+    completionByTask.set(a.taskId, a.isCompleted);
   }
 
   // Precompute task → jobId via elements so we don't rescan for each job.
@@ -73,23 +103,31 @@ function findLateJobs(
   const late: ComputeReportLateJob[] = [];
   for (const job of snapshot.jobs) {
     if (!job.workshopExitDate) continue;
-    const deadline = new Date(job.workshopExitDate);
+    const deadline = getDeadlineDate(job.workshopExitDate);
+
+    let isLate = deadline < today;
     let latestEnd: Date | null = null;
 
     for (const task of snapshot.tasks) {
       if (taskToJob.get(task.id) !== job.id) continue;
       const endStr = endByTask.get(task.id);
-      if (endStr) {
-        const end = new Date(endStr);
-        if (!latestEnd || end > latestEnd) latestEnd = end;
-      }
+      if (!endStr) continue;
+      const end = new Date(endStr);
+      if (!latestEnd || end > latestEnd) latestEnd = end;
+      if (end > deadline) isLate = true;
+      if (!completionByTask.get(task.id) && end < now) isLate = true;
     }
 
-    if (latestEnd && latestEnd > deadline) {
+    if (isLate) {
+      const referenceDate = latestEnd && latestEnd > today ? latestEnd : today;
+      const lateByMinutes = Math.max(
+        1,
+        Math.ceil((referenceDate.getTime() - deadline.getTime()) / 60000),
+      );
       late.push({
         ref: job.reference,
         client: job.client,
-        lateByMinutes: Math.round((latestEnd.getTime() - deadline.getTime()) / 60000),
+        lateByMinutes,
         priority: job.deadlinePriority ?? 2,
       });
     }
@@ -190,6 +228,7 @@ export function useComputeReportStream(
       }
 
       const token = localStorage.getItem('flux_auth_token') ?? '';
+      const scenarioHeader = resolveScenarioHeader();
       const body = JSON.stringify({
         mode: input.mode,
         ...(input.jobId ? { jobId: input.jobId } : {}),
@@ -203,6 +242,7 @@ export function useComputeReportStream(
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
+              ...(scenarioHeader ? { 'X-Flux-Scenario': scenarioHeader } : {}),
             },
             body,
           });

@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Per-stint completion — UX/UI + algo impact</title>
+<style>
+  :root {
+    --bg-page: #050505;
+    --bg-card: #0d0d0d;
+    --bg-grid: #111;
+    --border: #1f1f1f;
+    --border-light: #2a2a2a;
+    --text: #d8d8d8;
+    --text-muted: #888;
+    --text-dim: #555;
+    /* "À faire" = bleu (default state). "Fait" = vert (completed state).
+       Le rouge est réservé au tileState 'late' (job en retard) — hors-scope ici.
+       Aligné sur src/components/Tile/colorUtils.ts (default: blue-500,
+       completed: green-500). */
+    --tile-bg: rgba(59, 130, 246, 0.16);
+    --tile-bg-done: rgba(34, 197, 94, 0.18);
+    --tile-border: #3b82f6;
+    --tile-border-done: #22c55e;
+    --tile-text: #93c5fd;
+    --tile-text-done: #86efac;
+    --closure: repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 6px, transparent 6px 12px);
+    --pin-bg: rgba(64, 100, 180, 0.55);
+    --pin-border: #4a78c8;
+    --done: #22c55e;       /* green-500 */
+    --pending: #3b82f6;    /* blue-500  */
+    --pending-dim: #4a5568;
+    --stint-stripe: rgba(255, 255, 255, 0.06);
+    --replace: rgba(255, 100, 100, 0.10);
+    --frozen: rgba(45, 208, 117, 0.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg-page);
+    color: var(--text);
+    font: 13px/1.4 -apple-system, "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 13px; color: var(--text-muted); margin: 32px 0 8px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+  h3 { font-size: 12px; margin: 0 0 6px; font-weight: 600; color: #e8e8e8; }
+  p { color: var(--text-muted); margin: 4px 0 16px; max-width: 760px; }
+  .lead { color: #c8c8c8; font-size: 13px; max-width: 800px; }
+  .section {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .section-header {
+    display: flex; gap: 12px; align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .section-tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: rgba(96, 128, 255, 0.18); color: #a0c0ff;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .section-tag.algo { background: rgba(255, 160, 60, 0.18); color: #ffc880; }
+  .section-tag.ui { background: rgba(96, 200, 130, 0.18); color: #9ad8b0; }
+  .section-tag.data { background: rgba(180, 120, 220, 0.18); color: #d0a4ee; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-2 .lab { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .demo-grid {
+    position: relative;
+    background: var(--bg-grid);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    height: 260px;
+    overflow: hidden;
+  }
+  .demo-grid.tall { height: 380px; }
+  .col-header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.4);
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-light);
+    z-index: 5;
+  }
+  .col-header strong { color: var(--text); }
+  .hour-line {
+    position: absolute; left: 0; right: 0;
+    height: 1px; background: rgba(255,255,255,0.04);
+    pointer-events: none;
+  }
+  .hour-label {
+    position: absolute; left: 4px;
+    font-size: 9px; color: rgba(255,255,255,0.25);
+    pointer-events: none; transform: translateY(-50%);
+  }
+
+  /* Tile = chunk on station view — vertical proportional progressive fill */
+  .tile {
+    position: absolute;
+    left: 30px; right: 6px;
+    border-left: 2px solid var(--tile-border);
+    background: var(--tile-bg);
+    color: var(--tile-text);
+    padding: 4px 8px;
+    border-radius: 2px;
+    font-size: 11px;
+    overflow: hidden;
+  }
+  .tile.done { background: var(--tile-bg-done); border-left-color: var(--tile-border-done); }
+  /* Done overlay : remplit horizontalement (gauche → droite) jusqu'à
+     la fin du dernier stint done. Vert (= completed state). */
+  .tile-fill {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 0%;
+    background: linear-gradient(to right,
+      rgba(34, 197, 94, 0.30) 0%,
+      rgba(34, 197, 94, 0.36) 70%,
+      rgba(34, 197, 94, 0.28) 100%);
+    border-right: 1.5px solid var(--tile-border-done);
+    transition: width 220ms ease;
+    pointer-events: none;
+  }
+  .tile-label, .tile-meta {
+    position: relative;
+    z-index: 1;
+  }
+  .tile-label { font-weight: 500; line-height: 1.2; }
+  .tile-meta { font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 1px; }
+
+  /* Stints = sub-segments inside a chunk (operator view) */
+  .stint {
+    position: absolute; left: 30px; right: 6px;
+    border-left: 2px solid var(--tile-border);
+    background: var(--tile-bg);
+    color: var(--tile-text);
+    padding: 4px 8px;
+    border-radius: 2px;
+    font-size: 11px;
+    overflow: hidden;
+    transition: background 150ms ease, border-color 150ms ease;
+  }
+  .stint.done { background: var(--tile-bg-done); border-left-color: var(--tile-border-done); }
+  .stint.pending { background: var(--tile-bg); border-left-color: var(--tile-border); }
+  .stint-handle {
+    position: absolute; top: 4px; right: 6px;
+    width: 14px; height: 14px;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .stint-handle.done {
+    background: var(--done);
+    border-color: var(--done);
+    color: white;
+  }
+  .stint-handle.done::after {
+    content: "✓"; position: absolute;
+    top: 50%; left: 50%; transform: translate(-50%, -55%);
+    font-size: 10px; font-weight: bold; color: #052e16;
+  }
+  .stint-label { font-weight: 500; line-height: 1.15; }
+  .stint-op { font-size: 9px; color: rgba(255,255,255,0.6); margin-top: 1px; }
+
+  /* JDP — progress bar à remplissage proportionnel */
+  .jdp-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--border-light); border-radius: 4px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .jdp-row.task-done { background: rgba(45, 208, 117, 0.06); }
+  .jdp-row-content {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .jdp-row-label {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .jdp-progress {
+    position: relative;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 999px;
+    overflow: hidden;
+    width: 100%;
+  }
+  .jdp-progress-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(to right, #22c55e, #4ade80);
+    border-radius: 999px;
+    transition: width 220ms ease;
+  }
+  .jdp-progress-marks {
+    position: absolute; top: 0; bottom: 0; left: 0; right: 0;
+    pointer-events: none;
+  }
+  .jdp-progress-mark {
+    position: absolute; top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.15);
+  }
+  .jdp-pct { font-size: 10px; color: var(--text-muted); min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .jdp-pct.done { color: var(--done); }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+    margin: 10px 0 6px; font-size: 11px; color: var(--text-muted);
+  }
+  .legend-item { display: inline-flex; gap: 6px; align-items: center; }
+  .swatch {
+    width: 14px; height: 14px; border-radius: 2px; border-left: 2px solid var(--tile-border);
+  }
+  .swatch.done { background: var(--tile-bg-done); border-left-color: var(--tile-border-done); }
+  .swatch.partial { background: var(--tile-bg-partial); border-left-color: var(--tile-border-partial); }
+  .swatch.pending { background: var(--tile-bg); }
+  .swatch.pin { background: var(--pin-bg); border-left-color: var(--pin-border); }
+
+  /* Algo timeline */
+  .timeline {
+    position: relative;
+    background: var(--bg-grid);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    height: 60px;
+    margin-bottom: 8px;
+  }
+  .timeline-segment {
+    position: absolute;
+    top: 4px; bottom: 4px;
+    border-radius: 2px;
+    border-left: 2px solid var(--tile-border);
+    background: var(--tile-bg);
+    color: var(--tile-text);
+    font-size: 10px;
+    padding: 2px 6px;
+    line-height: 14px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .timeline-segment.done {
+    background: var(--tile-bg-done); border-left-color: var(--tile-border-done);
+  }
+  .timeline-segment.frozen {
+    background: var(--frozen);
+    border-left-color: var(--done);
+    color: var(--done);
+    font-style: italic;
+  }
+  .timeline-segment.replaced {
+    outline: 2px dashed rgba(255, 100, 100, 0.4);
+    outline-offset: -2px;
+  }
+  .timeline-label {
+    font-size: 10px; color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  table.data-table {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+    margin-top: 6px;
+  }
+  table.data-table th {
+    text-align: left; padding: 6px 10px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-muted); font-weight: 500;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  table.data-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", monospace;
+  }
+  table.data-table tr.highlight td {
+    background: rgba(45, 208, 117, 0.08);
+  }
+  table.data-table .check {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid var(--pending); vertical-align: middle;
+  }
+  table.data-table .check.done {
+    background: var(--done); border-color: var(--done);
+  }
+
+  .controls {
+    display: flex; gap: 12px; align-items: center;
+    padding: 8px 10px; background: rgba(255,255,255,0.025);
+    border-radius: 4px; margin-bottom: 12px; font-size: 12px;
+  }
+  .controls button {
+    background: rgba(96, 128, 255, 0.18);
+    color: #c0d0ff;
+    border: 1px solid rgba(96, 128, 255, 0.30);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .controls button:hover { background: rgba(96, 128, 255, 0.30); }
+
+  .note {
+    font-size: 11px; color: var(--text-muted);
+    background: rgba(255,255,255,0.02);
+    border-left: 2px solid rgba(96, 128, 255, 0.4);
+    padding: 6px 10px;
+    margin-top: 8px;
+  }
+
+  .api-row {
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    margin: 4px 0;
+    color: #c0c0c0;
+  }
+  .method-post { color: #ffc880; }
+  .method-get { color: #80c8ff; }
+</style>
+</head>
+<body>
+
+  <h1>Per-stint completion — modèle <code>(task × operator × slot_start)</code></h1>
+  <p class="lead">
+    Playground exhaustif des impacts UX/UI/Algo de la décision : la complétion s'entend par stint
+    (= une fenêtre <code>op.from→op.to</code> d'un opérateur sur une task), pas par task ni par chunk.
+    L'agrégation aux niveaux supérieurs (chunk, task, job) est mécanique et garde le code Flux/KPIs inchangé.
+  </p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="swatch pending"></div>Stint pending</div>
+    <div class="legend-item"><div class="swatch done"></div>Stint done</div>
+    <div class="legend-item"><div class="swatch pin"></div>Pin safety-frozen (séparé)</div>
+  </div>
+
+  <!-- ─────────────────────────────────────────── DATA ─────────────────────────────────────────── -->
+  <h2>Modèle de données</h2>
+  <div class="section">
+    <div class="section-header">
+      <h3>Schéma <code>prod_completion_overlay</code></h3>
+      <span class="section-tag data">DB</span>
+    </div>
+    <table class="data-table">
+      <tr><th>Colonne</th><th>Type</th><th>Rôle</th></tr>
+      <tr><td>prod_scenario_id</td><td>char(36)</td><td>existant</td></tr>
+      <tr><td>task_id</td><td>char(36)</td><td>existant</td></tr>
+      <tr class="highlight"><td>operator_id</td><td>char(36)</td><td><strong>NOUVEAU</strong> — quel opérateur reporte sa fin</td></tr>
+      <tr class="highlight"><td>slot_start</td><td>datetime</td><td><strong>NOUVEAU</strong> — début du stint (résilient aux re-computes)</td></tr>
+      <tr><td>is_completed</td><td>tinyint(1)</td><td>existant</td></tr>
+      <tr><td>completed_at</td><td>datetime</td><td>existant</td></tr>
+      <tr><td>completed_by_user_id</td><td>char(36)</td><td>existant</td></tr>
+    </table>
+    <div class="note">
+      PK = <code>(prod_scenario_id, task_id, operator_id, slot_start)</code>.
+      Index par <code>slot_start</code> au lieu d'un ordinal : un re-compute qui décale légèrement le stint
+      garde l'overlay (matching tolérant ±15 min). Suppressions/ajouts de stints laissent les overlays
+      orphelines, purgées via cleanup périodique.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h3>API</h3>
+      <span class="section-tag data">API</span>
+    </div>
+    <div class="api-row">
+      <span class="method-post">POST</span> /api/v1/scenarios/prod/completion/{taskId}/stint
+      &nbsp;&nbsp;<em style="color:#888">body:</em> <code>{ operatorId, slotStart, isCompleted }</code>
+    </div>
+    <div class="api-row">
+      <span class="method-get">GET</span> /api/v1/scenarios/prod/snapshot
+      &nbsp;&nbsp;<em style="color:#888">→ assignment.stintCompletions:</em> <code>[{ operatorId, slotStart, isCompleted, completedAt }]</code>
+    </div>
+    <div class="note">
+      Idempotent. Le client envoie le triplet (taskId, operatorId, slotStart) → le serveur upsert
+      l'overlay. Le snapshot expose tableau aligné aux stints — le front lit par <code>(operatorId, slotStart)</code>.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h3>Règles d'agrégation</h3>
+      <span class="section-tag data">domain</span>
+    </div>
+    <div style="font-family: ui-monospace, monospace; font-size: 11.5px; line-height: 1.7; padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 4px;">
+      <span style="color:#a0c0ff">stint.isDone</span>   = ∃ overlay(taskId, opId, slotStart) ∧ is_completed=true<br>
+      <span style="color:#a0c0ff">chunk.aggregate</span> = "all stints in chunk are done" → done · "some" → partial · "none" → pending<br>
+      <span style="color:#a0c0ff">task.isCompleted</span> = ∀ stint of task : stint.isDone<br>
+      <span style="color:#a0c0ff">job.isCompleted</span>  = ∀ task of job : task.isCompleted
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────── UI ─────────────────────────────────────────── -->
+  <h2>Impact UI — vues principales</h2>
+
+  <div class="section">
+    <div class="section-header">
+      <h3>Scénario : presse 12h, shift change opérateur à 13h</h3>
+      <span class="section-tag ui">UX/UI</span>
+    </div>
+
+    <div class="controls">
+      <span style="color: var(--text-muted);">Toggle pour simuler les actions :</span>
+      <button onclick="toggleStint('s1')">Marquer Adrien fini</button>
+      <button onclick="toggleStint('s2')">Marquer Arnaud fini</button>
+      <button onclick="resetAll()">Reset</button>
+    </div>
+
+    <div class="grid-2">
+      <!-- GRILLE STATION (chunk view) -->
+      <div>
+        <div class="lab">Grille station — agrégat chunk</div>
+        <div class="demo-grid">
+          <div class="col-header">G37 · <strong>Lundi 30/04</strong></div>
+          <div id="station-chunk" class="tile" style="top: 50px; height: 180px;">
+            <div class="tile-fill" id="station-chunk-fill"></div>
+            <div class="tile-label">202604.0048 · FUZEAU · 8P</div>
+            <div class="tile-meta" id="station-chunk-meta">06:00 → 18:00 · pending (0%)</div>
+          </div>
+        </div>
+        <div class="note">
+          Le chunk apparaît en partiel (orange) tant que tous les stints ne sont pas done.
+          Vert seulement quand les 2 ops ont fini. Click = expand pour voir/cocher les stints.
+        </div>
+      </div>
+
+      <!-- GRILLE OPERATEUR (stint view) -->
+      <div>
+        <div class="lab">Grille opérateur — par stint</div>
+        <div class="demo-grid">
+          <div class="col-header">Adrien Berthault · Arnaud Vilchange</div>
+          <div id="stint-s1" class="stint pending" style="top: 50px; height: 90px;">
+            <div class="stint-label">202604.0048 · FUZEAU · 8P</div>
+            <div class="stint-op">Adrien · 06:00 → 12:00</div>
+            <span class="stint-handle" onclick="toggleStint('s1')" id="handle-s1"></span>
+          </div>
+          <div id="stint-s2" class="stint pending" style="top: 145px; height: 90px;">
+            <div class="stint-label">202604.0048 · FUZEAU · 8P <span style="opacity:0.6">…suite</span></div>
+            <div class="stint-op">Arnaud · 13:00 → 18:00</div>
+            <span class="stint-handle" onclick="toggleStint('s2')" id="handle-s2"></span>
+          </div>
+        </div>
+        <div class="note">
+          Chaque opérateur ne voit/coche que SON stint. C'est l'unité de référence cliquable :
+          1 tile-segment = 1 toggle = 1 overlay row.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JDP -->
+  <div class="section">
+    <div class="section-header">
+      <h3>JobDetailsPanel — barre de progression chronologique proportionnelle</h3>
+      <span class="section-tag ui">UX/UI</span>
+    </div>
+    <div class="lab">Vue chef : remplissage de la barre = avancement chronologique réel</div>
+
+    <div class="jdp-row" id="jdp-line">
+      <div class="jdp-row-content">
+        <div class="jdp-row-label">
+          <span style="font-weight: 500;">FUZEAU · 8P (G37)</span>
+        </div>
+        <div class="jdp-progress" title="Adrien 06:00→12:00 · Arnaud 13:00→18:00">
+          <div class="jdp-progress-fill" id="jdp-fill"></div>
+          <div class="jdp-progress-marks" id="jdp-marks">
+            <!-- Tick au boundary entre stints — fournit un sens de "où en est l'avancement" -->
+            <div class="jdp-progress-mark" style="left: 50%;"></div>
+          </div>
+        </div>
+      </div>
+      <span class="jdp-pct" id="jdp-pct">0 %</span>
+    </div>
+
+    <div class="jdp-row task-done">
+      <div class="jdp-row-content">
+        <div class="jdp-row-label">
+          <span style="font-weight: 500;">CAPELLE · CFB (G37)</span>
+        </div>
+        <div class="jdp-progress" title="Adrien 06:00→07:45 · ✓">
+          <div class="jdp-progress-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+      <span class="jdp-pct done">100 % ✓</span>
+    </div>
+
+    <div class="jdp-row">
+      <div class="jdp-row-content">
+        <div class="jdp-row-label">
+          <span style="font-weight: 500;">EDITIONS · CAH (Stahl, 3 jours)</span>
+        </div>
+        <div class="jdp-progress" title="4 stints — 2 done">
+          <div class="jdp-progress-fill" style="width: 47%;"></div>
+          <div class="jdp-progress-marks">
+            <div class="jdp-progress-mark" style="left: 28%;"></div>
+            <div class="jdp-progress-mark" style="left: 47%;"></div>
+            <div class="jdp-progress-mark" style="left: 75%;"></div>
+          </div>
+        </div>
+      </div>
+      <span class="jdp-pct">47 %</span>
+    </div>
+
+    <div class="note">
+      <strong>Remplissage chronologique proportionnel</strong> : la barre se remplit jusqu'à
+      la fin du dernier stint <em>done</em> (pas seulement le ratio fait/restant — l'opérateur
+      voit "où on en est dans la timeline"). Les <strong>marques verticales</strong> sur la
+      barre signalent les frontières de stint, donnant le sens "stint 1 fini, stint 2 en cours".
+      <br>
+      Hover sur la barre → tooltip détaillant chaque stint avec son opérateur et son créneau.
+      Click sur la ligne entière = toggle agrégé bulk done/undo. La granularité fine reste
+      sur la grille opérateur.
+    </div>
+  </div>
+
+  <!-- FLUX -->
+  <div class="section">
+    <div class="section-header">
+      <h3>Flux table — aucun changement visuel</h3>
+      <span class="section-tag ui">UX/UI</span>
+    </div>
+    <p>
+      Au niveau Flux, on lit <code>task.isCompleted</code> agrégé. Tant qu'un stint reste pending,
+      la task reste "pas faite" — comportement actuel préservé. Pas de nouvelle colonne, pas de
+      nouveau dot. La complexité stint reste invisible aux chefs qui pilotent par job.
+    </p>
+    <table class="data-table">
+      <tr>
+        <th>Réf</th>
+        <th>Client</th>
+        <th>Statut prod</th>
+        <th>BAT</th>
+        <th>Papier</th>
+        <th>ST</th>
+        <th>Parti</th>
+      </tr>
+      <tr>
+        <td>202604.0048</td><td>FUZEAU</td>
+        <td><span class="check"></span> en cours</td>
+        <td>✓</td><td>✓</td><td>—</td><td>○</td>
+      </tr>
+      <tr>
+        <td>202604.0086</td><td>CAPELLE</td>
+        <td><span class="check done"></span> done</td>
+        <td>✓</td><td>✓</td><td>—</td><td>○</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ─────────────────────────────────────────── ALGO ─────────────────────────────────────────── -->
+  <h2>Impact algo — recompute préservant le done</h2>
+
+  <div class="section">
+    <div class="section-header">
+      <h3>Principe : seul le reliquat non-done est replacé</h3>
+      <span class="section-tag algo">Engine</span>
+    </div>
+    <p>
+      Quand le chef relance un compute après que des stints ont été marqués done, l'engine ne doit
+      PAS replacer le travail déjà fait — c'est de l'historique. Concrètement :
+    </p>
+    <ul style="color: var(--text); font-size: 12px; line-height: 1.6;">
+      <li>Pour chaque stint <code>done=true</code>, le PHP construit un <strong>occupied_slot</strong>
+        <code>(stationId, [opId], slot_start, slot_end)</code> et l'envoie dans
+        <code>ComputeRequest.occupied_slots</code>.</li>
+      <li>L'engine pré-marque ces slots comme bloqués sur la grille <em>avant</em> le forward-pass
+        (mécanisme qui existe déjà pour les pins safety-zone).</li>
+      <li>Si la task n'a plus que des stints non-done à placer, elle est partiellement re-schedulable
+        — le forward-pass cherche une fenêtre pour le reliquat seulement.</li>
+      <li>Si TOUS les stints d'une task sont done → la task n'a plus rien à placer → exclue du payload.</li>
+    </ul>
+
+    <div class="lab" style="margin-top: 14px;">Avant le recompute</div>
+    <div class="timeline">
+      <div class="timeline-segment done"  style="left: 4%;  width: 24%;" title="Adrien 06:00-12:00 done">Adrien · ✓ done</div>
+      <div class="timeline-segment"       style="left: 32%; width: 24%;" title="Arnaud 13:00-18:00 pending">Arnaud · pending</div>
+      <div class="timeline-segment"       style="left: 60%; width: 12%;" title="Conditionnement pending">Cond · pending</div>
+      <div class="timeline-segment"       style="left: 76%; width: 18%;" title="P137 pending">P137 · pending</div>
+    </div>
+
+    <div class="lab">Recompute — segments figés vs replacés</div>
+    <div class="timeline">
+      <div class="timeline-segment frozen"   style="left: 4%;  width: 24%;" title="figé (occupied_slot)">FROZEN · occupied_slot</div>
+      <div class="timeline-segment replaced" style="left: 32%; width: 22%;" title="replacé">Arnaud · replacé</div>
+      <div class="timeline-segment replaced" style="left: 56%; width: 14%;" title="replacé">Cond · replacé</div>
+      <div class="timeline-segment replaced" style="left: 72%; width: 24%;" title="replacé">P137 · replacé</div>
+    </div>
+    <div class="note">
+      Les segments en pointillé rouge sont ceux que l'engine est libre de replacer. Le segment
+      vert pâle (Adrien) est verrouillé : aucun re-shuffle ne peut le toucher. C'est exactement
+      ce qu'on veut métier — l'opérateur qui a coché vient de sortir du poste, son travail est
+      historique.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h3>Plomberie côté PHP — <code>buildOccupiedSlots</code> étendu</h3>
+      <span class="section-tag algo">PHP</span>
+    </div>
+    <p>
+      Aujourd'hui <code>buildOccupiedSlots</code> émet 1 slot par pin (user, in-progress, safety-zone).
+      Demain il émet AUSSI 1 slot par stint done :
+    </p>
+    <div class="api-row" style="white-space: pre-wrap;">
+foreach (overlays where is_completed=true) {
+  $slots[] = [
+    stationId: assignment.targetId,
+    operatorIds: [overlay.operator_id],
+    start: overlay.slot_start,
+    end: matching_op_window.to,  // depuis assignment.operators[]
+  ];
+}
+    </div>
+    <div class="note">
+      Bénéfice subtil : un re-compute peut décider que le reliquat est mieux placé ailleurs
+      sur la station, ou que d'autres opérateurs s'en chargeront. Mais le done historique est
+      intouchable — on conserve la traçabilité opérateur réelle.
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h3>Cas limites algo</h3>
+      <span class="section-tag algo">Engine</span>
+    </div>
+    <table class="data-table">
+      <tr><th>Cas</th><th>Effet</th></tr>
+      <tr>
+        <td>Stint done puis l'opérateur change d'avis (untoggle)</td>
+        <td>L'overlay row passe à <code>is_completed=false</code> → plus dans occupied_slots → re-schedulable au prochain compute. Aucun jet de données.</td>
+      </tr>
+      <tr>
+        <td>Re-compute génère un nouveau découpage en stints (ex: l'opérateur n'est plus dispo)</td>
+        <td>Les overlays <em>done</em> existantes restent — leurs slots sont préservés via occupied_slots. Les <em>nouveaux</em> stints non-done héritent de "pending".</td>
+      </tr>
+      <tr>
+        <td>Promotion préprod → prod avec stints done dans le payload</td>
+        <td>Le payload prod fige le découpage. Les overlays s'attachent par <code>(taskId, operatorId, slot_start)</code> — un re-compute prod ne génère pas de nouveau payload, donc pas de drift.</td>
+      </tr>
+      <tr>
+        <td>Suppression de la task (jcf modifié)</td>
+        <td>Cascade DB existante (FK CASCADE) supprime les overlays. Pas de fuite.</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ─────────────────────────────────────────── SUMMARY ─────────────────────────────────────────── -->
+  <h2>Synthèse</h2>
+  <div class="section" style="background: rgba(96, 200, 130, 0.04); border-color: rgba(96, 200, 130, 0.2);">
+    <div style="font-size: 12px; line-height: 1.7;">
+      <strong style="color: #9ad8b0;">Maille reportée par l'opérateur :</strong> stint = (taskId, operatorId, slot_start).<br>
+      <strong style="color: #9ad8b0;">Maille présentée au chef :</strong> agrégat task (Flux, JDP), agrégat chunk (grille station).<br>
+      <strong style="color: #9ad8b0;">Maille engine recompute :</strong> stint preserved via occupied_slots ; reliquat seul re-placeable.<br>
+      <strong style="color: #9ad8b0;">Coût par couche :</strong>
+      <ul style="margin: 4px 0 0 0;">
+        <li>BDD : +2 colonnes dans overlay, PK étendue (~50 lignes migration)</li>
+        <li>PHP : +1 méthode <code>buildOccupiedSlotsFromCompletions</code> + extension <code>upsertOverlay</code> (~80 lignes)</li>
+        <li>API : 1 nouvel endpoint stint-toggle (~30 lignes)</li>
+        <li>Front : adaptation <code>CompletionToggleIcon</code> + agrégation dans <code>stationTileData</code> et JDP (~120 lignes)</li>
+      </ul>
+      <strong style="color: #9ad8b0;">Total estimé :</strong> ~280 lignes effectives + tests.
+      Modèle réaliste, pas de refactor du modèle de tasks, retro-compat préservée par <code>operator_id=NULL/slot_start=NULL</code>
+      pour les overlays legacy.
+    </div>
+  </div>
+
+<script>
+  // Modélise les stints du chunk démo : Adrien 06:00→12:00, Arnaud 13:00→18:00.
+  // Le chunk lui-même va de 06:00 à 18:00 (12h wall-clock).
+  // On calcule le remplissage chronologique : jusqu'à la fin du dernier stint
+  // done. Approche conforme à ce que l'opérateur lit naturellement
+  // ("on en est là dans la journée").
+  const CHUNK_START = 6 * 60;        // 06:00 en minutes
+  const CHUNK_END   = 18 * 60;       // 18:00
+  const CHUNK_DURATION = CHUNK_END - CHUNK_START;
+  const STINTS = [
+    { id: 's1', label: 'Adrien',  startMin:  6*60, endMin: 12*60 },
+    { id: 's2', label: 'Arnaud',  startMin: 13*60, endMin: 18*60 },
+  ];
+  const stateDone = { s1: false, s2: false };
+
+  function toggleStint(id) {
+    stateDone[id] = !stateDone[id];
+    update();
+  }
+  function resetAll() { stateDone.s1 = false; stateDone.s2 = false; update(); }
+
+  function update() {
+    // 1) Stint visuals on the operator-view tiles
+    for (const s of STINTS) {
+      document.getElementById('handle-' + s.id).classList.toggle('done', stateDone[s.id]);
+      const stint = document.getElementById('stint-' + s.id);
+      stint.classList.toggle('done', stateDone[s.id]);
+      stint.classList.toggle('pending', !stateDone[s.id]);
+    }
+
+    // 2) Chronological fill — last done stint's end vs chunk wall-clock span
+    const doneStints = STINTS.filter(s => stateDone[s.id]);
+    let lastDoneEndMin = CHUNK_START;
+    for (const s of doneStints) {
+      if (s.endMin > lastDoneEndMin) lastDoneEndMin = s.endMin;
+    }
+    const fillRatio = (lastDoneEndMin - CHUNK_START) / CHUNK_DURATION;
+
+    // 3) Apply to station chunk (horizontal fill from left)
+    const chunk = document.getElementById('station-chunk');
+    const fill = document.getElementById('station-chunk-fill');
+    fill.style.width = (fillRatio * 100) + '%';
+    chunk.classList.toggle('done', fillRatio >= 0.999);
+
+    const meta = document.getElementById('station-chunk-meta');
+    const pct = Math.round(fillRatio * 100);
+    if (pct >= 100) meta.textContent = '06:00 → 18:00 · ✓ done (100 %)';
+    else if (pct > 0) meta.textContent = `06:00 → 18:00 · partiel (${pct} %)`;
+    else meta.textContent = '06:00 → 18:00 · pending (0 %)';
+
+    // 4) Apply to JDP progress bar (horizontal fill from left)
+    const jdpFill = document.getElementById('jdp-fill');
+    jdpFill.style.width = (fillRatio * 100) + '%';
+
+    const jdpPct = document.getElementById('jdp-pct');
+    if (pct >= 100) {
+      jdpPct.textContent = '100 % ✓';
+      jdpPct.classList.add('done');
+    } else {
+      jdpPct.textContent = pct + ' %';
+      jdpPct.classList.remove('done');
+    }
+  }
+
+  update(); // initial state
+</script>
+</body>
+</html>

@@ -31,6 +31,7 @@ import {
   useFuseTaskMutation,
   useClearJobAssignmentsMutation,
   useBatchSetPinMutation,
+  useGetPaperLeadTimeQuery,
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
@@ -88,6 +89,7 @@ import { useVirtualScroll, isAssignmentVisible, useMassUnschedule } from '../hoo
 import { useToast } from '../hooks/useToast';
 import { useLiftAndRecompute } from '../hooks/useLiftAndRecompute';
 import { MassUnscheduleDialog } from '../components/MassUnscheduleDialog';
+import { RazFab } from '../components/RazFab/RazFab';
 import { ComputeModal } from '../components/ComputeModal/ComputeModal';
 import { useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
 import { runBackgroundLns } from '../hooks/autoRecomputeRuntime';
@@ -141,6 +143,10 @@ export default function OperatorSchedulePage() {
   const isLoading = scenarioModeForSnapshot === 'prod' ? prodSnapshot.isLoading : preprodSnapshot.isLoading;
   const isError = scenarioModeForSnapshot === 'prod' ? prodSnapshot.isError : preprodSnapshot.isError;
   const error = scenarioModeForSnapshot === 'prod' ? prodSnapshot.error : preprodSnapshot.error;
+
+  // Paper lead-time (shop-wide). Threaded into JobDetailsPanel so the
+  // gate pill tooltip displays the configured delay.
+  const { data: paperLeadTime } = useGetPaperLeadTimeQuery();
   const refetch = scenarioModeForSnapshot === 'prod' ? prodSnapshot.refetch : preprodSnapshot.refetch;
 
   const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
@@ -1201,6 +1207,7 @@ export default function OperatorSchedulePage() {
             stations={snapshot.stations}
             categories={snapshot.categories}
             providers={snapshot.providers}
+            paperLeadTimeHours={paperLeadTime?.hours}
             onClose={() => setSelectedJobId(null)}
             onRecallTask={handleRecallAssignment}
             onToggleComplete={handleToggleComplete}
@@ -1341,6 +1348,12 @@ export default function OperatorSchedulePage() {
       {/* ---- Selection ring (CSS-only, same as App.tsx) ---- */}
       {selectedJobId && (
         <style>{`[data-job-id="${selectedJobId}"]::after { content: ''; position: absolute; inset: 0; border: 2px solid rgba(255,255,255,0.7); z-index: 5; pointer-events: none; }`}</style>
+      )}
+
+      {/* ---- RAZ FAB — entry point for the mass-unschedule flow.
+              Hidden in prod scenario mode (matches the Ctrl+Alt+Z guard). ---- */}
+      {scenarioMode !== 'prod' && (
+        <RazFab onClick={massUnschedule.trigger} />
       )}
 
       {/* ---- Mass unschedule confirmation dialog ---- */}

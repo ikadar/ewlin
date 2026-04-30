@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import type { Operator } from '@flux/types';
 import { OperatorSettingsButton } from './OperatorSettingsButton';
@@ -16,6 +16,7 @@ export interface OperatorHeaderProps {
  */
 export function OperatorHeader({ operator, columnWidth }: OperatorHeaderProps) {
   const fullName = `${operator.firstName} ${operator.lastName}`;
+  const location = useLocation();
   return (
     <div
       className="group w-60 shrink-0 py-2 px-3 text-sm flex items-center justify-between gap-2"
@@ -31,7 +32,7 @@ export function OperatorHeader({ operator, columnWidth }: OperatorHeaderProps) {
       <div className="flex items-center gap-1 shrink-0">
         <OperatorSettingsButton operatorId={operator.id} operatorLabel={fullName} />
         <Link
-          to={`/focus/operator/${operator.id}`}
+          to={`/focus/operator/${operator.id}${location.search}`}
           aria-label={`Ouvrir la vue focus de ${fullName}`}
           className="shrink-0 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
           data-testid={`operator-header-focus-link-${operator.id}`}

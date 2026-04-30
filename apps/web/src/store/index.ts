@@ -177,6 +177,8 @@ export {
   useSetSafetyOverrideMutation,
   useGetPrecedenceGapQuery,
   useUpdatePrecedenceGapMutation,
+  useGetPaperLeadTimeQuery,
+  useUpdatePaperLeadTimeMutation,
   scheduleApi,
 } from './api/scheduleApi';
 export type { SavedScheduleItem, ComputeScheduleResult } from './api/scheduleApi';

@@ -49,6 +49,8 @@ export interface TaskListProps {
   snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
   /** Callback to scroll the grid to a specific operator slice (operator view) */
   onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
+  /** Paper lead-time hours (shop-wide); shown in the Papier pill tooltip */
+  paperLeadTimeHours?: number;
 }
 
 /**
@@ -76,6 +78,7 @@ export function TaskList({
   onContextMenu,
   snapshotOperators,
   onJumpToOperatorSlice,
+  paperLeadTimeHours,
 }: TaskListProps) {
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
   const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
@@ -269,6 +272,8 @@ export function TaskList({
             element={element}
             allElements={jobElements}
             isSingleElement={isSingleElement}
+            batDeadline={job.batDeadline ?? null}
+            paperLeadTimeHours={paperLeadTimeHours}
           >
             {renderTaskTiles(elementTasks, element)}
           </ElementSection>

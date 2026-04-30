@@ -36,6 +36,31 @@ function getApiBaseUrl(): string {
 }
 
 /**
+ * Resolves the X-Flux-Scenario header value from the current URL.
+ *
+ * Three sources, in priority order:
+ *   1. URL path /scenarios/:uuid/* → V2 fork shell, scope to that scenario UUID.
+ *   2. URL search ?env=prod        → V1 prod read-only mode.
+ *   3. Otherwise                   → null (backend defaults to Préprod).
+ *
+ * Used by `prepareHeaders` for RTK Query traffic AND by the bare-fetch
+ * SSE paths (compute-stream, compute-lns/stream, ComputeModal) which
+ * can't route through fetchBaseQuery. Single source of truth here
+ * prevents drift — when a bare fetch silently leaks into Préprod, the
+ * symptom is a Ctrl+Alt+P that returns "0/0 placés" instantly because
+ * Préprod's `buildJobsUnplaced()` is empty while the scenario fork
+ * just had everything cleared.
+ */
+export function resolveScenarioHeader(): string | null {
+  if (typeof window === 'undefined') return null;
+  const pathMatch = window.location.pathname.match(/^\/scenarios\/([0-9a-f-]{36})(\/|$)/i);
+  if (pathMatch) return pathMatch[1];
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('env') === 'prod') return 'prod';
+  return null;
+}
+
+/**
  * Standard headers for API requests
  */
 function prepareHeaders(headers: Headers, { getState }: { getState: () => unknown }): Headers {
@@ -49,20 +74,9 @@ function prepareHeaders(headers: Headers, { getState }: { getState: () => unknow
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // Versioning header — three sources, in priority order:
-  //   1. URL path /scenarios/:uuid/* → V2 fork shell, scope to that scenario UUID.
-  //   2. URL search ?env=prod        → V1 prod read-only mode.
-  //   3. Otherwise                   → no header, backend defaults to Préprod.
-  if (typeof window !== 'undefined') {
-    const pathMatch = window.location.pathname.match(/^\/scenarios\/([0-9a-f-]{36})(\/|$)/i);
-    if (pathMatch) {
-      headers.set('X-Flux-Scenario', pathMatch[1]);
-    } else {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('env') === 'prod') {
-        headers.set('X-Flux-Scenario', 'prod');
-      }
-    }
+  const scenario = resolveScenarioHeader();
+  if (scenario !== null) {
+    headers.set('X-Flux-Scenario', scenario);
   }
 
   return headers;

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { ScheduleSnapshot, Job } from '@flux/types';
 import type { ComputeScheduleResult } from '../../store';
+import { resolveScenarioHeader } from '../../store/api/realBaseQuery';
 import { useAutoRecomputeCtx } from '../../contexts/AutoRecomputeContext';
 import { getJobIdForTask } from '../../utils/taskHelpers';
 
@@ -42,9 +43,18 @@ const PRIORITY_COLORS = ['#ef4444', '#f97316', '#fbbf24', '#22c55e'];
 // ─── Late jobs calculation ───
 
 function findLateJobs(snapshot: ScheduleSnapshot, result: ComputeScheduleResult): LateJob[] {
+  // Pull ends from BOTH halves of the engine response: internal
+  // `assignments` (machine-bound tiles) and `outsourcedAssignments` (ST
+  // steps like an Aller-simple PLIAGE). The validation-service iterates
+  // the merged Schedule.assignments map post-persist and catches ST
+  // returns that overshoot the deadline; this mirror has to do the same
+  // or "Calcul terminé · 100 %" lies while the JDP paints the row red.
   const endByTask = new Map<string, string>();
   for (const a of result.assignments) {
     if (a.scheduledEnd) endByTask.set(a.taskId, a.scheduledEnd);
+  }
+  for (const o of result.outsourcedAssignments ?? []) {
+    if (o.scheduledEnd) endByTask.set(o.taskId, o.scheduledEnd);
   }
 
   const jobMap = new Map(snapshot.jobs.map((j) => [j.id, j]));
@@ -141,6 +151,7 @@ function useComputeStream(
     }
 
     const token = localStorage.getItem('flux_auth_token') || '';
+    const scenarioHeader = resolveScenarioHeader();
 
     const body = JSON.stringify({
       mode,
@@ -154,6 +165,7 @@ function useComputeStream(
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
+            ...(scenarioHeader ? { 'X-Flux-Scenario': scenarioHeader } : {}),
           },
           body,
         });

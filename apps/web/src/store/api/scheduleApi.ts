@@ -41,6 +41,8 @@ import type {
   SetSafetyOverrideRequest,
   PrecedenceGapConfig,
   UpdatePrecedenceGapRequest,
+  PaperLeadTimeConfig,
+  UpdatePaperLeadTimeRequest,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
@@ -334,10 +336,9 @@ export const scheduleApi = createApi({
      * Uses optimistic update for instant UI feedback.
      */
     clearAllAssignments: builder.mutation<
-      { unassignedCount: number },
+      { unassignedCount: number; sweptOrphansCount?: number },
       {
         includeInProgress?: boolean;
-        fuseSplits?: boolean;
         includePinned?: boolean;
         includeFrozen?: boolean;
       } | void
@@ -345,7 +346,6 @@ export const scheduleApi = createApi({
       query: (opts) => {
         const params = new URLSearchParams();
         if (opts && opts.includeInProgress) params.set('includeInProgress', '1');
-        if (opts && opts.fuseSplits) params.set('fuseSplits', '1');
         if (opts && opts.includePinned) params.set('includePinned', '1');
         if (opts && opts.includeFrozen) params.set('includeFrozen', '1');
         const qs = params.toString();
@@ -883,6 +883,23 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Get the global paper lead-time configuration (working hours from now
+     * before a task whose element has paperStatus not Ready can start).
+     */
+    getPaperLeadTime: builder.query<PaperLeadTimeConfig, void>({
+      query: () => '/paper-lead-time',
+    }),
+
+    /**
+     * Update the global paper lead-time (admin). Invalidates Snapshot so
+     * the planning re-renders with the new floor on the next compute.
+     */
+    updatePaperLeadTime: builder.mutation<PaperLeadTimeConfig, UpdatePaperLeadTimeRequest>({
+      query: (body) => ({ url: '/paper-lead-time', method: 'PUT', body }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
      * Set (or clear) a safety override on a (jobId, sequenceIndex, stationId) tuple.
      * Optimistically mirrors the override into the snapshot so the tile
      * reflects the cyan-off state immediately.
@@ -993,6 +1010,21 @@ export interface ComputeScheduleResult {
     isDegraded: boolean;
     effectiveProductivity: number;
   }>;
+  /**
+   * Outsourced (ST) step placements — one entry per outsourced TaskInput
+   * the engine received. PHP merges these into the persisted
+   * `Schedule.assignments` map so SnapshotBuilder treats them as regular
+   * assignments downstream. The toast and modal mirrors must read from
+   * here too, otherwise an Aller-simple PLIAGE returning past the
+   * deadline is invisible to "à l'heure" while the JDP still paints the
+   * row red (snapshot.lateJobs catches it via the merged map).
+   */
+  outsourcedAssignments?: Array<{
+    taskId: string;
+    providerId: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+  }>;
   stats: {
     makespanMinutes: number;
     totalTasks: number;
@@ -1050,4 +1082,6 @@ export const {
   useSetSafetyOverrideMutation,
   useGetPrecedenceGapQuery,
   useUpdatePrecedenceGapMutation,
+  useGetPaperLeadTimeQuery,
+  useUpdatePaperLeadTimeMutation,
 } = scheduleApi;
