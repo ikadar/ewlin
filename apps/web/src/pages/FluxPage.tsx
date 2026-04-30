@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShortcutFooter } from '@/components/ShortcutFooter/ShortcutFooter';
 import { detectKeyboardLayout, isAltLetter } from '@/utils/keyboardLayout';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useEnvAwareNavigate } from '@/contexts/ScenarioContext';
 import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
@@ -30,7 +31,7 @@ import { sortFluxJobs, type SortColumn, type SortDirection } from '@/components/
  */
 export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useEnvAwareNavigate();
 
   const activeTab = pathnameToTab(location.pathname);
   const dispatch = useAppDispatch();

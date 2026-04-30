@@ -1,6 +1,7 @@
 import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, FlaskConical, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useEnvAwareNavigate } from '../../contexts/ScenarioContext';
 import { SidebarButton } from './SidebarButton';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAppSelector, useAppDispatch } from '../../store';
@@ -15,7 +16,8 @@ import { useHasPermission } from '../../hooks/useHasPermission';
  * REQ-07: Full viewport height with User/Settings at bottom.
  */
 export function Sidebar() {
-  const navigate = useNavigate();
+  const navigate = useEnvAwareNavigate();
+  const navigateRaw = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const dispatch = useAppDispatch();
@@ -52,7 +54,7 @@ export function Sidebar() {
   function handleLogout() {
     setShowUserMenu(false);
     dispatch(logout());
-    navigate('/login', { replace: true });
+    navigateRaw('/login', { replace: true });
   }
 
   function getUserInitials(): string {
