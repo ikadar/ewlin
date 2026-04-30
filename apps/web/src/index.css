@@ -419,27 +419,28 @@ html.light [data-testid^="tile-"][data-job-id] {
   animation: pulse-violet-ring 2s infinite;
 }
 
-/* Scenario shell viewport — distinctive violet glow on edges so the
-   chef knows they're inside a fork without a top banner. */
-.scenario-shell-glow {
-  position: relative;
-}
+/* Scenario shell viewport — distinctive violet glow on the edges so
+   the chef knows they're inside a fork without a top banner.
+   `position: fixed` ties the glow to the viewport (not the container),
+   z-index high enough to sit on top of every other layer (sticky
+   table headers, sticky tab bars, the ShortcutFooter…), and
+   `pointer-events: none` so clicks pass through unaffected. */
 .scenario-shell-glow::before {
   content: '';
-  position: absolute;
+  position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 9999;
   box-shadow:
-    inset 0 0 0 2px rgba(167, 139, 250, 0.35),
-    inset 0 0 40px rgba(167, 139, 250, 0.1);
+    inset 0 0 0 2px rgba(167, 139, 250, 0.4),
+    inset 0 0 40px rgba(167, 139, 250, 0.12);
 }
 .scenario-shell-glow::after {
   content: '';
-  position: absolute;
+  position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 9999;
   background:
     radial-gradient(ellipse at top left, rgba(167, 139, 250, 0.08), transparent 35%),
     radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.08), transparent 35%);
