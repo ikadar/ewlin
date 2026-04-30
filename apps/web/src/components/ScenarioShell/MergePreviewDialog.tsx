@@ -57,18 +57,32 @@ export function MergePreviewDialog({
         {/* Headline counts */}
         <div className="grid grid-cols-3 gap-[10px]">
           <CountTile icon={<Edit3 size={11} />} label="Modifications" value={totalMods} tone="violet" />
-          <CountTile icon={<Plus size={11} />} label="Ajouts (skipped)" value={totalAdds} tone="zinc" />
-          <CountTile icon={<Minus size={11} />} label="Suppressions (skipped)" value={totalDeletes} tone="zinc" />
+          <CountTile icon={<Plus size={11} />} label="Ajouts (non promus)" value={totalAdds} tone="zinc" />
+          <CountTile icon={<Minus size={11} />} label="Suppressions (non promues)" value={totalDeletes} tone="zinc" />
         </div>
 
         {(totalAdds > 0 || totalDeletes > 0) && (
           <div className="flex items-start gap-2 px-[10px] py-[8px] bg-amber-950/20 border border-amber-900/40 rounded-[3px] text-[11px] text-amber-300">
             <AlertTriangle size={12} className="shrink-0 mt-0.5" />
             <div>
-              V2.0 ne mergeait que les modifications de colonnes existantes.
-              Les ajouts ({totalAdds}) et suppressions ({totalDeletes}) sont
-              listés mais pas appliqués — il faut les recréer dans la préprod
-              à la main si besoin.
+              Seules les modifications listées ci-dessous seront appliquées
+              en préprod.{' '}
+              {totalAdds > 0 && (
+                <>
+                  Les <strong>{totalAdds}</strong> entité{totalAdds > 1 ? 's' : ''}{' '}
+                  ajoutée{totalAdds > 1 ? 's' : ''} dans la simulation{' '}
+                  {totalAdds > 1 ? 'devront être recréées' : 'devra être recréée'}{' '}
+                  manuellement.
+                </>
+              )}
+              {totalAdds > 0 && totalDeletes > 0 && ' '}
+              {totalDeletes > 0 && (
+                <>
+                  Les <strong>{totalDeletes}</strong> suppression{totalDeletes > 1 ? 's' : ''}{' '}
+                  {totalDeletes > 1 ? 'devront être refaites' : 'devra être refaite'}{' '}
+                  manuellement.
+                </>
+              )}
             </div>
           </div>
         )}
