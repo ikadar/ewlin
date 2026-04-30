@@ -62,6 +62,14 @@ function SimRow({
           >
             {sim.name ?? '(sans nom)'}
           </button>
+          {sim.mutationCount > 0 && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-violet-600/20 border border-violet-600/40 text-violet-300"
+              title={`${sim.mutationCount} mutations en attente`}
+            >
+              Δ {sim.mutationCount}
+            </span>
+          )}
         </div>
       </td>
       <td className="px-4 py-2.5 text-zinc-400">{formatStamp(sim.createdAt)}</td>

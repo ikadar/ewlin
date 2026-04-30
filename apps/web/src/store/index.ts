@@ -353,6 +353,9 @@ export {
   useGetSimulationQuery,
   useForkSimulationMutation,
   useDeleteSimulationMutation,
+  useAppendMutationMutation,
+  useRemoveMutationMutation,
+  useConvertSimulationMutation,
   simulationApi,
 } from './api/simulationApi';
 export type {
@@ -360,6 +363,8 @@ export type {
   SimulationDetail,
   SimulationListResponse,
   ForkSimulationArgs,
+  SimulationMutation,
+  SimulationMutationKind,
 } from './api/simulationApi';
 
 export {

@@ -1,15 +1,18 @@
 /**
- * Simulation detail — read-only KPI strip + audit metadata.
+ * Simulation detail — KPI strip + audit metadata + mutation editor +
+ * convert-to-Préprod action.
  *
- * Mirrors ArchiveDetail (same KPI computation, same metadata table)
- * because conceptually a sim is a frozen-Preprod blob with a TTL +
- * label. Mutation is deferred to a later phase, so this is read-only;
- * the user's only action is "delete" (top-right).
+ * The chef can now queue mutations on the sim (cancel a job, push a
+ * deadline, bump a priority) and apply them en bloc to Préprod via
+ * the dwell-confirm convert dialog. Failure = transactional rollback,
+ * the sim survives so the chef can fix and retry.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, AlertTriangle, CalendarRange, CircleDot, Hash, History, Tag, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRightCircle, FlaskConical, AlertTriangle, CalendarRange, CircleDot, Hash, History, Tag, Trash2 } from 'lucide-react';
 import { useGetSimulationQuery, useDeleteSimulationMutation } from '../store';
+import { MutationEditor } from '../components/SimulationBrowser/MutationEditor';
+import { ConvertSimulationDialog } from '../components/SimulationBrowser/ConvertSimulationDialog';
 
 interface PayloadKpis {
   jobsTotal: number;
@@ -90,19 +93,50 @@ function MetadataRow({
   );
 }
 
+interface PayloadJob {
+  id: string;
+  reference: string;
+  description: string;
+}
+
+function extractJobs(payload: Record<string, unknown> | null): PayloadJob[] {
+  if (!payload) return [];
+  const raw = Array.isArray(payload.jobs) ? (payload.jobs as Array<Record<string, unknown>>) : [];
+  return raw
+    .map((j) => {
+      const id = typeof j.id === 'string' ? j.id : null;
+      if (!id) return null;
+      const reference = typeof j.reference === 'string' ? j.reference : id.slice(0, 8);
+      const description = typeof j.description === 'string'
+        ? j.description
+        : typeof j.intitule === 'string'
+        ? (j.intitule as string)
+        : '';
+      return { id, reference, description };
+    })
+    .filter((j): j is PayloadJob => j !== null);
+}
+
 export function SimulationDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { data: detail, isLoading, error } = useGetSimulationQuery(id ?? '', { skip: !id });
   const [deleteSimulation, deleteState] = useDeleteSimulationMutation();
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const kpis = useMemo(() => computeKpis(detail?.payload ?? null), [detail?.payload]);
+  const jobs = useMemo(() => extractJobs(detail?.payload ?? null), [detail?.payload]);
 
   const handleDelete = async () => {
     if (!id || !detail) return;
     const ok = window.confirm(`Supprimer la simulation "${detail.name ?? id}" ?`);
     if (!ok) return;
     await deleteSimulation(id);
+    navigate('/simulations');
+  };
+
+  const handleConverted = () => {
+    setConvertOpen(false);
     navigate('/simulations');
   };
 
@@ -133,15 +167,33 @@ export function SimulationDetailPage() {
           </div>
         </div>
         {detail && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleteState.isLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-zinc-900 hover:bg-rose-950/50 hover:text-rose-300 border border-zinc-800 text-zinc-300 disabled:opacity-50"
-          >
-            <Trash2 size={13} />
-            Supprimer
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setConvertOpen(true)}
+              disabled={detail.mutationCount === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              data-testid="convert-trigger"
+              title={detail.mutationCount === 0 ? 'Ajoute au moins une mutation pour convertir' : 'Appliquer les mutations à la préprod'}
+            >
+              <ArrowRightCircle size={13} />
+              Convertir vers préprod
+              {detail.mutationCount > 0 && (
+                <span className="ml-1 px-1 rounded bg-violet-700 text-[10px] font-mono">
+                  {detail.mutationCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteState.isLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-zinc-900 hover:bg-rose-950/50 hover:text-rose-300 border border-zinc-800 text-zinc-300 disabled:opacity-50"
+            >
+              <Trash2 size={13} />
+              Supprimer
+            </button>
+          </div>
         )}
       </header>
 
@@ -174,18 +226,35 @@ export function SimulationDetailPage() {
             />
           </div>
 
-          <div className="px-5 py-4 flex-1 overflow-y-auto">
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Audit</div>
-            <MetadataRow icon={<Tag size={11} />} label="Nom" value={detail.name ?? '—'} />
-            <MetadataRow icon={<CalendarRange size={11} />} label="Forkée le" value={formatStamp(detail.createdAt)} />
-            <MetadataRow icon={<CalendarRange size={11} />} label="Dernière vue" value={formatStamp(detail.lastTouchedAt)} />
-            <MetadataRow icon={<CalendarRange size={11} />} label="Expire le" value={formatStamp(detail.ttlExpiresAt)} />
-            <MetadataRow icon={<History size={11} />} label="Engine" value={detail.engineVersion ?? '—'} mono />
-            <MetadataRow icon={<Hash size={11} />} label="Algo hash" value={detail.algoParamsHash ?? '—'} mono />
-            {detail.parentScenarioId && (
-              <MetadataRow icon={<FlaskConical size={11} />} label="Forkée de" value={detail.parentScenarioId} mono />
-            )}
+          <div className="px-5 py-4 flex-1 overflow-y-auto space-y-4">
+            <MutationEditor
+              simulationId={detail.id}
+              mutations={detail.mutations}
+              jobs={jobs}
+            />
+
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Audit</div>
+              <MetadataRow icon={<Tag size={11} />} label="Nom" value={detail.name ?? '—'} />
+              <MetadataRow icon={<CalendarRange size={11} />} label="Forkée le" value={formatStamp(detail.createdAt)} />
+              <MetadataRow icon={<CalendarRange size={11} />} label="Dernière vue" value={formatStamp(detail.lastTouchedAt)} />
+              <MetadataRow icon={<CalendarRange size={11} />} label="Expire le" value={formatStamp(detail.ttlExpiresAt)} />
+              <MetadataRow icon={<History size={11} />} label="Engine" value={detail.engineVersion ?? '—'} mono />
+              <MetadataRow icon={<Hash size={11} />} label="Algo hash" value={detail.algoParamsHash ?? '—'} mono />
+              {detail.parentScenarioId && (
+                <MetadataRow icon={<FlaskConical size={11} />} label="Forkée de" value={detail.parentScenarioId} mono />
+              )}
+            </div>
           </div>
+
+          <ConvertSimulationDialog
+            open={convertOpen}
+            simulationId={detail.id}
+            simulationName={detail.name ?? detail.id}
+            mutations={detail.mutations}
+            onClose={() => setConvertOpen(false)}
+            onConverted={handleConverted}
+          />
         </>
       )}
     </div>
