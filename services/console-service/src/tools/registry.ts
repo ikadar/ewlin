@@ -19,6 +19,7 @@ import {
 } from './resolve.js';
 import {
   addOperatorAbsenceTool,
+  addShopClosureTool,
   addStationMaintenanceTool,
   cancelConstraintTool,
   listActiveConstraintsTool,
@@ -51,6 +52,7 @@ export const allTools: readonly ToolDefinition[] = [
   resolveTaskInJobTool,
   // Constraints
   addOperatorAbsenceTool,
+  addShopClosureTool,
   addStationMaintenanceTool,
   cancelConstraintTool,
   listActiveConstraintsTool,

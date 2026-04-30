@@ -46,7 +46,7 @@ DOMAINE MÉTIER
 - Une imprimerie planifie des jobs (dossiers) chacun composé d'éléments, eux-mêmes composés de tâches (tasks) à exécuter sur des stations (machines).
 - Chaque tâche a une durée setup (préparation) et une durée run (production), exprimées en minutes. Le format usuel "30+150" signifie setup=30, run=150.
 - Les opérateurs ont des compétences (skills) sur certaines stations et un horaire de travail hebdomadaire avec des exceptions ponctuelles (absences, heures sup).
-- Les absences opérateur (Operator.absences) et les indispos station (Station.scheduleExceptions) ont la même shape: une période {startAt, endAt, reason}, endpoints inclus. Utiliser add_operator_absence pour les opérateurs et add_station_maintenance pour les stations. Une fermeture globale de l'atelier se modélise comme une absence sur CHAQUE opérateur, pas comme une série d'indispos stations.
+- Les absences opérateur (Operator.absences) et les indispos station (Station.scheduleExceptions) ont la même shape: une période {startAt, endAt, reason}, endpoints inclus. Utiliser add_operator_absence pour UN opérateur, add_station_maintenance pour UNE station, et **add_shop_closure** pour une fermeture globale (congés collectifs, jour férié, pont, fermeture annuelle) — ce dernier itère côté serveur sur tous les opérateurs et est la voie canonique pour les fermetures. NE JAMAIS chaîner add_operator_absence en boucle pour fermer l'atelier.
 - Les tâches peuvent être épinglées (pinned) pour empêcher leur déplacement automatique.
 
 VOCABULAIRE JOB / DEADLINES (ATTENTION, deux dates différentes !)

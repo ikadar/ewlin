@@ -143,6 +143,106 @@ export const addOperatorAbsenceTool: ToolDefinition = {
   },
 };
 
+export const addShopClosureTool: ToolDefinition = {
+  name: 'add_shop_closure',
+  description:
+    "Ferme l'atelier sur une période en posant une absence sur CHAQUE opérateur (modèle canonique d'une fermeture globale, cf. Operator.absences). À utiliser pour congés collectifs, jours fériés, ponts, fermeture annuelle, grève. Pour une journée entière, passer fromDate = toDate sans startTime/endTime. Atomique côté IA : un seul appel itère côté serveur sur tous les opérateurs — ne pas chaîner add_operator_absence en boucle.",
+  inputSchema: z.object({
+    fromDate: z.string().describe("Premier jour fermé inclus, YYYY-MM-DD."),
+    toDate: z.string().describe("Dernier jour fermé inclus, YYYY-MM-DD."),
+    startTime: z
+      .string()
+      .optional()
+      .describe("Heure HH:MM à laquelle commence la fermeture le premier jour. Défaut: 00:00."),
+    endTime: z
+      .string()
+      .optional()
+      .describe("Heure HH:MM à laquelle finit la fermeture le dernier jour. Défaut: 23:59."),
+    reason: z
+      .string()
+      .min(3)
+      .describe(
+        "Motif requis (ex 'Congés de printemps', 'Jour férié', 'Pont du 1er mai'). Si l'utilisateur ne précise pas, demande-lui via ask_user.",
+      ),
+  }),
+  handler: async (input, ctx) => {
+    if (!isIsoDate(input.fromDate) || !isIsoDate(input.toDate)) {
+      return { ok: false, error: 'fromDate and toDate must be YYYY-MM-DD' };
+    }
+    if (input.toDate < input.fromDate) {
+      return { ok: false, error: 'toDate must be >= fromDate' };
+    }
+    const startTime = input.startTime ?? '00:00';
+    const endTime = input.endTime ?? '23:59';
+    const startAt = combineDateAndTime(input.fromDate, startTime);
+    const endAt = combineDateAndTime(input.toDate, endTime);
+    const reasonText = input.reason;
+    const newAbsence: AbsenceLike = { startAt, endAt, reason: reasonText };
+
+    const operators = await ctx.php.get<OperatorResponse[]>('/api/v1/operators');
+
+    const hasExplicitTime = input.startTime !== undefined || input.endTime !== undefined;
+    const rangeLabel = hasExplicitTime
+      ? input.fromDate === input.toDate
+        ? `le ${input.fromDate} ${startTime}–${endTime}`
+        : `du ${input.fromDate} ${startTime} au ${input.toDate} ${endTime}`
+      : input.fromDate === input.toDate
+      ? `le ${input.fromDate}`
+      : `du ${input.fromDate} au ${input.toDate}`;
+    const preview = `Atelier fermé ${rangeLabel} (${reasonText}) — absence posée sur ${operators.length} opérateur${operators.length > 1 ? 's' : ''}`;
+
+    if (ctx.dryRun) {
+      return {
+        ok: true,
+        preview,
+        data: {
+          dryRun: true,
+          operatorCount: operators.length,
+          operatorIds: operators.map((o) => o.id),
+          absence: newAbsence,
+        },
+      };
+    }
+
+    // Read-modify-write per operator. We refetch each operator (rather than
+    // reusing the list response) to avoid clobbering concurrent edits to
+    // other absence entries written between the list call and our PUT.
+    const results = await Promise.allSettled(
+      operators.map(async (op) => {
+        const current = await ctx.php.get<OperatorResponse>(
+          `/api/v1/operators/${op.id}`,
+        );
+        const absences = [...(current.absences ?? []), newAbsence];
+        return ctx.php.put<OperatorResponse>(`/api/v1/operators/${op.id}`, {
+          absences,
+        });
+      }),
+    );
+
+    const firstFailure = results.find((r) => r.status === 'rejected') as
+      | PromiseRejectedResult
+      | undefined;
+    if (firstFailure) {
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+      const succeededCount = operators.length - failedCount;
+      return {
+        ok: false,
+        error: `Fermeture appliquée sur ${succeededCount}/${operators.length} opérateurs ; ${failedCount} échec(s). Premier message: ${String(firstFailure.reason).slice(0, 200)}`,
+      };
+    }
+
+    return {
+      ok: true,
+      preview,
+      data: {
+        operatorCount: operators.length,
+        operatorIds: operators.map((o) => o.id),
+        absence: newAbsence,
+      },
+    };
+  },
+};
+
 export const addStationMaintenanceTool: ToolDefinition = {
   name: 'add_station_maintenance',
   description:
