@@ -26,7 +26,7 @@ function formatStamp(iso: string | null): string {
 }
 
 function describeTtl(iso: string | null): { label: string; expired: boolean } {
-  if (!iso) return { label: 'Pas de TTL', expired: false };
+  if (!iso) return { label: 'Sans expiration', expired: false };
   const remaining = new Date(iso).getTime() - Date.now();
   if (remaining <= 0) return { label: 'Expirée', expired: true };
   const hours = Math.floor(remaining / 3_600_000);
@@ -188,7 +188,7 @@ export function ScenariosPage() {
                 <th className="px-4 py-2 text-left font-medium">Nom</th>
                 <th className="px-4 py-2 text-left font-medium">Forké le</th>
                 <th className="px-4 py-2 text-left font-medium">Dernière vue</th>
-                <th className="px-4 py-2 text-left font-medium">TTL</th>
+                <th className="px-4 py-2 text-left font-medium">Expire dans</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>

@@ -49,9 +49,9 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
               <FlaskConical size={16} className="text-violet-300" />
             </div>
             <div>
-              <div className="text-sm font-medium">Forker préprod</div>
+              <div className="text-sm font-medium">Forker la préprod</div>
               <div className="text-[11px] text-zinc-500">
-                Snapshot figé pour scénarios ADV / what-if
+                Crée une branche éditable de la préprod
               </div>
             </div>
           </div>
@@ -80,7 +80,7 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
             />
           </label>
           <label className="block">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">TTL (heures)</span>
+            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Auto-supprimée après (heures)</span>
             <input
               type="number"
               min={1}
@@ -91,7 +91,7 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
               data-testid="fork-ttl-input"
             />
             <span className="ml-2 text-[11px] text-zinc-500">
-              Auto-supprimée après ce délai (max 168h = 7j)
+              Si tu ne touches pas au scénario pendant ce délai, il est nettoyé automatiquement (max 168h = 7j).
             </span>
           </label>
         </div>
