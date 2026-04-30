@@ -22,7 +22,7 @@ export function ArchivesPage() {
 
   const handleSelect = useCallback(
     (archiveId: string) => {
-      navigate(`/archives/${archiveId}`);
+      navigate(`/historique/archives/${archiveId}`);
     },
     [navigate],
   );

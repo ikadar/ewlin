@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, Archive, ClipboardCheck, FlaskConical } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, FlaskConical, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarButton } from './SidebarButton';
@@ -33,10 +33,9 @@ export function Sidebar() {
   const isStationSchedule = location.pathname.startsWith('/stations');
   const isStats = location.pathname.startsWith('/stats');
   const isLogistique = location.pathname.startsWith('/logistique');
-  const isArchives = location.pathname.startsWith('/archives');
-  const isAudit = location.pathname.startsWith('/audit');
+  const isHistory = location.pathname.startsWith('/historique');
   const isScenarios = location.pathname.startsWith('/scenarios') || location.pathname.startsWith('/simulations');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && !isAudit && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isHistory && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -106,18 +105,6 @@ export function Sidebar() {
             onClick={() => navigate('/stats')}
           />
           <SidebarButton
-            icon={Archive}
-            label="Archives"
-            isActive={isArchives}
-            onClick={() => navigate('/archives')}
-          />
-          <SidebarButton
-            icon={ClipboardCheck}
-            label="Journal d'audit"
-            isActive={isAudit}
-            onClick={() => navigate('/audit')}
-          />
-          <SidebarButton
             icon={FlaskConical}
             label="Scénarios"
             isActive={isScenarios}
@@ -128,7 +115,7 @@ export function Sidebar() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Bottom section: Settings/User (REQ-07.3) */}
+        {/* Bottom section: Settings/Historique/User (REQ-07.3) */}
         <div className="flex flex-col items-center py-3 gap-2 border-t border-white/5">
           {canSeeSettings && (
             <SidebarButton
@@ -139,6 +126,13 @@ export function Sidebar() {
               testId="sidebar-settings-button"
             />
           )}
+          <SidebarButton
+            icon={History}
+            label="Historique & audit"
+            isActive={isHistory}
+            onClick={() => navigate('/historique')}
+            testId="sidebar-history-button"
+          />
           <SidebarButton
             icon={User}
             label="User"

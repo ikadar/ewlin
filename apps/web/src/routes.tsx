@@ -62,6 +62,7 @@ import { SimulationDetailPage } from './pages/SimulationDetailPage';
 import { CapacityOverridesPage } from './pages/CapacityOverridesPage';
 import { ScenariosPage } from './pages/ScenariosPage';
 import { ScenarioShell } from './components/ScenarioShell';
+import { HistoryLayout } from './components/HistoryLayout';
 
 /**
  * Application routes.
@@ -109,12 +110,14 @@ export function AppRoutes() {
         {/* Logistique — réceptions et expéditions de l'atelier (Phase 1) */}
         <Route path="/logistique" element={<LogistiquePage />} />
 
-        {/* Archives — frozen Prod history & restore (Phase 7) */}
-        <Route path="/archives" element={<ArchivesPage />} />
-        <Route path="/archives/:id" element={<ArchivesPage />} />
-
-        {/* Audit — chronological journal of every Prod plan (Phase 9) */}
-        <Route path="/audit" element={<AuditPage />} />
+        {/* Historique & audit — submenu under HistoryLayout (analogous
+            to /settings/*) */}
+        <Route path="/historique" element={<HistoryLayout />}>
+          <Route index element={<Navigate to="/historique/journal" replace />} />
+          <Route path="journal" element={<AuditPage />} />
+          <Route path="archives" element={<ArchivesPage />} />
+          <Route path="archives/:id" element={<ArchivesPage />} />
+        </Route>
 
         {/* Simulations — V1 read-only forks (kept temporarily for back-compat) */}
         <Route path="/simulations" element={<SimulationsPage />} />

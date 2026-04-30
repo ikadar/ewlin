@@ -116,7 +116,7 @@ export function AuditPage() {
                     {entry.state === 'archived' && (
                       <button
                         type="button"
-                        onClick={() => navigate(`/archives/${entry.id}`)}
+                        onClick={() => navigate(`/historique/archives/${entry.id}`)}
                         className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300"
                       >
                         Détail
