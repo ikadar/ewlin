@@ -13,7 +13,7 @@
  * Width fixed at 280 px to match the scenario shell card.
  */
 import { useState } from 'react';
-import { Layers, Lock, Rocket } from 'lucide-react';
+import { Unlock, Lock, Rocket } from 'lucide-react';
 import { useScenarioMode } from '../../contexts/ScenarioContext';
 import { PromotionModal } from '../PromotionModal/PromotionModal';
 import { PromotionUndoToast } from '../PromotionUndoToast/PromotionUndoToast';
@@ -26,11 +26,12 @@ export function EnvFloatingControls() {
   const isPreprod = mode === 'preprod';
   const isProd = mode === 'prod';
 
-  // Prod = amber (locked / engagé en atelier), pas emerald qui reste
-  // exclusivement réservé aux ACTIONS positives (bouton Promouvoir).
-  // L'état "prod" est un état de prudence, pas un état de succès.
-  const cardBorder = isProd ? 'border-amber-700/40' : 'border-zinc-800';
-  const cardShadow = isProd ? 'shadow-amber-950/30' : 'shadow-zinc-950/60';
+  // Préprod = emerald (cadenas ouvert, "tu peux éditer").
+  // Prod    = amber   (cadenas fermé, "engagé en atelier, prudence").
+  // Ces deux états sont visuellement coordonnés avec leur halo
+  // respectif sur le viewport (.preprod-shell-glow / .prod-shell-glow).
+  const cardBorder = isProd ? 'border-amber-700/40' : 'border-emerald-700/40';
+  const cardShadow = isProd ? 'shadow-amber-950/30' : 'shadow-emerald-950/30';
 
   return (
     <>
@@ -47,11 +48,11 @@ export function EnvFloatingControls() {
             onClick={() => setMode('preprod')}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] transition ${
               isPreprod
-                ? 'bg-zinc-900/70 text-zinc-100 font-medium'
+                ? 'bg-emerald-950/40 text-emerald-100 font-medium'
                 : 'text-zinc-500 hover:bg-zinc-900/40 hover:text-zinc-300'
             }`}
           >
-            <Layers size={12} className={isPreprod ? 'text-zinc-300' : ''} strokeWidth={isPreprod ? 2.5 : 2} />
+            <Unlock size={12} className={isPreprod ? 'text-emerald-300' : ''} strokeWidth={isPreprod ? 2.5 : 2} />
             Préprod
           </button>
           <button

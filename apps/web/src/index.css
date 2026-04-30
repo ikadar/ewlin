@@ -446,10 +446,34 @@ html.light [data-testid^="tile-"][data-job-id] {
     radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.08), transparent 35%);
 }
 
-/* Prod mode viewport — amber glow instead of violet so the chef
-   recognises "plan engagé en atelier" by colour alone, distinct
-   from "scénario éditable" (violet) and from préprod (no glow).
-   Same fixed/z-index/pointer-events trio as the scenario glow. */
+/* Préprod mode viewport — emerald glow ("c'est ouvert, tu peux
+   éditer"). Distinct from amber prod ("engagé, ne touche pas") et
+   violet scenario ("branche parallèle"). Same fixed/z-index/
+   pointer-events trio as the other env glows. */
+.preprod-shell-glow::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow:
+    inset 0 0 0 2px rgba(16, 185, 129, 0.4),
+    inset 0 0 40px rgba(16, 185, 129, 0.12);
+}
+.preprod-shell-glow::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background:
+    radial-gradient(ellipse at top left, rgba(16, 185, 129, 0.08), transparent 35%),
+    radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.08), transparent 35%);
+}
+
+/* Prod mode viewport — amber glow ("plan engagé en atelier"),
+   distinct from emerald préprod et violet scenario. Same fixed/
+   z-index/pointer-events trio. */
 .prod-shell-glow::before {
   content: '';
   position: fixed;
