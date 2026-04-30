@@ -118,7 +118,17 @@ export default function FocusPage({ mode }: FocusPageProps) {
     container.scrollTo({ top: Math.max(0, y - container.clientHeight / 2), behavior: 'smooth' });
   }, [gridStartDate]);
 
-  // Scroll to NOW on mount and on entity change (no animation, immediate)
+  // Scroll to NOW on mount and on entity change (no animation, immediate).
+  //
+  // The dependency intentionally watches `!!snapshot` rather than the
+  // snapshot object reference: we only need to know when the data first
+  // arrives (so the scroll target's height has been computed). Watching
+  // the reference itself caused every refetch — including the one fired
+  // by ticking a CompletionToggleIcon — to re-anchor the scroll on NOW,
+  // jumping the operator back to the current time mid-task. The toggle
+  // mutation invalidates the Snapshot tag, which produces a new snapshot
+  // reference even when the visible layout is unchanged.
+  const hasSnapshot = !!snapshot;
   useEffect(() => {
     if (!scrollEl) return;
     const container = scrollEl;
@@ -126,7 +136,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
       const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
       container.scrollTop = Math.max(0, y - container.clientHeight / 2);
     });
-  }, [scrollEl, gridStartDate, mode, id, snapshot]);
+  }, [scrollEl, gridStartDate, mode, id, hasSnapshot]);
 
   // Home key = scroll to now
   useEffect(() => {

@@ -174,6 +174,13 @@ function SurfacagePresetFormModal({
 
           <div className="flex gap-3 justify-end pt-2">
             <button
+                              onClick={() => { setDeleteError(null); setDeletingPreset(preset); }}
+                              className="text-red-400 hover:text-red-300 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                            <button
               type="button"
               onClick={onCancel}
               className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
@@ -403,13 +410,6 @@ export function SurfacagePresetsPage() {
                               title="Modifier"
                             >
                               <FolderOpen className="w-4 h-4" strokeWidth={2} />
-                            </button>
-                            <button
-                              onClick={() => { setDeleteError(null); setDeletingPreset(preset); }}
-                              className="text-red-400 hover:text-red-300 transition-colors"
-                              title="Supprimer"
-                            >
-                              <Trash2 className="w-4 h-4" strokeWidth={2} />
                             </button>
                           </div>
                         </td>

@@ -157,8 +157,13 @@ function dateMatchesFilter(movement: Movement, filter: DateFilter, now: Date): b
       // Reliquat: still-pending past-due items also belong under "Aujourd'hui"
       // so the warehouse staff sees what they should already have processed.
       if (planned !== null && planned < today && !movement.isCompleted) return true;
-      // Movements with no scheduled date fall back to today.
-      if (planned === null && actual === null) return true;
+      // No fall-through to "today" for movements with neither a planned nor
+      // an actual date. These are non-calculable ST steps whose predecessor
+      // hasn't been placed by the engine yet (job stays in "Non planifiées"
+      // until the scheduler can fit it). Surfacing them under "Aujourd'hui"
+      // misleads the warehouse into processing a movement that nothing
+      // upstream commits to. They reappear automatically once the engine
+      // places the predecessor and we can compute departure/return dates.
       return false;
     }
     case 'tomorrow': {

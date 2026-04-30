@@ -180,6 +180,21 @@ function CategoryFormModal({ initial, onSave, onCancel, isSaving }: CategoryForm
                     placeholder="fieldPath"
                   />
                   <button
+                              onClick={() => {
+                                setDeleteError(null);
+                                setDeletingCategory(cat);
+                              }}
+                              disabled={stationCount > 0}
+                              className="p-1.5 text-flux-text-tertiary hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              title={
+                                stationCount > 0
+                                  ? 'Catégorie utilisée par des stations'
+                                  : 'Supprimer'
+                              }
+                            >
+                              <Trash2 className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                            <button
                     type="button"
                     onClick={() => handleRemoveCriterion(i)}
                     className="p-1 text-flux-text-tertiary hover:text-red-400 transition-colors"
@@ -451,21 +466,6 @@ export function StationCategoriesPage() {
                               title="Modifier"
                             >
                               <FolderOpen className="w-4 h-4" strokeWidth={2} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteError(null);
-                                setDeletingCategory(cat);
-                              }}
-                              disabled={stationCount > 0}
-                              className="p-1.5 text-flux-text-tertiary hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              title={
-                                stationCount > 0
-                                  ? 'Catégorie utilisée par des stations'
-                                  : 'Supprimer'
-                              }
-                            >
-                              <Trash2 className="w-4 h-4" strokeWidth={2} />
                             </button>
                           </div>
                         </td>

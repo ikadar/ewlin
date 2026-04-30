@@ -11,9 +11,13 @@
  * /archives/:id flow which has its own confirmation UX.
  */
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, FolderOpen } from 'lucide-react';
 import { useGetAuditQuery } from '../store';
 import type { AuditEntry } from '../store/api/archiveApi';
+import {
+  FLUX_TABLE, FLUX_THEAD, FLUX_HEADER_TR, FLUX_HEADER_CELL,
+  FLUX_BODY_TR, FLUX_BODY_TR_STYLE, FLUX_BODY_CELL, FLUX_BODY_CELL_PRIMARY,
+} from '../components/FluxStyledTable';
 
 function formatStamp(iso: string | null): string {
   if (!iso) return '—';
@@ -77,50 +81,51 @@ export function AuditPage() {
           </div>
         )}
         {data && data.entries.length > 0 && (
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
-              <tr className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                <th className="px-4 py-2 text-left font-medium">État</th>
-                <th className="px-4 py-2 text-left font-medium">Promotion</th>
-                <th className="px-4 py-2 text-left font-medium">Engine</th>
-                <th className="px-4 py-2 text-left font-medium">Hash algo</th>
-                <th className="px-4 py-2 text-left font-medium">Promu par</th>
-                <th className="px-4 py-2"></th>
+          <table className={FLUX_TABLE}>
+            <thead className={FLUX_THEAD}>
+              <tr className={FLUX_HEADER_TR}>
+                <th className={FLUX_HEADER_CELL}>État</th>
+                <th className={FLUX_HEADER_CELL}>Promotion</th>
+                <th className={FLUX_HEADER_CELL}>Engine</th>
+                <th className={FLUX_HEADER_CELL}>Hash algo</th>
+                <th className={FLUX_HEADER_CELL}>Promu par</th>
+                <th className={FLUX_HEADER_CELL}></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-900">
+            <tbody>
               {data.entries.map((entry) => (
                 <tr
                   key={entry.id}
-                  className={`${entry.state === 'active' ? 'bg-emerald-950/10' : 'hover:bg-zinc-900/40'}`}
+                  className={FLUX_BODY_TR}
+                  style={FLUX_BODY_TR_STYLE}
                   data-testid={`audit-row-${entry.id}`}
                 >
-                  <td className="px-4 py-2.5">
+                  <td className={FLUX_BODY_CELL}>
                     <StateBadge entry={entry} />
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-200">
+                  <td className={FLUX_BODY_CELL_PRIMARY}>
                     {formatStamp(entry.promotedAt)}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-zinc-300">
+                  <td className={`${FLUX_BODY_CELL} font-mono`}>
                     {entry.engineVersion ?? '—'}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-zinc-500">
+                  <td className={`${FLUX_BODY_CELL} font-mono text-flux-text-muted`}>
                     {entry.algoParamsHash
                       ? `#${entry.algoParamsHash.slice(0, 12)}`
                       : '—'}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-zinc-500">
+                  <td className={`${FLUX_BODY_CELL} font-mono text-flux-text-muted`}>
                     {entry.promotedByUserId ? `${entry.promotedByUserId.slice(0, 8)}…` : '—'}
                   </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className={`${FLUX_BODY_CELL} text-right whitespace-nowrap`}>
                     {entry.state === 'archived' && (
                       <button
                         type="button"
                         onClick={() => navigate(`/historique/archives/${entry.id}`)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300"
+                        title="Ouvrir l'archive"
+                        className="text-blue-400 hover:text-blue-300 transition-colors"
                       >
-                        Détail
-                        <ExternalLink size={10} />
+                        <FolderOpen className="w-4 h-4" strokeWidth={2} />
                       </button>
                     )}
                   </td>

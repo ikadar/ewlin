@@ -184,6 +184,13 @@ function FeuilleFormatFormModal({
                 const active = poses.includes(pose);
                 return (
                   <button
+                            onClick={() => { setDeleteError(null); setDeletingFormat(fmt); }}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
+                          <button
                     key={pose}
                     type="button"
                     onClick={() => toggleStandardPose(pose)}
@@ -478,13 +485,6 @@ export function FeuilleFormatsPage() {
                             title="Modifier"
                           >
                             <FolderOpen className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
-                            onClick={() => { setDeleteError(null); setDeletingFormat(fmt); }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
                           </button>
                         </div>
                       </td>

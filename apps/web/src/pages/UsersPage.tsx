@@ -169,6 +169,13 @@ function UserFormModal({ initial, groups, onSave, onCancel, isSaving }: UserForm
 
           <div className="flex gap-3 justify-end pt-2">
             <button
+                            onClick={() => { setDeleteError(null); setDeletingUser(user); }}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Désactiver"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
+                          <button
               type="button"
               onClick={onCancel}
               className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
@@ -449,13 +456,6 @@ export function UsersPage() {
                             title="Modifier"
                           >
                             <FolderOpen className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
-                            onClick={() => { setDeleteError(null); setDeletingUser(user); }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Désactiver"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
                           </button>
                         </div>
                       </td>
