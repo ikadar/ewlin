@@ -16,7 +16,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Search, Trash2, FolderOpen, Clock, AlertTriangle, Check, GitMerge, ArrowUpDown,
+  Plus, Search, Trash2, FolderOpen, Clock, AlertTriangle, Check, GitMerge,
+  ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react';
 import {
   useGetSimulationsQuery,
@@ -228,14 +229,16 @@ export function ScenariosPage() {
               )}
               {data && scenarios.length > 0 && (
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-flux-elevated border-b border-flux-border">
-                    <tr className="text-[10px] text-flux-text-muted uppercase tracking-wider">
+                  <thead className="sticky top-0 z-30 bg-flux-hover">
+                    <tr className="bg-flux-hover border-b border-flux-border">
                       <SortableHeader col="name"           current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Nom</SortableHeader>
                       <SortableHeader col="createdAt"      current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Forké le</SortableHeader>
                       <SortableHeader col="lastTouchedAt"  current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Dernière vue</SortableHeader>
                       <SortableHeader col="ttlExpiresAt"   current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Expire dans</SortableHeader>
                       <SortableHeader col="modifications"  current={sortColumn} dir={sortDirection} onSort={handleSortChange} align="right">Modifs</SortableHeader>
-                      <th className="px-4 py-2 text-right">Actions</th>
+                      <th className="px-2 py-3 text-right text-sm font-medium whitespace-nowrap text-flux-text-secondary">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-flux-border">
@@ -277,6 +280,30 @@ export function ScenariosPage() {
   );
 }
 
+/**
+ * Sort indicator chevron — same shape and behaviour as
+ * FluxTable.SortChevron: inactive-but-sortable shows a faded
+ * up/down chevrons that fades in on group-hover; active shows a
+ * single blue arrow pointing in the sort direction.
+ */
+function SortChevron({ col, active, dir }: { col: SortColumn; active: SortColumn; dir: SortDirection }) {
+  if (col !== active) {
+    return (
+      <ChevronsUpDown
+        className="w-3 h-3 text-flux-text-muted opacity-0 group-hover:opacity-100 transition-opacity inline ml-0.5"
+        strokeWidth={2}
+      />
+    );
+  }
+  return dir === 'asc'
+    ? <ChevronUp className="w-3 h-3 text-blue-400 inline ml-0.5" strokeWidth={2.5} />
+    : <ChevronDown className="w-3 h-3 text-blue-400 inline ml-0.5" strokeWidth={2.5} />;
+}
+
+/**
+ * Header cell — clickable th itself (mirrors FluxTable's
+ * sortableHeader pattern), with the chevron group-hover behaviour.
+ */
 function SortableHeader({
   col, current, dir, onSort, align, children,
 }: {
@@ -287,25 +314,12 @@ function SortableHeader({
   align?: 'right';
   children: React.ReactNode;
 }) {
-  const isActive = current === col;
+  const base = 'px-2 py-3 text-sm font-medium whitespace-nowrap text-flux-text-secondary';
+  const sortable = `${base} ${align === 'right' ? 'text-right' : 'text-left'} group cursor-pointer select-none`;
   return (
-    <th
-      className={`px-4 py-2 ${align === 'right' ? 'text-right' : 'text-left'} font-medium select-none`}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(col)}
-        className={`inline-flex items-center gap-1 transition-colors ${
-          isActive ? 'text-flux-text-primary' : 'hover:text-flux-text-secondary'
-        }`}
-      >
-        {children}
-        {isActive ? (
-          <span className="text-[10px] opacity-80">{dir === 'asc' ? '▲' : '▼'}</span>
-        ) : (
-          <ArrowUpDown size={10} className="opacity-30" />
-        )}
-      </button>
+    <th className={sortable} onClick={() => onSort(col)}>
+      {children}
+      <SortChevron col={col} active={current} dir={dir} />
     </th>
   );
 }
