@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Search, Trash2, Clock, AlertTriangle, Check, GitMerge, ArrowUpDown,
+  Plus, Search, Trash2, FolderOpen, Clock, AlertTriangle, Check, GitMerge, ArrowUpDown,
 } from 'lucide-react';
 import {
   useGetSimulationsQuery,
@@ -369,34 +369,38 @@ function ScenarioRow({
         )}
       </td>
       <td className="px-4 py-2.5 text-right whitespace-nowrap">
-        {hasMods && !merged && (
+        <div className="flex items-center justify-end gap-2">
+          {hasMods && !merged && (
+            <button
+              type="button"
+              onClick={onPromote}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-violet-600 hover:bg-violet-500 text-white mr-1"
+              title="Promouvoir cette branche vers la préprod"
+              data-testid={`scenario-row-promote-${scenario.id}`}
+            >
+              <GitMerge size={11} />
+              Promouvoir
+            </button>
+          )}
+          {/* Pair "supprimer / ouvrir" alignée verbatim sur Flux :
+              Trash2 rouge, FolderOpen bleu, icon-only, sans border. */}
           <button
-            type="button"
-            onClick={onPromote}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-violet-600 hover:bg-violet-500 text-white mr-1 opacity-90"
-            title="Promouvoir cette branche vers la préprod"
-            data-testid={`scenario-row-promote-${scenario.id}`}
+            className="text-red-400 hover:text-red-300 transition-colors"
+            onClick={onDelete}
+            title="Supprimer"
+            data-testid="scenario-action-delete"
           >
-            <GitMerge size={11} />
-            Promouvoir
+            <Trash2 className="w-4 h-4" strokeWidth={2} />
           </button>
-        )}
-        <button
-          type="button"
-          onClick={onOpen}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] bg-flux-hover border border-flux-border hover:bg-flux-hover/70 text-flux-text-secondary mr-1"
-          aria-label="Ouvrir"
-        >
-          Ouvrir →
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-flux-hover border border-flux-border hover:bg-rose-950/50 hover:text-rose-300 text-flux-text-muted"
-          aria-label={`Supprimer ${scenario.name ?? scenario.id}`}
-        >
-          <Trash2 size={11} />
-        </button>
+          <button
+            className="text-blue-400 hover:text-blue-300 transition-colors"
+            onClick={onOpen}
+            title="Ouvrir"
+            data-testid="scenario-action-open"
+          >
+            <FolderOpen className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
       </td>
     </tr>
   );
