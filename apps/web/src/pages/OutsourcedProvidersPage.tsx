@@ -7,7 +7,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Search, ArrowLeft, Plus, FolderOpen, Trash2, X } from 'lucide-react';
 import {
   useGetProvidersQuery,
   useCreateProviderMutation,
