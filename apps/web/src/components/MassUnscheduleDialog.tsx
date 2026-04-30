@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import type { MassUnscheduleState } from '../hooks/useMassUnschedule';
 import { DwellButton } from './DwellButton/DwellButton';
+import { Modal, ModalHeader, ModalBody, ModalFooter, ModalCancelButton } from './Modal';
 
 interface Props {
   state: MassUnscheduleState;
@@ -15,68 +16,57 @@ interface Props {
 }
 
 export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDismiss, onUpdate }: Props) {
+  const count = getClearableCount(state.includeInProgress, state.includePinned, state.includeFrozen);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-         style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-         onClick={onDismiss}
-         onKeyDown={e => { if (e.key === 'Escape') onDismiss(); }}
-         tabIndex={-1}
-         ref={el => el?.focus()}>
-      <div className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-           style={{ width: '28rem' }}
-           onClick={e => e.stopPropagation()}>
-        <h2 className="text-flux-text-primary font-semibold mb-3">
-          Effacer toutes les tuiles
-        </h2>
-        <p className="text-flux-text-secondary mb-1" style={{ fontSize: '13px' }}>
-          Les tuiles terminées seront toujours conservées.
+    <Modal open onClose={onDismiss} width="28rem" testId="mass-unschedule-dialog">
+      <ModalHeader
+        icon={<Trash2 size={14} />}
+        iconTone="red"
+        title="Effacer toutes les tuiles"
+        description="Les tuiles terminées sont toujours conservées."
+      />
+      <ModalBody gap={10}>
+        <p className="text-zinc-100 text-sm font-mono tabular-nums">
+          {count} tuile{count > 1 ? 's' : ''} à effacer
         </p>
-        <p className="text-flux-text-primary font-mono mb-4" style={{ fontSize: '13px' }}>
-          {getClearableCount(state.includeInProgress, state.includePinned, state.includeFrozen)} tuile(s) à effacer
-        </p>
-        <div className="flex flex-col gap-2 mb-6">
-          <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-            <input
-              type="checkbox"
-              checked={state.includeInProgress}
-              onChange={(e) => onUpdate((prev) => prev ? { ...prev, includeInProgress: e.target.checked } : prev)}
-              className="accent-red-600"
-            />
-            Inclure les tuiles en cours d'exécution
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-            <input
-              type="checkbox"
-              checked={state.includePinned}
-              onChange={(e) => onUpdate((prev) => prev ? { ...prev, includePinned: e.target.checked } : prev)}
-              className="accent-red-600"
-            />
-            Inclure les tuiles épinglées
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer text-flux-text-secondary" style={{ fontSize: '13px' }}>
-            <input
-              type="checkbox"
-              checked={state.includeFrozen}
-              onChange={(e) => onUpdate((prev) => prev ? { ...prev, includeFrozen: e.target.checked } : prev)}
-              className="accent-red-600"
-            />
-            Inclure les tuiles avec flocon actif (safety zone)
-          </label>
-        </div>
-        <div className="flex justify-end gap-3 items-center">
-          <button className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
-                  onClick={onDismiss}>
-            Annuler
-          </button>
-          <DwellButton
-            color="red"
-            icon={Trash2}
-            label="Maintenir pour effacer"
-            onConfirmed={onConfirm}
-            testId="mass-unschedule-dwell-button"
+        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 text-sm">
+          <input
+            type="checkbox"
+            checked={state.includeInProgress}
+            onChange={(e) => onUpdate((prev) => prev ? { ...prev, includeInProgress: e.target.checked } : prev)}
+            className="rounded-[3px] accent-red-500"
           />
-        </div>
-      </div>
-    </div>
+          Inclure les tuiles en cours d'exécution
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 text-sm">
+          <input
+            type="checkbox"
+            checked={state.includePinned}
+            onChange={(e) => onUpdate((prev) => prev ? { ...prev, includePinned: e.target.checked } : prev)}
+            className="rounded-[3px] accent-red-500"
+          />
+          Inclure les tuiles épinglées
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 text-sm">
+          <input
+            type="checkbox"
+            checked={state.includeFrozen}
+            onChange={(e) => onUpdate((prev) => prev ? { ...prev, includeFrozen: e.target.checked } : prev)}
+            className="rounded-[3px] accent-red-500"
+          />
+          Inclure les tuiles avec flocon actif (safety zone)
+        </label>
+      </ModalBody>
+      <ModalFooter hint="Maintenir 1.2 s pour confirmer.">
+        <ModalCancelButton onClick={onDismiss}>Annuler</ModalCancelButton>
+        <DwellButton
+          color="red"
+          icon={Trash2}
+          label="Maintenir pour effacer"
+          onConfirmed={onConfirm}
+          testId="mass-unschedule-dwell-button"
+        />
+      </ModalFooter>
+    </Modal>
   );
 }

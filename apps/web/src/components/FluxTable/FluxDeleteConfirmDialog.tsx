@@ -1,6 +1,10 @@
+import { AlertTriangle } from 'lucide-react';
+import { Modal, ModalHeader, ModalBody, ModalFooter, ModalCancelButton, ModalPrimaryButton } from '../Modal';
+
 /**
  * Delete confirmation dialog for the Flux dashboard (qa.md K6.1).
- * Rendered by FluxPage when a delete action is triggered.
+ * Uses the shared Modal shell but keeps legacy test IDs (and the
+ * legacy `flux-delete-dialog-backdrop` hook used by light-mode CSS).
  */
 export function FluxDeleteConfirmDialog({
   onCancel,
@@ -10,44 +14,29 @@ export function FluxDeleteConfirmDialog({
   onConfirm: () => void;
 }) {
   return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-      onClick={onCancel}
-      data-testid="flux-delete-dialog-backdrop"
+    <Modal
+      open
+      onClose={onCancel}
+      width="22rem"
+      testId="flux-delete-dialog"
+      backdropTestId="flux-delete-dialog-backdrop"
     >
-      {/* Dialog card */}
-      <div
-        className="bg-flux-elevated border border-flux-border rounded-lg p-6 shadow-xl"
-        style={{ minWidth: '22rem' }}
-        onClick={e => e.stopPropagation()}
-        data-testid="flux-delete-dialog"
-      >
-        <h2 className="text-flux-text-primary font-semibold mb-2">
-          Supprimer le job ?
-        </h2>
-        <p className="text-flux-text-secondary mb-6" style={{ fontSize: '13px' }}>
+      <ModalHeader
+        icon={<AlertTriangle size={14} />}
+        iconTone="red"
+        title="Supprimer le job ?"
+      />
+      <ModalBody>
+        <p className="text-zinc-300 text-sm leading-relaxed">
           Cette action est irréversible.
         </p>
-
-        <div className="flex justify-end gap-3">
-          <button
-            className="px-4 py-2 rounded text-sm text-flux-text-secondary hover:bg-flux-hover border border-flux-border transition-colors"
-            onClick={onCancel}
-            data-testid="flux-delete-cancel"
-          >
-            Annuler
-          </button>
-          <button
-            className="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
-            onClick={onConfirm}
-            data-testid="flux-delete-confirm"
-          >
-            Supprimer
-          </button>
-        </div>
-      </div>
-    </div>
+      </ModalBody>
+      <ModalFooter>
+        <ModalCancelButton onClick={onCancel} testId="flux-delete-cancel">Annuler</ModalCancelButton>
+        <ModalPrimaryButton onClick={onConfirm} variant="destructive" testId="flux-delete-confirm">
+          Supprimer
+        </ModalPrimaryButton>
+      </ModalFooter>
+    </Modal>
   );
 }

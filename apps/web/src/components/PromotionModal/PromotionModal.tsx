@@ -10,13 +10,13 @@
  * A diff list (per-job) was prototyped but is deferred to v1.x — for v1
  * the two-KPI summary is the chef's go/no-go signal.
  */
-import { useEffect } from 'react';
-import { Rocket, X, TrendingUp, TrendingDown, CircleDot, AlertTriangle, Undo2 } from 'lucide-react';
+import { Rocket, TrendingUp, TrendingDown, CircleDot, AlertTriangle, Undo2 } from 'lucide-react';
 import {
   useGetPromotionPreviewQuery,
   usePromoteMutation,
 } from '../../store';
 import { PromotionDwellButton } from './PromotionDwellButton';
+import { Modal, ModalHeader, ModalBody, ModalFooter, ModalCancelButton } from '../Modal';
 
 interface PromotionModalProps {
   open: boolean;
@@ -35,18 +35,6 @@ export function PromotionModal({ open, onClose, onPromoted }: PromotionModalProp
   const { data: preview, isFetching } = useGetPromotionPreviewQuery(undefined, { skip: !open });
   const [promote, promoteState] = usePromoteMutation();
 
-  // Esc to close
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   const handleConfirm = async () => {
     try {
       const result = await promote().unwrap();
@@ -63,51 +51,23 @@ export function PromotionModal({ open, onClose, onPromoted }: PromotionModalProp
   const prodStamp = preview?.prod?.promotedAt;
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      data-testid="promotion-modal"
-    >
-      <div
-        className="bg-zinc-950 rounded-lg border border-zinc-800 w-full max-w-[820px] flex flex-col shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <header className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-emerald-600/15 border border-emerald-600/30 flex items-center justify-center">
-              <Rocket size={16} className="text-emerald-300" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">Promouvoir préprod → prod</div>
-              <div className="text-[11px] text-zinc-500">
-                L'ancienne prod est conservée 5 minutes en undo
-              </div>
-            </div>
+    <Modal open={open} onClose={onClose} width={820} testId="promotion-modal">
+      <ModalHeader
+        icon={<Rocket size={14} />}
+        iconTone="emerald"
+        title="Promouvoir préprod → prod"
+        description="L'ancienne prod est conservée 5 minutes en undo"
+        onClose={onClose}
+        extra={prodStamp ? (
+          <div className="text-right">
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Prod actuelle</div>
+            <div className="text-xs text-zinc-300">{new Date(prodStamp).toLocaleString('fr-FR')}</div>
           </div>
-          <div className="flex items-center gap-3">
-            {prodStamp && (
-              <div className="text-right">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Prod actuelle</div>
-                <div className="text-xs text-zinc-300">{new Date(prodStamp).toLocaleString('fr-FR')}</div>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-              aria-label="Fermer"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </header>
-
-        {/* KPI strip */}
-        <div className="px-5 py-3 border-b border-zinc-800 grid grid-cols-2 gap-3">
-          <div className="bg-zinc-900 rounded-md p-3 border border-zinc-800">
+        ) : null}
+      />
+      <ModalBody>
+        <div className="grid grid-cols-2 gap-[13px]">
+          <div className="bg-zinc-900 rounded-[3px] p-[13px] border border-zinc-800">
             <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">
               <CircleDot size={12} className="text-zinc-300" /> Jobs planifiés
             </div>
@@ -126,7 +86,7 @@ export function PromotionModal({ open, onClose, onPromoted }: PromotionModalProp
               )}
             </div>
           </div>
-          <div className="bg-zinc-900 rounded-md p-3 border border-zinc-800">
+          <div className="bg-zinc-900 rounded-[3px] p-[13px] border border-zinc-800">
             <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5">
               <AlertTriangle size={12} className="text-rose-400" /> Jobs en retard
             </div>
@@ -146,36 +106,27 @@ export function PromotionModal({ open, onClose, onPromoted }: PromotionModalProp
             </div>
           </div>
         </div>
-
-        {/* Error display */}
-        {promoteState.error && (
-          <div className="px-5 py-2 bg-rose-950/40 text-rose-300 text-xs border-b border-rose-900">
+      </ModalBody>
+      <ModalFooter
+        ribbon={promoteState.error ? (
+          <div className="text-xs text-rose-300">
             La promotion a échoué. Vérifiez les services back-end et réessayez.
           </div>
-        )}
-
-        {/* Footer */}
-        <footer className="px-5 py-3.5 border-t border-zinc-800 flex items-center justify-between gap-3">
-          <div className="text-[11px] text-zinc-500 flex items-center gap-1.5">
+        ) : null}
+        hint={(
+          <div className="flex items-center gap-1.5">
             <Undo2 size={12} />
-            <span>Annulation possible 5 minutes après promotion</span>
+            <span>Annulation possible 5 minutes après promotion · maintenir 1.2 s pour confirmer</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800"
-            >
-              Annuler
-            </button>
-            <PromotionDwellButton
-              onConfirmed={handleConfirm}
-              disabled={isFetching || promoteState.isLoading}
-              label={promoteState.isLoading ? 'Promotion en cours…' : 'Maintenir pour promouvoir'}
-            />
-          </div>
-        </footer>
-      </div>
-    </div>
+        )}
+      >
+        <ModalCancelButton onClick={onClose}>Annuler</ModalCancelButton>
+        <PromotionDwellButton
+          onConfirmed={handleConfirm}
+          disabled={isFetching || promoteState.isLoading}
+          label={promoteState.isLoading ? 'Promotion en cours…' : 'Maintenir pour promouvoir'}
+        />
+      </ModalFooter>
+    </Modal>
   );
 }

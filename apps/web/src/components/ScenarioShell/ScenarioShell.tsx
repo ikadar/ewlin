@@ -29,6 +29,7 @@ import {
 import { ScenarioSidebar } from './ScenarioSidebar';
 import { ScenarioDockCard } from './ScenarioDockCard';
 import { MergePreviewDialog } from './MergePreviewDialog';
+import { ConfirmDialog } from '../Modal';
 
 function ScenarioShellInner() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ function ScenarioShellInner() {
   const { data: scenario, isLoading } = useGetSimulationQuery(id ?? '', { skip: !id });
   const [deleteSimulation] = useDeleteSimulationMutation();
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
 
   // Bail if URL is malformed — back to the list.
@@ -103,9 +105,9 @@ function ScenarioShellInner() {
     );
   }
 
-  const handleDelete = async () => {
-    const ok = window.confirm(`Supprimer le scénario "${scenario.name ?? id}" ? Toutes ses modifications seront perdues.`);
-    if (!ok) return;
+  const handleDelete = () => setDeleteOpen(true);
+  const handleConfirmDelete = async () => {
+    setDeleteOpen(false);
     await deleteSimulation(id);
     navigate('/scenarios');
   };
@@ -136,6 +138,21 @@ function ScenarioShellInner() {
         scenarioName={scenario.name ?? id}
         onClose={() => setMergeOpen(false)}
         onMerged={handleMerged}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Supprimer ce scénario ?"
+        description={(
+          <>
+            <span className="text-zinc-100 font-medium">«&nbsp;{scenario.name ?? id}&nbsp;»</span>
+            {' '}et toutes ses modifications seront perdus définitivement.
+          </>
+        )}
+        variant="destructive"
+        testId="scenario-delete-confirm"
       />
 
       {!isOpen && (

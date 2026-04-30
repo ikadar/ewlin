@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harmonisation des modales — playground</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    /* Flux palette (used by current modals that diverge from JCF) */
+    :root {
+      --flux-base:           rgb(15 15 15);
+      --flux-surface:        rgb(26 26 26);
+      --flux-elevated:       rgb(36 36 36);
+      --flux-hover:          rgb(44 44 44);
+      --flux-border:         rgb(42 42 42);
+      --flux-border-light:   rgb(58 58 58);
+      --flux-text-primary:   rgb(245 245 245);
+      --flux-text-secondary: rgb(209 209 209);
+      --flux-text-muted:     rgb(128 128 128);
+    }
+    .bg-flux-base       { background: var(--flux-base); }
+    .bg-flux-elevated   { background: var(--flux-elevated); }
+    .bg-flux-hover      { background: var(--flux-hover); }
+    .border-flux-border { border-color: var(--flux-border); }
+    .text-flux-primary  { color: var(--flux-text-primary); }
+    .text-flux-secondary{ color: var(--flux-text-secondary); }
+    .text-flux-muted    { color: var(--flux-text-muted); }
+    .hover\:bg-flux-hover:hover { background: var(--flux-hover); }
+
+    /* Annotation badge for the "diff" markers */
+    .diff-pill {
+      font-size: 10px; line-height: 14px; padding: 2px 6px;
+      border-radius: 999px; border: 1px solid;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .diff-pill.before { background: rgba(239, 68, 68, 0.10); color: rgb(252, 165, 165); border-color: rgba(239, 68, 68, 0.35); }
+    .diff-pill.after  { background: rgba(34, 197, 94, 0.10);  color: rgb(134, 239, 172); border-color: rgba(34, 197, 94, 0.35);  }
+
+    .col-card {
+      background: rgb(15 15 17);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .col-label {
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+      font-weight: 600; color: rgb(161 161 170);
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .col-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.actual { background: rgb(248 113 113); }
+    .dot.target { background: rgb(74 222 128); }
+
+    /* Faux-modal stage so the modal doesn't get clipped by the page */
+    .modal-stage {
+      background: rgb(8 8 10);
+      border: 1px dashed rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 24px;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 320px;
+    }
+
+    /* JCF-aligned input style (used in the cible Promotion + bonus inputs section) */
+    .jcf-input {
+      background: rgb(24 24 27);
+      border: 1px solid rgb(39 39 42);
+      border-radius: 3px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: rgb(228 228 231);
+    }
+    .jcf-input:focus { outline: none; border-color: rgb(59 130 246); box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+
+  <header class="max-w-[1400px] mx-auto px-8 pt-10 pb-6">
+    <div class="text-[11px] uppercase tracking-[0.12em] text-zinc-500 font-semibold mb-2">Playground · UX</div>
+    <h1 class="text-2xl font-semibold tracking-tight">Harmonisation des modales</h1>
+    <p class="text-zinc-400 mt-3 text-[13px] leading-relaxed max-w-3xl">
+      Cible : aligner toutes les modales sur le langage visuel du <strong>JCF</strong> (Job Creation Form) — qui est
+      déjà le composant le plus utilisé. Quatre familles à harmoniser : promotion de planning, RAZ globale (Ctrl+Alt+Z),
+      suppression de job, confirmation d'action. Pour chacune : <em>actuel</em> vs <em>cible</em> à taille réelle, plus
+      le diff de tokens sous chaque modale.
+    </p>
+  </header>
+
+  <!-- ============================================================== -->
+  <!-- 0. Référence JCF — système de tokens                            -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-6">
+    <div class="flex items-end justify-between mb-4">
+      <h2 class="text-[15px] font-semibold">0 · Référence JCF — tokens</h2>
+      <span class="text-[11px] text-zinc-500">Ces valeurs sont la cible pour toutes les modales ci-dessous.</span>
+    </div>
+
+    <div class="grid grid-cols-4 gap-3">
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 overflow-hidden">
+        <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px]">
+          <div class="text-[11px] uppercase tracking-wider text-zinc-500">Container</div>
+        </div>
+        <ul class="px-[13px] py-[10px] text-[12px] text-zinc-300 space-y-1 mono">
+          <li><span class="text-zinc-500">bg</span> zinc-950</li>
+          <li><span class="text-zinc-500">border</span> zinc-800</li>
+          <li><span class="text-zinc-500">radius</span> 7px</li>
+          <li><span class="text-zinc-500">shadow</span> shadow-2xl</li>
+        </ul>
+      </div>
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 overflow-hidden">
+        <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px]">
+          <div class="text-[11px] uppercase tracking-wider text-zinc-500">Header</div>
+        </div>
+        <ul class="px-[13px] py-[10px] text-[12px] text-zinc-300 space-y-1 mono">
+          <li><span class="text-zinc-500">bg</span> zinc-900</li>
+          <li><span class="text-zinc-500">padding</span> 13px / 10px</li>
+          <li><span class="text-zinc-500">title</span> 15px / 23px / medium</li>
+          <li><span class="text-zinc-500">color</span> zinc-100</li>
+        </ul>
+      </div>
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 overflow-hidden">
+        <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px]">
+          <div class="text-[11px] uppercase tracking-wider text-zinc-500">Buttons</div>
+        </div>
+        <ul class="px-[13px] py-[10px] text-[12px] text-zinc-300 space-y-1 mono">
+          <li><span class="text-zinc-500">padding</span> 13px / 6px</li>
+          <li><span class="text-zinc-500">font</span> text-sm (13px)</li>
+          <li><span class="text-zinc-500">radius</span> 3px</li>
+          <li><span class="text-zinc-500">primary</span> blue-600 / 500</li>
+          <li><span class="text-zinc-500">cancel</span> zinc-800 / 700</li>
+        </ul>
+      </div>
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 overflow-hidden">
+        <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px]">
+          <div class="text-[11px] uppercase tracking-wider text-zinc-500">Inputs</div>
+        </div>
+        <ul class="px-[13px] py-[10px] text-[12px] text-zinc-300 space-y-1 mono">
+          <li><span class="text-zinc-500">bg</span> zinc-900</li>
+          <li><span class="text-zinc-500">border</span> zinc-800</li>
+          <li><span class="text-zinc-500">padding</span> 10px / 6px</li>
+          <li><span class="text-zinc-500">radius</span> 3px</li>
+          <li><span class="text-zinc-500">focus</span> blue-500 ring</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Mini live JCF mock -->
+    <div class="mt-6 modal-stage" style="min-height: 240px">
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 shadow-2xl w-[640px]">
+        <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px] flex items-center justify-between">
+          <div class="text-[15px] leading-[23px] font-medium text-zinc-100">Nouveau job — JCF</div>
+          <button class="p-[3px] text-zinc-400 hover:text-zinc-100">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="px-[20px] py-[13px] space-y-[13px]">
+          <div class="grid grid-cols-2 gap-[13px]">
+            <label class="block">
+              <div class="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">Référence</div>
+              <input type="text" class="jcf-input w-full" value="JOB-2025-04-30-A12" />
+            </label>
+            <label class="block">
+              <div class="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">Quantité</div>
+              <input type="text" class="jcf-input w-full" value="1 250" />
+            </label>
+          </div>
+        </div>
+        <div class="bg-zinc-900 border-t border-zinc-800">
+          <div class="px-[13px] py-[5px] text-[11px] text-zinc-500 border-b border-zinc-800/50 flex items-center gap-3">
+            <span><kbd class="bg-zinc-800 rounded px-1.5 py-0.5 text-[10px] text-zinc-300">Esc</kbd> annuler</span>
+            <span><kbd class="bg-zinc-800 rounded px-1.5 py-0.5 text-[10px] text-zinc-300">⌘ S</kbd> enregistrer</span>
+          </div>
+          <div class="px-[13px] py-[8px] flex justify-end gap-[10px]">
+            <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Annuler</button>
+            <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-blue-600 hover:bg-blue-500 text-white font-medium">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- 1. Promotion modal                                              -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-10 border-t border-white/5">
+    <div class="flex items-end justify-between mb-5">
+      <div>
+        <h2 class="text-[15px] font-semibold">1 · Modale de <span class="text-emerald-400">promotion de planning</span></h2>
+        <p class="text-[12px] text-zinc-500 mt-1">PromotionModal — déjà très proche de la cible, quelques ajustements de tokens.</p>
+      </div>
+      <span class="text-[11px] text-zinc-500 mono">apps/web/src/components/PromotionModal/PromotionModal.tsx</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-5">
+      <!-- ACTUEL -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot actual"></span>Actuel</div>
+        <div class="modal-stage">
+          <div class="rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl w-[560px]">
+            <div class="px-5 py-3.5 border-b border-zinc-800 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-md bg-emerald-600/15 border border-emerald-600/30 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(52 211 153)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div>
+                <div class="text-sm font-medium text-zinc-100">Promouvoir Préprod → Prod</div>
+                <div class="text-[11px] text-zinc-500">Le planning Préprod sera publié comme nouveau Prod.</div>
+              </div>
+            </div>
+            <div class="px-5 py-3 grid grid-cols-2 gap-3">
+              <div class="bg-zinc-900 rounded-md p-3 border border-zinc-800">
+                <div class="text-2xl font-semibold text-zinc-100 tabular-nums">2 814</div>
+                <div class="text-[10px] uppercase tracking-wider text-zinc-500 mt-1">tâches placées</div>
+              </div>
+              <div class="bg-zinc-900 rounded-md p-3 border border-zinc-800">
+                <div class="text-2xl font-semibold text-zinc-100 tabular-nums">12</div>
+                <div class="text-[10px] uppercase tracking-wider text-zinc-500 mt-1">jobs en retard</div>
+              </div>
+            </div>
+            <div class="px-5 py-3.5 border-t border-zinc-800 flex items-center justify-between">
+              <span class="text-[11px] text-zinc-500">Maintenir 1.2s pour confirmer.</span>
+              <div class="flex gap-2">
+                <button class="px-3 py-1.5 rounded-md text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300">Annuler</button>
+                <button class="px-3 py-1.5 rounded-md text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium">Promouvoir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill before">radius rounded-lg</span>
+          <span class="diff-pill before">btn px-3 py-1.5 text-xs</span>
+          <span class="diff-pill before">btn radius rounded-md</span>
+          <span class="diff-pill before">cancel bg-zinc-900</span>
+        </div>
+      </div>
+
+      <!-- CIBLE -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot target"></span>Cible (aligné JCF)</div>
+        <div class="modal-stage">
+          <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 shadow-2xl w-[560px]">
+            <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px] flex items-center gap-3">
+              <div class="w-7 h-7 rounded-[3px] bg-emerald-600/15 border border-emerald-600/30 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(52 211 153)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div>
+                <div class="text-[15px] leading-[23px] font-medium text-zinc-100">Promouvoir Préprod → Prod</div>
+                <div class="text-[11px] text-zinc-500">Le planning Préprod sera publié comme nouveau Prod.</div>
+              </div>
+            </div>
+            <div class="px-[20px] py-[13px] grid grid-cols-2 gap-[13px]">
+              <div class="bg-zinc-900 rounded-[3px] p-[13px] border border-zinc-800">
+                <div class="text-2xl font-semibold text-zinc-100 tabular-nums">2 814</div>
+                <div class="text-[10px] uppercase tracking-wider text-zinc-500 mt-1">tâches placées</div>
+              </div>
+              <div class="bg-zinc-900 rounded-[3px] p-[13px] border border-zinc-800">
+                <div class="text-2xl font-semibold text-zinc-100 tabular-nums">12</div>
+                <div class="text-[10px] uppercase tracking-wider text-zinc-500 mt-1">jobs en retard</div>
+              </div>
+            </div>
+            <div class="bg-zinc-900 border-t border-zinc-800">
+              <div class="px-[13px] py-[5px] text-[11px] text-zinc-500 border-b border-zinc-800/50">
+                Maintenir 1.2s pour confirmer.
+              </div>
+              <div class="px-[13px] py-[8px] flex justify-end gap-[10px]">
+                <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Annuler</button>
+                <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-emerald-600 hover:bg-emerald-500 text-white font-medium">Promouvoir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill after">radius 7px</span>
+          <span class="diff-pill after">btn 13px / 6px</span>
+          <span class="diff-pill after">btn radius 3px</span>
+          <span class="diff-pill after">cancel zinc-800</span>
+          <span class="diff-pill after">title 15/23 medium</span>
+          <span class="diff-pill after">footer en bandeau zinc-900</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- 2. Mass Unschedule (Ctrl+Alt+Z)                                 -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-10 border-t border-white/5">
+    <div class="flex items-end justify-between mb-5">
+      <div>
+        <h2 class="text-[15px] font-semibold">2 · RAZ planning <span class="text-red-400">(Ctrl+Alt+Z)</span></h2>
+        <p class="text-[12px] text-zinc-500 mt-1">MassUnscheduleDialog — palette flux, structure légère, à reconstruire sur tokens JCF.</p>
+      </div>
+      <span class="text-[11px] text-zinc-500 mono">apps/web/src/components/MassUnscheduleDialog.tsx</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-5">
+      <!-- ACTUEL -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot actual"></span>Actuel</div>
+        <div class="modal-stage">
+          <div class="rounded-lg border border-flux-border bg-flux-elevated shadow-xl p-6" style="width: 28rem">
+            <h2 class="text-flux-primary font-semibold mb-3 text-base">RAZ du planning</h2>
+            <p class="text-flux-secondary text-[13px] mb-4 leading-relaxed">
+              Cette action retire toutes les tuiles non-épinglées. Le compactage automatique reprendra à zéro.
+            </p>
+            <label class="flex items-center gap-2 mb-2 text-[13px] text-flux-secondary">
+              <input type="checkbox" checked class="accent-red-600" /> Conserver les tâches en cours
+            </label>
+            <label class="flex items-center gap-2 mb-5 text-[13px] text-flux-secondary">
+              <input type="checkbox" class="accent-red-600" /> Conserver les épinglages utilisateur
+            </label>
+            <div class="flex justify-end gap-3">
+              <button class="px-4 py-2 rounded text-sm text-flux-secondary border border-flux-border hover:bg-flux-hover">Annuler</button>
+              <button class="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium inline-flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                RAZ
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill before">palette flux-*</span>
+          <span class="diff-pill before">radius rounded-lg</span>
+          <span class="diff-pill before">pas de header séparé</span>
+          <span class="diff-pill before">checkbox accent-red brut</span>
+          <span class="diff-pill before">pas de footer en bandeau</span>
+        </div>
+      </div>
+
+      <!-- CIBLE -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot target"></span>Cible (aligné JCF)</div>
+        <div class="modal-stage">
+          <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 shadow-2xl" style="width: 28rem">
+            <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px] flex items-center gap-3">
+              <div class="w-7 h-7 rounded-[3px] bg-red-600/15 border border-red-600/30 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(248 113 113)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/></svg>
+              </div>
+              <div>
+                <div class="text-[15px] leading-[23px] font-medium text-zinc-100">RAZ du planning</div>
+                <div class="text-[11px] text-zinc-500">Action irréversible.</div>
+              </div>
+            </div>
+            <div class="px-[20px] py-[13px] space-y-[10px]">
+              <p class="text-zinc-300 text-sm leading-relaxed">
+                Cette action retire toutes les tuiles non-épinglées. Le compactage reprendra à zéro.
+              </p>
+              <label class="flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" checked class="rounded-[3px] border-zinc-700 bg-zinc-900 accent-red-500" />
+                Conserver les tâches en cours
+              </label>
+              <label class="flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" class="rounded-[3px] border-zinc-700 bg-zinc-900 accent-red-500" />
+                Conserver les épinglages utilisateur
+              </label>
+            </div>
+            <div class="bg-zinc-900 border-t border-zinc-800">
+              <div class="px-[13px] py-[5px] text-[11px] text-zinc-500 border-b border-zinc-800/50">
+                Maintenir 1.2s pour confirmer.
+              </div>
+              <div class="px-[13px] py-[8px] flex justify-end gap-[10px]">
+                <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Annuler</button>
+                <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-red-600 hover:bg-red-500 text-white font-medium inline-flex items-center gap-[6px]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/></svg>
+                  RAZ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill after">palette zinc</span>
+          <span class="diff-pill after">radius 7px</span>
+          <span class="diff-pill after">header zinc-900 + icône</span>
+          <span class="diff-pill after">title 15/23 medium</span>
+          <span class="diff-pill after">btn 13px / 6px</span>
+          <span class="diff-pill after">footer en bandeau</span>
+          <span class="diff-pill after">DwellButton dans la même grille</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- 3. Job delete confirm                                           -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-10 border-t border-white/5">
+    <div class="flex items-end justify-between mb-5">
+      <div>
+        <h2 class="text-[15px] font-semibold">3 · Suppression de <span class="text-red-400">job</span></h2>
+        <p class="text-[12px] text-zinc-500 mt-1">FluxDeleteConfirmDialog — petite confirmation, mêmes anomalies de tokens.</p>
+      </div>
+      <span class="text-[11px] text-zinc-500 mono">apps/web/src/components/FluxTable/FluxDeleteConfirmDialog.tsx</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-5">
+      <!-- ACTUEL -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot actual"></span>Actuel</div>
+        <div class="modal-stage">
+          <div class="rounded-lg border border-flux-border bg-flux-elevated shadow-xl p-6" style="min-width: 22rem">
+            <h2 class="text-flux-primary font-semibold mb-2 text-base">Supprimer ce job ?</h2>
+            <p class="text-flux-secondary mb-6 text-sm leading-relaxed">
+              Cette action est définitive. Le job et ses tâches associées seront retirés du planning.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button class="px-4 py-2 rounded text-sm text-flux-secondary border border-flux-border hover:bg-flux-hover">Annuler</button>
+              <button class="px-4 py-2 rounded text-sm bg-red-700 hover:bg-red-600 text-white font-medium">Supprimer</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill before">palette flux-*</span>
+          <span class="diff-pill before">radius rounded-lg</span>
+          <span class="diff-pill before">pas de header séparé</span>
+          <span class="diff-pill before">btn px-4 py-2 rounded</span>
+        </div>
+      </div>
+
+      <!-- CIBLE -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot target"></span>Cible (aligné JCF)</div>
+        <div class="modal-stage">
+          <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 shadow-2xl" style="min-width: 22rem">
+            <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px] flex items-center gap-3">
+              <div class="w-7 h-7 rounded-[3px] bg-red-600/15 border border-red-600/30 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(248 113 113)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="text-[15px] leading-[23px] font-medium text-zinc-100">Supprimer ce job ?</div>
+            </div>
+            <div class="px-[20px] py-[13px]">
+              <p class="text-zinc-300 text-sm leading-relaxed">
+                Cette action est définitive. Le job et ses tâches associées seront retirés du planning.
+              </p>
+            </div>
+            <div class="bg-zinc-900 border-t border-zinc-800 px-[13px] py-[8px] flex justify-end gap-[10px]">
+              <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Annuler</button>
+              <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-red-600 hover:bg-red-500 text-white font-medium">Supprimer</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill after">palette zinc</span>
+          <span class="diff-pill after">radius 7px</span>
+          <span class="diff-pill after">header zinc-900 + icône warning</span>
+          <span class="diff-pill after">btn 13px / 6px</span>
+          <span class="diff-pill after">footer en bandeau</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- 4. Generic action confirmation                                  -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-10 border-t border-white/5">
+    <div class="flex items-end justify-between mb-5">
+      <div>
+        <h2 class="text-[15px] font-semibold">4 · Confirmation d'action générique</h2>
+        <p class="text-[12px] text-zinc-500 mt-1">
+          Aujourd'hui : <code class="text-zinc-300">window.confirm(...)</code> natif (suppression scénario, etc.).
+          Cible : un composant <code class="text-zinc-300">ConfirmDialog</code> réutilisable, aligné JCF.
+        </p>
+      </div>
+      <span class="text-[11px] text-zinc-500 mono">ScenarioShell.handleDelete · ScheduleSaveLoadModal nested confirm</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-5">
+      <!-- ACTUEL -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot actual"></span>Actuel — window.confirm</div>
+        <div class="modal-stage">
+          <div class="rounded-md border border-zinc-700 bg-zinc-800 shadow-xl" style="width: 22rem">
+            <div class="px-4 py-3 text-zinc-100 text-[13px] leading-relaxed border-b border-zinc-700/60">
+              <div class="font-semibold mb-1">localhost dit :</div>
+              <div class="text-zinc-300">Supprimer le scénario "Mai 2026 — Test capa" ? Toutes ses modifications seront perdues.</div>
+            </div>
+            <div class="flex justify-end gap-2 px-3 py-2 bg-zinc-900/40">
+              <button class="px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-100 text-[13px]">Annuler</button>
+              <button class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[13px]">OK</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill before">window.confirm natif</span>
+          <span class="diff-pill before">style navigateur</span>
+          <span class="diff-pill before">pas de variant destructive</span>
+          <span class="diff-pill before">aucun token applicatif</span>
+        </div>
+      </div>
+
+      <!-- CIBLE -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot target"></span>Cible — ConfirmDialog</div>
+        <div class="modal-stage">
+          <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 shadow-2xl" style="width: 22rem">
+            <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px] flex items-center gap-3">
+              <div class="w-7 h-7 rounded-[3px] bg-red-600/15 border border-red-600/30 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(248 113 113)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="text-[15px] leading-[23px] font-medium text-zinc-100">Supprimer ce scénario ?</div>
+            </div>
+            <div class="px-[20px] py-[13px]">
+              <p class="text-zinc-300 text-sm leading-relaxed">
+                <span class="text-zinc-100 font-medium">"Mai 2026 — Test capa"</span> et toutes ses modifications seront perdus définitivement.
+              </p>
+            </div>
+            <div class="bg-zinc-900 border-t border-zinc-800 px-[13px] py-[8px] flex justify-end gap-[10px]">
+              <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Annuler</button>
+              <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-red-600 hover:bg-red-500 text-white font-medium">Supprimer</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill after">composant ConfirmDialog</span>
+          <span class="diff-pill after">props variant: 'default' | 'destructive'</span>
+          <span class="diff-pill after">props title / description / confirmLabel</span>
+          <span class="diff-pill after">tokens JCF</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-5 rounded-[7px] border border-zinc-800 bg-zinc-900/40 px-[13px] py-[10px] text-[12px] text-zinc-400 leading-relaxed">
+      <span class="text-zinc-200 font-medium">Note d'API.</span>
+      <code class="text-zinc-300">ConfirmDialog</code> remplacerait
+      <code class="text-zinc-300">window.confirm</code> à 5+ endroits (<code class="text-zinc-300">ScenarioShell.handleDelete</code>,
+      ScheduleSaveLoadModal nested confirm, EnvFloatingControls reset, etc.). Signature suggérée :
+      <code class="text-zinc-300">{ open, title, description, confirmLabel?, variant?: 'default'|'destructive', onConfirm, onCancel }</code>.
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- 5. Bonus — MergePreviewDialog                                   -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-10 border-t border-white/5">
+    <div class="flex items-end justify-between mb-5">
+      <div>
+        <h2 class="text-[15px] font-semibold">5 · Bonus — fusion de scénario</h2>
+        <p class="text-[12px] text-zinc-500 mt-1">MergePreviewDialog — déjà aligné, simple ajustement de radius pour cohérence visuelle.</p>
+      </div>
+      <span class="text-[11px] text-zinc-500 mono">apps/web/src/components/ScenarioShell/MergePreviewDialog.tsx</span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-5">
+      <!-- ACTUEL -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot actual"></span>Actuel</div>
+        <div class="modal-stage">
+          <div class="rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl w-[520px]">
+            <div class="px-5 py-3.5 border-b border-zinc-800 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-md bg-violet-600/15 border border-violet-600/30 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(167 139 250)" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+              </div>
+              <div>
+                <div class="text-sm font-medium text-zinc-100">Fusionner vers Préprod</div>
+                <div class="text-[11px] text-zinc-500">14 modifications seront appliquées (last-write-wins).</div>
+              </div>
+            </div>
+            <div class="px-5 py-4 grid grid-cols-3 gap-2">
+              <div class="bg-zinc-900 rounded-md p-2.5 border border-zinc-800">
+                <div class="text-xl font-semibold text-zinc-100 tabular-nums">8</div>
+                <div class="text-[10px] uppercase text-zinc-500">jobs</div>
+              </div>
+              <div class="bg-zinc-900 rounded-md p-2.5 border border-zinc-800">
+                <div class="text-xl font-semibold text-zinc-100 tabular-nums">4</div>
+                <div class="text-[10px] uppercase text-zinc-500">éléments</div>
+              </div>
+              <div class="bg-zinc-900 rounded-md p-2.5 border border-zinc-800">
+                <div class="text-xl font-semibold text-zinc-100 tabular-nums">2</div>
+                <div class="text-[10px] uppercase text-zinc-500">opérateurs</div>
+              </div>
+            </div>
+            <div class="px-5 py-3.5 border-t border-zinc-800 flex items-center justify-between">
+              <span class="text-[11px] text-zinc-500">Maintenir 1.2s.</span>
+              <div class="flex gap-2">
+                <button class="px-3 py-1.5 rounded-md text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300">Annuler</button>
+                <button class="px-3 py-1.5 rounded-md text-xs bg-violet-600 hover:bg-violet-500 text-white font-medium">Fusionner</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill before">radius rounded-lg / md</span>
+          <span class="diff-pill before">btn px-3 py-1.5 text-xs</span>
+        </div>
+      </div>
+
+      <!-- CIBLE -->
+      <div class="col-card">
+        <div class="col-label"><span class="dot target"></span>Cible (aligné JCF)</div>
+        <div class="modal-stage">
+          <div class="rounded-[7px] border border-zinc-800 bg-zinc-950 shadow-2xl w-[520px]">
+            <div class="bg-zinc-900 border-b border-zinc-800 px-[13px] py-[10px] flex items-center gap-3">
+              <div class="w-7 h-7 rounded-[3px] bg-violet-600/15 border border-violet-600/30 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(167 139 250)" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+              </div>
+              <div>
+                <div class="text-[15px] leading-[23px] font-medium text-zinc-100">Fusionner vers Préprod</div>
+                <div class="text-[11px] text-zinc-500">14 modifications seront appliquées (last-write-wins).</div>
+              </div>
+            </div>
+            <div class="px-[20px] py-[13px] grid grid-cols-3 gap-[10px]">
+              <div class="bg-zinc-900 rounded-[3px] p-[10px] border border-zinc-800">
+                <div class="text-xl font-semibold text-zinc-100 tabular-nums">8</div>
+                <div class="text-[10px] uppercase text-zinc-500">jobs</div>
+              </div>
+              <div class="bg-zinc-900 rounded-[3px] p-[10px] border border-zinc-800">
+                <div class="text-xl font-semibold text-zinc-100 tabular-nums">4</div>
+                <div class="text-[10px] uppercase text-zinc-500">éléments</div>
+              </div>
+              <div class="bg-zinc-900 rounded-[3px] p-[10px] border border-zinc-800">
+                <div class="text-xl font-semibold text-zinc-100 tabular-nums">2</div>
+                <div class="text-[10px] uppercase text-zinc-500">opérateurs</div>
+              </div>
+            </div>
+            <div class="bg-zinc-900 border-t border-zinc-800">
+              <div class="px-[13px] py-[5px] text-[11px] text-zinc-500 border-b border-zinc-800/50">
+                Maintenir 1.2s pour confirmer.
+              </div>
+              <div class="px-[13px] py-[8px] flex justify-end gap-[10px]">
+                <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Annuler</button>
+                <button class="px-[13px] py-[6px] text-sm rounded-[3px] bg-violet-600 hover:bg-violet-500 text-white font-medium">Fusionner</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <span class="diff-pill after">radius 7px / 3px</span>
+          <span class="diff-pill after">btn 13px / 6px</span>
+          <span class="diff-pill after">footer 2 bandeaux zinc-900</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Footer — récap des changements                                  -->
+  <!-- ============================================================== -->
+  <section class="max-w-[1400px] mx-auto px-8 py-10 border-t border-white/5 pb-20">
+    <h2 class="text-[15px] font-semibold mb-4">Récap — ce que la migration change</h2>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-900/40 p-[13px]">
+        <div class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Conteneur</div>
+        <ul class="text-[12px] text-zinc-300 space-y-1.5">
+          <li>• <code class="text-zinc-400">rounded-lg</code> / <code class="text-zinc-400">rounded-xl</code> → <code class="text-emerald-400">rounded-[7px]</code></li>
+          <li>• <code class="text-zinc-400">bg-flux-elevated</code> → <code class="text-emerald-400">bg-zinc-950</code></li>
+          <li>• <code class="text-zinc-400">border-flux-border</code> → <code class="text-emerald-400">border-zinc-800</code></li>
+          <li>• <code class="text-zinc-400">shadow-xl</code> → <code class="text-emerald-400">shadow-2xl</code></li>
+        </ul>
+      </div>
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-900/40 p-[13px]">
+        <div class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Header / Footer</div>
+        <ul class="text-[12px] text-zinc-300 space-y-1.5">
+          <li>• Header en bandeau <code class="text-emerald-400">bg-zinc-900</code> + icône 28px</li>
+          <li>• Titre <code class="text-emerald-400">text-[15px] leading-[23px] medium</code></li>
+          <li>• Padding header <code class="text-emerald-400">13px / 10px</code></li>
+          <li>• Footer 2 bandeaux : hint + actions, gap <code class="text-emerald-400">10px</code></li>
+        </ul>
+      </div>
+      <div class="rounded-[7px] border border-zinc-800 bg-zinc-900/40 p-[13px]">
+        <div class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Boutons / champs</div>
+        <ul class="text-[12px] text-zinc-300 space-y-1.5">
+          <li>• Boutons <code class="text-emerald-400">px-[13px] py-[6px] text-sm</code></li>
+          <li>• Radius bouton <code class="text-emerald-400">3px</code></li>
+          <li>• Annuler : <code class="text-emerald-400">bg-zinc-800</code> (plus visible)</li>
+          <li>• Inputs <code class="text-emerald-400">px-[10px] py-[6px] bg-zinc-900 border-zinc-800 rounded-[3px]</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-6 rounded-[7px] border border-amber-500/30 bg-amber-500/5 px-[13px] py-[10px] text-[12px] text-amber-200/90 leading-relaxed">
+      <span class="font-semibold text-amber-100">Avant d'implémenter.</span>
+      Si les choix te conviennent, je propose : (1) ajouter un composant <code class="text-amber-50">Modal</code> + <code class="text-amber-50">ConfirmDialog</code>
+      partagés sous <code class="text-amber-50">apps/web/src/components/Modal/</code>, (2) refactoriser les 4 modales nommées en se basant dessus,
+      (3) remplacer les <code class="text-amber-50">window.confirm</code> par <code class="text-amber-50">ConfirmDialog</code>.
+      Le diff sera majoritairement de la suppression de classes flux-* + import du nouveau Modal — pas de logique métier touchée.
+    </div>
+  </section>
+
+</body>
+</html>

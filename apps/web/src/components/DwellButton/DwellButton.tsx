@@ -77,7 +77,7 @@ export function DwellButton({
       onTouchEnd={cancel}
       onTouchCancel={cancel}
       disabled={disabled}
-      className={`relative px-4 py-1.5 rounded-md text-xs font-medium text-white flex items-center gap-1.5 overflow-hidden select-none transition ${
+      className={`relative px-[13px] py-[6px] rounded-[3px] text-sm font-medium text-white flex items-center gap-[6px] overflow-hidden select-none transition ${
         disabled ? 'bg-zinc-700 cursor-not-allowed' : palette.idle
       }`}
       data-testid={testId}
