@@ -93,16 +93,7 @@ export function MergePreviewDialog({
                     </span>
                   </div>
                   {Object.entries(m.changes).map(([col, change]) => (
-                    <div key={col} className="text-[10px] text-zinc-500 ml-1">
-                      <span className="text-zinc-400 font-mono">{col}</span>:{' '}
-                      <span className="text-rose-300 line-through">
-                        {String(change.from ?? '∅').slice(0, 40)}
-                      </span>{' '}
-                      →{' '}
-                      <span className="text-emerald-300">
-                        {String(change.to ?? '∅').slice(0, 40)}
-                      </span>
-                    </div>
+                    <ChangeRow key={col} col={col} from={change.from} to={change.to} />
                   ))}
                 </li>
               ))}
@@ -142,6 +133,69 @@ export function MergePreviewDialog({
       </ModalFooter>
     </Modal>
   );
+}
+
+/**
+ * Renders a single column-level change. Defends against the easy
+ * trap of truncating at a fixed width on JSON columns: the prefix
+ * of two arrays often matches for tens of chars before they diverge,
+ * so a short truncation makes the modal look like a no-op even
+ * though the data really did change.
+ *
+ * Strategy:
+ *   1. If both sides parse as a JSON array, show the entry count
+ *      delta upfront ("1 → 2 entrées") so the structural change
+ *      is unambiguous, then dump the truncated raw on a second line.
+ *   2. Otherwise show the raw values with a generous truncation
+ *      and word-break so the divergence is actually visible.
+ */
+function ChangeRow({
+  col,
+  from,
+  to,
+}: {
+  col: string;
+  from: unknown;
+  to: unknown;
+}) {
+  const fromStr = from === null || from === undefined ? '∅' : String(from);
+  const toStr = to === null || to === undefined ? '∅' : String(to);
+  const fromArr = tryParseArray(fromStr);
+  const toArr = tryParseArray(toStr);
+  const showCount = fromArr !== null && toArr !== null;
+  return (
+    <div className="text-[10px] text-zinc-500 ml-1 mt-0.5">
+      <div className="flex items-baseline gap-1">
+        <span className="text-zinc-400 font-mono">{col}</span>
+        {showCount && (
+          <span className="text-zinc-500">
+            <span className="text-rose-300/80">{fromArr!.length}</span>
+            {' → '}
+            <span className="text-emerald-300/80">{toArr!.length}</span>
+            {' entrée' + (toArr!.length > 1 ? 's' : '')}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-0.5 font-mono break-all whitespace-pre-wrap leading-snug">
+        <div className="text-rose-300/90 line-through">{truncate(fromStr, 220)}</div>
+        <div className="text-emerald-300/90">{truncate(toStr, 220)}</div>
+      </div>
+    </div>
+  );
+}
+
+function tryParseArray(s: string): unknown[] | null {
+  if (!s.startsWith('[')) return null;
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
 function CountTile({
