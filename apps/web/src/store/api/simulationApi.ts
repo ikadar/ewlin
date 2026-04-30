@@ -30,6 +30,8 @@ export interface SimulationSummary {
   algoParamsHash: string | null;
   mutations: SimulationMutation[];
   mutationCount: number;
+  /** Approximate count of post-fork edits across the scoped tables. */
+  modificationCount: number;
   createdAt: string;
   updatedAt: string;
 }

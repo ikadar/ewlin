@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { KBD_CLASS } from './kbdStyles';
 
-export type FooterMode = 'default' | 'jobSelected' | 'picking' | 'jcfModal' | 'flux' | 'operatorDefault' | 'operatorJobSelected';
+export type FooterMode = 'default' | 'jobSelected' | 'picking' | 'jcfModal' | 'flux' | 'operatorDefault' | 'operatorJobSelected' | 'scenarios';
 
 export interface ShortcutFooterProps {
   mode: FooterMode;
@@ -64,6 +64,17 @@ const MODE_CONFIGS: Record<FooterMode, ModeConfig> = {
       { keys: ['Alt', 'F'], label: 'Rechercher' },
       { keys: ['Alt', 'N'], label: 'Nouveau job' },
       { keys: ['Alt', '\u2190', '\u2192'], label: 'Onglets' },
+      { keys: ['Alt', 'K'], label: 'Commandes' },
+    ],
+  },
+  scenarios: {
+    modeLabel: 'SC\u00c9NARIOS',
+    modeLabelClass: 'text-violet-400',
+    shortcuts: [
+      { keys: ['Alt', 'F'], label: 'Rechercher' },
+      { keys: ['Alt', 'N'], label: 'Nouveau sc\u00e9nario' },
+      { keys: ['Alt', '\u2191', '\u2193'], label: 'Naviguer' },
+      { keys: ['Enter'], label: 'Ouvrir' },
       { keys: ['Alt', 'K'], label: 'Commandes' },
     ],
   },
