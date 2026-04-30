@@ -330,12 +330,6 @@ function ScenarioRow({
     >
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-            merged ? 'bg-emerald-400'
-            : ttl.expired ? 'bg-rose-400'
-            : hasMods ? 'bg-violet-400'
-            : 'bg-zinc-500'
-          }`} aria-hidden="true" />
           <button
             type="button"
             onClick={onOpen}
