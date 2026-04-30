@@ -180,21 +180,6 @@ function CategoryFormModal({ initial, onSave, onCancel, isSaving }: CategoryForm
                     placeholder="fieldPath"
                   />
                   <button
-                              onClick={() => {
-                                setDeleteError(null);
-                                setDeletingCategory(cat);
-                              }}
-                              disabled={stationCount > 0}
-                              className="p-1.5 text-flux-text-tertiary hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              title={
-                                stationCount > 0
-                                  ? 'Catégorie utilisée par des stations'
-                                  : 'Supprimer'
-                              }
-                            >
-                              <Trash2 className="w-4 h-4" strokeWidth={2} />
-                            </button>
-                            <button
                     type="button"
                     onClick={() => handleRemoveCriterion(i)}
                     className="p-1 text-flux-text-tertiary hover:text-red-400 transition-colors"
@@ -460,6 +445,21 @@ export function StationCategoriesPage() {
                         </td>
                         <td className="px-4 py-0">
                           <div className="flex items-center gap-2 justify-end">
+                            <button
+                              onClick={() => {
+                                setDeleteError(null);
+                                setDeletingCategory(cat);
+                              }}
+                              disabled={stationCount > 0}
+                              className="p-1.5 text-flux-text-tertiary hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              title={
+                                stationCount > 0
+                                  ? 'Catégorie utilisée par des stations'
+                                  : 'Supprimer'
+                              }
+                            >
+                              <Trash2 className="w-4 h-4" strokeWidth={2} />
+                            </button>
                             <button
                               onClick={() => setEditingCategory(cat)}
                               className="text-blue-400 hover:text-blue-300 transition-colors"

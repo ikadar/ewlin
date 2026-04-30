@@ -195,13 +195,6 @@ function ProviderFormModal({ initial, onSave, onCancel, isSaving }: ProviderForm
                     placeholder="Type d'action"
                   />
                   <button
-                            onClick={() => { setDeleteError(null); setDeletingProvider(provider); }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
                     type="button"
                     onClick={() => handleRemoveActionType(i)}
                     className="p-1 text-flux-text-tertiary hover:text-red-400 transition-colors"
@@ -451,6 +444,13 @@ export function OutsourcedProvidersPage() {
                       </td>
                       <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => { setDeleteError(null); setDeletingProvider(provider); }}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
                           <button
                             onClick={() => { setSaveError(null); setEditingProvider(provider); }}
                             className="text-blue-400 hover:text-blue-300 transition-colors"

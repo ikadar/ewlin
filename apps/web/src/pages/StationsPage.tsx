@@ -269,16 +269,6 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
             {/* Masked time switch */}
             <div className="flex items-center gap-2.5 mb-3">
               <button
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeletingStation(station);
-                            }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
                 type="button"
                 onClick={() => setMaskedTimeEnabled(!maskedTimeEnabled)}
                 className={`relative w-9 h-5 rounded-full transition-colors ${maskedTimeEnabled ? 'bg-green-500' : 'bg-flux-elevated border border-flux-border-light'}`}
@@ -647,6 +637,16 @@ export function StationsPage() {
                       </td>
                       <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => {
+                              setDeleteError(null);
+                              setDeletingStation(station);
+                            }}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
                           <button
                             onClick={() => setEditingStation(station)}
                             className="text-blue-400 hover:text-blue-300 transition-colors"

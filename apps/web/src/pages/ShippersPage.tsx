@@ -74,13 +74,6 @@ function ShipperFormModal({ initial, onSave, onCancel, isSaving }: ShipperFormMo
 
           <div className="flex gap-3 justify-end pt-2">
             <button
-                            onClick={() => { setDeleteError(null); setDeletingShipper(shipper); }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
               type="button"
               onClick={onCancel}
               className="px-3 py-1.5 text-sm text-flux-text-secondary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded transition-colors"
@@ -287,6 +280,13 @@ export function ShippersPage() {
                       </td>
                       <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => { setDeleteError(null); setDeletingShipper(shipper); }}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
                           <button
                             onClick={() => { setSaveError(null); setEditingShipper(shipper); }}
                             className="text-blue-400 hover:text-blue-300 transition-colors"

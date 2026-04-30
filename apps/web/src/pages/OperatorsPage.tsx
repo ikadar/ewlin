@@ -467,16 +467,6 @@ function ConcurrentGroupsSection({ skilledStations, groups, onChange }: Concurre
                     );
                   })}
                   <button
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeletingOperator(operator);
-                            }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
                     type="button"
                     onClick={() => removeGroup(idx)}
                     className="text-flux-text-muted hover:text-red-400 transition-colors text-lg leading-none"
@@ -1355,6 +1345,16 @@ export default function OperatorsPage() {
                       </td>
                       <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => {
+                              setDeleteError(null);
+                              setDeletingOperator(operator);
+                            }}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
                           <button
                             onClick={() => setEditingOperator(operator)}
                             className="text-blue-400 hover:text-blue-300 transition-colors"
