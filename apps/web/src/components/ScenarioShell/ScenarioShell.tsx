@@ -16,6 +16,7 @@ import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, FlaskConical, GitMerge, Trash2 } from 'lucide-react';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AutoRecomputeProvider } from '../../contexts/AutoRecomputeContext';
+import { ScenarioProvider } from '../../contexts/ScenarioContext';
 import { CommandCenterProvider } from '../CommandPalette/CommandCenterContext';
 import {
   useGetSimulationQuery,
@@ -130,16 +131,21 @@ function ScenarioShellInner() {
 }
 
 export function ScenarioShell() {
-  // Wraps the inner shell with the same context providers as the main
-  // app so existing pages (planning, flux, settings…) get what they
-  // need when rendered under the scenario route tree.
+  // Wraps the inner shell with the same context providers as
+  // RootLayout so existing pages (planning, flux, settings…) get
+  // what they need when rendered under the scenario route tree.
+  // ScenarioProvider is mandatory — every page tree calls
+  // useScenarioMode() somewhere; without it React throws and the
+  // shell renders a blank screen.
   return (
     <ThemeProvider>
-      <CommandCenterProvider>
-        <AutoRecomputeProvider>
-          <ScenarioShellInner />
-        </AutoRecomputeProvider>
-      </CommandCenterProvider>
+      <ScenarioProvider>
+        <CommandCenterProvider>
+          <AutoRecomputeProvider>
+            <ScenarioShellInner />
+          </AutoRecomputeProvider>
+        </CommandCenterProvider>
+      </ScenarioProvider>
     </ThemeProvider>
   );
 }
