@@ -8,7 +8,11 @@
  * planned capacity changes ahead of the engine integration.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, AlertTriangle, Info, Edit2, X, Check } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, AlertTriangle, Info, X, Check } from 'lucide-react';
+import {
+  FLUX_TABLE, FLUX_THEAD, FLUX_HEADER_TR, FLUX_HEADER_CELL,
+  FLUX_BODY_TR, FLUX_BODY_TR_STYLE, FLUX_BODY_CELL, FLUX_BODY_CELL_PRIMARY,
+} from '../components/FluxStyledTable';
 import {
   useListAllScenariosQuery,
   useGetCapacityOverridesQuery,
@@ -213,18 +217,18 @@ export function CapacityOverridesPage() {
           </div>
         )}
         {overrides && overrides.overrides.length > 0 && (
-          <table className="w-full text-xs">
-            <thead className="bg-zinc-900/60 border-b border-zinc-800">
-              <tr className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                <th className="px-3 py-2 text-left font-medium">Station</th>
-                <th className="px-3 py-2 text-left font-medium">Du</th>
-                <th className="px-3 py-2 text-left font-medium">Au</th>
-                <th className="px-3 py-2 text-left font-medium">Δ opérateurs</th>
-                <th className="px-3 py-2 text-left font-medium">Note</th>
-                <th className="px-3 py-2"></th>
+          <table className={FLUX_TABLE}>
+            <thead className={FLUX_THEAD}>
+              <tr className={FLUX_HEADER_TR}>
+                <th className={FLUX_HEADER_CELL}>Station</th>
+                <th className={FLUX_HEADER_CELL}>Du</th>
+                <th className={FLUX_HEADER_CELL}>Au</th>
+                <th className={FLUX_HEADER_CELL}>Δ opérateurs</th>
+                <th className={FLUX_HEADER_CELL}>Note</th>
+                <th className={FLUX_HEADER_CELL}></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-900">
+            <tbody>
               {overrides.overrides.map((override) =>
                 editingId === override.id ? (
                   <tr key={override.id} className="bg-violet-950/10">
@@ -260,11 +264,11 @@ export function CapacityOverridesPage() {
                     </td>
                   </tr>
                 ) : (
-                  <tr key={override.id} className="hover:bg-zinc-900/40">
-                    <td className="px-3 py-2 text-zinc-200">{override.stationName}</td>
-                    <td className="px-3 py-2 text-zinc-400">{formatDate(override.startsAt)}</td>
-                    <td className="px-3 py-2 text-zinc-400">{formatDate(override.endsAt)}</td>
-                    <td className="px-3 py-2">
+                  <tr key={override.id} className={FLUX_BODY_TR} style={FLUX_BODY_TR_STYLE}>
+                    <td className={FLUX_BODY_CELL_PRIMARY}>{override.stationName}</td>
+                    <td className={FLUX_BODY_CELL}>{formatDate(override.startsAt)}</td>
+                    <td className={FLUX_BODY_CELL}>{formatDate(override.endsAt)}</td>
+                    <td className={FLUX_BODY_CELL}>
                       <span
                         className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono ${
                           override.operatorCountDelta > 0
@@ -276,24 +280,24 @@ export function CapacityOverridesPage() {
                         {override.operatorCountDelta}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-zinc-500">{override.note ?? '—'}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleStartEdit(override)}
-                        className="inline-flex items-center px-1.5 py-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                        aria-label="Éditer"
-                      >
-                        <Edit2 size={11} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(override.id)}
-                        className="inline-flex items-center ml-1 px-1.5 py-1 rounded text-zinc-400 hover:text-rose-300 hover:bg-rose-950/40"
-                        aria-label="Supprimer"
-                      >
-                        <Trash2 size={11} />
-                      </button>
+                    <td className={FLUX_BODY_CELL}>{override.note ?? '—'}</td>
+                    <td className={`${FLUX_BODY_CELL} text-right whitespace-nowrap`}>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          className="text-red-400 hover:text-red-300 transition-colors"
+                          onClick={() => handleDelete(override.id)}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" strokeWidth={2} />
+                        </button>
+                        <button
+                          className="text-blue-400 hover:text-blue-300 transition-colors"
+                          onClick={() => handleStartEdit(override)}
+                          title="Éditer"
+                        >
+                          <FolderOpen className="w-4 h-4" strokeWidth={2} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ),

@@ -7,13 +7,18 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Search, ArrowLeft, Plus } from 'lucide-react';
 import {
   useGetClientsQuery,
   useCreateClientMutation,
   useUpdateClientMutation,
   useDeleteClientMutation,
 } from '../store/api/clientApi';
+import {
+  FLUX_TABLE_SHELL, FLUX_TABLE, FLUX_THEAD, FLUX_HEADER_TR, FLUX_HEADER_CELL,
+  FLUX_BODY_TR, FLUX_BODY_TR_STYLE, FLUX_BODY_CELL, FLUX_BODY_CELL_PRIMARY,
+  FluxRowActions,
+} from '../components/FluxStyledTable';
 import type { ClientResponse } from '../store/api/clientApi';
 
 // ============================================================================
@@ -252,13 +257,13 @@ export function ClientsPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-flux-hover">
-                  <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
-                    <th className="text-left px-4 py-3 font-medium">Nom</th>
-                    <th className="text-left px-4 py-3 font-medium">Créé le</th>
-                    <th className="px-4 py-3" />
+            <div className={FLUX_TABLE_SHELL}>
+              <table className={FLUX_TABLE}>
+                <thead className={FLUX_THEAD}>
+                  <tr className={FLUX_HEADER_TR}>
+                    <th className={FLUX_HEADER_CELL}>Nom</th>
+                    <th className={FLUX_HEADER_CELL}>Créé le</th>
+                    <th className={FLUX_HEADER_CELL} />
                   </tr>
                 </thead>
                 <tbody>
@@ -272,29 +277,18 @@ export function ClientsPage() {
                   {filteredClients.map((client) => (
                     <tr
                       key={client.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
+                      className={FLUX_BODY_TR}
+                      style={FLUX_BODY_TR_STYLE}
                     >
-                      <td className="px-4 py-3 text-flux-text-primary font-medium">{client.name}</td>
-                      <td className="px-4 py-3 text-flux-text-secondary">
+                      <td className={FLUX_BODY_CELL_PRIMARY}>{client.name}</td>
+                      <td className={FLUX_BODY_CELL}>
                         {new Date(client.createdAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 justify-end">
-                          <button
-                            onClick={() => { setSaveError(null); setEditingClient(client); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
-                            title="Modifier"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            onClick={() => { setDeleteError(null); setDeletingClient(client); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-red-400 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
+                      <td className={FLUX_BODY_CELL}>
+                        <FluxRowActions
+                          onEdit={() => { setSaveError(null); setEditingClient(client); }}
+                          onDelete={() => { setDeleteError(null); setDeletingClient(client); }}
+                        />
                       </td>
                     </tr>
                   ))}

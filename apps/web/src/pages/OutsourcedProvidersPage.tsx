@@ -411,7 +411,7 @@ export function OutsourcedProvidersPage() {
                     <th className="text-left px-4 py-3 font-medium">Réception</th>
                     <th className="text-left px-4 py-3 font-medium">Transit</th>
                     <th className="text-left px-4 py-3 font-medium">Créé le</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-0" />
                   </tr>
                 </thead>
                 <tbody>
@@ -425,38 +425,38 @@ export function OutsourcedProvidersPage() {
                   {filteredProviders.map((provider) => (
                     <tr
                       key={provider.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9"
                     >
-                      <td className="px-4 py-3 text-flux-text-primary font-medium">{provider.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-0 text-flux-text-primary font-medium">{provider.name}</td>
+                      <td className="px-4 py-0">
                         <StatusBadge status={provider.status} />
                       </td>
-                      <td className="px-4 py-3 text-flux-text-secondary">
+                      <td className="px-4 py-0 text-flux-text-secondary">
                         {provider.supportedActionTypes.length > 0
                           ? provider.supportedActionTypes.join(', ')
                           : <span className="text-flux-text-muted">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-flux-text-secondary">{provider.latestDepartureTime}</td>
-                      <td className="px-4 py-3 text-flux-text-secondary">{provider.receptionTime}</td>
-                      <td className="px-4 py-3 text-flux-text-secondary">{provider.transitDays} j</td>
-                      <td className="px-4 py-3 text-flux-text-secondary">
+                      <td className="px-4 py-0 text-flux-text-secondary">{provider.latestDepartureTime}</td>
+                      <td className="px-4 py-0 text-flux-text-secondary">{provider.receptionTime}</td>
+                      <td className="px-4 py-0 text-flux-text-secondary">{provider.transitDays} j</td>
+                      <td className="px-4 py-0 text-flux-text-secondary">
                         {new Date(provider.createdAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setSaveError(null); setEditingProvider(provider); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
                             title="Modifier"
                           >
-                            <Pencil size={15} />
+                            <FolderOpen className="w-4 h-4" strokeWidth={2} />
                           </button>
                           <button
                             onClick={() => { setDeleteError(null); setDeletingProvider(provider); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-red-400 transition-colors"
+                            className="text-red-400 hover:text-red-300 transition-colors"
                             title="Supprimer"
                           >
-                            <Trash2 size={15} />
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
                           </button>
                         </div>
                       </td>

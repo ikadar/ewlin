@@ -402,7 +402,7 @@ export function StationCategoriesPage() {
                     <th className="text-left px-4 py-3 font-medium">Description</th>
                     <th className="text-left px-4 py-3 font-medium">Critères</th>
                     <th className="text-left px-4 py-3 font-medium">Stations</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-0" />
                   </tr>
                 </thead>
                 <tbody>
@@ -418,13 +418,13 @@ export function StationCategoriesPage() {
                     return (
                       <tr
                         key={cat.id}
-                        className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
+                        className="border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9"
                       >
-                        <td className="px-4 py-3 text-flux-text-primary font-medium">{cat.name}</td>
-                        <td className="px-4 py-3 text-flux-text-secondary">
+                        <td className="px-4 py-0 text-flux-text-primary font-medium">{cat.name}</td>
+                        <td className="px-4 py-0 text-flux-text-secondary">
                           {cat.description ?? <span className="text-flux-text-muted">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-flux-text-secondary">
+                        <td className="px-4 py-0 text-flux-text-secondary">
                           {cat.similarityCriteria.length > 0 ? (
                             <span className="inline-flex items-center gap-1">
                               <span className="text-flux-text-secondary">{cat.similarityCriteria.length}</span>
@@ -436,21 +436,21 @@ export function StationCategoriesPage() {
                             <span className="text-flux-text-muted">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-flux-text-secondary">
+                        <td className="px-4 py-0 text-flux-text-secondary">
                           {stationCount > 0 ? (
                             <span className="text-flux-text-secondary">{stationCount}</span>
                           ) : (
                             <span className="text-flux-text-muted">0</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-0">
                           <div className="flex items-center gap-2 justify-end">
                             <button
                               onClick={() => setEditingCategory(cat)}
-                              className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
+                              className="text-blue-400 hover:text-blue-300 transition-colors"
                               title="Modifier"
                             >
-                              <Pencil size={15} />
+                              <FolderOpen className="w-4 h-4" strokeWidth={2} />
                             </button>
                             <button
                               onClick={() => {
@@ -465,7 +465,7 @@ export function StationCategoriesPage() {
                                   : 'Supprimer'
                               }
                             >
-                              <Trash2 size={15} />
+                              <Trash2 className="w-4 h-4" strokeWidth={2} />
                             </button>
                           </div>
                         </td>

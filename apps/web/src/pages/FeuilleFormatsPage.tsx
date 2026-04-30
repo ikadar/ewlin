@@ -445,7 +445,7 @@ export function FeuilleFormatsPage() {
                     <th className="text-left px-4 py-3 font-medium">Format</th>
                     <th className="text-left px-4 py-3 font-medium">Poses</th>
                     <th className="text-left px-4 py-3 font-medium">Créé le</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-0" />
                   </tr>
                 </thead>
                 <tbody>
@@ -459,7 +459,7 @@ export function FeuilleFormatsPage() {
                   {filteredFormats.map((fmt) => (
                     <tr
                       key={fmt.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9"
                     >
                       <td className="px-4 py-3 text-flux-text-primary font-medium font-mono">
                         {fmt.format}
@@ -467,24 +467,24 @@ export function FeuilleFormatsPage() {
                       <td className="px-4 py-3 text-flux-text-secondary font-mono text-xs">
                         {[...fmt.poses].sort((a, b) => a - b).join(' · ')}
                       </td>
-                      <td className="px-4 py-3 text-flux-text-secondary">
+                      <td className="px-4 py-0 text-flux-text-secondary">
                         {new Date(fmt.createdAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setSaveError(null); setEditingFormat(fmt); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
                             title="Modifier"
                           >
-                            <Pencil size={15} />
+                            <FolderOpen className="w-4 h-4" strokeWidth={2} />
                           </button>
                           <button
                             onClick={() => { setDeleteError(null); setDeletingFormat(fmt); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-red-400 transition-colors"
+                            className="text-red-400 hover:text-red-300 transition-colors"
                             title="Supprimer"
                           >
-                            <Trash2 size={15} />
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
                           </button>
                         </div>
                       </td>

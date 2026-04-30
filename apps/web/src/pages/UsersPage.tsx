@@ -7,7 +7,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Search, ArrowLeft, Plus, FolderOpen, Trash2 } from 'lucide-react';
 import {
   useGetUsersQuery,
   useCreateUserMutation,
@@ -387,7 +387,7 @@ export function UsersPage() {
                     <th className="text-left px-4 py-3 font-medium">Groupes</th>
                     <th className="text-left px-4 py-3 font-medium">Statut</th>
                     <th className="text-left px-4 py-3 font-medium">Dernière connexion</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-0" />
                   </tr>
                 </thead>
                 <tbody>
@@ -401,13 +401,13 @@ export function UsersPage() {
                   {filteredUsers.map((user) => (
                     <tr
                       key={user.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors min-h-[36px] h-9"
+                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9"
                     >
-                      <td className="px-4 py-3 text-flux-text-primary font-medium">
+                      <td className="px-4 py-0 text-flux-text-primary font-medium">
                         {user.displayName}
                       </td>
-                      <td className="px-4 py-3 text-flux-text-secondary">{user.email}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-0 text-flux-text-secondary">{user.email}</td>
+                      <td className="px-4 py-0">
                         <div className="flex flex-wrap gap-1">
                           {user.groups.map((g) => (
                             <span
@@ -419,7 +419,7 @@ export function UsersPage() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-0">
                         <span
                           className={`px-1.5 py-0.5 text-xs rounded ${
                             user.isActive
@@ -430,7 +430,7 @@ export function UsersPage() {
                           {user.isActive ? 'Actif' : 'Inactif'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-flux-text-secondary">
+                      <td className="px-4 py-0 text-flux-text-secondary">
                         {user.lastLoginAt
                           ? new Date(user.lastLoginAt).toLocaleDateString('fr-FR', {
                               day: '2-digit',
@@ -441,21 +441,21 @@ export function UsersPage() {
                             })
                           : '—'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setSaveError(null); setEditingUser(user); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-flux-text-primary transition-colors"
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
                             title="Modifier"
                           >
-                            <Pencil size={15} />
+                            <FolderOpen className="w-4 h-4" strokeWidth={2} />
                           </button>
                           <button
                             onClick={() => { setDeleteError(null); setDeletingUser(user); }}
-                            className="p-1.5 text-flux-text-tertiary hover:text-red-400 transition-colors"
+                            className="text-red-400 hover:text-red-300 transition-colors"
                             title="Désactiver"
                           >
-                            <Trash2 size={15} />
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
                           </button>
                         </div>
                       </td>
