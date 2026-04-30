@@ -21,7 +21,6 @@ const SETTINGS_ITEMS = [
   { label: 'Templates',                   path: '/settings/templates' },
   { label: 'Safety Zone',                 path: '/settings/safety-zone' },
   { label: 'Écart de précédence',         path: '/settings/precedence-gap' },
-  { label: 'Capacités scénarisées',       path: '/settings/capacity-overrides' },
 ];
 
 /**

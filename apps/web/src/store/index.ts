@@ -34,7 +34,6 @@ import { prodCompletionApi } from './api/prodCompletionApi';
 import { prodSnapshotApi } from './api/prodSnapshotApi';
 import { archiveApi } from './api/archiveApi';
 import { simulationApi } from './api/simulationApi';
-import { capacityOverrideApi } from './api/capacityOverrideApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -70,7 +69,6 @@ export const store = configureStore({
     [prodSnapshotApi.reducerPath]: prodSnapshotApi.reducer,
     [archiveApi.reducerPath]: archiveApi.reducer,
     [simulationApi.reducerPath]: simulationApi.reducer,
-    [capacityOverrideApi.reducerPath]: capacityOverrideApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -106,7 +104,6 @@ export const store = configureStore({
       .concat(prodSnapshotApi.middleware)
       .concat(archiveApi.middleware)
       .concat(simulationApi.middleware)
-      .concat(capacityOverrideApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we
@@ -371,20 +368,6 @@ export type {
   ScenarioDiffModification,
   ScenarioMergeResult,
 } from './api/simulationApi';
-
-export {
-  useGetCapacityOverridesQuery,
-  useCreateCapacityOverrideMutation,
-  useUpdateCapacityOverrideMutation,
-  useDeleteCapacityOverrideMutation,
-  capacityOverrideApi,
-} from './api/capacityOverrideApi';
-export type {
-  CapacityOverride,
-  CapacityOverrideListResponse,
-  CreateCapacityOverrideArgs,
-  UpdateCapacityOverrideArgs,
-} from './api/capacityOverrideApi';
 
 export {
   useGetUsersQuery,

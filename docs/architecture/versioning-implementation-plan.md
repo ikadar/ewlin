@@ -418,6 +418,19 @@ ALTER TABLE scenarios
 
 ### Phase 8 — Capacity overrides (chef's what-if) (v2)
 
+> **Status: REVERTED 2026-04-30.** A V1 ("intent-only", with CRUD UI but no
+> engine consumption) shipped in commit `08c6b80` and was removed today.
+> The original use cases — overtime, station closure, vacation absences —
+> are now expressed via the **operator-centric** capacity model: working
+> hours, operator absences, and shop-wide closures projected as absences
+> on every operator. The per-station signed-integer delta abstraction
+> never matched that model, the engine never read these rows, and Sim
+> scenarios (the originally-intended consumer) remain deferred. If a
+> what-if affordance is needed in the future, build it on top of the
+> operator-availability surface, not as a separate scoped table.
+>
+> See: `feedback_no_station_schedule`, `project_shop_closure_model`.
+
 **Goal.** The chef wants to model "what if I add overtime Wednesday night" or "what if station X is closed Friday morning" without touching the live operator/station availability. Today this requires editing the master data which propagates immediately to compute.
 
 **Schema migration**

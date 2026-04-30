@@ -59,7 +59,6 @@ import { ArchivesPage } from './pages/ArchivesPage';
 import { AuditPage } from './pages/AuditPage';
 import { SimulationsPage } from './pages/SimulationsPage';
 import { SimulationDetailPage } from './pages/SimulationDetailPage';
-import { CapacityOverridesPage } from './pages/CapacityOverridesPage';
 import { ScenariosPage } from './pages/ScenariosPage';
 import { ScenarioShell } from './components/ScenarioShell';
 import { HistoryLayout } from './components/HistoryLayout';
@@ -146,7 +145,6 @@ export function AppRoutes() {
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="safety-zone" element={<SafetyZonePage />} />
           <Route path="precedence-gap" element={<PrecedenceGapPage />} />
-          <Route path="capacity-overrides" element={<CapacityOverridesPage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
           <Route path="shippers" element={<ShippersPage />} />
           <Route path="users" element={<RequirePermission permission="admin.users"><UsersPage /></RequirePermission>} />
