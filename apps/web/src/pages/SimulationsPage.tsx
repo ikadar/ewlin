@@ -109,9 +109,9 @@ export function SimulationsPage() {
   const [deleteSimulation] = useDeleteSimulationMutation();
 
   const handleFork = useCallback(
-    async (name: string, ttlHours: number) => {
+    async (name: string) => {
       try {
-        await forkSimulation({ name, ttlHours }).unwrap();
+        await forkSimulation({ name }).unwrap();
         setForkOpen(false);
       } catch {
         // RTK error already exposed; the dialog displays it

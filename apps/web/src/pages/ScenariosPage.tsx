@@ -101,9 +101,10 @@ export function ScenariosPage() {
   }, [sortColumn]);
 
   const handleFork = useCallback(
-    async (name: string, ttlHours: number) => {
+    async (name: string) => {
       try {
-        const result = await forkSimulation({ name, ttlHours }).unwrap();
+        // No ttlHours — backend defaults to 48 h.
+        const result = await forkSimulation({ name }).unwrap();
         setForkOpen(false);
         navigate(`/scenarios/${result.id}`);
       } catch {

@@ -1,6 +1,12 @@
 /**
- * Fork-confirmation dialog. Captures the simulation's name and TTL,
+ * Fork-confirmation dialog. Captures the simulation's name and
  * confirms with a single button (no dwell — forks are non-destructive).
+ *
+ * No TTL prompt: the backend defaults forks to 48 h auto-deletion,
+ * which covers an ADV intra-day scenario plus an overnight pause
+ * without bleeding into the next week's planning. The chef can
+ * always extend the life by re-touching the scenario (reaper grace
+ * window) or simply create a fresh fork.
  *
  * The name input pre-fills with a fun random name ("petite girafe
  * bleue", "grand dauphin mignon"…) so the chef doesn't have to invent
@@ -14,17 +20,15 @@ import { generateScenarioName } from '../../utils/scenarioNameGenerator';
 interface ForkSimulationDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (name: string, ttlHours: number) => void;
+  onConfirm: (name: string) => void;
 }
 
 export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulationDialogProps) {
   const [name, setName] = useState('');
-  const [ttlHours, setTtlHours] = useState(24);
 
   useEffect(() => {
     if (!open) return;
     setName(generateScenarioName());
-    setTtlHours(24);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -35,7 +39,7 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
   if (!open) return null;
 
   const trimmed = name.trim();
-  const canConfirm = trimmed.length > 0 && ttlHours > 0;
+  const canConfirm = trimmed.length > 0;
 
   return (
     <div
@@ -97,21 +101,10 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
               </button>
             </div>
           </label>
-          <label className="block">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Auto-supprimée après (heures)</span>
-            <input
-              type="number"
-              min={1}
-              max={168}
-              value={ttlHours}
-              onChange={(e) => setTtlHours(Number.parseInt(e.target.value, 10) || 0)}
-              className="mt-1 w-32 px-3 py-2 rounded-md text-xs bg-zinc-900 border border-zinc-800 focus:border-violet-500 focus:outline-none"
-              data-testid="fork-ttl-input"
-            />
-            <span className="ml-2 text-[11px] text-zinc-500">
-              Si tu ne touches pas au scénario pendant ce délai, il est nettoyé automatiquement (max 168h = 7j).
-            </span>
-          </label>
+          <p className="text-[11px] text-zinc-500 leading-relaxed">
+            Le scénario est auto-supprimé après <strong className="text-zinc-300">48 h</strong> sans
+            modification. Ouvre-le ou édite-le pour repousser ce délai automatiquement.
+          </p>
         </div>
 
         <footer className="px-5 py-3.5 border-t border-zinc-800 flex items-center justify-end gap-2">
@@ -125,7 +118,7 @@ export function ForkSimulationDialog({ open, onClose, onConfirm }: ForkSimulatio
           <button
             type="button"
             disabled={!canConfirm}
-            onClick={() => onConfirm(trimmed, ttlHours)}
+            onClick={() => onConfirm(trimmed)}
             className={`px-3 py-1.5 rounded-md text-xs text-white ${
               canConfirm ? 'bg-violet-600 hover:bg-violet-500' : 'bg-zinc-700 cursor-not-allowed'
             }`}
