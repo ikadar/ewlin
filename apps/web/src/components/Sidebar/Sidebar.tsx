@@ -35,8 +35,8 @@ export function Sidebar() {
   const isLogistique = location.pathname.startsWith('/logistique');
   const isArchives = location.pathname.startsWith('/archives');
   const isAudit = location.pathname.startsWith('/audit');
-  const isSimulations = location.pathname.startsWith('/simulations');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && !isAudit && !isSimulations && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isScenarios = location.pathname.startsWith('/scenarios') || location.pathname.startsWith('/simulations');
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isArchives && !isAudit && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -119,9 +119,9 @@ export function Sidebar() {
           />
           <SidebarButton
             icon={FlaskConical}
-            label="Simulations"
-            isActive={isSimulations}
-            onClick={() => navigate('/simulations')}
+            label="Scénarios"
+            isActive={isScenarios}
+            onClick={() => navigate('/scenarios')}
           />
         </div>
 

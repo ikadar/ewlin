@@ -60,6 +60,8 @@ import { AuditPage } from './pages/AuditPage';
 import { SimulationsPage } from './pages/SimulationsPage';
 import { SimulationDetailPage } from './pages/SimulationDetailPage';
 import { CapacityOverridesPage } from './pages/CapacityOverridesPage';
+import { ScenariosPage } from './pages/ScenariosPage';
+import { ScenarioShell } from './components/ScenarioShell';
 
 /**
  * Application routes.
@@ -75,6 +77,15 @@ export function AppRoutes() {
       <Route element={<RequireAuth><FocusLayout /></RequireAuth>}>
         <Route path="/focus/operator/:id" element={<FocusPage mode="operator" />} />
         <Route path="/focus/station/:id" element={<FocusPage mode="station" />} />
+      </Route>
+
+      {/* V2 scenario shell — full-screen layout outside RootLayout. */}
+      <Route element={<RequireAuth><ScenarioShell /></RequireAuth>}>
+        <Route path="/scenarios/:id" element={<OperatorSchedulePage />} />
+        <Route path="/scenarios/:id/stations" element={<App />} />
+        <Route path="/scenarios/:id/flux" element={<FluxPage />} />
+        <Route path="/scenarios/:id/settings/stations" element={<StationsPage />} />
+        <Route path="/scenarios/:id/settings/operators" element={<OperatorsPage />} />
       </Route>
 
       <Route element={<RequireAuth><RootLayout /></RequireAuth>}>
@@ -105,9 +116,12 @@ export function AppRoutes() {
         {/* Audit — chronological journal of every Prod plan (Phase 9) */}
         <Route path="/audit" element={<AuditPage />} />
 
-        {/* Simulations — read-only Préprod forks for ADV / what-if (Phase 6) */}
+        {/* Simulations — V1 read-only forks (kept temporarily for back-compat) */}
         <Route path="/simulations" element={<SimulationsPage />} />
         <Route path="/simulations/:id" element={<SimulationDetailPage />} />
+
+        {/* V2 Scenarios — list + entry point into the dedicated shell */}
+        <Route path="/scenarios" element={<ScenariosPage />} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

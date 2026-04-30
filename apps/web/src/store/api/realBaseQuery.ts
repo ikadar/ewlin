@@ -49,17 +49,19 @@ function prepareHeaders(headers: Headers, { getState }: { getState: () => unknow
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // V1 versioning — when the URL says ?env=prod, every API call carries
-  // an X-Flux-Scenario: prod header. The PHP ProdReadOnlyGuardSubscriber
-  // reads this and rejects every mutating route except the allow-listed
-  // few (promotion, prod completion, auth). One header, one source of
-  // truth — the frontend doesn't need to gate each shortcut/button
-  // individually; anything that reaches the backend in prod and isn't
-  // allow-listed comes back as 403.
+  // Versioning header — three sources, in priority order:
+  //   1. URL path /scenarios/:uuid/* → V2 fork shell, scope to that scenario UUID.
+  //   2. URL search ?env=prod        → V1 prod read-only mode.
+  //   3. Otherwise                   → no header, backend defaults to Préprod.
   if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('env') === 'prod') {
-      headers.set('X-Flux-Scenario', 'prod');
+    const pathMatch = window.location.pathname.match(/^\/scenarios\/([0-9a-f-]{36})(\/|$)/i);
+    if (pathMatch) {
+      headers.set('X-Flux-Scenario', pathMatch[1]);
+    } else {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('env') === 'prod') {
+        headers.set('X-Flux-Scenario', 'prod');
+      }
     }
   }
 

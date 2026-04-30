@@ -356,6 +356,8 @@ export {
   useAppendMutationMutation,
   useRemoveMutationMutation,
   useConvertSimulationMutation,
+  useGetScenarioDiffQuery,
+  useMergeScenarioMutation,
   simulationApi,
 } from './api/simulationApi';
 export type {
@@ -365,6 +367,9 @@ export type {
   ForkSimulationArgs,
   SimulationMutation,
   SimulationMutationKind,
+  ScenarioDiff,
+  ScenarioDiffModification,
+  ScenarioMergeResult,
 } from './api/simulationApi';
 
 export {

@@ -25,12 +25,49 @@ export interface SimulationSummary {
   parentScenarioId: string | null;
   ttlExpiresAt: string | null;
   lastTouchedAt: string | null;
+  mergedAt: string | null;
   engineVersion: string | null;
   algoParamsHash: string | null;
   mutations: SimulationMutation[];
   mutationCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ScenarioDiffChange {
+  from: unknown;
+  to: unknown;
+}
+
+export interface ScenarioDiffModification {
+  table: string;
+  label: string;
+  scenarioRowId: string;
+  preprodRowId: string;
+  changes: Record<string, ScenarioDiffChange>;
+}
+
+export interface ScenarioDiffSummary {
+  modified: number;
+  added: number;
+  deleted: number;
+}
+
+export interface ScenarioDiff {
+  summary: Record<string, ScenarioDiffSummary>;
+  modifications: ScenarioDiffModification[];
+  adds: Array<{ table: string; label: string; scenarioRowId: string }>;
+  deletes: Array<{ table: string; label: string; preprodRowId: string }>;
+}
+
+export interface ScenarioMergeResult {
+  scenarioId: string;
+  mergedAt: string | null;
+  applied: {
+    modifiedRows: number;
+    skippedAdds: number;
+    skippedDeletes: number;
+  };
 }
 
 export interface SimulationListResponse {
@@ -124,6 +161,35 @@ export const simulationApi = createApi({
         }
       },
     }),
+    /** V2 — column-level diff between scenario and current Préprod. */
+    getScenarioDiff: builder.query<ScenarioDiff, string>({
+      query: (id) => `/scenarios/simulations/${id}/diff`,
+      providesTags: (_r, _e, id) => [{ type: 'Simulation', id: `DIFF-${id}` }],
+    }),
+    /** V2 — apply the diff to Préprod (last-write-wins). */
+    mergeScenario: builder.mutation<ScenarioMergeResult, string>({
+      query: (id) => ({
+        url: `/scenarios/simulations/${id}/merge`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: 'Simulation', id },
+        { type: 'Simulation', id: 'LIST' },
+        { type: 'Simulation', id: `DIFF-${id}` },
+      ],
+      async onQueryStarted(_id, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Préprod just changed — burn every Préprod-derived cache.
+          const { scheduleApi } = await import('./scheduleApi');
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          const { fluxApi } = await import('./fluxApi');
+          dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+        } catch {
+          // Merge rejected — Préprod intact, no invalidation needed
+        }
+      },
+    }),
   }),
 });
 
@@ -135,4 +201,6 @@ export const {
   useAppendMutationMutation,
   useRemoveMutationMutation,
   useConvertSimulationMutation,
+  useGetScenarioDiffQuery,
+  useMergeScenarioMutation,
 } = simulationApi;
