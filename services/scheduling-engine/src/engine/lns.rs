@@ -74,9 +74,23 @@ pub fn lns_improve(
         })
         .collect();
 
+    // LNS is blind to the safety zone: it only sees actions that start
+    // *after* the rolling freeze window, since intra-zone tiles are
+    // pinned (`is_frozen_by_safety_zone == true`) and pre_place locks
+    // them verbatim. Including them in late_jobs / job_stations /
+    // sacrifice_candidates wastes destroy/destabilize cycles — the
+    // repair cannot move what is pinned. Two consequences:
+    //   - a late job whose last tile is intra-zone disappears from
+    //     late_jobs (its tardiness is locked, nothing to repair);
+    //   - a station that hosts only intra-zone tiles for a job is
+    //     dropped from that job's footprint, narrowing the destabilize
+    //     pool to stations with actual leverage.
     let mut late_jobs: Vec<(String, u64)> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
     for action in actions {
+        if action.is_frozen_by_safety_zone {
+            continue;
+        }
         if let Some(end_tick) = action.end_tick {
             if let Some(&deadline_tick) = job_deadlines.get(action.job_id.as_str()) {
                 if end_tick as u64 > deadline_tick && !seen.contains(&action.job_id) {
@@ -88,9 +102,14 @@ pub fn lns_improve(
     }
     late_jobs.sort_by(|a, b| b.1.cmp(&a.1));
 
-    // Build job → stations map
+    // Build job → stations map (still safety-zone-blind: we only
+    // record stations from movable actions, otherwise sacrifice
+    // candidates would include jobs that have nothing to lose).
     let mut job_stations: HashMap<String, HashSet<usize>> = HashMap::new();
     for action in actions {
+        if action.is_frozen_by_safety_zone {
+            continue;
+        }
         job_stations
             .entry(action.job_id.clone())
             .or_default()
@@ -110,8 +129,9 @@ pub fn lns_improve(
     // Cycle through different destroy sizes
     let destroy_sizes = [5, 10, 15, 20, 8, 12, 25];
 
-    eprintln!("[LNS] starting: {} late jobs, {} total jobs, budget {}ms",
-        late_jobs.len(), jobs.len(), time_budget_ms);
+    let frozen_action_count = actions.iter().filter(|a| a.is_frozen_by_safety_zone).count();
+    eprintln!("[LNS] starting: {} late jobs (movable scope), {} total jobs, {} frozen actions skipped, budget {}ms",
+        late_jobs.len(), jobs.len(), frozen_action_count, time_budget_ms);
 
     while (start.elapsed().as_millis() as u64) < time_budget_ms {
         // Early exit if the caller (e.g. a newer compute superseded us)
@@ -227,10 +247,15 @@ pub fn lns_improve(
         if improved {
             best_stats_ref = new_s.clone();
 
-            // Update late_jobs list from new result BEFORE moving into best_result
+            // Update late_jobs list from new result BEFORE moving into best_result.
+            // Same safety-zone filter as the initial build — never re-introduce
+            // intra-zone late jobs here.
             late_jobs.clear();
             seen.clear();
             for action in &new_act {
+                if action.is_frozen_by_safety_zone {
+                    continue;
+                }
                 if let Some(end_tick) = action.end_tick {
                     if let Some(&deadline_tick) = job_deadlines.get(action.job_id.as_str()) {
                         if end_tick as u64 > deadline_tick && !seen.contains(&action.job_id) {
