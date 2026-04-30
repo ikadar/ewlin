@@ -1,7 +1,7 @@
 /**
  * SafetyZonePage — admin UI for the global Safety Zone duration.
  *
- * Accessible at /settings/safety-zone. A slider drives a value in 0→168h,
+ * Accessible at /settings/safety-zone. A slider drives a value in 0→8h,
  * and the change is pushed through PUT /api/v1/safety-zone. The snapshot
  * is invalidated so the Planning re-renders immediately with the new boundary.
  */
@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { Snowflake, Check } from 'lucide-react';
 import { useGetSafetyZoneQuery, useUpdateSafetyZoneMutation } from '../store';
 
-const MAX_HOURS = 168;
+const MAX_HOURS = 8;
 
 export function SafetyZonePage() {
   const { data: config, isLoading } = useGetSafetyZoneQuery();
@@ -45,7 +45,7 @@ export function SafetyZonePage() {
           <h1 className="text-lg font-semibold text-flux-text-primary">Safety Zone</h1>
         </div>
         <p className="text-sm text-flux-text-tertiary mb-8 leading-relaxed">
-          Durée (en heures calendaires depuis maintenant) pendant laquelle les
+          Durée (en heures ouvrées depuis maintenant) pendant laquelle les
           cartes déjà planifiées sont figées dans le planning. Au prochain
           recompute, le moteur de scheduling ne pourra pas les déplacer — sauf
           si l'utilisateur active un override manuel (flocon éteint) sur une
@@ -78,9 +78,10 @@ export function SafetyZonePage() {
 
             <div className="flex justify-between text-xs text-flux-text-muted mt-2">
               <span>0 h (off)</span>
-              <span>24 h</span>
-              <span>72 h (3 j)</span>
-              <span>{MAX_HOURS} h (7 j)</span>
+              <span>2 h</span>
+              <span>4 h</span>
+              <span>6 h</span>
+              <span>{MAX_HOURS} h</span>
             </div>
 
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-flux-border">
@@ -121,7 +122,7 @@ export function SafetyZonePage() {
             les cartes qui sortent de la zone redeviennent mobiles.
           </p>
           <p>
-            Valeur par défaut : 12 h. V1 : scope global (toutes stations). Les
+            Valeur par défaut : 4 h. V1 : scope global (toutes stations). Les
             overrides par-tuile (flocon éteint) persistent indépendamment.
           </p>
         </div>
