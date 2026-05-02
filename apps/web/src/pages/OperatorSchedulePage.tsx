@@ -1207,7 +1207,7 @@ export default function OperatorSchedulePage() {
             stations={snapshot.stations}
             categories={snapshot.categories}
             providers={snapshot.providers}
-            paperLeadTimeHours={paperLeadTime?.hours}
+            paperLeadTime={paperLeadTime}
             onClose={() => setSelectedJobId(null)}
             onRecallTask={handleRecallAssignment}
             onToggleComplete={handleToggleComplete}

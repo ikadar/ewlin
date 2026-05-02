@@ -1985,7 +1985,7 @@ function AppContent() {
           providers={snapshot.providers}
           activeTaskId={undefined}
           conflictTaskIds={conflictTaskIds}
-          paperLeadTimeHours={paperLeadTime?.hours}
+          paperLeadTime={paperLeadTime}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onClose={() => setSelectedJobId(null)}

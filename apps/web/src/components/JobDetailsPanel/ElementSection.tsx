@@ -6,7 +6,9 @@ import type {
   PaperStatus,
   PlateStatus,
   FormeStatus,
+  PaperLeadTimeConfig,
 } from '@flux/types';
+import { computePaperEarliestStart } from '../../utils/paperGate';
 
 export interface ElementSectionProps {
   /** The element to display */
@@ -22,12 +24,11 @@ export interface ElementSectionProps {
    */
   batDeadline?: string | null;
   /**
-   * Paper lead-time in working hours (shop-wide setting). Shown in the
-   * Papier pill tooltip ONLY for the `to_order` state where there's no
-   * event date yet to anchor the floor. Defaults to 48 to match the
-   * server default and keep tests free of Redux setup.
+   * Paper lead-time configuration (shop-wide). Drives the date shown in
+   * the Papier pill tooltip for `to_order` and `ordered` states. When
+   * undefined the tooltip falls back to event-date-only meta.
    */
-  paperLeadTimeHours?: number;
+  paperLeadTime?: PaperLeadTimeConfig;
   /** Children (task tiles) */
   children: React.ReactNode;
 }
@@ -128,6 +129,10 @@ function formatShortDate(iso: string): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function formatShortDateTime(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} · ${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 function batMeta(element: Element, batDeadline: string | null | undefined): string | null {
   const parts: string[] = [];
   if (element.batStatus === 'files_received' && element.filesReceivedAt) {
@@ -143,15 +148,17 @@ function batMeta(element: Element, batDeadline: string | null | undefined): stri
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-function paperMeta(element: Element, paperLeadTimeHours: number): string | null {
-  if (element.paperStatus === 'ordered' && element.paperOrderedAt) {
-    return `Commandé le ${formatShortDate(element.paperOrderedAt)}`;
-  }
+function paperMeta(element: Element, config: PaperLeadTimeConfig | undefined): string | null {
   if (element.paperStatus === 'delivered' && element.paperDeliveredAt) {
     return `Livré le ${formatShortDate(element.paperDeliveredAt)}`;
   }
-  if (element.paperStatus === 'to_order') {
-    return `Délai estimé : ${paperLeadTimeHours}h ouvrées`;
+  const earliest = computePaperEarliestStart(element, config);
+  if (element.paperStatus === 'ordered' && element.paperOrderedAt) {
+    const base = `Commandé le ${formatShortDate(element.paperOrderedAt)}`;
+    return earliest ? `${base} · Démarrage : ${formatShortDateTime(earliest)}` : base;
+  }
+  if (element.paperStatus === 'to_order' && earliest) {
+    return `Démarrage possible : ${formatShortDateTime(earliest)}`;
   }
   return null;
 }
@@ -269,7 +276,7 @@ interface BadgeSpec {
 function buildBadges(
   element: Element,
   batDeadline: string | null | undefined,
-  paperLeadTimeHours: number,
+  paperLeadTime: PaperLeadTimeConfig | undefined,
 ): BadgeSpec[] {
   const badges: BadgeSpec[] = [];
   // 'none' status means "not applicable to this element" (e.g., no BAT
@@ -290,7 +297,7 @@ function buildBadges(
       label: 'PAP',
       tone: paperOrFormeTone(element.paperStatus),
       tipTitle: `Papier · ${PAPER_LABEL[element.paperStatus]}`,
-      tipMeta: paperMeta(element, paperLeadTimeHours),
+      tipMeta: paperMeta(element, paperLeadTime),
     });
   }
   if (element.formeStatus !== 'none') {
@@ -335,10 +342,10 @@ export function ElementSection({
   allElements,
   isSingleElement = false,
   batDeadline,
-  paperLeadTimeHours = 48,
+  paperLeadTime,
   children,
 }: ElementSectionProps) {
-  const badges = buildBadges(element, batDeadline, paperLeadTimeHours);
+  const badges = buildBadges(element, batDeadline, paperLeadTime);
 
   const precedenceElements = element.prerequisiteElementIds
     .map((id) => allElements.find((e) => e.id === id))

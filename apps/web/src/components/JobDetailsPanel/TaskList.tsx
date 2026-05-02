@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig } from '@flux/types';
 import { isMultiElementJob } from '@flux/types';
 import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
@@ -49,8 +49,8 @@ export interface TaskListProps {
   snapshotOperators?: Array<{ id: string; firstName: string; lastName: string }>;
   /** Callback to scroll the grid to a specific operator slice (operator view) */
   onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
-  /** Paper lead-time hours (shop-wide); shown in the Papier pill tooltip */
-  paperLeadTimeHours?: number;
+  /** Paper lead-time configuration (shop-wide); drives the Papier pill tooltip date */
+  paperLeadTime?: PaperLeadTimeConfig;
 }
 
 /**
@@ -78,7 +78,7 @@ export function TaskList({
   onContextMenu,
   snapshotOperators,
   onJumpToOperatorSlice,
-  paperLeadTimeHours,
+  paperLeadTime,
 }: TaskListProps) {
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
   const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
@@ -273,7 +273,7 @@ export function TaskList({
             allElements={jobElements}
             isSingleElement={isSingleElement}
             batDeadline={job.batDeadline ?? null}
-            paperLeadTimeHours={paperLeadTimeHours}
+            paperLeadTime={paperLeadTime}
           >
             {renderTaskTiles(elementTasks, element)}
           </ElementSection>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Délai d'approvisionnement papier — admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    html { font-size: 13px; }
+
+    /* Mirror of apps/web/src/index.css Flux tokens (dark theme). */
+    :root {
+      --color-flux-base:           rgb(15 15 15);
+      --color-flux-surface:        rgb(26 26 26);
+      --color-flux-border:         rgb(42 42 42);
+      --color-flux-border-light:   rgb(58 58 58);
+      --color-flux-text-primary:   rgb(245 245 245);
+      --color-flux-text-secondary: rgb(209 209 209);
+      --color-flux-text-tertiary:  rgb(161 161 161);
+      --color-flux-text-muted:     rgb(128 128 128);
+    }
+    .bg-flux-base              { background-color: var(--color-flux-base); }
+    .bg-flux-surface           { background-color: var(--color-flux-surface); }
+    .border-flux-border        { border-color:    var(--color-flux-border); }
+    .text-flux-text-primary    { color: var(--color-flux-text-primary); }
+    .text-flux-text-secondary  { color: var(--color-flux-text-secondary); }
+    .text-flux-text-tertiary   { color: var(--color-flux-text-tertiary); }
+    .text-flux-text-muted      { color: var(--color-flux-text-muted); }
+
+    /* Number input — same look as a unit-bearing scalar field. */
+    .num-input {
+      width: 4.25rem;
+      padding: 5px 8px;
+      text-align: right;
+      background: rgb(20 20 20);
+      border: 1px solid var(--color-flux-border-light);
+      color: var(--color-flux-text-primary);
+      border-radius: 4px;
+      font-size: 16px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    .num-input::-webkit-outer-spin-button,
+    .num-input::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .num-input:focus {
+      border-color: rgb(245 158 11);
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
+    }
+    .num-input.invalid {
+      border-color: rgb(220 38 38);
+      box-shadow: 0 0 0 2px rgba(220,38,38,0.18);
+    }
+  </style>
+</head>
+<body class="bg-flux-base text-flux-text-primary min-h-screen">
+
+<!-- Page shell mirrors SafetyZonePage / PrecedenceGapPage:
+     flex-1 overflow-auto bg-flux-base, max-w-2xl mx-auto p-8 -->
+<div class="flex-1 overflow-auto">
+  <div class="max-w-2xl mx-auto p-8">
+
+    <!-- Header: lucide icon + title (Truck = livraison fournisseur) -->
+    <div class="flex items-center gap-3 mb-2">
+      <!-- Inline lucide Truck icon (no cdn dep) -->
+      <svg class="w-5 h-5" style="color: rgb(245 158 11)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/>
+        <path d="M15 18H9"/>
+        <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/>
+        <circle cx="17" cy="18" r="2"/>
+        <circle cx="7" cy="18" r="2"/>
+      </svg>
+      <h1 class="text-lg font-semibold text-flux-text-primary">
+        Délai d'approvisionnement papier
+      </h1>
+    </div>
+
+    <!-- Description -->
+    <p class="text-sm text-flux-text-tertiary mb-8 leading-relaxed">
+      Règle utilisée par le moteur pour gater les éléments dont le papier
+      n'est pas encore disponible (statuts <em>à commander</em> ou
+      <em>commandé</em>). Le démarrage est repoussé à la première date à
+      laquelle le fournisseur garantit la livraison du papier, en heures
+      ouvrées.
+    </p>
+
+    <!-- ── Form card ───────────────────────────────────── -->
+    <div class="bg-flux-surface border border-flux-border rounded-lg p-6">
+
+      <!-- Field 1 -->
+      <div class="flex items-baseline justify-between py-3">
+        <label for="in-cutoff" class="text-sm text-flux-text-secondary">
+          Heure limite de commande J
+        </label>
+        <div class="flex items-baseline gap-2">
+          <input id="in-cutoff" class="num-input" type="number" min="0" max="23" value="11" />
+          <span class="font-mono text-sm text-flux-text-tertiary">h</span>
+        </div>
+      </div>
+
+      <!-- Field 2 -->
+      <div class="flex items-baseline justify-between py-3 border-t border-flux-border">
+        <label for="in-offset" class="text-sm text-flux-text-secondary">
+          Délai de livraison
+        </label>
+        <div class="flex items-baseline gap-2">
+          <input id="in-offset" class="num-input" type="number" min="0" max="30" value="1" />
+          <span class="font-mono text-sm text-flux-text-tertiary">jour&nbsp;ouvré</span>
+        </div>
+      </div>
+
+      <!-- Field 3 -->
+      <div class="flex items-baseline justify-between py-3 border-t border-flux-border">
+        <label for="in-arrival" class="text-sm text-flux-text-secondary">
+          Heure de livraison maximale
+        </label>
+        <div class="flex items-baseline gap-2">
+          <input id="in-arrival" class="num-input" type="number" min="0" max="23" value="10" />
+          <span class="font-mono text-sm text-flux-text-tertiary">h</span>
+        </div>
+      </div>
+
+      <!-- Validation message -->
+      <div id="validation" class="mt-3 text-xs text-red-400 hidden"></div>
+
+      <!-- Footer: separator + last-updated + savedAck + Save -->
+      <div class="flex items-center justify-between mt-6 pt-4 border-t border-flux-border">
+        <div class="text-xs text-flux-text-tertiary">
+          Dernière mise à jour&nbsp;:
+          <span class="font-mono" id="last-updated">02/05/2026 14:32:18</span>
+        </div>
+
+        <div class="flex gap-2 items-center">
+          <span id="saved-ack" class="text-xs text-emerald-400 inline-flex items-center gap-1 hidden">
+            <!-- lucide Check -->
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Enregistré
+          </span>
+          <button id="save-btn" type="button" disabled
+            class="px-4 py-1.5 rounded-md text-sm font-medium bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Long-form explanation (mirror PrecedenceGapPage) ──────── -->
+    <div class="mt-8 space-y-5 text-sm text-flux-text-secondary leading-relaxed">
+
+      <section>
+        <h2 class="text-base font-semibold text-flux-text-primary mb-2">
+          Comment se lit la règle&nbsp;?
+        </h2>
+        <p>
+          <span id="rule-summary">—</span>
+        </p>
+        <p class="mt-2 text-flux-text-tertiary">
+          Si la commande arrive <em>après</em> l'heure limite, elle est
+          considérée comme passée le jour ouvré suivant&nbsp;: la livraison
+          se cale alors automatiquement sur ce nouveau jour de référence,
+          sans paramètre supplémentaire.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-flux-text-primary mb-2">
+          À quoi ça sert&nbsp;?
+        </h2>
+        <p>
+          Le moteur de planification ne peut pas démarrer un élément tant
+          que son papier n'est pas physiquement présent. Cette règle traduit
+          la promesse du fournisseur en une <strong>date plancher</strong> par
+          élément&nbsp;: la référence prise en compte est la date de
+          commande si le statut est <em>commandé</em>, ou maintenant si le
+          statut est <em>à commander</em>.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-flux-text-primary mb-2">
+          Comment choisir les valeurs&nbsp;?
+        </h2>
+        <ul class="space-y-2 list-disc pl-5">
+          <li>
+            <strong>Heure limite de commande J</strong> — l'horaire au-delà
+            duquel le fournisseur traite la commande le lendemain seulement.
+            Demande au commercial fournisseur (souvent 11h ou 12h).
+          </li>
+          <li>
+            <strong>Délai de livraison</strong> — combien de jours ouvrés
+            après le jour de traitement le papier arrive. <em>1</em> = J+1
+            ouvré (le lendemain). Augmente si le fournisseur est lointain
+            ou que le papier est spécifique.
+          </li>
+          <li>
+            <strong>Heure de livraison maximale</strong> — l'heure tardive
+            à laquelle on est sûr d'avoir le papier le jour de livraison.
+            Sert de plancher horaire — le moteur n'engage pas l'élément
+            avant cet instant ce jour-là.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-base font-semibold text-flux-text-primary mb-2">
+          Quand prend effet la modification&nbsp;?
+        </h2>
+        <p>
+          Au prochain recompute (manuel via Ctrl+Alt+P ou automatique après
+          une action console). Les plannings sauvegardés ne sont pas
+          réécrits&nbsp;; seul le prochain calcul applique la nouvelle
+          règle.
+        </p>
+      </section>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ─────────────────────────────────────────────────────────
+  // State + initial config (matches backend defaults).
+  // ─────────────────────────────────────────────────────────
+  const INITIAL = { cutoff: 11, offset: 1, arrival: 10 };
+
+  const els = {
+    cutoff:  document.getElementById("in-cutoff"),
+    offset:  document.getElementById("in-offset"),
+    arrival: document.getElementById("in-arrival"),
+    valMsg:  document.getElementById("validation"),
+    summary: document.getElementById("rule-summary"),
+    saveBtn: document.getElementById("save-btn"),
+    savedAck: document.getElementById("saved-ack"),
+    lastUpdated: document.getElementById("last-updated"),
+  };
+
+  function readDraft() {
+    return {
+      cutoff:  parseInt(els.cutoff.value, 10),
+      offset:  parseInt(els.offset.value, 10),
+      arrival: parseInt(els.arrival.value, 10),
+    };
+  }
+
+  function validate(d) {
+    const errs = [];
+    const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+    if (!inRange(d.cutoff, 0, 23))  errs.push("Heure limite de commande ∈ [0,23]");
+    if (!inRange(d.arrival, 0, 23)) errs.push("Heure de livraison maximale ∈ [0,23]");
+    if (!inRange(d.offset, 0, 30))  errs.push("Délai de livraison ∈ [0,30] jours ouvrés");
+    return errs;
+  }
+
+  function renderSummary(d) {
+    const offsetStr = d.offset === 0 ? "le jour même" : `J+${d.offset} ouvré`;
+    const cutoffStr = d.cutoff.toString().padStart(2, "0");
+    const arrivalStr = d.arrival.toString().padStart(2, "0");
+    els.summary.innerHTML = `
+      Si la commande est passée avant <strong class="text-flux-text-primary">${cutoffStr}h00</strong>
+      le jour J, le papier est livré <strong class="text-flux-text-primary">${offsetStr}</strong>
+      au plus tard à <strong class="text-flux-text-primary">${arrivalStr}h00</strong>.
+    `;
+  }
+
+  let saved = { ...INITIAL };
+
+  function rerender() {
+    const draft = readDraft();
+    const errs = validate(draft);
+
+    [els.cutoff, els.offset, els.arrival].forEach(i => i.classList.remove("invalid"));
+
+    if (errs.length > 0) {
+      els.valMsg.classList.remove("hidden");
+      els.valMsg.innerHTML = errs.map(e => `• ${e}`).join("<br>");
+      els.saveBtn.disabled = true;
+      if (errs.some(e => e.includes("commande")))   els.cutoff.classList.add("invalid");
+      if (errs.some(e => e.includes("maximale")))   els.arrival.classList.add("invalid");
+      if (errs.some(e => e.includes("Délai")))      els.offset.classList.add("invalid");
+      return;
+    }
+    els.valMsg.classList.add("hidden");
+    renderSummary(draft);
+
+    const dirty = draft.cutoff !== saved.cutoff
+      || draft.offset !== saved.offset
+      || draft.arrival !== saved.arrival;
+    els.saveBtn.disabled = !dirty;
+  }
+
+  function fakeSave() {
+    saved = readDraft();
+    els.savedAck.classList.remove("hidden");
+    els.lastUpdated.textContent = new Date().toLocaleString("fr-FR");
+    setTimeout(() => els.savedAck.classList.add("hidden"), 1800);
+    rerender();
+  }
+
+  ["cutoff", "offset", "arrival"].forEach(k => {
+    els[k].addEventListener("input", rerender);
+  });
+  els.saveBtn.addEventListener("click", fakeSave);
+
+  rerender();
+</script>
+
+</body>
+</html>

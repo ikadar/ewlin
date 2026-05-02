@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig } from '@flux/types';
 import { X, Calendar, CalendarCheck } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
@@ -62,12 +62,12 @@ export interface JobDetailsPanelProps {
   /** Callback to scroll the operator grid to a specific operator slice */
   onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
   /**
-   * Paper lead-time hours (shop-wide setting), shown in the Papier pill
-   * tooltip when an element has paperStatus not Ready. Pass through from
-   * the consuming page that already holds Redux state — keeps this
-   * component free of store dependencies and unit-test-friendly.
+   * Paper lead-time configuration (shop-wide), drives the Papier pill
+   * tooltip date. Passed from the consuming page that already holds
+   * Redux state — keeps this component free of store dependencies and
+   * unit-test-friendly.
    */
-  paperLeadTimeHours?: number;
+  paperLeadTime?: PaperLeadTimeConfig;
 }
 
 /** Format a datetime as DD/MM/YYYY a HHhMM */
@@ -126,7 +126,7 @@ export function JobDetailsPanel({
   onSelectJob,
   snapshotOperators,
   onJumpToOperatorSlice,
-  paperLeadTimeHours,
+  paperLeadTime,
 }: JobDetailsPanelProps) {
   // Memoize data filtering for this job
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
@@ -349,7 +349,7 @@ export function JobDetailsPanel({
         tasks={jobTasks}
         elements={jobElements}
         job={job}
-        paperLeadTimeHours={paperLeadTimeHours}
+        paperLeadTime={paperLeadTime}
         assignments={jobAssignments}
         stations={stations}
         categories={categories}
