@@ -393,7 +393,15 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
                   collapses={effectiveCollapses}
-                  onTileContextMenu={(p) =>
+                  onTileContextMenu={(p) => {
+                    // Prod focus has a single legal tile action: saisie
+                    // d'avancement on past-started tiles. Future-start tiles
+                    // would only expose "Définir heure de début…", which is
+                    // a préprod-only affordance — so we suppress the menu
+                    // entirely rather than opening an empty shell.
+                    const hasStarted =
+                      new Date(p.currentScheduledStart).getTime() <= now.getTime();
+                    if (scenarioMode === 'prod' && !hasStarted) return;
                     setContextMenuState({
                       x: p.x,
                       y: p.y,
@@ -403,8 +411,8 @@ export default function FocusPage({ mode }: FocusPageProps) {
                       isPinned: p.isPinned,
                       isCompleted: p.isCompleted,
                       openSaisie: p.openSaisie,
-                    })
-                  }
+                    });
+                  }}
                 />
               )}
               {mode === 'station' && selectedStation && (
@@ -441,7 +449,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
             onSaisirAvancement={hasStarted && contextMenuState.openSaisie
               ? contextMenuState.openSaisie
               : undefined}
-            onDefinirDebut={!hasStarted
+            onDefinirDebut={!hasStarted && scenarioMode !== 'prod'
               ? () => {
                   setPinDialogState({
                     taskId: contextMenuState.taskId,
