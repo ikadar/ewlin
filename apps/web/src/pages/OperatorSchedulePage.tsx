@@ -38,6 +38,7 @@ import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
 import { useProgressTriggers } from '../hooks/useProgressTriggers';
 import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
+import { TileContextMenu } from '../components/Tile';
 import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
 import { useScenarioMode } from '../contexts/ScenarioContext';
 import { getTasksForJob } from '../utils';
@@ -864,9 +865,20 @@ export default function OperatorSchedulePage() {
 
   const saisieTriggers = useProgressTriggers(snapshot.assignments, now);
 
-  // Right-click on a tile opens SetStartTimeDialog (V2 parameterized pin).
-  // The chef-mode multi-action context menu lives on the station grid
-  // (App.tsx) — operator views give a single, focused affordance.
+  // Right-click opens TileContextMenu (subset of the chef-mode menu :
+  // Épingler / Voir détails / Définir heure de début…). Selecting
+  // "Définir heure de début…" then opens the SetStartTimeDialog.
+  const [contextMenuState, setContextMenuState] = useState<{
+    x: number;
+    y: number;
+    assignmentId: string;
+    taskId: string;
+    jobId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+    isPinned: boolean;
+    isCompleted: boolean;
+  } | null>(null);
   const [pinDialogState, setPinDialogState] = useState<{
     taskId: string;
     job: { reference: string; client: string };
@@ -1189,10 +1201,16 @@ export default function OperatorSchedulePage() {
       if (!assignment) return;
       e.preventDefault();
       e.stopPropagation();
-      setPinDialogState({
+      setContextMenuState({
+        x: e.clientX,
+        y: e.clientY,
+        assignmentId: assignment.id,
         taskId: task.id,
+        jobId: job.id,
         job: { reference: job.reference, client: job.client },
         currentScheduledStart: assignment.scheduledStart,
+        isPinned: assignment.isPinned ?? false,
+        isCompleted: assignment.isCompleted ?? false,
       });
     };
 
@@ -1477,9 +1495,38 @@ export default function OperatorSchedulePage() {
       {/* ---- Shortcut footer ---- */}
       <ShortcutFooter mode={selectedJobId ? 'operatorJobSelected' : 'operatorDefault'} />
 
-      {/* V2 set-start-time dialog — opened by right-clicking a tile. The
-          dialog auto-fires the pin mutation ; autoRecomputeMiddleware
-          handles the replan. */}
+      {/* Right-click context menu — operator subset of the chef-mode menu.
+          "Définir heure de début…" routes to the SetStartTimeDialog, which
+          fires the pin mutation ; autoRecomputeMiddleware handles the replan. */}
+      {contextMenuState && (
+        <TileContextMenu
+          x={contextMenuState.x}
+          y={contextMenuState.y}
+          isPinned={contextMenuState.isPinned}
+          isCompleted={contextMenuState.isCompleted}
+          onTogglePin={() => {
+            void handleTogglePin(contextMenuState.assignmentId);
+            setContextMenuState(null);
+          }}
+          onViewDetails={() => {
+            setSelectedJobId(contextMenuState.jobId);
+            setContextMenuState(null);
+          }}
+          onDefinirDebut={() => {
+            setPinDialogState({
+              taskId: contextMenuState.taskId,
+              job: contextMenuState.job,
+              currentScheduledStart: contextMenuState.currentScheduledStart,
+            });
+            setContextMenuState(null);
+          }}
+          onClose={() => setContextMenuState(null)}
+        />
+      )}
+
+      {/* V2 set-start-time dialog — opened from the menu's "Définir heure de
+          début…" item. The dialog fires the pin mutation ;
+          autoRecomputeMiddleware handles the replan. */}
       {pinDialogState && (
         <SetStartTimeDialog
           isOpen={true}

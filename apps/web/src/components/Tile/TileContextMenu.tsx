@@ -11,10 +11,12 @@ export interface TileContextMenuProps {
   isCompleted: boolean;
   /** Whether tile is currently pinned */
   isPinned: boolean;
-  /** Callback for "Toggle pin" action */
-  onTogglePin: () => void;
-  /** Callback for "View details" action */
-  onViewDetails: () => void;
+  /** Callback for "Toggle pin" action. Optional — operator views without
+   *  a pin mutation may omit it ; the item then disappears. */
+  onTogglePin?: () => void;
+  /** Callback for "View details" action. Optional — surfaces without a
+   *  JDP target may omit it. */
+  onViewDetails?: () => void;
   /**
    * Callback for "Toggle completion" action. Optional in V2 — the
    * progress-capture refactor derives completion from `scheduledEnd < now`
@@ -183,7 +185,7 @@ export function TileContextMenu({
 
   // Action handlers that close the menu after action
   const handleViewDetails = () => {
-    onViewDetails();
+    onViewDetails?.();
     onClose();
   };
 
@@ -193,7 +195,7 @@ export function TileContextMenu({
   };
 
   const handleTogglePin = () => {
-    onTogglePin();
+    onTogglePin?.();
     onClose();
   };
 
@@ -232,12 +234,14 @@ export function TileContextMenu({
       data-testid="tile-context-menu"
       role="menu"
     >
-      <MenuItem
-        icon={<Eye className="w-4 h-4" />}
-        label="Voir détails"
-        onClick={handleViewDetails}
-        testId="context-menu-view-details"
-      />
+      {onViewDetails && (
+        <MenuItem
+          icon={<Eye className="w-4 h-4" />}
+          label="Voir détails"
+          onClick={handleViewDetails}
+          testId="context-menu-view-details"
+        />
+      )}
       {onSaisirAvancement && (
         <MenuItem
           icon={<Clock className="w-4 h-4" />}
@@ -254,12 +258,14 @@ export function TileContextMenu({
           testId="context-menu-toggle-complete"
         />
       )}
-      <MenuItem
-        icon={<Pin className="w-4 h-4" />}
-        label={isPinned ? 'Désépingler' : 'Épingler'}
-        onClick={handleTogglePin}
-        testId="context-menu-toggle-pin"
-      />
+      {onTogglePin && (
+        <MenuItem
+          icon={<Pin className="w-4 h-4" />}
+          label={isPinned ? 'Désépingler' : 'Épingler'}
+          onClick={handleTogglePin}
+          testId="context-menu-toggle-pin"
+        />
+      )}
       {onDefinirDebut && (
         <MenuItem
           icon={<CalendarDays className="w-4 h-4" />}

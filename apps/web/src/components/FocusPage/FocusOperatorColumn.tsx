@@ -35,9 +35,21 @@ export interface FocusOperatorColumnProps {
   collapses: readonly Collapse[];
   /**
    * Right-click on any tile bubbles up here so the page (FocusPage) can
-   * mount the SetStartTimeDialog once instead of N times across columns.
+   * mount a single TileContextMenu / SetStartTimeDialog instead of N times
+   * across columns. Passes enough context for the page to render the menu
+   * (cursor coords + assignment + job metadata).
    */
-  onTileContextMenu?: (taskId: string, job: { reference: string; client: string }, currentScheduledStart: string) => void;
+  onTileContextMenu?: (payload: {
+    x: number;
+    y: number;
+    assignmentId: string;
+    taskId: string;
+    jobId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+    isPinned: boolean;
+    isCompleted: boolean;
+  }) => void;
 }
 
 /**
@@ -255,11 +267,17 @@ export function FocusOperatorColumn({
           if (!assignment || !onTileContextMenu) return;
           e.preventDefault();
           e.stopPropagation();
-          onTileContextMenu(
-            slice.taskId,
-            { reference: job.reference, client: job.client },
-            assignment.scheduledStart,
-          );
+          onTileContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            assignmentId: assignment.id,
+            taskId: slice.taskId,
+            jobId: job.id,
+            job: { reference: job.reference, client: job.client },
+            currentScheduledStart: assignment.scheduledStart,
+            isPinned: assignment.isPinned ?? false,
+            isCompleted: assignment.isCompleted ?? false,
+          });
         };
 
         return (

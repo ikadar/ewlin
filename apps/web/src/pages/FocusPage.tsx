@@ -18,6 +18,7 @@ import { useVirtualScroll } from '../hooks';
 import { computeCollapses } from '../utils/computeCollapses';
 import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
+import { TileContextMenu } from '../components/Tile';
 import { CollapseBand } from '../components/SchedulingGrid/CollapseBand';
 
 const START_HOUR = 0;
@@ -108,8 +109,18 @@ export default function FocusPage({ mode }: FocusPageProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
 
-  // V2 set-start-time dialog state — opened from a tile right-click
-  // bubbled up by FocusOperatorColumn. Single mount per page.
+  // Right-click menu state — bubbled up from FocusOperatorColumn so a
+  // single TileContextMenu mounts at page level. The menu's "Définir heure
+  // de début…" item then routes to the SetStartTimeDialog below.
+  const [contextMenuState, setContextMenuState] = useState<{
+    x: number;
+    y: number;
+    taskId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+    isPinned: boolean;
+    isCompleted: boolean;
+  } | null>(null);
   const [pinDialogState, setPinDialogState] = useState<{
     taskId: string;
     job: { reference: string; client: string };
@@ -379,8 +390,16 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
                   collapses={effectiveCollapses}
-                  onTileContextMenu={(taskId, job, currentScheduledStart) =>
-                    setPinDialogState({ taskId, job, currentScheduledStart })
+                  onTileContextMenu={(p) =>
+                    setContextMenuState({
+                      x: p.x,
+                      y: p.y,
+                      taskId: p.taskId,
+                      job: p.job,
+                      currentScheduledStart: p.currentScheduledStart,
+                      isPinned: p.isPinned,
+                      isCompleted: p.isCompleted,
+                    })
                   }
                 />
               )}
@@ -403,7 +422,29 @@ export default function FocusPage({ mode }: FocusPageProps) {
         </div>
       </div>
 
-      {/* V2 set-start-time dialog — opened by right-clicking any tile. */}
+      {/* Right-click context menu (focus subset : "Définir heure de début…"
+          is the V2 affordance ; pin / view-details aren't bound on this
+          surface so the menu shows a single actionable item). */}
+      {contextMenuState && (
+        <TileContextMenu
+          x={contextMenuState.x}
+          y={contextMenuState.y}
+          isPinned={contextMenuState.isPinned}
+          isCompleted={contextMenuState.isCompleted}
+          onDefinirDebut={() => {
+            setPinDialogState({
+              taskId: contextMenuState.taskId,
+              job: contextMenuState.job,
+              currentScheduledStart: contextMenuState.currentScheduledStart,
+            });
+            setContextMenuState(null);
+          }}
+          onClose={() => setContextMenuState(null)}
+        />
+      )}
+
+      {/* V2 set-start-time dialog — opened from the menu's "Définir heure
+          de début…" item. */}
       {pinDialogState && (
         <SetStartTimeDialog
           isOpen={true}
