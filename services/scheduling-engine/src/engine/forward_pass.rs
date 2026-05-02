@@ -798,9 +798,14 @@ pub fn productivity_at_tick(
 ///   under-skilled caleur (prof < 1.0) doesn't get borrowed for a duration
 ///   that overflows a closure or shift end on its way back to the donor.
 ///
-/// Returns the first viable `(op_idx, source_action_idx)` pair. The caller
-/// is responsible for the grid manipulation (`clear_operator_at_tick`,
-/// `assign_operator`) and for setting `borrow_until_tick` on the donor.
+/// Returns the first viable `(op_idx, source_action_idx, real_window)` triple.
+/// `real_window` is the borrow duration in real ticks (already scaled by the
+/// op's setup_proficiency) and matches the span the helper just verified
+/// availability over — the caller MUST use it when setting `borrow_until_tick`
+/// so the donor's peremption gate covers exactly the verified span (otherwise
+/// gate and check can drift). The caller is responsible for the grid
+/// manipulation (`clear_operator_at_tick`, `assign_operator`) and for setting
+/// `borrow_until_tick` on the donor.
 fn try_borrow_setup_op(
     actions: &[Action],
     operator_skills: &[Vec<SkillEntry>],
@@ -809,7 +814,7 @@ fn try_borrow_setup_op(
     target_station: usize,
     t: usize,
     remaining_setup_ticks: u32,
-) -> Option<(usize, usize)> {
+) -> Option<(usize, usize, u32)> {
     for (source_idx, source) in actions.iter().enumerate() {
         if source.station_idx == target_station {
             continue;
@@ -830,9 +835,9 @@ fn try_borrow_setup_op(
         }
 
         // Run progress so far must satisfy the donor station's *actual*
-        // chunk-mini floor, not a hardcoded ratio. effective_chunk_mini_ticks
-        // mirrors the same computation used by the engine's chunk-mini guard
-        // in assign_action_at_tick, so the borrow respects whatever per-station
+        // chunk-mini floor, not a hardcoded ratio. `chunk_mini_ticks` mirrors
+        // the same computation used by the engine's chunk-mini guard in
+        // assign_action_at_tick, so the borrow respects whatever per-station
         // configuration is in force.
         let donor_attrs = match station_attrs.get(source.station_idx) {
             Some(a) => a,
@@ -875,7 +880,7 @@ fn try_borrow_setup_op(
             if !available_full_window {
                 continue;
             }
-            return Some((op, source_idx));
+            return Some((op, source_idx, real_window));
         }
     }
     None
@@ -2251,7 +2256,7 @@ fn assign_action_at_tick(
         let target_setup_ticks = actions[action_idx].setup_ticks;
         let already_done = actions[action_idx].eat.min(target_setup_ticks);
         let remaining_setup_ticks = target_setup_ticks.saturating_sub(already_done).max(1);
-        if let Some((op, source_idx)) = try_borrow_setup_op(
+        if let Some((op, source_idx, real_window_ticks)) = try_borrow_setup_op(
             actions,
             operator_skills,
             operator_availability,
@@ -2260,19 +2265,12 @@ fn assign_action_at_tick(
             t,
             remaining_setup_ticks,
         ) {
-            // Compute the borrow window in real ticks, not productivity-1.0 ticks.
-            // The borrowed op's setup_proficiency on the target station drives the
-            // actual setup duration: at prof=0.5 the calage takes 2× as long, so
-            // the donor's borrow_until_tick must extend that long too — otherwise
-            // peremption would fire on the donor while the op is still calage-ing.
-            let op_setup_prof = operator_skills[op]
-                .iter()
-                .find(|s| s.station_idx == station_idx)
-                .map(|s| s.setup_proficiency)
-                .unwrap_or(1.0)
-                .max(f64::MIN_POSITIVE);
-            let real_window_ticks =
-                ((remaining_setup_ticks as f64 / op_setup_prof).ceil() as u32).max(1);
+            // `real_window_ticks` is the borrow span the helper just verified
+            // op availability over — already scaled by the op's setup_proficiency
+            // on the target station (so a prof=0.5 caleur gets a 2× window).
+            // Reusing it here keeps the donor's peremption gate aligned with
+            // the verified availability span — single source of truth.
+            //
             // Steal the op from the donor's grid claim (if any) and place
             // them on the target station for this tick.
             grid.clear_operator_at_tick(op, t);
@@ -4800,5 +4798,201 @@ mod safety_zone_chunk_mini_tests {
             !warnings.iter().any(|w| w.message.contains("retiré")),
             "no degradation warning on in-progress pin: {warnings:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod borrow_tests {
+    //! Integration tests for the P3b caleur volant borrow path:
+    //!   - try_borrow_setup_op picks a viable donor and respects chunk_mini
+    //!   - apply_peremption_rule gates peremption while a borrow is in flight
+    //!   - apply_peremption_rule restores magnetism after the borrow expires
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn permissive_attrs() -> StationAttrs {
+        StationAttrs {
+            attention_full: 1.0,
+            attention_run: 1.0,
+            max_run_attention: 1.0,
+            masked_time_enabled: false,
+            peremption_ticks: 8,
+            max_operators: 1,
+            max_chunk_ticks: 1000,
+            // chunk_mini set to 0% so the borrow path's chunk-mini floor doesn't
+            // block tests where the donor has barely started its run. The
+            // chunk-mini-floor test below opts back into a real value.
+            chunk_mini_setup_multiplier: 0.0,
+            chunk_mini_task_percentage: 0.0,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        }
+    }
+
+    fn make_donor_action(
+        idx: usize,
+        station_idx: usize,
+        setup_ticks: u32,
+        run_ticks: u32,
+        eat: u32,
+        assigned_op: usize,
+    ) -> Action {
+        let total = setup_ticks + run_ticks;
+        let setup_progress = (eat as f64).min(setup_ticks as f64);
+        Action {
+            idx,
+            task_id: format!("donor-{idx}"),
+            job_id: "j".into(),
+            station_idx,
+            setup_ticks,
+            run_ticks,
+            art: total.saturating_sub(eat),
+            eat,
+            last: u64::MAX,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: vec![assigned_op],
+            start_tick: Some(0),
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            earliest_start_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks: 0,
+            tick_operator_log: Vec::new(),
+            original_art: total,
+            task_total_ticks: total,
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            is_pinned: false,
+            is_frozen_by_safety_zone: false,
+            chain_remaining_art: total,
+            pinned_start_tick: None,
+            pinned_end_tick: None,
+            peremption_count: 0,
+            pending_recalage: false,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
+            spec_snapshot: crate::engine::similarity::SpecSnapshot::default(),
+            setup_progress,
+            setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
+            borrow_until_tick: None,
+            borrowed_op_to_restore: None,
+        }
+    }
+
+    fn always_avail(num_ops: usize, num_ticks: usize) -> OperatorAvailability {
+        let schedules: Vec<OperatorScheduleData> = (0..num_ops)
+            .map(|_| OperatorScheduleData {
+                schedules: None,
+                reference_week: None,
+                absences: Vec::new(),
+                overtimes: Vec::new(),
+            })
+            .collect();
+        let mut avail = OperatorAvailability::new(
+            num_ops,
+            num_ticks,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 9).unwrap(),
+            schedules,
+        );
+        for op in 0..num_ops {
+            for t in 0..num_ticks {
+                while avail.data.get(op).map_or(0, |v| v.len()) <= t {
+                    avail.data.get_mut(op).map(|v| v.push(true));
+                }
+                if let Some(v) = avail.data.get_mut(op) {
+                    v[t] = true;
+                }
+            }
+        }
+        avail
+    }
+
+    /// Donor (Bernard) is rolling on station 0 with eat well past setup.
+    /// Target station 1 needs a setup. Bernard is qualified for setup of
+    /// station 1. Borrow should fire.
+    #[test]
+    fn borrow_fires_when_donor_is_in_run_phase_and_op_is_qualified() {
+        let donor = make_donor_action(0, 0, 2, 10, 6, /*op=*/ 0);
+        let actions = vec![donor];
+        let skills = vec![vec![
+            SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
+            SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
+        ]];
+        let avail = always_avail(1, 100);
+        let attrs = vec![permissive_attrs(), permissive_attrs()];
+
+        let result = try_borrow_setup_op(
+            &actions, &skills, &avail, &attrs,
+            /*target_station=*/ 1, /*t=*/ 7, /*remaining_setup_ticks=*/ 4,
+        );
+
+        assert_eq!(
+            result,
+            Some((0_usize, 0_usize, 4_u32)),
+            "borrow should pick Bernard (op 0) from donor action 0; \
+             real_window=4 because remaining_setup_ticks=4 and prof=1.0"
+        );
+    }
+
+    /// Donor's chunk_mini is configured at 50% of task_total. Donor has
+    /// only 1 run-phase tick out of 12 — well below the 6-tick floor —
+    /// so try_borrow must refuse, even though the op is qualified.
+    #[test]
+    fn borrow_refused_when_donor_chunk_mini_floor_not_met() {
+        let donor = make_donor_action(0, 0, 2, 10, /*eat=*/ 3, 0);
+        let actions = vec![donor];
+        let skills = vec![vec![
+            SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
+            SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
+        ]];
+        let avail = always_avail(1, 100);
+        let mut attrs0 = permissive_attrs();
+        attrs0.chunk_mini_task_percentage = 0.5; // 6-tick floor on a 12-tick task
+        let attrs = vec![attrs0, permissive_attrs()];
+
+        let result = try_borrow_setup_op(
+            &actions, &skills, &avail, &attrs, 1, 4, 4,
+        );
+
+        assert!(
+            result.is_none(),
+            "donor with 1 run tick (eat=3 - setup=2) must fail 6-tick floor"
+        );
+    }
+
+    /// borrow_until_tick gates apply_peremption_rule while the borrow is
+    /// in flight. Once current_tick crosses the window end, peremption
+    /// proceeds normally AND the previously-borrowed op is restored to
+    /// the donor's assigned_operators list.
+    #[test]
+    fn borrow_until_tick_gates_then_restores_magnetism() {
+        let mut donor = make_donor_action(0, 0, 4, 20, 10, 0);
+        donor.borrow_until_tick = Some(15);
+        donor.borrowed_op_to_restore = Some(0);
+        donor.assigned_operators.clear();
+        donor.idle_ticks = 100;
+
+        let triggered_inside = apply_peremption_rule(&mut donor, 4, 8, /*current=*/ 12);
+        assert!(!triggered_inside, "peremption must be gated during borrow");
+        assert!(
+            donor.assigned_operators.is_empty(),
+            "magnetism not yet restored mid-borrow"
+        );
+        assert!(donor.borrow_until_tick.is_some(), "window flag still set");
+
+        let _ = apply_peremption_rule(&mut donor, 4, 8, /*current=*/ 15);
+        assert!(donor.borrow_until_tick.is_none(), "window auto-cleared");
+        assert!(
+            donor.assigned_operators.contains(&0),
+            "borrowed op restored to magnetism after window expires"
+        );
+        assert!(donor.borrowed_op_to_restore.is_none(), "restore field consumed");
     }
 }
