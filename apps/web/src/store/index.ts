@@ -32,6 +32,7 @@ import { consoleApi } from './api/consoleApi';
 import { promotionApi } from './api/promotionApi';
 import { prodCompletionApi } from './api/prodCompletionApi';
 import { saisieApi } from './api/saisieApi';
+import { pinApi } from './api/pinApi';
 import { prodSnapshotApi } from './api/prodSnapshotApi';
 import { archiveApi } from './api/archiveApi';
 import { simulationApi } from './api/simulationApi';
@@ -68,6 +69,7 @@ export const store = configureStore({
     [promotionApi.reducerPath]: promotionApi.reducer,
     [prodCompletionApi.reducerPath]: prodCompletionApi.reducer,
     [saisieApi.reducerPath]: saisieApi.reducer,
+    [pinApi.reducerPath]: pinApi.reducer,
     [prodSnapshotApi.reducerPath]: prodSnapshotApi.reducer,
     [archiveApi.reducerPath]: archiveApi.reducer,
     [simulationApi.reducerPath]: simulationApi.reducer,
@@ -104,6 +106,7 @@ export const store = configureStore({
       .concat(promotionApi.middleware)
       .concat(prodCompletionApi.middleware)
       .concat(saisieApi.middleware)
+      .concat(pinApi.middleware)
       .concat(prodSnapshotApi.middleware)
       .concat(archiveApi.middleware)
       .concat(simulationApi.middleware)
@@ -336,6 +339,19 @@ export type {
   ReportSaisieRequest,
   ReportSaisieResult,
 } from './api/saisieApi';
+
+export {
+  useFeasibilityPreviewMutation,
+  usePinAtTimeMutation,
+  pinApi,
+} from './api/pinApi';
+export type {
+  InfeasibilityReason,
+  FeasibilityPreviewRequest,
+  FeasibilityPreviewResult,
+  PinAtTimeRequest,
+  PinAtTimeResult,
+} from './api/pinApi';
 
 export {
   useGetProdSnapshotQuery,
