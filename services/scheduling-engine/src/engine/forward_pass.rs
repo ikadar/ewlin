@@ -2318,6 +2318,14 @@ fn advance_action_at_tick(
         // phase no longer applies".
         if new_progress >= setup_ticks_f && actions[action_idx].setup_end_tick.is_none() {
             actions[action_idx].setup_end_tick = Some((t + 1) as u32);
+            // Clear magnetism at the setup→run boundary so the next tick
+            // re-elects operators without bias toward the setup_op. This
+            // is what enables setup_op != run_op: the run-phase election
+            // sees a clean preference list, the run-specialist tiebreaker
+            // (P3a) fires, and a roule-only candidate can take over from
+            // a versatile caleur. The setup_op is automatically released
+            // by the grid because it isn't reassigned at the next tick.
+            actions[action_idx].assigned_operators.clear();
         }
     }
 
