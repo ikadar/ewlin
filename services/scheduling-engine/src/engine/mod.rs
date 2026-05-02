@@ -942,6 +942,7 @@ pub fn build_actions(
                     // flag for actions whose conducteur is being borrowed away
                     // and whose calage must be preserved across the gap.
                     preserve_calage_during_gap: false,
+                    borrow_until_tick: None,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

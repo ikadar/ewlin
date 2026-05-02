@@ -262,6 +262,20 @@ impl ScheduleGrid {
         }
     }
 
+    /// Clear an operator's tick-t state entirely (attention reset to 0,
+    /// both station slots cleared). Used by the caleur volant borrow
+    /// machinery (P3b) to "steal" an operator from the run-phase action
+    /// they were initially assigned to. After clearing, a fresh
+    /// `assign_operator` call places them on the borrow target station.
+    /// The borrow source action is expected to have its `borrow_until_tick`
+    /// flagged so peremption is gated while the op is away.
+    pub fn clear_operator_at_tick(&mut self, operator: usize, t: usize) {
+        if t < self.num_ticks && operator < self.num_operators {
+            self.operator_attention[operator * self.num_ticks + t] = 0.0;
+            self.operator_stations[operator * self.num_ticks + t] = [None, None];
+        }
+    }
+
     /// Get remaining attention capacity for an operator at tick t
     pub fn operator_remaining_attention(&self, operator: usize, t: usize) -> f64 {
         if t >= self.num_ticks || operator >= self.num_operators {
