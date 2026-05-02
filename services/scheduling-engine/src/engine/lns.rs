@@ -123,7 +123,6 @@ pub fn lns_improve(
     //     (calage_bonus_sum, calage_bonus_mean, calage_bonus_median),
     //     i.e. at least one strictly higher and none lower.
     let mut best_stats_ref: ScheduleStats = stats.clone();
-    let mut total_iters: u32 = 0;
     let mut iteration = 0;
 
     // Cycle through different destroy sizes
@@ -214,7 +213,6 @@ pub fn lns_improve(
             precedence_min_gap_ticks,
             &mut _lns_warnings,
         );
-        total_iters += new_i;
 
         // Hard reject any FBI result that violates the station-capacity
         // invariant. Single-iteration FBI inside LNS occasionally leaves

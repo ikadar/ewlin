@@ -223,7 +223,7 @@ fn compute_inner(
         let lns_budget = options
             .lns_budget_ms
             .unwrap_or_else(|| 60_000u64.saturating_sub(elapsed_ms).max(5_000));
-        if let Some((lns_a, lns_act, lns_s, lns_i)) = lns::lns_improve(
+        if let Some((lns_a, lns_act, _lns_s, lns_i)) = lns::lns_improve(
             &request.jobs,
             &request.stations,
             &request.operators,
@@ -243,7 +243,8 @@ fn compute_inner(
         ) {
             assignments = lns_a;
             actions = lns_act;
-            stats = lns_s;
+            // stats from LNS is intentionally dropped — it would be shadowed
+            // by recompute_stats_from_assignments(...) further down anyway.
             fbi_iterations += lns_i;
         }
     }
@@ -1258,7 +1259,7 @@ fn recompute_stats_from_assignments(
     assignments: &[ComputedAssignment],
     outsourced_assignments: &[OutsourcedAssignment],
     jobs: &[JobInput],
-    tick_minutes: u32,
+    _tick_minutes: u32,
     start_date: chrono::NaiveDate,
 ) -> ScheduleStats {
     let tier_weights: [f64; 4] = [4.0, 2.0, 1.0, 0.5];

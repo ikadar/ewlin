@@ -3234,7 +3234,7 @@ fn build_operator_assignments(
 
     let mut result: Vec<OperatorAssignment> = Vec::new();
 
-    for (op_idx, mut ticks) in op_ticks {
+    for (op_idx, ticks) in op_ticks {
         // Ticks are already in chronological order (appended by tick_operator_log
         // in the main loop's tick-ascending order). Skip the sort.
         debug_assert!(ticks.windows(2).all(|w| w[0].0 <= w[1].0));
