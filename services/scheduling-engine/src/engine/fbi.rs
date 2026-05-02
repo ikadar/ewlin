@@ -12,7 +12,7 @@ use crate::model::job::JobInput;
 use super::backward_pass::{compute_last_values, BackwardOrdering};
 use super::forward_pass::{
     build_prepared_groups, run_forward_pass, Action, OperatorAvailability, OperatorScheduleData,
-    PreparedConcurrentGroup, StationAttrs,
+    PreparedConcurrentGroup, SkillEntry, StationAttrs,
 };
 use super::grid::ScheduleGrid;
 use super::pre_split::pre_split;
@@ -78,7 +78,7 @@ pub fn run_with_fbi(
         })
         .collect();
 
-    let operator_skills: Vec<Vec<(usize, f64)>> = operators
+    let operator_skills: Vec<Vec<SkillEntry>> = operators
         .iter()
         .map(|op| {
             op.skills
@@ -86,7 +86,11 @@ pub fn run_with_fbi(
                 .filter_map(|skill| {
                     station_id_to_idx
                         .get(&skill.station_id)
-                        .map(|&idx| (idx, skill.proficiency))
+                        .map(|&idx| SkillEntry {
+                            station_idx: idx,
+                            setup_proficiency: skill.setup_proficiency,
+                            run_proficiency: skill.run_proficiency,
+                        })
                 })
                 .collect()
         })

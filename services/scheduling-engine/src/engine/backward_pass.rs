@@ -50,7 +50,7 @@ pub fn compute_last_values(
     stations: &[StationInput],
     operators: &[OperatorInput],
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<crate::engine::forward_pass::SkillEntry>],
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     tick_minutes: u32,
     start_date: NaiveDate,
@@ -425,7 +425,7 @@ fn run_backward_tier(
     actions: &mut Vec<BackwardAction>,
     grid: &mut ScheduleGrid,
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<crate::engine::forward_pass::SkillEntry>],
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
@@ -523,7 +523,7 @@ fn run_backward_edd(
     actions: &mut Vec<BackwardAction>,
     grid: &mut ScheduleGrid,
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<crate::engine::forward_pass::SkillEntry>],
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
@@ -654,7 +654,7 @@ fn place_backward(
     actions: &[BackwardAction],
     grid: &mut ScheduleGrid,
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<crate::engine::forward_pass::SkillEntry>],
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     operator_availability: &OperatorAvailability,
     horizon_ticks: usize,
@@ -753,8 +753,8 @@ fn place_backward(
                 match load[0].or(load[1]) {
                     None => operator_skills[op]
                         .iter()
-                        .find(|(s, _)| *s == station_idx)
-                        .map(|(_, p)| *p)
+                        .find(|s| s.station_idx == station_idx)
+                        .map(|s| s.run_proficiency)
                         .unwrap_or(0.0),
                     Some(other_station) => {
                         let pair = if other_station < station_idx {
@@ -983,7 +983,7 @@ mod tests {
             })
             .collect();
 
-        let operator_skills: Vec<Vec<(usize, f64)>> = vec![alice.clone()]
+        let operator_skills: Vec<Vec<crate::engine::forward_pass::SkillEntry>> = vec![alice.clone()]
             .iter()
             .map(|op| {
                 op.skills
@@ -991,7 +991,11 @@ mod tests {
                     .filter_map(|sk| {
                         station_id_to_idx
                             .get(&sk.station_id)
-                            .map(|&idx| (idx, sk.proficiency))
+                            .map(|&idx| crate::engine::forward_pass::SkillEntry {
+                                station_idx: idx,
+                                setup_proficiency: sk.setup_proficiency,
+                                run_proficiency: sk.run_proficiency,
+                            })
                     })
                     .collect()
             })

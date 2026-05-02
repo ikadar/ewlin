@@ -61,6 +61,51 @@ impl StationAttrs {
     }
 }
 
+/// A station the operator is qualified on, prepared for fast lookup during
+/// scheduling. Carries the asymmetric setup vs run proficiency split so the
+/// engine can pick the right value depending on the phase being scheduled.
+///
+/// 0.0 on either field means the operator cannot perform that phase on this
+/// station — they are excluded from the candidate pool when the engine is
+/// looking for a setup_op (resp. run_op).
+#[derive(Debug, Clone, Copy)]
+pub struct SkillEntry {
+    pub station_idx: usize,
+    pub setup_proficiency: f64,
+    pub run_proficiency: f64,
+}
+
+impl SkillEntry {
+    /// Proficiency for the phase currently being scheduled.
+    #[inline]
+    pub fn proficiency_for(&self, is_setup_phase: bool) -> f64 {
+        if is_setup_phase {
+            self.setup_proficiency
+        } else {
+            self.run_proficiency
+        }
+    }
+
+    /// True when the operator can perform at least one phase on this station.
+    /// Used by sites that don't track the phase explicitly (e.g. some pre-checks).
+    #[inline]
+    pub fn is_qualified_either_phase(&self) -> bool {
+        self.setup_proficiency > 0.0 || self.run_proficiency > 0.0
+    }
+}
+
+impl From<(usize, f64)> for SkillEntry {
+    /// Convenience for tests and migration paths: a single proficiency value
+    /// is mirrored to both setup and run phases.
+    fn from((station_idx, proficiency): (usize, f64)) -> Self {
+        SkillEntry {
+            station_idx,
+            setup_proficiency: proficiency,
+            run_proficiency: proficiency,
+        }
+    }
+}
+
 /// A pair of stations an operator can supervise simultaneously, prepared
 /// for fast lookup during scheduling. station_pair is sorted (min, max).
 /// productivity is aligned: productivity[0] is for station_pair[0],
@@ -109,7 +154,7 @@ impl PreparedConcurrentGroup {
 /// matching the "policy B" relaxation pattern already in place.
 pub fn available_work_window(
     grid: &ScheduleGrid,
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     operator_availability: &OperatorAvailability,
     actions: &[Action],
     scoring_priority: u8,
@@ -149,7 +194,7 @@ pub fn available_work_window(
         let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
             skills
                 .iter()
-                .any(|(s, p)| *s == station_idx && *p > 0.0)
+                .any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
                 && operator_availability.is_available(op, tick)
         });
         if !any_op {
@@ -547,7 +592,7 @@ pub fn find_operators_for_station(
     grid: &ScheduleGrid,
     t: usize,
     station_idx: usize,
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     preferred_operators: &[usize],
@@ -558,8 +603,8 @@ pub fn find_operators_for_station(
         .filter_map(|op| {
             let prof = operator_skills[op]
                 .iter()
-                .find(|(s, _)| *s == station_idx)
-                .map(|(_, p)| *p)?;
+                .find(|s| s.station_idx == station_idx)
+                .map(|s| s.proficiency_for(is_setup_phase))?;
             if prof > 0.0 { Some((op, prof)) } else { None }
         })
         .collect();
@@ -641,9 +686,11 @@ pub fn find_operators_for_station(
 /// Compute the productivity contribution of an operator on a station at a tick.
 ///
 /// - If the operator is on this station alone (load == 1): productivity equals
-///   the operator's proficiency on this station.
+///   the operator's proficiency on this station for the phase being scheduled
+///   (`setup_proficiency` if `is_setup_phase`, `run_proficiency` otherwise).
 /// - If the operator is on this station as part of a known pair: productivity
-///   comes from the matching PreparedConcurrentGroup.
+///   comes from the matching PreparedConcurrentGroup. (Pairing is run-only by
+///   construction — the setup phase always runs solo.)
 /// - Otherwise (operator not on station, or load doesn't match any group):
 ///   returns 0.0.
 pub fn productivity_at_tick(
@@ -652,7 +699,8 @@ pub fn productivity_at_tick(
     t: usize,
     grid: &ScheduleGrid,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
+    is_setup_phase: bool,
 ) -> f64 {
     let load = grid.operator_stations_at(op, t);
     let count = load.iter().filter(|s| s.is_some()).count();
@@ -665,8 +713,8 @@ pub fn productivity_at_tick(
     if count == 1 {
         return operator_skills[op]
             .iter()
-            .find(|(s, _)| *s == station)
-            .map(|(_, p)| *p)
+            .find(|s| s.station_idx == station)
+            .map(|s| s.proficiency_for(is_setup_phase))
             .unwrap_or(0.0);
     }
 
@@ -739,7 +787,7 @@ pub fn run_forward_pass(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     operator_availability: &mut OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     tick_minutes: u32,
@@ -802,9 +850,9 @@ pub fn run_forward_pass(
     // doesn't waste time on the SkipTo dance forever.
     let mut station_has_qualified_op: Vec<bool> = vec![false; station_attrs.len()];
     for skills in operator_skills.iter() {
-        for &(s_idx, prof) in skills.iter() {
-            if prof > 0.0 && s_idx < station_has_qualified_op.len() {
-                station_has_qualified_op[s_idx] = true;
+        for entry in skills.iter() {
+            if entry.is_qualified_either_phase() && entry.station_idx < station_has_qualified_op.len() {
+                station_has_qualified_op[entry.station_idx] = true;
             }
         }
     }
@@ -941,7 +989,7 @@ pub fn run_forward_pass(
                 let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
                     skills
                         .iter()
-                        .any(|(s, p)| *s == station && *p > 0.0)
+                        .any(|s| s.station_idx == station && s.is_qualified_either_phase())
                         && operator_availability.is_available(op, future_t)
                 });
                 if !any_op {
@@ -1853,7 +1901,7 @@ fn assign_action_at_tick(
     action_idx: usize,
     t: usize,
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     operator_availability: &mut OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     station_to_group: &[Option<(usize, u32)>],
@@ -1944,7 +1992,7 @@ fn assign_action_at_tick(
                 let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
                     skills
                         .iter()
-                        .any(|(s, p)| *s == station_idx && *p > 0.0)
+                        .any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
                         && operator_availability.is_available(op, tick)
                 });
                 if !any_op {
@@ -2052,7 +2100,7 @@ fn assign_action_at_tick(
 
         // Skip ahead if NO qualified operator is available at all
         let any_qualified_available = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
-            skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+            skills.iter().any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
                 && operator_availability.is_available(op_idx, t)
         });
         if !any_qualified_available {
@@ -2064,7 +2112,7 @@ fn assign_action_at_tick(
                     operator_availability.extend(grow_ticks);
                 }
                 let any_avail = operator_skills.iter().enumerate().any(|(op_idx, skills)| {
-                    skills.iter().any(|(s_idx, p)| *s_idx == station_idx && *p > 0.0)
+                    skills.iter().any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
                         && operator_availability.is_available(op_idx, skip_to)
                 });
                 if any_avail { break; }
@@ -2144,26 +2192,31 @@ fn advance_action_at_tick(
     t: usize,
     grid: &ScheduleGrid,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     station_attrs: &[StationAttrs],
     operators_this_tick: &[usize],
 ) -> bool {
     let station_idx = actions[action_idx].station_idx;
     let attrs = &station_attrs[station_idx];
 
-    // Raw productivity = sum across operators currently on this station.
-    // For solo: each operator contributes their proficiency. For paired:
-    // each contributes their group's productivity for this station.
-    let raw_productivity: f64 = operators_this_tick
-        .iter()
-        .map(|&op| productivity_at_tick(op, station_idx, t, grid, operator_groups, operator_skills))
-        .sum();
-
-    actions[action_idx].tick_operator_log.push((t, operators_this_tick.to_vec()));
-
     let setup_ticks = actions[action_idx].setup_ticks;
     let setup_ticks_f = setup_ticks as f64;
     let eat_before = actions[action_idx].eat;
+    // Phase is determined by setup_progress relative to setup_ticks; we lift
+    // it before calling productivity_at_tick so each operator contributes
+    // their setup or run proficiency consistently for this tick.
+    let in_setup_phase = actions[action_idx].setup_progress < setup_ticks_f;
+
+    // Raw productivity = sum across operators currently on this station.
+    // For solo: each operator contributes their phase-appropriate proficiency.
+    // For paired: each contributes their group's productivity for this station
+    // (pairing is run-only by construction).
+    let raw_productivity: f64 = operators_this_tick
+        .iter()
+        .map(|&op| productivity_at_tick(op, station_idx, t, grid, operator_groups, operator_skills, in_setup_phase))
+        .sum();
+
+    actions[action_idx].tick_operator_log.push((t, operators_this_tick.to_vec()));
 
     // First productive tick after a pending peremption: record the re-calage
     // window's actual start here, so the segment spans only productive
@@ -2193,8 +2246,7 @@ fn advance_action_at_tick(
     //   One op solo on the same machine → rate = min(1, 2)/2 = 0.5
     //   (run takes 2× longer, which is the correct under-staffing penalty).
     let setup_progress_before = actions[action_idx].setup_progress;
-    let in_setup = setup_progress_before < setup_ticks_f;
-    let effective_rate = if in_setup {
+    let effective_rate = if in_setup_phase {
         let cap = attrs.attention_full.max(f64::MIN_POSITIVE);
         raw_productivity.min(cap) / cap
     } else {
@@ -2217,7 +2269,7 @@ fn advance_action_at_tick(
     // accumulated, in unit terms. Saturate at setup_ticks so an
     // accumulator overshoot at the boundary doesn't bleed into the
     // run-phase counter.
-    if in_setup {
+    if in_setup_phase {
         let new_progress = (setup_progress_before + effective_rate).min(setup_ticks_f);
         actions[action_idx].setup_progress = new_progress;
         // Mark the setup→run boundary the first time we cross it. Use
@@ -2290,7 +2342,7 @@ fn is_window_operator_feasible(
     start: usize,
     end: usize,
     station_idx: usize,
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     operator_availability: &OperatorAvailability,
 ) -> bool {
     for t in start..end {
@@ -2298,7 +2350,7 @@ fn is_window_operator_feasible(
             if !operator_availability.is_available(op, t) { return false; }
             operator_skills[op]
                 .iter()
-                .any(|(s, p)| *s == station_idx && *p > 0.0)
+                .any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
         });
         if !any_op_here { return false; }
     }
@@ -2331,7 +2383,7 @@ fn pre_place_pinned_actions(
     tick_minutes: u32,
     start_date: NaiveDate,
     station_attrs: &[StationAttrs],
-    operator_skills: &[Vec<(usize, f64)>],
+    operator_skills: &[Vec<SkillEntry>],
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     now_tick: usize,
@@ -2476,7 +2528,7 @@ fn pre_place_pinned_actions(
                         _ => break,
                     }
                     let any_op = operator_skills.iter().enumerate().any(|(op, skills)| {
-                        skills.iter().any(|(s, p)| *s == station_idx && *p > 0.0)
+                        skills.iter().any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
                             && operator_availability.is_available(op, tick)
                     });
                     if !any_op {
@@ -2614,7 +2666,7 @@ fn pre_place_pinned_actions(
                 operator_availability.is_available(op, t)
                     && operator_skills[op]
                         .iter()
-                        .any(|&(s, prof)| s == station_idx && prof > 0.0)
+                        .any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
             })
         };
         let mut conflict_with: Option<usize> = None;
@@ -2712,8 +2764,17 @@ fn pre_place_pinned_actions(
                     .filter_map(|(op, skills)| {
                         skills
                             .iter()
-                            .find(|(s, _)| *s == station_idx)
-                            .and_then(|(_, p)| if *p > 0.0 { Some((op, *p)) } else { None })
+                            .find(|s| s.station_idx == station_idx)
+                            .and_then(|s| {
+                                // Sort by run_proficiency (the dominant phase by duration);
+                                // qualification check accepts either phase so a calage-only
+                                // op is still a valid fallback for safety-zone pinned tasks.
+                                if s.is_qualified_either_phase() {
+                                    Some((op, s.run_proficiency.max(s.setup_proficiency)))
+                                } else {
+                                    None
+                                }
+                            })
                     })
                     .collect();
                 fallback.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -3025,6 +3086,18 @@ fn compute_calage_bonus(
     }
 }
 
+/// Test helper: convert a `Vec<Vec<(usize, f64)>>` of (station_idx, proficiency)
+/// tuples into the engine's `Vec<Vec<SkillEntry>>` shape, mirroring the
+/// proficiency value to both setup and run phases. Tests that don't care
+/// about the asymmetry stay terse.
+#[cfg(test)]
+pub fn mk_skills(entries: Vec<Vec<(usize, f64)>>) -> Vec<Vec<SkillEntry>> {
+    entries
+        .into_iter()
+        .map(|row| row.into_iter().map(Into::into).collect())
+        .collect()
+}
+
 #[cfg(test)]
 mod selection_tests {
     use super::*;
@@ -3073,7 +3146,7 @@ mod selection_tests {
         let grid = make_grid(2, 2, 10);
         let avail = always_available(2, 10);
         // Op 0 has skill on station 0, op 1 on station 1.
-        let skills = vec![vec![(0, 1.0)], vec![(1, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0)], vec![(1, 1.0)]]);
         let groups = vec![vec![]; 2];
 
         let result = find_operators_for_station(
@@ -3087,7 +3160,7 @@ mod selection_tests {
         let mut grid = make_grid(2, 1, 10);
         let avail = always_available(1, 10);
         // Single op skilled on both stations, with a group {0, 1}.
-        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0), (1, 1.0)]]);
         let groups = vec![vec![PreparedConcurrentGroup {
             station_pair: [0, 1],
             productivity: [0.85, 0.9],
@@ -3107,7 +3180,7 @@ mod selection_tests {
     fn run_phase_pairs_when_group_matches() {
         let mut grid = make_grid(2, 1, 10);
         let avail = always_available(1, 10);
-        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0), (1, 1.0)]]);
         let groups = vec![vec![PreparedConcurrentGroup {
             station_pair: [0, 1],
             productivity: [0.85, 0.9],
@@ -3125,7 +3198,7 @@ mod selection_tests {
     fn run_phase_does_not_pair_when_group_does_not_match() {
         let mut grid = make_grid(3, 1, 10);
         let avail = always_available(1, 10);
-        let skills = vec![vec![(0, 1.0), (1, 1.0), (2, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0), (1, 1.0), (2, 1.0)]]);
         // Operator can pair {0, 1} but NOT {0, 2}.
         let groups = vec![vec![PreparedConcurrentGroup {
             station_pair: [0, 1],
@@ -3144,7 +3217,7 @@ mod selection_tests {
     fn operator_without_groups_never_pairs() {
         let mut grid = make_grid(2, 1, 10);
         let avail = always_available(1, 10);
-        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0), (1, 1.0)]]);
         let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![]]; // Frédéric: no groups
 
         grid.assign_operator(0, 5, 0, 0.0);
@@ -3160,7 +3233,7 @@ mod selection_tests {
         let mut grid = make_grid(2, 2, 10);
         let avail = always_available(2, 10);
         // Both ops can do both stations; op 0 has the group, op 1 is idle.
-        let skills = vec![vec![(0, 1.0), (1, 1.0)], vec![(0, 1.0), (1, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0), (1, 1.0)], vec![(0, 1.0), (1, 1.0)]]);
         let groups = vec![
             vec![PreparedConcurrentGroup {
                 station_pair: [0, 1],
@@ -3183,19 +3256,19 @@ mod selection_tests {
     #[test]
     fn productivity_solo_uses_proficiency() {
         let mut grid = make_grid(2, 1, 10);
-        let skills = vec![vec![(0, 0.95)]];
+        let skills = mk_skills(vec![vec![(0, 0.95)]]);
         let groups = vec![vec![]];
 
         grid.assign_operator(0, 5, 0, 0.0);
 
-        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills, false);
         assert_eq!(p, 0.95);
     }
 
     #[test]
     fn productivity_paired_uses_group_value() {
         let mut grid = make_grid(2, 1, 10);
-        let skills = vec![vec![(0, 1.0), (1, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0), (1, 1.0)]]);
         let groups = vec![vec![PreparedConcurrentGroup {
             station_pair: [0, 1],
             productivity: [0.85, 0.92],
@@ -3205,22 +3278,22 @@ mod selection_tests {
         grid.assign_operator(0, 5, 1, 0.0);
 
         // On station 0 in this pairing → 0.85
-        let p0 = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        let p0 = productivity_at_tick(0, 0, 5, &grid, &groups, &skills, false);
         assert_eq!(p0, 0.85);
 
         // On station 1 in this pairing → 0.92
-        let p1 = productivity_at_tick(0, 1, 5, &grid, &groups, &skills);
+        let p1 = productivity_at_tick(0, 1, 5, &grid, &groups, &skills, false);
         assert_eq!(p1, 0.92);
     }
 
     #[test]
     fn productivity_for_station_not_assigned_is_zero() {
         let grid = make_grid(2, 1, 10);
-        let skills = vec![vec![(0, 1.0)]];
+        let skills = mk_skills(vec![vec![(0, 1.0)]]);
         let groups = vec![vec![]];
 
         // Op is idle, not on station 0.
-        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills, false);
         assert_eq!(p, 0.0);
     }
 
@@ -3239,7 +3312,7 @@ mod selection_tests {
         let avail = always_available(2, 10);
         // Op 0: prof 1.0 on station 0. Op 1: prof 1.5 on station 0
         // (the "higher proficiency idle op" that would otherwise win).
-        let skills = vec![vec![(0, 1.0)], vec![(0, 1.5)]];
+        let skills = mk_skills(vec![vec![(0, 1.0)], vec![(0, 1.5)]]);
         let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![]];
 
         // Op 0 is preferred (e.g., it was the initial pick at start_t).
@@ -3260,7 +3333,7 @@ mod selection_tests {
     #[test]
     fn productivity_solo_after_fresh_assign_returns_proficiency() {
         let mut grid = make_grid(2, 1, 10);
-        let skills = vec![vec![(0, 0.95)]];
+        let skills = mk_skills(vec![vec![(0, 0.95)]]);
         let groups = vec![vec![]];
 
         // Simulate the algorithm flow: assign_operator then immediately
@@ -3269,7 +3342,7 @@ mod selection_tests {
         let load = grid.operator_load_count(0, 5);
         assert_eq!(load, 1, "load must be 1 after a single assign");
 
-        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills);
+        let p = productivity_at_tick(0, 0, 5, &grid, &groups, &skills, false);
         assert_eq!(p, 0.95, "solo branch must return proficiency");
     }
 
@@ -3278,7 +3351,7 @@ mod selection_tests {
     fn no_preference_picks_highest_proficiency() {
         let grid = make_grid(1, 2, 10);
         let avail = always_available(2, 10);
-        let skills = vec![vec![(0, 1.0)], vec![(0, 1.5)]];
+        let skills = mk_skills(vec![vec![(0, 1.0)], vec![(0, 1.5)]]);
         let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![]];
 
         let result = find_operators_for_station(
@@ -3502,7 +3575,7 @@ mod peremption_tests {
 
         let mut grid = ScheduleGrid::new(1, 1, num_ticks, 15);
         let mut actions = vec![action];
-        let skills = vec![vec![(0usize, 1.0f64)]];
+        let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]);
         let groups = vec![vec![]];
         let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
 
@@ -3610,7 +3683,7 @@ mod peremption_tests {
 
         let mut grid = ScheduleGrid::new(1, 1, num_ticks, 5);
         let mut actions = vec![action];
-        let skills = vec![vec![(0usize, 1.0f64)]];
+        let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]);
         let groups = vec![vec![]];
         let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
 
@@ -3756,7 +3829,7 @@ mod attention_capacity_tests {
         let mut grid = ScheduleGrid::new(1, 2, 30, 5);
         // Two operators with proficiency 1.0 on station 0, no concurrent
         // groups (Hohner is solo-station, not paired with anything).
-        let operator_skills = vec![vec![(0_usize, 1.0)], vec![(0_usize, 1.0)]];
+        let operator_skills = mk_skills(vec![vec![(0_usize, 1.0)], vec![(0_usize, 1.0)]]);
         let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new(), Vec::new()];
 
         let mut actions = vec![make_advance_action(6, 6)];
@@ -3816,7 +3889,7 @@ mod attention_capacity_tests {
     fn fin_with_one_op_takes_90min_under_staffing_penalty() {
         let attrs = vec![hohner_attrs()];
         let mut grid = ScheduleGrid::new(1, 1, 30, 5);
-        let operator_skills = vec![vec![(0_usize, 1.0)]];
+        let operator_skills = mk_skills(vec![vec![(0_usize, 1.0)]]);
         let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new()];
 
         let mut actions = vec![make_advance_action(6, 6)];
@@ -3876,7 +3949,7 @@ mod attention_capacity_tests {
             similarity_score_rules: Vec::new(),
         }];
         let mut grid = ScheduleGrid::new(1, 1, 20, 5);
-        let operator_skills = vec![vec![(0_usize, 1.0)]];
+        let operator_skills = mk_skills(vec![vec![(0_usize, 1.0)]]);
         let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new()];
         let mut actions = vec![make_advance_action(4, 6)];
         for t in 0..15 {
@@ -4231,7 +4304,7 @@ mod safety_zone_chunk_mini_tests {
         let mut actions = vec![action];
         let mut assignments = Vec::new();
         let mut warnings = Vec::new();
-        let skills = vec![vec![(0usize, 1.0f64)]]; // op 0 skilled on station 0
+        let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]); // op 0 skilled on station 0
         let groups = vec![vec![]];
         pre_place_pinned_actions(
             &mut grid,
