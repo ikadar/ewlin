@@ -106,7 +106,10 @@ pub fn compute_last_values(
                 };
 
                 let setup_ticks = minutes_to_ticks(task.setup_minutes, tick_minutes);
-                let run_ticks = minutes_to_ticks(task.run_minutes, tick_minutes);
+                // V2 progress capture : prefer the realistic run when a saisie has produced one.
+                // `effective_run_minutes()` falls back to the JCF planned `run_minutes` otherwise,
+                // so pre-V2 behaviour is preserved.
+                let run_ticks = minutes_to_ticks(task.effective_run_minutes(), tick_minutes);
                 let total_ticks = setup_ticks + run_ticks;
 
                 // Successor gap: if THIS station is a press, add drying time to successor
@@ -915,6 +918,9 @@ mod tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "task-laminate".into(),
@@ -928,6 +934,9 @@ mod tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "task-cut".into(),
@@ -941,6 +950,9 @@ mod tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                 ],
                 spec: None,

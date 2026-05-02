@@ -863,7 +863,10 @@ pub fn build_actions(
                 };
 
                 let setup_ticks = minutes_to_ticks(task.setup_minutes, tick_minutes);
-                let run_ticks = minutes_to_ticks(task.run_minutes, tick_minutes);
+                // V2 progress capture : the operator's realistic pace replaces the
+                // JCF planned run when a saisie has produced one. Calage neutral —
+                // `setup_minutes` is read directly above without any override.
+                let run_ticks = minutes_to_ticks(task.effective_run_minutes(), tick_minutes);
                 let total_ticks = setup_ticks + run_ticks;
 
                 let predecessor_idx = prev_task_id
@@ -1625,6 +1628,9 @@ mod integration_tests {
                     pinned_end_tick: None,
                     outsourced: None,
                     earliest_start_tick: None,
+                    realistic_run_minutes: None,
+                    cumulative_position_pct: None,
+                    slot_volume_pct: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1952,6 +1958,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "task-finish".into(),
@@ -1965,6 +1974,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                 ],
                 spec: None,
@@ -2162,6 +2174,9 @@ mod integration_tests {
                     pinned_end_tick: None,
                     outsourced: None,
                     earliest_start_tick: None,
+                    realistic_run_minutes: None,
+                    cumulative_position_pct: None,
+                    slot_volume_pct: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2222,8 +2237,8 @@ mod integration_tests {
                 id: format!("{id}-elem"),
                 name: None,
                 tasks: vec![
-                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None },
-                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None },
+                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None },
+                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None },
                 ],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2297,6 +2312,9 @@ mod integration_tests {
                     pinned_end_tick: None,
                     outsourced: None,
                     earliest_start_tick: None,
+                    realistic_run_minutes: None,
+                    cumulative_position_pct: None,
+                    slot_volume_pct: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2395,6 +2413,9 @@ mod integration_tests {
                     pinned_end_tick: Some(end),
                     outsourced: None,
                     earliest_start_tick: None,
+                    realistic_run_minutes: None,
+                    cumulative_position_pct: None,
+                    slot_volume_pct: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2517,6 +2538,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "task-ST".into(),
@@ -2530,6 +2554,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: Some(outsourced_params.clone()),
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "task-B".into(),
@@ -2543,6 +2570,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                 ],
                 spec: None,
@@ -2660,6 +2690,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "ST".into(),
@@ -2673,6 +2706,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: Some(outsourced_params.clone()),
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                     TaskInput {
                         id: "B".into(),
@@ -2686,6 +2722,9 @@ mod integration_tests {
                         pinned_end_tick: None,
                         outsourced: None,
                         earliest_start_tick: None,
+                        realistic_run_minutes: None,
+                        cumulative_position_pct: None,
+                        slot_volume_pct: None,
                     },
                 ],
                 spec: None,

@@ -326,6 +326,9 @@ mod tests {
             pinned_end_tick: None,
             outsourced: None,
             earliest_start_tick: None,
+            realistic_run_minutes: None,
+            cumulative_position_pct: None,
+            slot_volume_pct: None,
         }
     }
 
@@ -655,6 +658,9 @@ mod tests {
                 pinned_end_tick: None,
                 outsourced: None,
                 earliest_start_tick: None,
+                realistic_run_minutes: None,
+                cumulative_position_pct: None,
+                slot_volume_pct: None,
             }
         }
 
@@ -671,6 +677,9 @@ mod tests {
                 pinned_end_tick: None,
                 outsourced: None,
                 earliest_start_tick: None,
+                realistic_run_minutes: None,
+                cumulative_position_pct: None,
+                slot_volume_pct: None,
             }
         }
 

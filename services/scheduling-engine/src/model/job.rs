@@ -109,21 +109,27 @@ pub struct TaskInput {
     ///     element of E has batStatus not Ready
     /// In both cases the floor is `Job.batDeadline` converted to tick units.
     /// The engine treats the field neutrally — it doesn't know about BAT.
-    //
-    // V2 progress capture (TODO) — three optional fields are planned here :
-    //   - `realistic_run_minutes: Option<u32>` (operator-derived run)
-    //   - `cumulative_position_pct: Option<f64>` (job-cumulative slot start)
-    //   - `slot_volume_pct: Option<f64>` (slot's share of the job)
-    // They were prototyped in commit 7a495ed-... but reverted because adding
-    // fields to `TaskInput` cascades into ~20 struct literals across the
-    // engine tests that aren't yet using struct-update syntax. The math is
-    // stable in `productivity.rs` ; when the integration lands, plumbing the
-    // fields through is a focused mechanical change, not a design question.
-    // See docs/operator-sandbox/progress-capture-design.md § 4 and
-    // docs/operator-sandbox/progress-capture-impl-plan.md § 4.4 for the
-    // contract.
     #[serde(default)]
     pub earliest_start_tick: Option<usize>,
+    /// V2 progress capture — operator-derived realistic run duration (minutes).
+    /// `Some` when a saisie has produced a productivity ratio for this fragment ;
+    /// the engine should plan with this value instead of `run_minutes`. `None`
+    /// = pre-saisie, fall back to JCF planned run. Setup is unchanged either
+    /// way (calage neutral, see `productivity::ratio_run_only`).
+    #[serde(default)]
+    pub realistic_run_minutes: Option<u32>,
+    /// V2 progress capture — % of the parent job's volume already delivered by
+    /// fragments before this one. Carried through so the FE's VolumeGauge can
+    /// position the active slot on the 100% job scale without re-deriving it.
+    /// Computed by the snapshot builder from the element/task ordering. `None`
+    /// → FE falls back to a sane default.
+    #[serde(default)]
+    pub cumulative_position_pct: Option<f64>,
+    /// V2 progress capture — % of the job's volume that this slot delivers.
+    /// Pairs with `cumulative_position_pct` to fully describe the slot zone in
+    /// the gauge. `None` → FE falls back to a default.
+    #[serde(default)]
+    pub slot_volume_pct: Option<f64>,
 }
 
 /// Provider parameters needed to compute departure & return ticks of a
@@ -161,10 +167,83 @@ impl TaskInput {
         self.setup_minutes + self.run_minutes
     }
 
+    /// V2 progress capture — effective run duration used for scheduling.
+    /// Returns the realistic value when a saisie has produced one (the engine
+    /// should plan with the operator's actual pace) ; otherwise the JCF
+    /// planned `run_minutes`. Setup is always immutable (calage neutral).
+    pub fn effective_run_minutes(&self) -> u32 {
+        self.realistic_run_minutes.unwrap_or(self.run_minutes)
+    }
+
+    /// Theoretical total duration (setup + planned run) — immutable JCF view.
+    /// Use for audit / devis / comparison with the realistic.
+    #[allow(dead_code)]
+    pub fn theoretical_duration_minutes(&self) -> u32 {
+        self.setup_minutes.saturating_add(self.run_minutes)
+    }
+
+    /// Realistic total duration (setup + effective run) — calage neutral.
+    /// Use for live planning, snapshot enrichment, etc.
+    #[allow(dead_code)]
+    pub fn realistic_duration_minutes(&self) -> u32 {
+        self.setup_minutes.saturating_add(self.effective_run_minutes())
+    }
+
     /// True when this task is an outsourced step that must NOT be placed
     /// on a station/operator. The engine treats it as a floor-shifter
     /// (see `OutsourcedParams`) rather than a placeable action.
     pub fn is_outsourced(&self) -> bool {
         self.outsourced.is_some()
+    }
+}
+
+#[cfg(test)]
+mod task_input_v2_helpers_tests {
+    use super::*;
+
+    fn task(setup: u32, run: u32, realistic: Option<u32>) -> TaskInput {
+        TaskInput {
+            id: "t".to_string(),
+            station_id: "s".to_string(),
+            setup_minutes: setup,
+            run_minutes: run,
+            sequence_order: 0,
+            is_pinned: false,
+            pinned_start_tick: None,
+            pinned_end_tick: None,
+            is_frozen_by_safety_zone: false,
+            outsourced: None,
+            earliest_start_tick: None,
+            realistic_run_minutes: realistic,
+            cumulative_position_pct: None,
+            slot_volume_pct: None,
+        }
+    }
+
+    #[test]
+    fn effective_run_falls_back_to_planned_when_realistic_absent() {
+        assert_eq!(task(30, 120, None).effective_run_minutes(), 120);
+    }
+
+    #[test]
+    fn effective_run_uses_realistic_when_present() {
+        assert_eq!(task(30, 120, Some(150)).effective_run_minutes(), 150);
+    }
+
+    #[test]
+    fn theoretical_duration_ignores_realistic_override() {
+        // Theoretical = JCF immutable view, never affected by saisie.
+        assert_eq!(task(30, 120, Some(150)).theoretical_duration_minutes(), 150);
+    }
+
+    #[test]
+    fn realistic_duration_is_setup_plus_effective_run() {
+        assert_eq!(task(30, 120, Some(150)).realistic_duration_minutes(), 180);
+    }
+
+    #[test]
+    fn realistic_equals_theoretical_when_no_saisie() {
+        let t = task(30, 120, None);
+        assert_eq!(t.theoretical_duration_minutes(), t.realistic_duration_minutes());
     }
 }
