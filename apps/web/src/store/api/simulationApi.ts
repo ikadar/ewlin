@@ -55,11 +55,18 @@ export interface ScenarioDiffSummary {
   deleted: number;
 }
 
+export interface ScenarioPinChange {
+  taskId: string;
+  before: { isPinned: boolean; pinnedAt: string | null };
+  after: { isPinned: boolean; pinnedAt: string | null };
+}
+
 export interface ScenarioDiff {
   summary: Record<string, ScenarioDiffSummary>;
   modifications: ScenarioDiffModification[];
   adds: Array<{ table: string; label: string; scenarioRowId: string }>;
   deletes: Array<{ table: string; label: string; preprodRowId: string }>;
+  pinChanges: ScenarioPinChange[];
 }
 
 export interface ScenarioMergeResult {
@@ -67,6 +74,7 @@ export interface ScenarioMergeResult {
   mergedAt: string | null;
   applied: {
     modifiedRows: number;
+    pinsApplied: number;
     skippedAdds: number;
     skippedDeletes: number;
   };

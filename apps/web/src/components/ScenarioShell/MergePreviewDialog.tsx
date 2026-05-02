@@ -4,11 +4,13 @@
  * conflicts (per the user's spec); adds and deletes are reported
  * but skipped in V2.0.
  */
-import { GitMerge, AlertTriangle, Plus, Minus, Edit3 } from 'lucide-react';
+import { GitMerge, AlertTriangle, Plus, Minus, Edit3, Pin } from 'lucide-react';
 import {
   useGetScenarioDiffQuery,
   useMergeScenarioMutation,
 } from '../../store';
+import { useComputeScheduleMutation } from '../../store/api/scheduleApi';
+import { useAutoRecomputeCtx } from '../../contexts/AutoRecomputeContext';
 import { PromotionDwellButton } from '../PromotionModal/PromotionDwellButton';
 import { Modal, ModalHeader, ModalBody, ModalFooter, ModalCancelButton } from '../Modal';
 
@@ -29,10 +31,28 @@ export function MergePreviewDialog({
 }: MergePreviewDialogProps) {
   const { data: diff, isFetching } = useGetScenarioDiffQuery(scenarioId, { skip: !open });
   const [merge, mergeState] = useMergeScenarioMutation();
+  const [computeSchedule] = useComputeScheduleMutation();
+  const { showToast } = useAutoRecomputeCtx();
 
   const handleConfirm = async () => {
     try {
       await merge(scenarioId).unwrap();
+      // After a successful merge, the chef's data has changed (modifications +
+      // pin propagations) so the existing préprod schedule is stale. Kick off
+      // a full recompute against préprod (no scenario header — `computeSchedule`
+      // routes through realBaseQuery which is scoped by URL/headers, and we're
+      // about to navigate away from the fork shell). We don't await it so the
+      // navigation isn't blocked by the compute roundtrip ; the `.catch()`
+      // surfaces compute failures via the toaster so the chef knows the plan
+      // is stale rather than seeing nothing change.
+      computeSchedule({ mode: 'full' })
+        .unwrap()
+        .catch(() => {
+          showToast({
+            type: 'error',
+            title: 'Promotion appliquée, mais le recalcul automatique a échoué — relancez manuellement.',
+          });
+        });
       onMerged();
     } catch {
       // Error stays on screen via mergeState.error
@@ -42,7 +62,8 @@ export function MergePreviewDialog({
   const totalMods = diff?.modifications.length ?? 0;
   const totalAdds = diff?.adds.length ?? 0;
   const totalDeletes = diff?.deletes.length ?? 0;
-  const canMerge = !isFetching && !!diff && totalMods > 0;
+  const totalPinChanges = diff?.pinChanges?.length ?? 0;
+  const canMerge = !isFetching && !!diff && (totalMods > 0 || totalPinChanges > 0);
 
   return (
     <Modal open={open} onClose={onClose} width={680} maxHeight="80vh" testId="merge-preview-dialog">
@@ -54,9 +75,12 @@ export function MergePreviewDialog({
         onClose={onClose}
       />
       <ModalBody scroll gap={13}>
-        {/* Headline counts */}
-        <div className="grid grid-cols-3 gap-[10px]">
+        {/* Headline counts. The 4-tile layout splits structural changes (left)
+            from pin changes (right) so the chef sees at a glance whether the
+            promotion will touch entity columns, pin state, or both. */}
+        <div className="grid grid-cols-4 gap-[10px]">
           <CountTile icon={<Edit3 size={11} />} label="Modifications" value={totalMods} tone="violet" />
+          <CountTile icon={<Pin size={11} />} label="Épinglages" value={totalPinChanges} tone="violet" />
           <CountTile icon={<Plus size={11} />} label="Ajouts (non promus)" value={totalAdds} tone="zinc" />
           <CountTile icon={<Minus size={11} />} label="Suppressions (non promues)" value={totalDeletes} tone="zinc" />
         </div>
@@ -120,7 +144,41 @@ export function MergePreviewDialog({
           </div>
         )}
 
-        {totalMods === 0 && !isFetching && (
+        {/* Pin changes list — pin/unpin operations the chef did in the fork.
+            Surfaced separately so the Détail des modifications above stays
+            focused on entity column changes. */}
+        {totalPinChanges > 0 && diff && (
+          <div>
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">
+              Détail des épinglages
+            </div>
+            <ul className="space-y-1">
+              {diff.pinChanges.slice(0, 30).map((p, idx) => {
+                const action = p.after.isPinned ? 'Épinglée' : 'Désépinglée';
+                const tone = p.after.isPinned ? 'text-emerald-300' : 'text-rose-300';
+                return (
+                  <li
+                    key={p.taskId}
+                    className="px-[10px] py-[6px] rounded-[3px] bg-zinc-900 border border-zinc-800 text-[11px]"
+                    data-testid={`merge-pin-${idx}`}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className={`font-medium ${tone}`}>{action}</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">task {p.taskId.slice(0, 8)}</span>
+                    </div>
+                  </li>
+                );
+              })}
+              {diff.pinChanges.length > 30 && (
+                <li className="px-2 py-1 text-[10px] text-zinc-500 italic">
+                  … et {diff.pinChanges.length - 30} autres épinglages
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {totalMods === 0 && totalPinChanges === 0 && !isFetching && (
           <div className="text-center text-xs text-zinc-500 py-6">
             Aucune modification à promouvoir.
           </div>
@@ -136,7 +194,7 @@ export function MergePreviewDialog({
             La promotion a échoué (peut-être un job/station déjà supprimé en préprod entre-temps).
           </div>
         ) : null}
-        hint="Last-write-wins · pas de fenêtre d'undo · maintenir 1.2 s pour confirmer"
+        hint="Maintenir 1.2 s pour confirmer · last-write-wins, pas d'undo · le planning préprod sera recalculé automatiquement après promotion"
       >
         <ModalCancelButton onClick={onClose}>Annuler</ModalCancelButton>
         <PromotionDwellButton
