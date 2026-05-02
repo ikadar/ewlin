@@ -172,16 +172,72 @@ fn default_role() -> String {
     "operator".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// An operator's skill on a specific station.
+///
+/// `setup_proficiency` and `run_proficiency` are independent values in
+/// `[0.0, 2.0]`. 1.0 = nominal speed, <1.0 = slower, >1.0 = faster, **0.0
+/// = cannot perform that phase** on this station (excluded from candidate
+/// pool by the engine).
+///
+/// The legacy single `proficiency` field is accepted on input for backward
+/// compat with callers that haven't yet split their payload; when missing,
+/// the split fields default to 1.0 individually. When `proficiency` is
+/// present but the split fields are missing, both split fields fall back
+/// to the legacy value (handled by `Deserialize::deserialize`).
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OperatorSkill {
     pub station_id: String,
-    #[serde(default = "default_proficiency")]
+    /// Mirrors `run_proficiency` for any consumer that still reads the
+    /// legacy field. New code should use the split fields.
     pub proficiency: f64,
+    pub setup_proficiency: f64,
+    pub run_proficiency: f64,
 }
 
-fn default_proficiency() -> f64 {
-    1.0
+impl OperatorSkill {
+    /// Construct a skill with the same proficiency value applied to both
+    /// the setup and run phases. Convenient for tests and migration paths
+    /// where the asymmetric values aren't relevant or are equal by design.
+    pub fn uniform(station_id: String, proficiency: f64) -> Self {
+        OperatorSkill {
+            station_id,
+            proficiency,
+            setup_proficiency: proficiency,
+            run_proficiency: proficiency,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OperatorSkill {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Raw {
+            station_id: String,
+            #[serde(default)]
+            proficiency: Option<f64>,
+            #[serde(default)]
+            setup_proficiency: Option<f64>,
+            #[serde(default)]
+            run_proficiency: Option<f64>,
+        }
+
+        let raw = Raw::deserialize(deserializer)?;
+        let legacy = raw.proficiency.unwrap_or(1.0);
+        let setup = raw.setup_proficiency.unwrap_or(legacy);
+        let run = raw.run_proficiency.unwrap_or(legacy);
+        Ok(OperatorSkill {
+            station_id: raw.station_id,
+            // Keep legacy mirroring run for any reader that has not migrated.
+            proficiency: run,
+            setup_proficiency: setup,
+            run_proficiency: run,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

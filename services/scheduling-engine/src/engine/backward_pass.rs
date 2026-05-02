@@ -874,7 +874,7 @@ mod tests {
             schedule_rotation_reference_week: None,
             skills: station_ids
                 .iter()
-                .map(|s| OperatorSkill { station_id: s.to_string(), proficiency: 1.0 })
+                .map(|s| OperatorSkill::uniform(s.to_string(), 1.0))
                 .collect(),
             concurrent_groups: vec![],
             absences: vec![],

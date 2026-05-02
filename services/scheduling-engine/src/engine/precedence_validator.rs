@@ -634,7 +634,7 @@ mod tests {
                 schedule_rotation_reference_week: None,
                 skills: station_ids
                     .iter()
-                    .map(|s| OperatorSkill { station_id: (*s).into(), proficiency: 1.0 })
+                    .map(|s| OperatorSkill::uniform((*s).into(), 1.0))
                     .collect(),
                 concurrent_groups: Vec::<ConcurrentGroupInput>::new(),
                 absences: Vec::new(),
@@ -821,10 +821,7 @@ mod tests {
                 role: "operator".into(),
                 operating_schedules: Some(vec![always_on_schedule()]),
                 schedule_rotation_reference_week: None,
-                skills: vec![OperatorSkill {
-                    station_id: "S1".into(),
-                    proficiency: 1.0,
-                }],
+                skills: vec![OperatorSkill::uniform("S1".into(), 1.0)],
                 concurrent_groups: vec![],
                 absences: vec![crate::model::operator::Absence {
                     start_at: absent_start,

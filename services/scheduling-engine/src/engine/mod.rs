@@ -1554,10 +1554,7 @@ mod integration_tests {
             schedule_rotation_reference_week: None,
             skills: skills
                 .iter()
-                .map(|(s, p)| OperatorSkill {
-                    station_id: s.to_string(),
-                    proficiency: *p,
-                })
+                .map(|(s, p)| OperatorSkill::uniform(s.to_string(), *p))
                 .collect(),
             concurrent_groups: groups,
             absences: Vec::new(),
@@ -1594,10 +1591,7 @@ mod integration_tests {
             schedule_rotation_reference_week: None,
             skills: skills
                 .iter()
-                .map(|(s, p)| OperatorSkill {
-                    station_id: s.to_string(),
-                    proficiency: *p,
-                })
+                .map(|(s, p)| OperatorSkill::uniform(s.to_string(), *p))
                 .collect(),
             concurrent_groups: groups,
             absences: Vec::new(),
