@@ -746,3 +746,139 @@ html.light [data-testid^="task-tile-"][style*="white"] {
 .env-readonly .snowflake-icon {
   display: none !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   V2 progress-capture — saisie indicator + tile-level pulses
+   See docs/operator-sandbox/progress-capture-design.md
+   ───────────────────────────────────────────────────────────────── */
+
+/* Saisie indicator — amber pulse on tile-end state. 1.6s synchronized with the
+   tile's orange pulse so both signals breathe together. */
+@keyframes saisie-pulse-amber {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.30);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.05);
+  }
+}
+.animate-saisie-pulse {
+  animation: saisie-pulse-amber 1.6s ease-in-out infinite;
+}
+
+/* Tile-level hourly pulse — pure opacity oscillation (no color change). The
+   semantic stays carried by the saisie indicator's blue color. */
+@keyframes tile-hourly-opacity {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+.tile-hourly-active {
+  animation: tile-hourly-opacity 1.6s ease-in-out infinite;
+}
+
+/* Tile-level tile-end pulse — toward and from orange. Reserved for the
+   "moment de saisie" state, distinct from any business-state code. */
+@keyframes tile-end-orange {
+  0%, 100% {
+    background-color: var(--tile-end-rest-bg, transparent);
+    border-left-color: var(--tile-end-rest-border, currentColor);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+  }
+  50% {
+    background-color: rgba(249, 115, 22, 0.22);
+    border-left-color: rgb(249, 115, 22);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.32);
+  }
+}
+.tile-end-active {
+  animation: tile-end-orange 1.6s ease-in-out infinite;
+}
+
+/* VolumeGauge — slot context inside ProgressCaptureModal. The bar is the
+   100% scale of the job ; the active slot is isolated as a distinct band. */
+.volume-gauge { margin-top: 4px; }
+.volume-gauge-track {
+  position: relative;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  margin: 26px 0 6px;
+}
+.volume-gauge-slot-zone {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.10);
+  transition: left 220ms ease, width 220ms ease;
+}
+.volume-gauge-slot-zone::before,
+.volume-gauge-slot-zone::after {
+  content: '';
+  position: absolute;
+  top: -3px; bottom: -3px;
+  width: 1.5px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 1px;
+}
+.volume-gauge-slot-zone::before { left: 0; }
+.volume-gauge-slot-zone::after { right: 0; }
+.volume-gauge-slot-fill {
+  position: absolute;
+  top: 1px; bottom: 1px; left: 0;
+  background: rgba(16, 185, 129, 0.55);
+  border-radius: 1px;
+  transition: width 220ms ease;
+}
+.volume-gauge-marker {
+  position: absolute;
+  top: -4px; bottom: -4px;
+  width: 2px;
+  background: rgb(245 245 245);
+  border-radius: 1px;
+  transition: left 220ms ease;
+}
+.volume-gauge-marker-label {
+  position: absolute;
+  bottom: 100%; left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-flux-text-primary);
+  white-space: nowrap;
+  padding: 2px 7px;
+  margin-bottom: 4px;
+  background: var(--color-flux-elevated);
+  border: 1px solid var(--color-flux-border-light);
+  border-radius: 3px;
+  font-weight: 600;
+}
+.volume-gauge-marker-label::after {
+  content: '';
+  position: absolute;
+  top: 100%; left: 50%;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--color-flux-border-light);
+}
+.volume-gauge-endpoints {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--color-flux-text-tertiary);
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.volume-gauge-endpoints strong {
+  color: var(--color-flux-text-secondary);
+}
+.volume-gauge-slot-info {
+  font-size: 10.5px;
+  color: var(--color-flux-text-tertiary);
+  margin-top: 6px;
+}
+.volume-gauge-slot-info strong {
+  color: var(--color-flux-text-secondary);
+  font-weight: 600;
+}
