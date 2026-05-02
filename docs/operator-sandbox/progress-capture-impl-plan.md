@@ -152,11 +152,45 @@ pub fn cumulative_position(plan: &Plan, fragment_id: &str) -> CumulativePosition
 }
 ```
 
-### 4.4 Tests Rust
+### 4.4 Rollup réaliste au niveau Task et Job (cf. doc design § 4)
+
+Les durées réalistes des niveaux supérieurs sont des **rollups dérivés** des fragments. À implémenter dans les méthodes du `Plan` ou du builder de snapshot :
+
+```rust
+// services/scheduling-engine/src/durations.rs
+
+impl Task {
+    pub fn theoretical_duration(&self) -> u32 {
+        self.fragments.iter()
+            .map(|f| f.setup_minutes + f.run_minutes_planned)
+            .sum()
+    }
+
+    pub fn realistic_duration(&self) -> u32 {
+        self.fragments.iter()
+            .map(|f| f.setup_minutes + (f.run_minutes_planned as f64 * f.ratio_run).round() as u32)
+            .sum()
+    }
+}
+
+impl Job {
+    pub fn theoretical_duration(&self) -> u32 {
+        self.tasks.iter().map(|t| t.theoretical_duration()).sum()
+    }
+    pub fn realistic_duration(&self) -> u32 {
+        self.tasks.iter().map(|t| t.realistic_duration()).sum()
+    }
+}
+```
+
+Exposer les deux durées dans le snapshot envoyé au frontend (cf. PHP API § 5.1). Le frontend lit la **réaliste par défaut** sauf cas explicite (audit / devis / comparaison).
+
+### 4.5 Tests Rust
 
 - `tests/productivity_ratio_run_only.rs` — 5 cas : setup=0 / setup_long / retard / avance / new_run<0 (clamp)
 - `tests/feasibility_probe.rs` — closures / capacité saturée / dépendance non résolue
 - `tests/fragments_cumulative.rs` — premier fragment / milieu / dernier / job mono-fragment
+- `tests/durations.rs` — théorique vs réaliste sur task / job, pre-saisie (égales) vs post-saisie (divergence), edge cases (job mono-task, task mono-fragment)
 
 ## 5. Phase 2 — PHP API
 
@@ -450,8 +484,33 @@ Désactiver le flag → comportement actuel restauré sans déploiement (juste c
 - **Nouveau champ** : `Assignment.lastSaisieAt` (nullable timestamp) pour le debounce et la staleness manager-side
 - **Nouvelle table optionnelle** : `SaisieAuditLog` (taskId, operatorId, reportedEndTime, reportedAt, reason)
 - **Champ exposé snapshot** : `Assignment.cumulativePositionPct` (% du job avant ce fragment) pour la jauge
+- **Dual-duration sur Task** (cf. doc design § 4) :
+  - `Task.theoreticalDurationMinutes` (immutable, vient du JCF)
+  - `Task.realisticDurationMinutes` (recalculé à chaque replan : Σ fragments)
+- **Dual-duration sur Job** :
+  - `Job.theoreticalDurationMinutes` (Σ tasks théoriques, immutable)
+  - `Job.realisticDurationMinutes` (Σ tasks réalistes, recalculé)
+- **Dual-duration sur Fragment** : déjà implicite dans le modèle existant
+  (`setupMinutes` + `runMinutes` théoriques venant du JCF, et la durée
+  réaliste calculée comme `setupMinutes + runMinutes × ratio_run`).
+
+Note : les durées réalistes des niveaux supérieurs (Task, Job) peuvent rester
+**dérivées à la volée** depuis les fragments lors du build du snapshot — pas
+besoin de les stocker en DB sauf si la perf l'exige sur des très gros jobs.
 
 Migration Doctrine standard. Pas de migration destructive.
+
+### 8.4 Règle « on utilise toujours la durée réaliste »
+
+Tout point de l'UI ou de l'algo qui consomme une durée doit utiliser la
+**réaliste** par défaut. La théorique reste accessible mais en sous-info.
+
+Lieux à auditer pendant l'implémentation :
+- Tile tooltip (durée principale affichée)
+- JobDetailsPanel (TaskTile, summary)
+- Job summary (admin / chef d'atelier)
+- Engine planning (déjà conforme via `runMinutes × ratio_run` propagé)
+- Reporting / KPIs (devis vs. réalisé : seul cas où la dualité explicite est demandée)
 
 ## 9. Annexes
 

@@ -67,7 +67,53 @@ Each `Enregistrer` triggers a complete replan (3–5 secondes, modale de progres
 
 > **Règle générale** : tout enrobage UX qui prétend visualiser un *écart au plan* dans un système à auto-replan ment, parce que le gap est mathématiquement nul après chaque save.
 
-## 4. Calage vs. roule — décomposition du ratio de productivité
+## 4. Modèle de durée — théorique vs réaliste, à 3 niveaux
+
+Pour soutenir l'auto-replan continu, le système maintient **deux durées en parallèle** à trois niveaux du modèle (fragment, task, job). Cette dualité est l'invariant qui permet de tout reconstituer après chaque saisie.
+
+| Niveau | Durée théorique (immutable) | Durée réaliste (calculée, vivante) |
+|---|---|---|
+| **Fragment** | `setupMinutes + runMinutes` du JCF | `setupMinutes + runMinutes × ratio_run` (cf. § 5) |
+| **Task** (avant fragmentation) | Somme des durées théoriques des fragments | Somme des durées réalistes des fragments |
+| **Job** | Somme des tasks théoriques | Somme des tasks réalistes |
+
+### Règle d'affichage
+
+> **On utilise toujours la durée *réaliste* pour piloter et afficher**, sauf cas explicite où la durée théorique est demandée (audit, comparaison post-mortem, devis).
+
+L'opérateur, le chef d'atelier et l'algo voient la durée réaliste. La théorique reste consultable mais n'est pas l'information dominante. À l'initialisation d'une task (avant toute saisie), réaliste = théorique — donc aucun changement visible.
+
+### Pourquoi cette dualité
+
+1. **Traçabilité** : on garde toujours la trace du contrat initial (JCF) pour audit, devis, comparaison post-mortem (« on avait estimé X, on a fait Y »).
+2. **Stabilité** : la théorique ne bouge jamais ; les ratios qui s'accumulent au fil des saisies n'érodent pas le contrat d'origine.
+3. **Reconstitution** : à n'importe quel instant, on peut recalculer la réaliste depuis la théorique + l'historique des ratios — donc dégradation gracieuse en cas de divergence DB ou bug d'écriture.
+
+### Implications data model
+
+Chaque entité (Fragment / Task / Job) doit exposer **deux champs durée** :
+
+```
+Fragment.theoreticalDurationMinutes  : u32  // immutable, vient du JCF
+Fragment.realisticDurationMinutes    : u32  // calculé : setupMin + runMin × ratio_run
+
+Task.theoreticalDurationMinutes      : u32  // = Σ fragment.theoretical
+Task.realisticDurationMinutes        : u32  // = Σ fragment.realistic — recalculé à chaque replan
+
+Job.theoreticalDurationMinutes       : u32  // = Σ task.theoretical
+Job.realisticDurationMinutes         : u32  // = Σ task.realistic — recalculé à chaque replan
+```
+
+Les deux niveaux supérieurs (Task, Job) sont dérivés des fragments — pas besoin de les stocker en DB s'ils sont calculés à la volée à chaque snapshot. Stocker uniquement si la perf l'exige.
+
+### Implications UI
+
+- **Tile tooltip** : afficher la durée réaliste en avant, théorique discrète si l'écart est notable
+- **JDP** : task summary avec durée réaliste dominante, théorique en sous-info ou tooltip
+- **Modale d'avancement** : déjà conforme — la jauge montre le volume (donc indirectement la productivité réelle), la slot range affiche les heures planifiées (donc la réaliste courante)
+- **Job summary (admin)** : les deux durées affichées côte à côte, avec delta visible en pourcentage
+
+## 5. Calage vs. roule — décomposition du ratio de productivité
 
 Le ratio de productivité s'applique au **roule uniquement**, pas au calage. Le calage est borné par la machine et la matière (durée fixe ou faiblement variable) ; le roule est borné par l'opérateur (durée élastique).
 
@@ -103,7 +149,7 @@ Chaque saisie produit un nouveau ratio à partir de l'observation courante. **Le
 - `setupMinutes = 0` → `ratio_run` dégénère vers `ratio_total` (pas de cas spécial à coder)
 - Calage long + roule court (haut de gamme petit tirage) : la décomposition est critique pour ne pas propager du retard fantôme sur des phases qui ne le subissent pas
 
-## 5. Auto-completion (« no news = good news »)
+## 6. Auto-completion (« no news = good news »)
 
 Pour les tuiles où `scheduledEnd < now` et sans saisie contradictoire :
 
@@ -128,7 +174,7 @@ Le « comme prévu » réfère **au dernier plan en vigueur**, pas au plan d'ori
 
 L'opérateur peut ouvrir une tuile auto-complétée et faire une saisie avec une heure de fin dans le passé (ex. « non en fait j'ai fini à 14h, pas à 12h30 »). Le replan absorbe ce delta rétroactif et propage les conséquences à l'aval (jobs impactés, statistiques mises à jour). La modale telle que définie le permet déjà — l'heure de fin saisie peut être dans le passé sans difficulté.
 
-## 6. Interaction opérateur
+## 7. Interaction opérateur
 
 ### Trois chemins d'ouverture de la modale
 
@@ -140,7 +186,7 @@ La modale peut être déclenchée de trois façons :
 | **Automatique tile-end** | Quand `scheduledEnd` est atteint sur l'horloge | Non-bloquant, dismissable |
 | **Automatique hourly** | Toutes les heures pendant qu'une tuile est in-progress | Non-bloquant, dismissable, debounce 30 min |
 
-Détails sur les triggers automatiques en section 7.
+Détails sur les triggers automatiques en section 8.
 
 ### Manuel : substitution de l'icône checkbox
 
@@ -195,7 +241,7 @@ Le `TileContextMenu` actuel a 6 items dont la majorité ne fait pas sens en mode
 6. Modale de progression replan existante apparaît (3–5 s)
 7. Nouveau planning rendu
 
-## 7. Stratégie de prompts actifs (validée)
+## 8. Stratégie de prompts actifs (validée)
 
 Pour neutraliser le risque de retard silencieux sans tomber dans le forçage, deux triggers automatiques pour ouvrir la modale :
 
@@ -257,7 +303,7 @@ Les deux triggers se manifestent **différemment** selon le mode d'affichage cou
 
 Une variante forçante (15 min + flash rouge + bip) a été envisagée et rejetée. Raisons : UX atelier hostile (mains occupées, focus à préserver), risque de dismiss en masse dégradant la donnée vers du bruit, charge compute replan déraisonnable, impact négatif sur la confiance opérateur. La règle de design correspondante : **aucune UX bloquante ou forçante en mode prod**, sauf urgence sécurité (incident machine, fin de poste).
 
-## 8. Hors scope
+## 9. Hors scope
 
 - Sync bidirectionnelle temps / volume dans la modale (rejeté — l'opérateur pense en temps)
 - Visualisation cascade sur les tuiles voisines (rejeté — replan gère)
@@ -265,7 +311,7 @@ Une variante forçante (15 min + flash rouge + bip) a été envisagée et rejet�
 - Notes / commentaires opérateur lors de la saisie (différé — canal séparé)
 - Visualisation temps réel de la propagation (rejeté — replan absorbe)
 
-## 9. Plan d'implémentation
+## 10. Plan d'implémentation
 
 ### Composants
 
@@ -290,7 +336,7 @@ Une variante forçante (15 min + flash rouge + bip) a été envisagée et rejet�
 - Dans `computeTileState()` : `isCompletedEffective = isCompleted || scheduledEnd < now`
 - Tous les call sites qui lisent `isCompleted` à des fins d'état doivent utiliser la forme dérivée
 
-## 10. Décisions clés en mémoire
+## 11. Décisions clés en mémoire
 
 Pour référence rapide, les décisions structurantes consignées dans la mémoire auto Claude :
 
