@@ -20,6 +20,8 @@ import {
   type ElementBlockingInfo,
 } from '../../utils/stationTileData';
 import { getStationDayScheduleForDate } from '../../utils/stationSchedule';
+import { timeToYPosition } from '../TimelineColumn';
+import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface FocusStationColumnProps {
   station: Station;
@@ -31,6 +33,8 @@ export interface FocusStationColumnProps {
   now: Date;
   visibleDayRange: { start: number; end: number };
   dayCount: number;
+  /** Collapse bands (nights/weekends/closures). Empty array if none. */
+  collapses: readonly Collapse[];
 }
 
 function getStationDaySchedule(station: Station, date: Date): DaySchedule {
@@ -50,6 +54,7 @@ export function FocusStationColumn({
   now,
   visibleDayRange,
   dayCount,
+  collapses,
 }: FocusStationColumnProps) {
   const stationAssignments = useMemo<TaskAssignment[]>(() => {
     const filtered = snapshot.assignments.filter(
@@ -211,7 +216,7 @@ export function FocusStationColumn({
         pixelsPerHour,
         startDate: gridStartDate,
         now,
-        collapses: [],
+        collapses,
       }),
     [
       station.id,
@@ -231,18 +236,34 @@ export function FocusStationColumn({
       pixelsPerHour,
       gridStartDate,
       now,
+      collapses,
     ],
   );
 
+  // Hour grid lines (visible range only). Collapse-aware: skip lines whose
+  // wall-clock hour falls inside a band, then use collapse-aware Y so they
+  // stay aligned with the timeline column when bands swallow night hours.
   const gridLines = useMemo(() => {
     const lines: number[] = [];
-    const startHourIndex = visibleDayRange.start * 24;
-    const endHourIndex = (visibleDayRange.end + 1) * 24;
-    for (let i = startHourIndex; i <= endHourIndex; i++) {
-      lines.push(i * pixelsPerHour);
+    const startDay = visibleDayRange.start;
+    const endDay = visibleDayRange.end;
+    const useCollapse = collapses.length > 0;
+
+    for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
+      for (let h = 0; h < 24; h++) {
+        if (!useCollapse) {
+          lines.push((dayIndex * 24 + h) * pixelsPerHour);
+          continue;
+        }
+        const hourDate = new Date(gridStartDate.getTime() + (dayIndex * 24 + h) * 3_600_000);
+        const ms = hourDate.getTime();
+        const inside = collapses.some((c) => ms > c.from.getTime() && ms < c.to.getTime());
+        if (inside) continue;
+        lines.push(timeToYPosition(hourDate, 0, pixelsPerHour, gridStartDate, collapses));
+      }
     }
     return lines;
-  }, [visibleDayRange, pixelsPerHour]);
+  }, [visibleDayRange, pixelsPerHour, collapses, gridStartDate]);
 
   const unavailabilityOverlays = useMemo(() => {
     const nodes: React.ReactNode[] = [];
@@ -254,6 +275,7 @@ export function FocusStationColumn({
         (s) => s.stationId === station.id && (s.proficiency ?? 0) > 0,
       ),
     );
+    const useCollapse = collapses.length > 0;
     for (let d = startDay; d <= endDay; d++) {
       const currentDate = new Date(gridStartDate.getTime() + d * 24 * 60 * 60 * 1000);
       const baseSchedule = getStationDaySchedule(station, currentDate);
@@ -268,7 +290,11 @@ export function FocusStationColumn({
       const daySchedule = operators.length === 0
         ? withOvertime
         : narrowDayScheduleByQualifiedOperators(withOvertime, qualifiedOps, currentDate);
-      const yOffset = d * 24 * pixelsPerHour;
+      // With collapses, day Y comes from the piecewise mapping — a linear
+      // `d * 24 * pixelsPerHour` would offset overlays under their bands.
+      const yOffset = useCollapse
+        ? timeToYPosition(currentDate, 0, pixelsPerHour, gridStartDate, collapses)
+        : d * 24 * pixelsPerHour;
 
       if (overtimePeriods.length > 0) {
         nodes.push(
@@ -279,6 +305,9 @@ export function FocusStationColumn({
             hoursToDisplay={24}
             pixelsPerHour={pixelsPerHour}
             yOffset={yOffset}
+            collapses={collapses}
+            dayDate={currentDate}
+            gridStartDate={gridStartDate}
           />,
         );
       }
@@ -291,11 +320,14 @@ export function FocusStationColumn({
           hoursToDisplay={24}
           pixelsPerHour={pixelsPerHour}
           yOffset={yOffset}
+          collapses={collapses}
+          dayDate={currentDate}
+          gridStartDate={gridStartDate}
         />,
       );
     }
     return nodes;
-  }, [station, gridStartDate, pixelsPerHour, visibleDayRange, dayCount, snapshot.operators]);
+  }, [station, gridStartDate, pixelsPerHour, visibleDayRange, dayCount, snapshot.operators, collapses]);
 
   return (
     <div

@@ -4,6 +4,7 @@ import { useGetSnapshotQuery, useGetProdSnapshotQuery } from '../store';
 import { useScenarioMode } from '../contexts/ScenarioContext';
 import { TimelineColumn } from '../components/TimelineColumn';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
+import { yPositionToTime } from '../components/DragPreview/snapUtils';
 import { DateStrip } from '../components/DateStrip/DateStrip';
 import {
   FocusTopBar,
@@ -14,6 +15,9 @@ import type { FocusKind, FocusSelectorItem } from '../components/FocusSelector';
 import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
 import { useVirtualScroll } from '../hooks';
+import { computeCollapses } from '../utils/computeCollapses';
+import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
+import { CollapseBand } from '../components/SchedulingGrid/CollapseBand';
 
 const START_HOUR = 0;
 const DAY_COUNT = 365;
@@ -57,19 +61,79 @@ export default function FocusPage({ mode }: FocusPageProps) {
     return d;
   }, []);
 
+  const gridEndDate = useMemo(
+    () => new Date(gridStartDate.getTime() + DAY_COUNT * 24 * 60 * 60 * 1000),
+    [gridStartDate],
+  );
+
+  // Collapse bands — entity-scoped, NOT shop-wide.
+  //
+  // The main planning view intersects every operator's gaps (only folds when
+  // ALL operators are off) because its columns share the same Y axis: a band
+  // that holds for operator A but not B couldn't be drawn coherently across
+  // the row. The focus view has a single column → that constraint disappears
+  // → we can personalize bands to the entity actually displayed.
+  //
+  // - Operator focus: feed `[operator]`. The intersection over a 1-element
+  //   list is just that operator's gaps, so a worker with Tuesdays off gets
+  //   Tuesdays folded — even if other operators work them.
+  //
+  // - Station focus: feed the station's qualified operators (proficiency > 0).
+  //   The fold then represents "no qualified operator can run this station",
+  //   which mirrors `narrowDayScheduleByQualifiedOperators` — the same logic
+  //   that already drives the unavailability hatching on this column. So the
+  //   bands and the hachures speak the same truth: "this station is
+  //   effectively closed".
+  //   Per `feedback_no_station_schedule` (machine dispo = operator dispo) we
+  //   intentionally don't mix in `Station.scheduleExceptions` here.
+  //
+  // Edge case: empty qualified-op list (a station nobody is trained on) →
+  // `computeCollapses([])` returns []. Linear timeline + full-day hachures
+  // signal "nobody can run this", which is what the user should see.
+  const effectiveCollapses = useMemo<readonly Collapse[]>(() => {
+    if (!snapshot || !id) return [];
+    if (mode === 'operator') {
+      const op = snapshot.operators.find((o) => o.id === id);
+      return op ? computeCollapses([op], gridStartDate, gridEndDate) : [];
+    }
+    const station = snapshot.stations.find((s) => s.id === id);
+    if (!station) return [];
+    const qualifiedOps = snapshot.operators.filter((op) =>
+      op.skills?.some((s) => s.stationId === station.id && (s.proficiency ?? 0) > 0),
+    );
+    return computeCollapses(qualifiedOps, gridStartDate, gridEndDate);
+  }, [snapshot, mode, id, gridStartDate, gridEndDate]);
+
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const dayHeightPx = 24 * PIXELS_PER_HOUR;
+
+  // Virtual scroll thinks linearly (`start = floor(scrollTop / dayHeightPx)`).
+  // After collapse, scrollTop is collapse-aware (smaller than linear), so feeding
+  // it raw produces wrong day indices → tiles, gridLines, overlays disappear.
+  // Convert via yPositionToTime → linear equivalent before handing to the hook.
+  const linearScrollTop = useMemo(() => {
+    if (effectiveCollapses.length === 0) return scrollTop;
+    const t = yPositionToTime(scrollTop, START_HOUR, gridStartDate, PIXELS_PER_HOUR, effectiveCollapses);
+    return ((t.getTime() - gridStartDate.getTime()) / 3_600_000) * PIXELS_PER_HOUR;
+  }, [scrollTop, effectiveCollapses, gridStartDate]);
 
   const virtualScroll = useVirtualScroll({
     totalDays: DAY_COUNT,
     bufferDays: 3,
     dayHeightPx,
-    scrollTop,
+    scrollTop: linearScrollTop,
     viewportHeight,
   });
 
-  const totalHeight = virtualScroll.totalHeight;
+  // Collapse-aware total height: each band trades real height for its heightPx.
+  const totalHeight = useMemo(() => {
+    let h = virtualScroll.totalHeight;
+    for (const c of effectiveCollapses) {
+      h -= c.durationHours * PIXELS_PER_HOUR - c.heightPx;
+    }
+    return h;
+  }, [virtualScroll.totalHeight, effectiveCollapses]);
 
   const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
   const [viewportStartHour, setViewportStartHour] = useState<number>(0);
@@ -90,13 +154,19 @@ export default function FocusPage({ mode }: FocusPageProps) {
       const newScrollTop = container.scrollTop;
       setScrollTop(newScrollTop);
       const vh = container.clientHeight;
+
+      // Collapse-aware: the visible Y span covers MORE wall-clock time than
+      // a linear `Y / pixelsPerHour` suggests (a 60px band hides ~10h+).
+      // yPositionToTime resolves piecewise so the focused-date and DateStrip
+      // viewport indicator stay correct when bands consume rendered Y.
       const centerY = newScrollTop + vh / 2;
-      const hoursFromStart = centerY / PIXELS_PER_HOUR;
-      const fd = new Date(gridStartDate);
-      fd.setTime(gridStartDate.getTime() + hoursFromStart * 60 * 60 * 1000);
+      const fd = yPositionToTime(centerY, START_HOUR, gridStartDate, PIXELS_PER_HOUR, effectiveCollapses);
       setFocusedDate(fd);
-      setViewportStartHour(newScrollTop / PIXELS_PER_HOUR);
-      setViewportEndHour((newScrollTop + vh) / PIXELS_PER_HOUR);
+
+      const topTime = yPositionToTime(newScrollTop, START_HOUR, gridStartDate, PIXELS_PER_HOUR, effectiveCollapses);
+      const bottomTime = yPositionToTime(newScrollTop + vh, START_HOUR, gridStartDate, PIXELS_PER_HOUR, effectiveCollapses);
+      setViewportStartHour((topTime.getTime() - gridStartDate.getTime()) / 3_600_000);
+      setViewportEndHour((bottomTime.getTime() - gridStartDate.getTime()) / 3_600_000);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -105,7 +175,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [scrollEl, gridStartDate]);
+  }, [scrollEl, gridStartDate, effectiveCollapses]);
 
   // ResizeObserver keeps viewportHeight in sync when layout shifts without a
   // window resize — otherwise a stale viewport can collapse the virtual range.
@@ -128,9 +198,9 @@ export default function FocusPage({ mode }: FocusPageProps) {
   const scrollToNow = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
-    const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
+    const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, effectiveCollapses);
     container.scrollTo({ top: Math.max(0, y - container.clientHeight / 2), behavior: 'smooth' });
-  }, [gridStartDate]);
+  }, [gridStartDate, effectiveCollapses]);
 
   // Scroll to NOW on mount and on entity change (no animation, immediate).
   //
@@ -147,10 +217,10 @@ export default function FocusPage({ mode }: FocusPageProps) {
     if (!scrollEl) return;
     const container = scrollEl;
     requestAnimationFrame(() => {
-      const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
+      const y = timeToYPosition(new Date(), START_HOUR, PIXELS_PER_HOUR, gridStartDate, effectiveCollapses);
       container.scrollTop = Math.max(0, y - container.clientHeight / 2);
     });
-  }, [scrollEl, gridStartDate, mode, id, hasSnapshot]);
+  }, [scrollEl, gridStartDate, mode, id, hasSnapshot, effectiveCollapses]);
 
   // Home key = scroll to now
   useEffect(() => {
@@ -168,12 +238,14 @@ export default function FocusPage({ mode }: FocusPageProps) {
     (date: Date) => {
       const container = scrollRef.current;
       if (!container) return;
-      const msFromGridStart = date.getTime() - gridStartDate.getTime();
-      const hoursFromStart = msFromGridStart / (1000 * 60 * 60);
-      const y = hoursFromStart * PIXELS_PER_HOUR;
+      // Collapse-aware: a date inside (or after) a folded band must land on
+      // the band's top, not at its raw linear hour offset — otherwise clicking
+      // "Sat" on the DateStrip scrolls into a band that has zero rendered
+      // Y span, leaving the user mid-Friday.
+      const y = timeToYPosition(date, START_HOUR, PIXELS_PER_HOUR, gridStartDate, effectiveCollapses);
       container.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     },
-    [gridStartDate],
+    [gridStartDate, effectiveCollapses],
   );
 
   const operatorItems = useMemo<FocusSelectorItem[]>(() => {
@@ -238,7 +310,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
     );
   }
 
-  const nowY = timeToYPosition(now, START_HOUR, PIXELS_PER_HOUR, gridStartDate, []);
+  const nowY = timeToYPosition(now, START_HOUR, PIXELS_PER_HOUR, gridStartDate, effectiveCollapses);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -268,6 +340,8 @@ export default function FocusPage({ mode }: FocusPageProps) {
                 showNowLine={false}
                 pixelsPerHour={PIXELS_PER_HOUR}
                 visibleDayRange={virtualScroll.visibleRange}
+                gridStartDate={gridStartDate}
+                collapses={effectiveCollapses}
               />
             </div>
             <div className="relative flex-1 min-w-0" style={{ maxWidth: '500px' }}>
@@ -276,6 +350,16 @@ export default function FocusPage({ mode }: FocusPageProps) {
                 style={{ top: `${nowY}px` }}
                 data-testid="focus-now-line"
               />
+              {/* Collapse bands — full-width across the focus column. Rendered
+                  before the now-line/tile layer so the chip sits behind the
+                  red line if they ever overlap. */}
+              {effectiveCollapses.map((c) => (
+                <CollapseBand
+                  key={c.id}
+                  collapse={c}
+                  topPx={timeToYPosition(c.from, START_HOUR, PIXELS_PER_HOUR, gridStartDate, effectiveCollapses)}
+                />
+              ))}
               {mode === 'operator' && selectedOperator && (
                 <FocusOperatorColumn
                   operator={selectedOperator}
@@ -287,6 +371,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   now={now}
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
+                  collapses={effectiveCollapses}
                 />
               )}
               {mode === 'station' && selectedStation && (
@@ -300,6 +385,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   now={now}
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
+                  collapses={effectiveCollapses}
                 />
               )}
             </div>

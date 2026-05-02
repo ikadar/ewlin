@@ -16,6 +16,7 @@ import {
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 import { getProduitLabel } from '../../utils/tileLabelResolver';
+import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface FocusOperatorColumnProps {
   operator: Operator;
@@ -29,6 +30,8 @@ export interface FocusOperatorColumnProps {
   visibleDayRange: { start: number; end: number };
   /** Total number of days rendered in the grid (bounds overlay loop) */
   dayCount: number;
+  /** Collapse bands (nights/weekends/closures). Empty array if none. */
+  collapses: readonly Collapse[];
 }
 
 /**
@@ -44,6 +47,7 @@ export function FocusOperatorColumn({
   now,
   visibleDayRange,
   dayCount,
+  collapses,
 }: FocusOperatorColumnProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(320);
@@ -90,25 +94,47 @@ export function FocusOperatorColumn({
     [snapshot.lateJobs],
   );
 
+  // Hour grid lines (visible range only). Collapse-aware: skip lines whose
+  // wall-clock hour falls inside a band (the band cover hides them) and use
+  // collapse-aware Y for the surviving lines so they line up with the
+  // piecewise-linear timeline column.
   const gridLines = useMemo(() => {
     const lines: number[] = [];
-    const startHourIndex = visibleDayRange.start * 24;
-    const endHourIndex = (visibleDayRange.end + 1) * 24;
-    for (let i = startHourIndex; i <= endHourIndex; i++) {
-      lines.push(i * pixelsPerHour);
+    const startDay = visibleDayRange.start;
+    const endDay = visibleDayRange.end;
+    const useCollapse = collapses.length > 0;
+
+    for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
+      for (let h = 0; h < 24; h++) {
+        if (!useCollapse) {
+          lines.push((dayIndex * 24 + h) * pixelsPerHour);
+          continue;
+        }
+        const hourDate = new Date(gridStartDate.getTime() + (dayIndex * 24 + h) * 3_600_000);
+        const ms = hourDate.getTime();
+        const inside = collapses.some((c) => ms > c.from.getTime() && ms < c.to.getTime());
+        if (inside) continue;
+        lines.push(timeToYPosition(hourDate, 0, pixelsPerHour, gridStartDate, collapses));
+      }
     }
     return lines;
-  }, [visibleDayRange, pixelsPerHour]);
+  }, [visibleDayRange, pixelsPerHour, collapses, gridStartDate]);
 
   const unavailabilityOverlays = useMemo(() => {
     const nodes: React.ReactNode[] = [];
     const startDay = visibleDayRange.start;
     const endDay = Math.min(visibleDayRange.end, dayCount - 1);
+    const useCollapse = collapses.length > 0;
     for (let d = startDay; d <= endDay; d++) {
       const currentDate = new Date(gridStartDate.getTime() + d * 24 * 60 * 60 * 1000);
       const daySchedule = getOperatorDaySchedule(operator, currentDate);
       const overtimePeriods = getOperatorOvertimePeriodsForDay(operator, currentDate);
-      const yOffset = d * 24 * pixelsPerHour;
+      // With collapses, day Y must be derived from the piecewise mapping —
+      // a linear `d * 24 * pixelsPerHour` would land overlays under their
+      // bands (or far below the actual visible day).
+      const yOffset = useCollapse
+        ? timeToYPosition(currentDate, 0, pixelsPerHour, gridStartDate, collapses)
+        : d * 24 * pixelsPerHour;
 
       if (overtimePeriods.length > 0) {
         nodes.push(
@@ -119,6 +145,9 @@ export function FocusOperatorColumn({
             hoursToDisplay={24}
             pixelsPerHour={pixelsPerHour}
             yOffset={yOffset}
+            collapses={collapses}
+            dayDate={currentDate}
+            gridStartDate={gridStartDate}
           />,
         );
       }
@@ -131,11 +160,14 @@ export function FocusOperatorColumn({
           hoursToDisplay={24}
           pixelsPerHour={pixelsPerHour}
           yOffset={yOffset}
+          collapses={collapses}
+          dayDate={currentDate}
+          gridStartDate={gridStartDate}
         />,
       );
     }
     return nodes;
-  }, [operator, gridStartDate, pixelsPerHour, visibleDayRange, dayCount]);
+  }, [operator, gridStartDate, pixelsPerHour, visibleDayRange, dayCount, collapses]);
 
   return (
     <div
@@ -163,8 +195,8 @@ export function FocusOperatorColumn({
         const station = stationMap.get(task.stationId);
         const assignment = operatorAssignments.find((a) => a.id === slice.assignmentId);
 
-        const top = timeToYPosition(slice.from, startHour, pixelsPerHour, gridStartDate, []);
-        const bottom = timeToYPosition(slice.to, startHour, pixelsPerHour, gridStartDate, []);
+        const top = timeToYPosition(slice.from, startHour, pixelsPerHour, gridStartDate, collapses);
+        const bottom = timeToYPosition(slice.to, startHour, pixelsPerHour, gridStartDate, collapses);
         const height = Math.max(bottom - top, 8);
 
         const isLate =
