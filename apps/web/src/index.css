@@ -882,3 +882,115 @@ html.light [data-testid^="task-tile-"][style*="white"] {
   color: var(--color-flux-text-secondary);
   font-weight: 600;
 }
+
+/* ─── ProgressCaptureModal — quick actions + custom stepper + status ─── */
+
+/* Layout en T : "À l'heure" massive on top, 6 adjustments below */
+.pm-quick { display: flex; flex-direction: column; gap: 8px; }
+.pm-adjust-row { display: flex; gap: 6px; }
+
+/* Base button — compact (applied to the 6 adjustment buttons) */
+.pm-quick-btn {
+  padding: 8px 10px;
+  background: rgb(45 45 45);
+  border: 1px solid var(--color-flux-border-light);
+  color: var(--color-flux-text-secondary);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+.pm-quick-btn:hover {
+  background: rgb(60 60 60);
+  color: var(--color-flux-text-primary);
+}
+
+/* "À l'heure" — massive full-width primary action target */
+.pm-quick-btn.is-ontime {
+  width: 100%;
+  flex: none;
+  padding: 16px 20px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid rgba(16, 185, 129, 0.45);
+  color: rgb(167, 243, 208);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 8px;
+}
+.pm-quick-btn.is-ontime:hover { background: rgba(16, 185, 129, 0.22); }
+.pm-quick-btn.is-ontime.is-active {
+  background: rgba(16, 185, 129, 0.32);
+  border-color: rgba(16, 185, 129, 0.70);
+}
+
+/* Adjustment variants — colour appears only when active */
+.pm-quick-btn.is-early.is-active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: rgb(110, 231, 183);
+}
+.pm-quick-btn.is-late.is-active {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.50);
+  color: rgb(252, 211, 77);
+}
+
+/* Custom time stepper — escape hatch for non-preset values */
+.pm-custom {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.pm-custom-label {
+  font-size: 11.5px;
+  color: var(--color-flux-text-tertiary);
+}
+.pm-custom-controls {
+  display: flex; align-items: center; gap: 4px;
+}
+.pm-custom input {
+  width: 5rem;
+  padding: 8px 10px;
+  background: rgb(28 28 30);
+  border: 1px solid var(--color-flux-border-light);
+  color: var(--color-flux-text-primary);
+  border-radius: 4px;
+  text-align: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 120ms;
+}
+.pm-custom input:focus { border-color: rgb(59 130 246); }
+.pm-custom-step {
+  padding: 8px 12px;
+  background: rgb(45 45 45);
+  border: 1px solid var(--color-flux-border-light);
+  color: var(--color-flux-text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+}
+.pm-custom-step:hover {
+  background: rgb(60 60 60);
+  color: var(--color-flux-text-primary);
+}
+
+/* Status line — live feedback under the controls */
+.pm-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+  padding: 9px 11px;
+  border-radius: 4px;
+  transition: background 120ms, color 120ms;
+}
+.pm-status.is-ontime { background: rgba(16, 185, 129, 0.08); color: rgb(110, 231, 183); }
+.pm-status.is-avance { background: rgba(16, 185, 129, 0.06); color: rgb(110, 231, 183); }
+.pm-status.is-retard { background: rgba(245, 158, 11, 0.08); color: rgb(252, 211, 77);  }
