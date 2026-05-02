@@ -111,7 +111,9 @@ export default function FocusPage({ mode }: FocusPageProps) {
 
   // Right-click menu state — bubbled up from FocusOperatorColumn so a
   // single TileContextMenu mounts at page level. The menu's "Définir heure
-  // de début…" item then routes to the SetStartTimeDialog below.
+  // de début…" item routes to the SetStartTimeDialog below ; "Saisir
+  // l'avancement" calls the pre-bound openSaisie closure (only present
+  // when the task has started).
   const [contextMenuState, setContextMenuState] = useState<{
     x: number;
     y: number;
@@ -120,6 +122,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
     currentScheduledStart: string;
     isPinned: boolean;
     isCompleted: boolean;
+    openSaisie?: () => void;
   } | null>(null);
   const [pinDialogState, setPinDialogState] = useState<{
     taskId: string;
@@ -399,6 +402,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
                       currentScheduledStart: p.currentScheduledStart,
                       isPinned: p.isPinned,
                       isCompleted: p.isCompleted,
+                      openSaisie: p.openSaisie,
                     })
                   }
                 />
@@ -422,26 +426,35 @@ export default function FocusPage({ mode }: FocusPageProps) {
         </div>
       </div>
 
-      {/* Right-click context menu (focus subset : "Définir heure de début…"
-          is the V2 affordance ; pin / view-details aren't bound on this
-          surface so the menu shows a single actionable item). */}
-      {contextMenuState && (
-        <TileContextMenu
-          x={contextMenuState.x}
-          y={contextMenuState.y}
-          isPinned={contextMenuState.isPinned}
-          isCompleted={contextMenuState.isCompleted}
-          onDefinirDebut={() => {
-            setPinDialogState({
-              taskId: contextMenuState.taskId,
-              job: contextMenuState.job,
-              currentScheduledStart: contextMenuState.currentScheduledStart,
-            });
-            setContextMenuState(null);
-          }}
-          onClose={() => setContextMenuState(null)}
-        />
-      )}
+      {/* Right-click context menu — focus subset. "Saisir l'avancement"
+          shows only on past-started tasks ; "Définir heure de début…"
+          shows only on future-start tasks. Mutually exclusive in practice. */}
+      {contextMenuState && (() => {
+        const startMs = new Date(contextMenuState.currentScheduledStart).getTime();
+        const hasStarted = startMs <= now.getTime();
+        return (
+          <TileContextMenu
+            x={contextMenuState.x}
+            y={contextMenuState.y}
+            isPinned={contextMenuState.isPinned}
+            isCompleted={contextMenuState.isCompleted}
+            onSaisirAvancement={hasStarted && contextMenuState.openSaisie
+              ? contextMenuState.openSaisie
+              : undefined}
+            onDefinirDebut={!hasStarted
+              ? () => {
+                  setPinDialogState({
+                    taskId: contextMenuState.taskId,
+                    job: contextMenuState.job,
+                    currentScheduledStart: contextMenuState.currentScheduledStart,
+                  });
+                  setContextMenuState(null);
+                }
+              : undefined}
+            onClose={() => setContextMenuState(null)}
+          />
+        );
+      })()}
 
       {/* V2 set-start-time dialog — opened from the menu's "Définir heure
           de début…" item. */}

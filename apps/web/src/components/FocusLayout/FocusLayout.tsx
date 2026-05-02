@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { ScenarioProvider } from '../../contexts/ScenarioContext';
+import { SaisieModalProvider } from '../../contexts/SaisieModalContext';
 import { useMercureSubscription } from '../../hooks/useMercureSubscription';
 
 function FocusLayoutInner() {
@@ -30,7 +31,9 @@ export function FocusLayout() {
   return (
     <ThemeProvider>
       <ScenarioProvider defaultMode="prod">
-        <FocusLayoutInner />
+        <SaisieModalProvider>
+          <FocusLayoutInner />
+        </SaisieModalProvider>
       </ScenarioProvider>
     </ThemeProvider>
   );

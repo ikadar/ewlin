@@ -17,6 +17,7 @@ import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 import { getProduitLabel } from '../../utils/tileLabelResolver';
 import { useProgressTriggers } from '../../hooks/useProgressTriggers';
+import { useSaisieModal } from '../../contexts/SaisieModalContext';
 import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface FocusOperatorColumnProps {
@@ -36,8 +37,10 @@ export interface FocusOperatorColumnProps {
   /**
    * Right-click on any tile bubbles up here so the page (FocusPage) can
    * mount a single TileContextMenu / SetStartTimeDialog instead of N times
-   * across columns. Passes enough context for the page to render the menu
-   * (cursor coords + assignment + job metadata).
+   * across columns. Includes a pre-bound `openSaisie` closure that fires
+   * the saisie modal with the right assignment in scope — FocusPage just
+   * forwards it to the menu's "Saisir l'avancement" item, gated by past-
+   * start (only present when the task has started).
    */
   onTileContextMenu?: (payload: {
     x: number;
@@ -49,6 +52,8 @@ export interface FocusOperatorColumnProps {
     currentScheduledStart: string;
     isPinned: boolean;
     isCompleted: boolean;
+    /** Past-start only ; undefined when the task hasn't started yet. */
+    openSaisie?: () => void;
   }) => void;
 }
 
@@ -113,11 +118,16 @@ export function FocusOperatorColumn({
     [snapshot.lateJobs],
   );
 
-  // Saisie indicator placement — pick ONE slice per assignment to host the
-  // indicator + modal so a chunk-split task never multiplies affordances.
-  // Rule: the slice whose [from, to] contains `now` ; failing that, the
-  // first future slice ; failing that, the last past slice (the task is
-  // already over but the operator may still need to report a late saisie).
+  // Saisie indicator placement — past-started tasks only (rien à reporter
+  // sur du futur). For each task that has started, pick ONE slice to host
+  // the indicator: containing-now → last-past. Chunk-split tasks never
+  // surface multiple indicators.
+  const assignmentById = useMemo(() => {
+    const m = new Map<string, TaskAssignment>();
+    for (const a of operatorAssignments) m.set(a.id, a);
+    return m;
+  }, [operatorAssignments]);
+
   const saisieSliceKeys = useMemo(() => {
     const byAssignment = new Map<string, typeof slices>();
     for (const s of slices) {
@@ -126,20 +136,24 @@ export function FocusOperatorColumn({
       byAssignment.set(s.assignmentId, list);
     }
     const keys = new Set<string>();
-    for (const [, list] of byAssignment) {
-      const sorted = list.slice().sort((a, b) => a.from.getTime() - b.from.getTime());
+    for (const [aId, list] of byAssignment) {
+      const a = assignmentById.get(aId);
+      if (!a) continue;
+      // Gate: the saisie indicator only makes sense once the task has started.
+      if (new Date(a.scheduledStart).getTime() > now.getTime()) continue;
+      const sorted = list.slice().sort((s1, s2) => s1.from.getTime() - s2.from.getTime());
       const containingNow = sorted.find((s) => s.from <= now && now < s.to);
-      const firstFuture = sorted.find((s) => s.from > now);
       const lastPast = sorted[sorted.length - 1];
-      const chosen = containingNow ?? firstFuture ?? lastPast;
+      const chosen = containingNow ?? lastPast;
       if (chosen) {
         keys.add(`${chosen.assignmentId}-${chosen.from.getTime()}`);
       }
     }
     return keys;
-  }, [slices, now]);
+  }, [slices, now, assignmentById]);
 
   const triggers = useProgressTriggers(operatorAssignments, now);
+  const saisieModal = useSaisieModal();
 
   // Hour grid lines (visible range only). Collapse-aware: skip lines whose
   // wall-clock hour falls inside a band (the band cover hides them) and use
@@ -262,6 +276,20 @@ export function FocusOperatorColumn({
 
         const sliceKey = `${slice.assignmentId}-${slice.from.getTime()}`;
         const showSaisieIndicator = saisieSliceKeys.has(sliceKey);
+        const hasStarted = assignment
+          ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
+          : false;
+
+        const handleOpenSaisie = assignment && isInternalTask(task)
+          ? () =>
+              saisieModal.open({
+                assignment,
+                taskDuration: task.duration,
+                job: { reference: job.reference, client: job.client },
+                machineName: station?.name ?? task.stationId,
+                now,
+              })
+          : undefined;
 
         const handleContextMenu = (e: React.MouseEvent) => {
           if (!assignment || !onTileContextMenu) return;
@@ -277,6 +305,7 @@ export function FocusOperatorColumn({
             currentScheduledStart: assignment.scheduledStart,
             isPinned: assignment.isPinned ?? false,
             isCompleted: assignment.isCompleted ?? false,
+            openSaisie: hasStarted ? handleOpenSaisie : undefined,
           });
         };
 
@@ -301,11 +330,7 @@ export function FocusOperatorColumn({
             overrideWidth={overrideWidth}
             showSaisieIndicator={showSaisieIndicator}
             saisieState={triggers[slice.assignmentId] ?? 'inactive'}
-            assignment={assignment}
-            jobHeader={{ reference: job.reference, client: job.client }}
-            taskDuration={isInternalTask(task) ? task.duration : undefined}
-            machineDisplayName={station?.name}
-            now={now}
+            onOpenSaisie={handleOpenSaisie}
             onContextMenu={handleContextMenu}
           />
         );

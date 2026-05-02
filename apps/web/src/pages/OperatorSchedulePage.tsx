@@ -37,6 +37,7 @@ import {
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
 import { useProgressTriggers } from '../hooks/useProgressTriggers';
+import { useSaisieModal } from '../contexts/SaisieModalContext';
 import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
 import { TileContextMenu } from '../components/Tile';
 import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
@@ -835,11 +836,11 @@ export default function OperatorSchedulePage() {
     return map;
   }, [operators, assignmentsByOperator]);
 
-  // V2 saisie indicator placement — for each (operatorId, assignmentId) pair,
-  // pick exactly ONE slice to host the indicator + modal. Rule mirrors
-  // FocusOperatorColumn: containing-now → first-future → last-past. Without
-  // this gate, a chunk-split task would surface multiple indicators in the
-  // same column for the same task.
+  // V2 saisie indicator placement — past-started tasks only. For each
+  // (operatorId, assignmentId) pair whose task has started, pick exactly
+  // ONE slice to host the indicator. Rule mirrors FocusOperatorColumn:
+  // containing-now → last-past. Future tasks don't surface an indicator
+  // (rien à reporter).
   const saisieSliceKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const [opId, slices] of allTileSlices.entries()) {
@@ -849,25 +850,28 @@ export default function OperatorSchedulePage() {
         list.push(s);
         byAssignment.set(s.assignmentId, list);
       }
-      for (const [, list] of byAssignment) {
-        const sorted = list.slice().sort((a, b) => a.from.getTime() - b.from.getTime());
+      for (const [aId, list] of byAssignment) {
+        const a = lensAssignmentMap.get(aId);
+        if (!a) continue;
+        if (new Date(a.scheduledStart).getTime() > now.getTime()) continue;
+        const sorted = list.slice().sort((s1, s2) => s1.from.getTime() - s2.from.getTime());
         const containingNow = sorted.find((s) => s.from <= now && now < s.to);
-        const firstFuture = sorted.find((s) => s.from > now);
         const lastPast = sorted[sorted.length - 1];
-        const chosen = containingNow ?? firstFuture ?? lastPast;
+        const chosen = containingNow ?? lastPast;
         if (chosen) {
           keys.add(`${opId}-${chosen.assignmentId}-${chosen.from.getTime()}`);
         }
       }
     }
     return keys;
-  }, [allTileSlices, now]);
+  }, [allTileSlices, now, lensAssignmentMap]);
 
   const saisieTriggers = useProgressTriggers(snapshot.assignments, now);
+  const saisieModal = useSaisieModal();
 
-  // Right-click opens TileContextMenu (subset of the chef-mode menu :
-  // Épingler / Voir détails / Définir heure de début…). Selecting
-  // "Définir heure de début…" then opens the SetStartTimeDialog.
+  // Right-click opens TileContextMenu. "Saisir l'avancement" shows only
+  // on past-started tasks (the indicator's gate) ; "Définir heure de
+  // début…" shows only on future-start tasks. Mutually exclusive.
   const [contextMenuState, setContextMenuState] = useState<{
     x: number;
     y: number;
@@ -878,6 +882,7 @@ export default function OperatorSchedulePage() {
     currentScheduledStart: string;
     isPinned: boolean;
     isCompleted: boolean;
+    openSaisie?: () => void;
   } | null>(null);
   const [pinDialogState, setPinDialogState] = useState<{
     taskId: string;
@@ -1196,6 +1201,20 @@ export default function OperatorSchedulePage() {
     const showSaisieIndicator = assignment
       ? saisieSliceKeys.has(`${operatorId}-${assignment.id}-${slice.from.getTime()}`)
       : false;
+    const hasStarted = assignment
+      ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
+      : false;
+
+    const handleOpenSaisie = assignment
+      ? () =>
+          saisieModal.open({
+            assignment,
+            taskDuration: task.duration,
+            job: { reference: job.reference, client: job.client },
+            machineName: stationName ?? task.stationId,
+            now,
+          })
+      : undefined;
 
     const handleContextMenu = (e: React.MouseEvent) => {
       if (!assignment) return;
@@ -1211,6 +1230,7 @@ export default function OperatorSchedulePage() {
         currentScheduledStart: assignment.scheduledStart,
         isPinned: assignment.isPinned ?? false,
         isCompleted: assignment.isCompleted ?? false,
+        openSaisie: hasStarted ? handleOpenSaisie : undefined,
       });
     };
 
@@ -1247,11 +1267,7 @@ export default function OperatorSchedulePage() {
         isSelected={selectedJobId === job.id}
         showSaisieIndicator={showSaisieIndicator}
         saisieState={assignment ? (saisieTriggers[assignment.taskId] ?? 'inactive') : 'inactive'}
-        assignment={assignment}
-        jobHeader={{ reference: job.reference, client: job.client }}
-        taskDuration={task.duration}
-        machineDisplayName={stationName}
-        now={now}
+        onOpenSaisie={handleOpenSaisie}
         onContextMenu={handleContextMenu}
         {...positionProps}
       />
@@ -1495,34 +1511,47 @@ export default function OperatorSchedulePage() {
       {/* ---- Shortcut footer ---- */}
       <ShortcutFooter mode={selectedJobId ? 'operatorJobSelected' : 'operatorDefault'} />
 
-      {/* Right-click context menu — operator subset of the chef-mode menu.
-          "Définir heure de début…" routes to the SetStartTimeDialog, which
-          fires the pin mutation ; autoRecomputeMiddleware handles the replan. */}
-      {contextMenuState && (
-        <TileContextMenu
-          x={contextMenuState.x}
-          y={contextMenuState.y}
-          isPinned={contextMenuState.isPinned}
-          isCompleted={contextMenuState.isCompleted}
-          onTogglePin={() => {
-            void handleTogglePin(contextMenuState.assignmentId);
-            setContextMenuState(null);
-          }}
-          onViewDetails={() => {
-            setSelectedJobId(contextMenuState.jobId);
-            setContextMenuState(null);
-          }}
-          onDefinirDebut={() => {
-            setPinDialogState({
-              taskId: contextMenuState.taskId,
-              job: contextMenuState.job,
-              currentScheduledStart: contextMenuState.currentScheduledStart,
-            });
-            setContextMenuState(null);
-          }}
-          onClose={() => setContextMenuState(null)}
-        />
-      )}
+      {/* Right-click context menu — operator subset (Épingler / Voir
+          détails / Saisir l'avancement / Définir heure de début…). Saisie
+          and "Définir heure de début" follow the same gates as the icon :
+          past-start ⇒ saisie, future-start ⇒ Définir heure de début. */}
+      {contextMenuState && (() => {
+        const startMs = new Date(contextMenuState.currentScheduledStart).getTime();
+        const hasStarted = startMs <= now.getTime();
+        return (
+          <TileContextMenu
+            x={contextMenuState.x}
+            y={contextMenuState.y}
+            isPinned={contextMenuState.isPinned}
+            isCompleted={contextMenuState.isCompleted}
+            onTogglePin={() => {
+              void handleTogglePin(contextMenuState.assignmentId);
+              setContextMenuState(null);
+            }}
+            onViewDetails={() => {
+              setSelectedJobId(contextMenuState.jobId);
+              setContextMenuState(null);
+            }}
+            onSaisirAvancement={hasStarted && contextMenuState.openSaisie
+              ? () => {
+                  contextMenuState.openSaisie!();
+                  setContextMenuState(null);
+                }
+              : undefined}
+            onDefinirDebut={!hasStarted
+              ? () => {
+                  setPinDialogState({
+                    taskId: contextMenuState.taskId,
+                    job: contextMenuState.job,
+                    currentScheduledStart: contextMenuState.currentScheduledStart,
+                  });
+                  setContextMenuState(null);
+                }
+              : undefined}
+            onClose={() => setContextMenuState(null)}
+          />
+        );
+      })()}
 
       {/* V2 set-start-time dialog — opened from the menu's "Définir heure de
           début…" item. The dialog fires the pin mutation ;

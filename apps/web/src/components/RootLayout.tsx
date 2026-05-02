@@ -8,6 +8,7 @@ import { useCommands } from './CommandPalette/useCommands';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AutoRecomputeProvider, useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
 import { ScenarioProvider, useScenarioMode, useEnvAwareNavigate } from '../contexts/ScenarioContext';
+import { SaisieModalProvider } from '../contexts/SaisieModalContext';
 import { EnvFloatingControls } from './EnvFloatingControls/EnvFloatingControls';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
@@ -185,7 +186,9 @@ export function RootLayout() {
       <CommandCenterProvider>
         <AutoRecomputeProvider>
           <ScenarioProvider>
-            <RootLayoutInner />
+            <SaisieModalProvider>
+              <RootLayoutInner />
+            </SaisieModalProvider>
           </ScenarioProvider>
         </AutoRecomputeProvider>
       </CommandCenterProvider>

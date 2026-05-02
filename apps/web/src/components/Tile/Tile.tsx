@@ -1,7 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
 import { SaisieIndicator } from './SaisieIndicator';
-import { ProgressCaptureModal } from '../ProgressCaptureModal/ProgressCaptureModal';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { getStateColorClasses, getStateRgb } from './colorUtils';
@@ -12,9 +11,8 @@ import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
 import { useProgressTriggers } from '../../hooks/useProgressTriggers';
-import { useReportSaisieMutation } from '../../store';
+import { useSaisieModal } from '../../contexts/SaisieModalContext';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
-import { isoToMinFromMidnight, applyMinToDate, computeExpectedAtNowPct } from './saisieMath';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
 export interface TileProps {
@@ -93,24 +91,6 @@ export interface TileProps {
   onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
   /** Flat index of this task within its job (0-based, stable across JCF rebuilds). */
   sequenceIndex?: number;
-  /**
-   * V2 — Display name of the machine for the saisie modal header.
-   * Falls back to `task.stationId` if not provided. The parent (StationGrid)
-   * is best placed to look it up since it has the station registry handy.
-   */
-  machineName?: string;
-  /**
-   * V2 — % of the job already delivered by previous fragments. Read from
-   * `assignment.cumulativePositionPct` by default ; this prop overrides
-   * for tests / playgrounds. Falls back to 0 when neither is set.
-   */
-  cumulBeforeSlotPct?: number;
-  /**
-   * V2 — % of the job that this slot delivers. Read from
-   * `assignment.slotVolumePct` by default ; this prop overrides for
-   * tests / playgrounds. Falls back to 100 when neither is set.
-   */
-  slotVolumePct?: number;
 }
 
 /**
@@ -158,19 +138,7 @@ export const Tile = memo(function Tile({
   isFrozenOverridden = false,
   onToggleFrozenOverride,
   sequenceIndex,
-  machineName,
-  cumulBeforeSlotPct: cumulBeforeSlotPctProp,
-  slotVolumePct: slotVolumePctProp,
 }: TileProps) {
-  // V2 progress capture — prefer the snapshot-derived value (computed by
-  // SnapshotBuilder from the parent job's run-volume distribution). Props
-  // remain available so tests / playgrounds can pin specific values.
-  const cumulBeforeSlotPct = cumulBeforeSlotPctProp
-    ?? assignment.cumulativePositionPct
-    ?? 0;
-  const slotVolumePct = slotVolumePctProp
-    ?? assignment.slotVolumePct
-    ?? 100;
   const crosslink = useHoverCrosslink(task.id);
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -183,29 +151,16 @@ export const Tile = memo(function Tile({
   // Progress-capture wiring. useNow ticks every 60 s ; useProgressTriggers
   // is a memoized derivation.
   // ────────────────────────────────────────────────────────────────────────
-  const [pmIsOpen, setPmIsOpen] = useState(false);
   const now = useNow(60_000);
   const singleAssignmentArr = useMemo(() => [assignment], [assignment]);
   const triggers = useProgressTriggers(singleAssignmentArr, now);
   const saisieState = triggers[assignment.taskId] ?? 'inactive';
-  const [reportSaisie] = useReportSaisieMutation();
+  const saisieModal = useSaisieModal();
 
-  const handleSaisieSave = async (estimatedEndMin: number) => {
-    const iso = applyMinToDate(assignment.scheduledStart, estimatedEndMin);
-    await reportSaisie({ taskId: assignment.taskId, estimatedEndTime: iso }).unwrap();
-  };
-
-  const slotStartMin = isoToMinFromMidnight(assignment.scheduledStart);
-  const slotEndMin = isoToMinFromMidnight(assignment.scheduledEnd);
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const expectedAtNowPct = computeExpectedAtNowPct(
-    assignment.scheduledStart,
-    assignment.scheduledEnd,
-    setupMinutes,
-    task.duration.runMinutes ?? 0,
-    now.getTime(),
-    slotVolumePct,
-  );
+  // Gate: the saisie indicator is only meaningful once the task has
+  // started. Future tasks have nothing to report — surfacing the icon
+  // would just add noise.
+  const hasStarted = new Date(assignment.scheduledStart).getTime() <= now.getTime();
 
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;
@@ -421,10 +376,18 @@ export const Tile = memo(function Tile({
           className={`${colorClasses.text} text-[11px] font-medium leading-tight truncate`}
           data-testid="tile-content"
         >
-          {assignment.taskId && (
+          {assignment.taskId && hasStarted && (
             <SaisieIndicator
               state={saisieState}
-              onClick={() => setPmIsOpen(true)}
+              onClick={() =>
+                saisieModal.open({
+                  assignment,
+                  taskDuration: { setupMinutes, runMinutes: task.duration.runMinutes ?? 0 },
+                  job: { reference: job.reference, client: job.client },
+                  machineName: task.stationId,
+                  now,
+                })
+              }
             />
           )}
           <span
@@ -473,20 +436,6 @@ export const Tile = memo(function Tile({
         )}
       </div>
 
-      {/* Progress-capture modal — opens from the SaisieIndicator click. */}
-      <ProgressCaptureModal
-        isOpen={pmIsOpen}
-        onClose={() => setPmIsOpen(false)}
-        onSave={handleSaisieSave}
-        job={{ reference: job.reference, client: job.client }}
-        machineName={machineName ?? task.stationId}
-        slotStartMin={slotStartMin}
-        slotEndMin={slotEndMin}
-        cumulBeforeSlotPct={cumulBeforeSlotPct}
-        slotVolumePct={slotVolumePct}
-        expectedAtNowPct={expectedAtNowPct}
-        nowMin={nowMin}
-      />
     </div>
   );
 }, arePropsEqual);

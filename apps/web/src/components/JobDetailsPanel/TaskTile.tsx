@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
 import { Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
@@ -6,10 +6,8 @@ import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../Flux
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
 import { useProgressTriggers } from '../../hooks/useProgressTriggers';
-import { useReportSaisieMutation } from '../../store';
+import { useSaisieModal } from '../../contexts/SaisieModalContext';
 import { SaisieIndicator } from '../Tile/SaisieIndicator';
-import { ProgressCaptureModal } from '../ProgressCaptureModal/ProgressCaptureModal';
-import { isoToMinFromMidnight, applyMinToDate, computeExpectedAtNowPct } from '../Tile/saisieMath';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -140,10 +138,9 @@ export const TaskTile = memo(function TaskTile({
   // JDP ↔ grid hover crosslink — heartbeat pulse on the paired tile(s)
   const crosslink = useHoverCrosslink(task.id);
 
-  // V2 progress capture wiring — hooks always run (rules-of-hooks). Only
-  // the Internal scheduled branch consumes them ; the modal mounts only
-  // when an assignment is present.
-  const [pmIsOpen, setPmIsOpen] = useState(false);
+  // V2 progress capture — hooks always run (rules-of-hooks). The icon
+  // appears only on past-started internal tasks ; click delegates to the
+  // page-level SaisieModalProvider so a single modal mounts per layout.
   const now = useNow(60_000);
   const assignmentArr = useMemo(
     () => (assignment ? [assignment] : []),
@@ -151,13 +148,9 @@ export const TaskTile = memo(function TaskTile({
   );
   const triggers = useProgressTriggers(assignmentArr, now);
   const saisieState = assignment ? (triggers[assignment.taskId] ?? 'inactive') : 'inactive';
-  const [reportSaisie] = useReportSaisieMutation();
-
-  const handleSaisieSave = async (estimatedEndMin: number) => {
-    if (!assignment) return;
-    const iso = applyMinToDate(assignment.scheduledStart, estimatedEndMin);
-    await reportSaisie({ taskId: assignment.taskId, estimatedEndTime: iso }).unwrap();
-  };
+  const saisieModal = useSaisieModal();
+  const hasStarted = !!assignment
+    && new Date(assignment.scheduledStart).getTime() <= now.getTime();
 
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
@@ -257,25 +250,21 @@ export const TaskTile = memo(function TaskTile({
   // Get display name (station name for internal tasks)
   const displayName = station?.name || 'Unknown';
 
-  // Saisie modal props — derived from the assignment when scheduled.
+  // Saisie modal opener — closes over the current assignment + task. The
+  // SaisieModalProvider (mounted in RootLayout) renders the actual modal.
   // The legacy `onToggleComplete` callback stays on the props for the JDP
   // context-menu path, gated separately at the JobDetailsPanel level.
   const internalTask = task as InternalTask;
-  const slotStartMin = assignment ? isoToMinFromMidnight(assignment.scheduledStart) : 0;
-  const slotEndMin = assignment ? isoToMinFromMidnight(assignment.scheduledEnd) : 0;
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const cumulBeforeSlotPct = assignment?.cumulativePositionPct ?? 0;
-  const slotVolumePct = assignment?.slotVolumePct ?? 100;
-  const expectedAtNowPct = assignment
-    ? computeExpectedAtNowPct(
-        assignment.scheduledStart,
-        assignment.scheduledEnd,
-        internalTask.duration.setupMinutes,
-        internalTask.duration.runMinutes ?? 0,
-        now.getTime(),
-        slotVolumePct,
-      )
-    : 0;
+  const handleOpenSaisie = assignment
+    ? () =>
+        saisieModal.open({
+          assignment,
+          taskDuration: internalTask.duration,
+          job: { reference: job.reference, client: job.client },
+          machineName: station?.name ?? task.stationId ?? 'Atelier',
+          now,
+        })
+    : undefined;
 
   // Pin icon click handler
   const handleTogglePin = (e: React.MouseEvent) => {
@@ -313,7 +302,6 @@ export const TaskTile = memo(function TaskTile({
     };
 
     return (
-      <>
       <button
         type="button"
         className={`border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
@@ -325,10 +313,12 @@ export const TaskTile = memo(function TaskTile({
       >
         <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
           <div className="flex items-center gap-1.5 min-w-0">
-            <SaisieIndicator
-              state={saisieState}
-              onClick={() => setPmIsOpen(true)}
-            />
+            {hasStarted && handleOpenSaisie && (
+              <SaisieIndicator
+                state={saisieState}
+                onClick={handleOpenSaisie}
+              />
+            )}
             <span
               onClick={handleTogglePin}
               className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
@@ -407,20 +397,6 @@ export const TaskTile = memo(function TaskTile({
           </div>
         )}
       </button>
-      <ProgressCaptureModal
-        isOpen={pmIsOpen}
-        onClose={() => setPmIsOpen(false)}
-        onSave={handleSaisieSave}
-        job={{ reference: job.reference, client: job.client }}
-        machineName={station?.name ?? task.stationId ?? 'Atelier'}
-        slotStartMin={slotStartMin}
-        slotEndMin={slotEndMin}
-        cumulBeforeSlotPct={cumulBeforeSlotPct}
-        slotVolumePct={slotVolumePct}
-        expectedAtNowPct={expectedAtNowPct}
-        nowMin={nowMin}
-      />
-      </>
     );
   }
 
