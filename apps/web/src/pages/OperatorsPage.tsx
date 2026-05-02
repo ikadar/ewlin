@@ -1204,6 +1204,38 @@ export default function OperatorsPage() {
     [stations],
   );
 
+  /**
+   * Classify an operator's overall profile from their skill matrix:
+   * - "Roule-only" — every skilled station has setupProficiency=0 (run-only specialist)
+   * - "Caleur-only" — every skilled station has runProficiency=0 (rare; pure setter)
+   * - "Polyvalent" — versatile on at least one station (both phases > 0)
+   * - "Mixte" — mix of run-only and calage-only stations across the matrix
+   * - "—" — no skills
+   *
+   * The "Polyvalent" tag is the one that surfaces caleur volant candidates;
+   * "Roule-only" highlights the operators the engine should keep occupied
+   * continuously per the P3a spécialisation rule.
+   */
+  type OperatorProfile = 'Polyvalent' | 'Roule-only' | 'Caleur-only' | 'Mixte' | '—';
+  const profileForOperator = (op: OperatorResponse): OperatorProfile => {
+    if (op.skills.length === 0) return '—';
+    let hasVersatile = false;
+    let hasRunOnly = false;
+    let hasCalageOnly = false;
+    for (const s of op.skills) {
+      const setup = s.setupProficiency ?? s.proficiency ?? 0;
+      const run = s.runProficiency ?? s.proficiency ?? 0;
+      if (setup > 0 && run > 0) hasVersatile = true;
+      else if (setup === 0 && run > 0) hasRunOnly = true;
+      else if (setup > 0 && run === 0) hasCalageOnly = true;
+    }
+    if (hasVersatile) return 'Polyvalent';
+    if (hasRunOnly && hasCalageOnly) return 'Mixte';
+    if (hasRunOnly) return 'Roule-only';
+    if (hasCalageOnly) return 'Caleur-only';
+    return '—';
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     if (editingOperator || isCreating || deletingOperator) return;
@@ -1400,6 +1432,7 @@ export default function OperatorsPage() {
                     <th className="text-left px-4 py-3 font-medium">Prénom</th>
                     <th className="text-left px-4 py-3 font-medium">Nom</th>
                     <th className="text-left px-4 py-3 font-medium">Fonction</th>
+                    <th className="text-left px-4 py-3 font-medium">Profil</th>
                     <th className="text-left px-4 py-3 font-medium">Compétences</th>
                     <th className="px-4 py-0" />
                   </tr>
@@ -1407,12 +1440,24 @@ export default function OperatorsPage() {
                 <tbody>
                   {filteredOperators.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center text-flux-text-muted py-12">
+                      <td colSpan={6} className="text-center text-flux-text-muted py-12">
                         Aucun opérateur trouvé
                       </td>
                     </tr>
                   )}
-                  {filteredOperators.map((operator) => (
+                  {filteredOperators.map((operator) => {
+                    const profile = profileForOperator(operator);
+                    const profileBadgeClass =
+                      profile === 'Polyvalent'
+                        ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                        : profile === 'Roule-only'
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : profile === 'Caleur-only'
+                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                        : profile === 'Mixte'
+                        ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                        : 'bg-transparent text-flux-text-muted border-transparent';
+                    return (
                     <tr
                       key={operator.id}
                       className="border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9"
@@ -1420,6 +1465,24 @@ export default function OperatorsPage() {
                       <td className="px-4 py-0 text-flux-text-primary font-medium">{operator.firstName}</td>
                       <td className="px-4 py-3 text-flux-text-primary">{operator.lastName}</td>
                       <td className="px-4 py-0 text-flux-text-secondary">{operator.role || <span className="text-flux-text-muted italic">—</span>}</td>
+                      <td className="px-4 py-0">
+                        <span
+                          className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded border ${profileBadgeClass}`}
+                          title={
+                            profile === 'Polyvalent'
+                              ? 'Cale ET roule au moins une station — candidat caleur volant'
+                              : profile === 'Roule-only'
+                              ? 'Sait rouler mais pas caler — à occuper en continu (cible spécialisation algo)'
+                              : profile === 'Caleur-only'
+                              ? 'Sait caler mais pas rouler — purement spécialiste mise en route'
+                              : profile === 'Mixte'
+                              ? 'Différent par station : run-only sur certaines, calage-only sur d’autres'
+                              : 'Aucune compétence saisie'
+                          }
+                        >
+                          {profile}
+                        </span>
+                      </td>
                       <td className="px-4 py-0 text-flux-text-secondary">
                         {operator.skills.length > 0
                           ? operator.skills
@@ -1449,7 +1512,8 @@ export default function OperatorsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
