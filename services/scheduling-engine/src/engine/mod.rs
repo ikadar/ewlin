@@ -943,6 +943,7 @@ pub fn build_actions(
                     // and whose calage must be preserved across the gap.
                     preserve_calage_during_gap: false,
                     borrow_until_tick: None,
+                    borrowed_op_to_restore: None,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
