@@ -390,17 +390,19 @@ export const Tile = memo(function Tile({
               }
             />
           )}
-          <span
-            onClick={handleTogglePin}
-            className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
-              assignment.isPinned
-                ? 'text-amber-500 hover:text-amber-400'
-                : 'text-zinc-700 hover:text-zinc-400'
-            }`}
-            title={assignment.isPinned ? 'Désépingler' : 'Épingler'}
-          >
-            <Pin className="w-3 h-3 shrink-0" />
-          </span>
+          {onTogglePin && (
+            <span
+              onClick={handleTogglePin}
+              className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center align-middle mr-1 pointer-events-auto transition-colors hover:bg-white/5 ${
+                assignment.isPinned
+                  ? 'text-amber-500 hover:text-amber-400'
+                  : 'text-zinc-700 hover:text-zinc-400'
+              }`}
+              title={assignment.isPinned ? 'Désépingler' : 'Épingler'}
+            >
+              <Pin className="w-3 h-3 shrink-0" />
+            </span>
+          )}
           {inSafetyZone && (
             <span
               onClick={handleToggleFrozen}

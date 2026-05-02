@@ -4,6 +4,7 @@ import type { Station, StationCategory } from '@flux/types';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import { OffScreenIndicator } from './OffScreenIndicator';
 import { StationSettingsButton } from './StationSettingsButton';
+import { useScenarioMode } from '../../contexts/ScenarioContext';
 
 export interface OffScreenInfo {
   /** Count of tiles above viewport */
@@ -55,6 +56,7 @@ export function StationHeader({
   category,
 }: StationHeaderProps) {
   const location = useLocation();
+  const { mode } = useScenarioMode();
   // Custom width: explicit DB value takes priority, then category-based default, then CSS w-60.
   const customWidth = category?.columnWidth ?? (category ? getDefaultCategoryWidth(category.name) : null);
 
@@ -82,14 +84,16 @@ export function StationHeader({
           />
         )}
         <StationSettingsButton stationId={station.id} stationLabel={station.name} />
-        <Link
-          to={`/focus/station/${station.id}${location.search}`}
-          aria-label={`Ouvrir la vue focus de ${station.name}`}
-          className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
-          data-testid={`station-header-focus-link-${station.id}`}
-        >
-          <ExternalLink className="w-4 h-4" />
-        </Link>
+        {mode === 'prod' && (
+          <Link
+            to={`/focus/station/${station.id}${location.search}`}
+            aria-label={`Ouvrir la vue focus de ${station.name}`}
+            className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
+            data-testid={`station-header-focus-link-${station.id}`}
+          >
+            <ExternalLink className="w-4 h-4" />
+          </Link>
+        )}
       </div>
     </div>
   );
