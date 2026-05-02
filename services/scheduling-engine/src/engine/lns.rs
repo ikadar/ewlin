@@ -478,7 +478,6 @@ mod tests {
                 .map(|(s, e)| crate::model::schedule::PhaseSegment {
                     start: s.to_string(),
                     end: e.to_string(),
-                    gap_reason: None,
                 })
                 .collect(),
         );

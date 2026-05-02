@@ -698,7 +698,6 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
                     merged_windows.push(crate::model::schedule::PhaseSegment {
                         start: c.scheduled_start.clone(),
                         end: c.scheduled_end.clone(),
-                        gap_reason: None,
                     });
                 }
             }
@@ -941,7 +940,6 @@ pub fn build_actions(
                     // Default false until P3b (caleur volant emprunts) lifts the
                     // flag for actions whose conducteur is being borrowed away
                     // and whose calage must be preserved across the gap.
-                    preserve_calage_during_gap: false,
                     borrow_until_tick: None,
                     borrowed_op_to_restore: None,
                 });

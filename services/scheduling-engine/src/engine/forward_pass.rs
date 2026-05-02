@@ -382,19 +382,12 @@ pub struct Action {
     /// payload is done in a second pass over the input `jobs` so trailing
     /// ST steps (no internal successor) are also covered.
     pub outsourced_predecessor_chain: Vec<crate::model::job::OutsourcedParams>,
-    /// When true, transparent operator absences (gap typed `OperatorAbsentManaged`)
-    /// do NOT accumulate `idle_ticks` toward the peremption threshold — the
-    /// calage is preserved across the gap. Default `false` keeps the engine's
-    /// historical behaviour (any operator absence eventually fires peremption).
-    /// Set to `true` for actions that are deliberately interrupted by the
-    /// caleur volant pattern (P3b) or any future pause-managed scenario.
-    pub preserve_calage_during_gap: bool,
     /// Latest tick (exclusive) up to which this action's stall is justified
     /// by an operator borrow (the conducteur is calage-volant on another
     /// station). When `Some(t_end)` and current tick < `t_end`, peremption
-    /// is gated even if `preserve_calage_during_gap` is false — the borrow
-    /// is the explicit reason for the gap, automatically cleared once the
-    /// borrow expires so a long unrelated stall would still hit peremption.
+    /// is gated — the calage is preserved across the deliberate absence.
+    /// Self-clears once the borrow expires so a long unrelated stall after
+    /// the borrow still hits peremption.
     pub borrow_until_tick: Option<u32>,
     /// Operator that was removed from `assigned_operators` to honour a borrow.
     /// Used to restore magnetism continuity once the borrow ends, so the
@@ -2008,19 +2001,10 @@ pub fn apply_peremption_rule(
     peremption_ticks: u32,
     current_tick: u32,
 ) -> bool {
-    // Pause-managed actions opt out of peremption: their gaps are tracked
-    // explicitly by the engine (e.g. caleur volant emprunts) and the calage
-    // is preserved across the absence by construction. Without this gate,
-    // any deliberate operator absence would invalidate the calage at the
-    // peremption threshold and force a recalage, defeating the purpose of
-    // the borrow. Two opt-out paths:
-    //   - `preserve_calage_during_gap=true` : long-lived flag (rarely used).
-    //   - `borrow_until_tick=Some(t_end)`  : window flag set by the borrow
-    //     site itself (P3b). Self-clearing once the borrow expires so an
-    //     unrelated long stall after the borrow ends still hits peremption.
-    if a.preserve_calage_during_gap {
-        return false;
-    }
+    // Caleur-volant borrows opt out of peremption while the borrow is in
+    // flight: the calage is preserved across the deliberate operator
+    // absence by construction. Self-clearing once the borrow expires so
+    // an unrelated long stall afterward still hits peremption.
     if let Some(t_end) = a.borrow_until_tick {
         if current_tick < t_end {
             return false;
@@ -3119,10 +3103,6 @@ fn build_assignment_for(
         .map(|&(s, e)| crate::model::schedule::PhaseSegment {
             start: super::format_minutes(s as u64 * tick_minutes as u64, start_date),
             end: super::format_minutes(e as u64 * tick_minutes as u64, start_date),
-            // Recalage segments mark active re-setup work — not a gap. The
-            // GapType::RecalageForced classification applies to the *gap*
-            // that triggered the recalage, not the recalage span itself.
-            gap_reason: None,
         })
         .collect();
 
@@ -3210,11 +3190,6 @@ fn derive_active_windows_from_log(
                 // wall-clock end of a productive run is therefore at
                 // (run_end + 1) × tick_minutes.
                 end: super::format_minutes((e as u64 + 1) * tick_minutes as u64, start_date),
-                // Active windows are productive spans by definition — the
-                // gap_reason field is reserved for the inactive intervals
-                // between them, which today the engine does not emit
-                // explicitly (the UI infers them from start/end deltas).
-                gap_reason: None,
             })
             .collect(),
     )
@@ -3659,7 +3634,6 @@ mod peremption_tests {
             setup_progress: 0.0,
             setup_end_tick: None,
             outsourced_predecessor_chain: Vec::new(),
-            preserve_calage_during_gap: false,
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
         }
@@ -4068,7 +4042,6 @@ mod attention_capacity_tests {
             setup_progress: 0.0,
             setup_end_tick: None,
             outsourced_predecessor_chain: Vec::new(),
-            preserve_calage_during_gap: false,
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
         }
@@ -4516,7 +4489,6 @@ mod safety_zone_chunk_mini_tests {
             setup_progress: 0.0,
             setup_end_tick: None,
             outsourced_predecessor_chain: Vec::new(),
-            preserve_calage_during_gap: false,
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
         }
