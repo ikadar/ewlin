@@ -618,7 +618,29 @@ pub fn find_operators_for_station(
 
     let is_pref = |op_idx: usize| preferred_operators.contains(&op_idx);
 
-    // Priority A — idle solo. Sort by preferred → proficiency desc.
+    // Run-phase specialization rule: when picking a run operator, prefer ops
+    // who can ONLY run on this station (setup_proficiency == 0) over versatile
+    // ops who could also be used for calage. This frees the versatiles to
+    // serve as caleurs volants on stations that need a setup. The check is
+    // a tiebreaker between candidates of equal magnetism preference, sorted
+    // before the proficiency tiebreaker so the rule fires meaningfully when
+    // proficiencies are similar (the common case after the P1 split where
+    // most ops keep setup == run = legacy proficiency).
+    //
+    // Setup phase is unaffected — there's nothing to specialize for, since
+    // run-only ops are already excluded by the qualification filter above.
+    let is_run_specialist = |op_idx: usize| -> bool {
+        if is_setup_phase {
+            return false;
+        }
+        operator_skills[op_idx]
+            .iter()
+            .find(|s| s.station_idx == station_idx)
+            .map(|s| s.setup_proficiency == 0.0 && s.run_proficiency > 0.0)
+            .unwrap_or(false)
+    };
+
+    // Priority A — idle solo. Sort by preferred → run-specialist → proficiency desc.
     let mut idle_candidates: Vec<(usize, f64)> = qualified_ops
         .iter()
         .copied()
@@ -628,6 +650,7 @@ pub fn find_operators_for_station(
     idle_candidates.sort_by(|a, b| {
         is_pref(b.0)
             .cmp(&is_pref(a.0))
+            .then_with(|| is_run_specialist(b.0).cmp(&is_run_specialist(a.0)))
             .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
     });
 
