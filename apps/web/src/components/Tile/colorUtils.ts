@@ -19,13 +19,10 @@ export interface ColorClasses {
 }
 
 /**
- * V2 progress-capture — derived completion. A tile whose `scheduledEnd` is past
- * `now` is considered completed even without the explicit `isCompleted` flag,
- * per the "no-news = good-news" rule (cf. project_progress_capture_modal memory
- * + docs/operator-sandbox/progress-capture-design.md § 6).
- *
- * The derivation is only meaningful when FEATURE_PROGRESS_CAPTURE_V2 is on ;
- * the helper is callsite-agnostic so it can be used from Tile, JDP, etc.
+ * Derived completion. A tile whose `scheduledEnd` is past `now` is considered
+ * completed even without the explicit `isCompleted` flag, per the
+ * "no-news = good-news" rule (cf. progress-capture-design.md § 6).
+ * Callsite-agnostic so it can be used from Tile, JDP, etc.
  */
 export function isCompletedEffective(
   isCompleted: boolean,
