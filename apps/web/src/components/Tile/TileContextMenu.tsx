@@ -283,7 +283,7 @@ export function TileContextMenu({
           testId="context-menu-recall"
         />
       )}
-      <Separator />
+      {((onSplit && !isCompleted) || (isSplit && onFuse)) && <Separator />}
       {onSplit && !isCompleted && (
         <MenuItem
           icon={<Scissors className="w-4 h-4" />}
