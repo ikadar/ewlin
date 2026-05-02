@@ -1,7 +1,6 @@
 /**
  * Tests for SaisieIndicator — the V2 progress-capture indicator on tiles.
  *
- * Mirrors the testing conventions used in CompletionToggleIcon.test.tsx:
  *   - mock useScenarioMode to drive prod / preprod gating
  *   - assert visibility via testid
  *   - assert state transitions via data-saisie-state attribute
@@ -33,7 +32,7 @@ describe('SaisieIndicator', () => {
     setMode.mockClear();
   });
 
-  it('renders nothing in préprod (icon hidden entirely, mirrors CompletionToggleIcon)', () => {
+  it('renders nothing in préprod (icon hidden entirely)', () => {
     currentMode = 'preprod';
     renderIndicator({ state: 'inactive', onClick: () => {} });
     expect(screen.queryByTestId('tile-saisie-indicator')).toBeNull();

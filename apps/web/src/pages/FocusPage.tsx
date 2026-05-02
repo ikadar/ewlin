@@ -207,11 +207,9 @@ export default function FocusPage({ mode }: FocusPageProps) {
   // The dependency intentionally watches `!!snapshot` rather than the
   // snapshot object reference: we only need to know when the data first
   // arrives (so the scroll target's height has been computed). Watching
-  // the reference itself caused every refetch — including the one fired
-  // by ticking a CompletionToggleIcon — to re-anchor the scroll on NOW,
-  // jumping the operator back to the current time mid-task. The toggle
-  // mutation invalidates the Snapshot tag, which produces a new snapshot
-  // reference even when the visible layout is unchanged.
+  // the reference itself caused every refetch (including snapshot
+  // invalidations triggered by tile mutations) to re-anchor the scroll
+  // on NOW, jumping the operator back to the current time mid-task.
   const hasSnapshot = !!snapshot;
   useEffect(() => {
     if (!scrollEl) return;

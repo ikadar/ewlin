@@ -23,8 +23,8 @@ function FocusLayoutInner() {
  *
  * ScenarioProvider is mounted here (mirroring RootLayout) so any tile
  * inside /focus/* can call `useScenarioMode()` — notably the
- * CompletionToggleIcon embedded in TileSegment, which the operator uses
- * to mark execution truth from the focus view.
+ * SaisieIndicator embedded in TileSegment, which the operator uses
+ * to report execution truth from the focus view.
  */
 export function FocusLayout() {
   return (

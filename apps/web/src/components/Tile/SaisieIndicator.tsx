@@ -1,12 +1,12 @@
 /**
- * Saisie indicator on a tile. Replaces CompletionToggleIcon (V2 progress
- * capture refactor — see docs/operator-sandbox/progress-capture-design.md).
+ * Saisie indicator on a tile (V2 progress capture — see
+ * docs/operator-sandbox/progress-capture-design.md).
  *
- * The completion is now derived (`scheduledEnd < now`); explicit progress
- * reporting goes through the ProgressCaptureModal opened from this indicator.
+ * Completion is derived (`scheduledEnd < now`); explicit progress reporting
+ * goes through the ProgressCaptureModal opened from this indicator.
  *
- * Visibility rule (mirrors CompletionToggleIcon): only visible in prod mode.
- * Préprod stays read-only — operators cannot create a saisie there.
+ * Visibility rule: only visible in prod mode. Préprod stays read-only —
+ * operators cannot create a saisie there.
  *
  * Three visual states (set by the parent via useProgressTriggers):
  *   - 'inactive'  : neutral grey ring at low opacity. Cliquable à tout moment
