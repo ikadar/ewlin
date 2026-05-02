@@ -220,13 +220,50 @@ pub struct ComputedAssignment {
 }
 
 /// A generic phase window within an assignment, used today for re-calage
-/// events. Timestamps are RFC 3339 strings aligned with scheduled_start /
-/// scheduled_end.
+/// events and active-window decomposition. Timestamps are RFC 3339 strings
+/// aligned with scheduled_start / scheduled_end.
+///
+/// `gap_reason` is `None` for an active span (work happening). `Some(...)`
+/// flags an inactive span with the reason it was inserted — used by the UI
+/// to differentiate transparent operator pauses (e.g. caleur volant lent
+/// out) from ordinary closures or recalage-driven discontinuities.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PhaseSegment {
     pub start: String,
     pub end: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gap_reason: Option<GapType>,
+}
+
+impl PhaseSegment {
+    /// Convenience constructor for an active span (no gap reason).
+    pub fn active(start: String, end: String) -> Self {
+        Self { start, end, gap_reason: None }
+    }
+}
+
+/// The reason a span between two productive phases is inactive.
+///
+/// - `Closure` — outside business hours / scheduled shop closure. Calage
+///   degrades naturally; péremption applies.
+/// - `OperatorAbsentManaged` — operator deliberately released by the engine
+///   (e.g. borrowed by the caleur volant pattern); calage is preserved on
+///   the home station, péremption SHOULD NOT fire as long as the gap stays
+///   within the engine's planned bounds.
+/// - `OperatorAbsentUnmanaged` — unplanned absence (op not back when
+///   expected, conflict with another action). Treated like a stall:
+///   péremption applies normally.
+/// - `RecalageForced` — péremption already fired and a recalage was
+///   inserted. The new active span starts a fresh calage chunk subject to
+///   chunk_mini.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GapType {
+    Closure,
+    OperatorAbsentManaged,
+    OperatorAbsentUnmanaged,
+    RecalageForced,
 }
 
 fn default_productivity() -> f64 {

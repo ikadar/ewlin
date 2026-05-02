@@ -698,6 +698,7 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
                     merged_windows.push(crate::model::schedule::PhaseSegment {
                         start: c.scheduled_start.clone(),
                         end: c.scheduled_end.clone(),
+                        gap_reason: None,
                     });
                 }
             }
@@ -937,6 +938,10 @@ pub fn build_actions(
                     setup_progress: 0.0,
                     setup_end_tick: None,
                     outsourced_predecessor_chain: std::mem::take(&mut pending_outsourced_chain),
+                    // Default false until P3b (caleur volant emprunts) lifts the
+                    // flag for actions whose conducteur is being borrowed away
+                    // and whose calage must be preserved across the gap.
+                    preserve_calage_during_gap: false,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);

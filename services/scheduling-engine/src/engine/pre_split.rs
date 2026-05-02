@@ -167,6 +167,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 setup_progress: 0.0,
                 setup_end_tick: None,
                 outsourced_predecessor_chain,
+                preserve_calage_during_gap: action.preserve_calage_during_gap,
             });
 
             prev_chunk_idx = Some(idx);
@@ -255,6 +256,7 @@ mod tests {
             setup_progress: 0.0,
             setup_end_tick: None,
             outsourced_predecessor_chain: Vec::new(),
+            preserve_calage_during_gap: false,
         }
     }
 
@@ -409,5 +411,6 @@ pub fn clone_action(a: &Action) -> Action {
         setup_progress: a.setup_progress,
         setup_end_tick: a.setup_end_tick,
         outsourced_predecessor_chain: a.outsourced_predecessor_chain.clone(),
+        preserve_calage_during_gap: a.preserve_calage_during_gap,
     }
 }
