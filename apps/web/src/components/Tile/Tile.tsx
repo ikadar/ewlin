@@ -14,6 +14,7 @@ import { useNow } from '../../hooks/useNow';
 import { useProgressTriggers } from '../../hooks/useProgressTriggers';
 import { useReportSaisieMutation } from '../../store';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
+import { isoToMinFromMidnight, applyMinToDate, computeExpectedAtNowPct } from './saisieMath';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
 export interface TileProps {
@@ -110,46 +111,6 @@ export interface TileProps {
    * tests / playgrounds. Falls back to 100 when neither is set.
    */
   slotVolumePct?: number;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Time helpers — V2 progress capture (used for the saisie modal). Local to
-// Tile because they're tightly coupled to the assignment's scheduledStart/End.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function isoToMinFromMidnight(iso: string): number {
-  const d = new Date(iso);
-  return d.getHours() * 60 + d.getMinutes();
-}
-
-function applyMinToDate(baseIso: string, minutesFromMidnight: number): string {
-  const base = new Date(baseIso);
-  const result = new Date(base);
-  result.setHours(0, 0, 0, 0);
-  result.setMinutes(minutesFromMidnight);
-  return result.toISOString();
-}
-
-/**
- * Volume already delivered by this slot at `now`, in job-percentage units.
- * Calage-aware: only the run portion contributes (cf. project_calage_run_ratio).
- */
-function computeExpectedAtNowPct(
-  scheduledStart: string,
-  scheduledEnd: string,
-  setupMin: number,
-  runMin: number,
-  nowMs: number,
-  slotVolumePct: number,
-): number {
-  const startMs = new Date(scheduledStart).getTime();
-  const setupEndMs = startMs + setupMin * 60_000;
-  if (nowMs <= setupEndMs) return 0;
-  const endMs = new Date(scheduledEnd).getTime();
-  if (nowMs >= endMs) return slotVolumePct;
-  if (runMin === 0) return slotVolumePct;
-  const runElapsedMin = (nowMs - setupEndMs) / 60_000;
-  return Math.min(slotVolumePct, (runElapsedMin / runMin) * slotVolumePct);
 }
 
 /**

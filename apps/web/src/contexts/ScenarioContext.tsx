@@ -37,9 +37,7 @@ interface ScenarioProviderProps {
   /**
    * Mode used when the URL has no `?env=` param. Defaults to 'preprod'
    * (chef view). FocusLayout overrides to 'prod' because the focus view is
-   * the operator-on-floor experience where execution truth is reported —
-   * defaulting to préprod there would hide the CompletionToggleIcon and
-   * leave operators with no way to mark tiles as done.
+   * the operator-on-floor experience where execution truth is reported.
    */
   defaultMode?: ScenarioMode;
 }

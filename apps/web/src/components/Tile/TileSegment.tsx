@@ -6,12 +6,16 @@
  * and a relay label ("→ pause" / "reprise →").
  */
 
+import { useState } from 'react';
 import { Pin } from 'lucide-react';
-import { CompletionToggleIcon } from './CompletionToggleIcon';
+import { SaisieIndicator, type SaisieState } from './SaisieIndicator';
+import { ProgressCaptureModal } from '../ProgressCaptureModal/ProgressCaptureModal';
 import { getStateInlineColors, type TileState } from './colorUtils';
-import type { PhaseSegment } from '@flux/types';
+import type { PhaseSegment, TaskAssignment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import { useHoverCrosslink } from '../../hooks';
+import { useReportSaisieMutation } from '../../store';
+import { isoToMinFromMidnight, applyMinToDate, computeExpectedAtNowPct } from './saisieMath';
 
 interface TileSegmentProps {
   /** Unique key for this segment */
@@ -75,6 +79,27 @@ interface TileSegmentProps {
   isFrozenOverridden?: boolean;
   /** Callback when the Sky snowflake is clicked. Receives (jobId, sequenceIndex, stationId). */
   onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
+  /**
+   * Iff true, this segment hosts the saisie indicator + opens the
+   * ProgressCaptureModal on click. The parent picks ONE segment per task
+   * (the chunk-split rule: containing-now → first-future → last-past) so
+   * a chunk-split task never shows multiple indicators.
+   */
+  showSaisieIndicator?: boolean;
+  /** Saisie state (inactive/due/overdue) for the indicator badge. */
+  saisieState?: SaisieState;
+  /** Full assignment — required when `showSaisieIndicator` is true.
+   *  Drives the modal's slot/cumul math. */
+  assignment?: TaskAssignment;
+  /** Job header — required when `showSaisieIndicator` is true.
+   *  Surfaced in the modal title. */
+  jobHeader?: { reference: string; client: string };
+  /** Setup + planned run minutes — needed by the gauge math. */
+  taskDuration?: { setupMinutes: number; runMinutes?: number };
+  /** Display name of the machine (modal header). */
+  machineDisplayName?: string;
+  /** Current Date — drives `now`-based gauge derivations. */
+  now?: Date;
 }
 
 /**
@@ -135,7 +160,50 @@ export function TileSegment({
   isFrozenOverridden = false,
   isSelected = false,
   onToggleFrozenOverride,
+  showSaisieIndicator = false,
+  saisieState = 'inactive',
+  assignment,
+  jobHeader,
+  taskDuration,
+  machineDisplayName,
+  now,
 }: TileSegmentProps) {
+  // Saisie modal state — only meaningful when `showSaisieIndicator` is true.
+  // Hooks always run (rules-of-hooks), but the wiring below is gated.
+  const [pmIsOpen, setPmIsOpen] = useState(false);
+  const [reportSaisie] = useReportSaisieMutation();
+
+  const canRenderSaisie =
+    showSaisieIndicator &&
+    !!assignment &&
+    !!jobHeader &&
+    !!taskDuration &&
+    !!now;
+
+  const handleSaisieSave = canRenderSaisie
+    ? async (estimatedEndMin: number) => {
+        const iso = applyMinToDate(assignment!.scheduledStart, estimatedEndMin);
+        await reportSaisie({ taskId: assignment!.taskId, estimatedEndTime: iso }).unwrap();
+      }
+    : undefined;
+
+  // Gauge math — only computed when the modal can render. The parent might
+  // override cumul/slot via the snapshot's enriched fields.
+  const slotStartMin = canRenderSaisie ? isoToMinFromMidnight(assignment!.scheduledStart) : 0;
+  const slotEndMin = canRenderSaisie ? isoToMinFromMidnight(assignment!.scheduledEnd) : 0;
+  const nowMin = now ? now.getHours() * 60 + now.getMinutes() : 0;
+  const cumulBeforeSlotPct = assignment?.cumulativePositionPct ?? 0;
+  const slotVolumePct = assignment?.slotVolumePct ?? 100;
+  const expectedAtNowPct = canRenderSaisie
+    ? computeExpectedAtNowPct(
+        assignment!.scheduledStart,
+        assignment!.scheduledEnd,
+        taskDuration!.setupMinutes,
+        taskDuration!.runMinutes ?? 0,
+        now!.getTime(),
+        slotVolumePct,
+      )
+    : 0;
   // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
   // selected-job segments only. Was a hover trigger; switched to dblclick
   // (explicit user intent, no accidental pulses while scanning).
@@ -284,11 +352,10 @@ export function TileSegment({
       >
         <div className="flex items-baseline gap-1.5">
         <div className="text-[11px] font-medium leading-tight truncate flex-1 min-w-0" style={{ color: colors.text }}>
-          {taskId && (
-            <CompletionToggleIcon
-              taskId={taskId}
-              isCompleted={tileState === 'completed'}
-              tileState={tileState as TileState}
+          {taskId && showSaisieIndicator && (
+            <SaisieIndicator
+              state={saisieState}
+              onClick={() => setPmIsOpen(true)}
             />
           )}
           {onTogglePin && assignmentId && (
@@ -363,6 +430,25 @@ export function TileSegment({
         >
           {relayLabelBottom}
         </div>
+      )}
+
+      {/* Saisie modal — opens from the SaisieIndicator click. Lives here so
+          a chunk-split task with N segments still mounts only ONE modal
+          (only the chosen segment renders the indicator). */}
+      {canRenderSaisie && handleSaisieSave && (
+        <ProgressCaptureModal
+          isOpen={pmIsOpen}
+          onClose={() => setPmIsOpen(false)}
+          onSave={handleSaisieSave}
+          job={jobHeader!}
+          machineName={machineDisplayName ?? assignment!.targetId}
+          slotStartMin={slotStartMin}
+          slotEndMin={slotEndMin}
+          cumulBeforeSlotPct={cumulBeforeSlotPct}
+          slotVolumePct={slotVolumePct}
+          expectedAtNowPct={expectedAtNowPct}
+          nowMin={nowMin}
+        />
       )}
     </div>
   );

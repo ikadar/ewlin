@@ -16,6 +16,7 @@ import {
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 import { getProduitLabel } from '../../utils/tileLabelResolver';
+import { useProgressTriggers } from '../../hooks/useProgressTriggers';
 import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
 export interface FocusOperatorColumnProps {
@@ -93,6 +94,34 @@ export function FocusOperatorColumn({
     () => new Set(snapshot.lateJobs.map((l) => l.jobId)),
     [snapshot.lateJobs],
   );
+
+  // Saisie indicator placement — pick ONE slice per assignment to host the
+  // indicator + modal so a chunk-split task never multiplies affordances.
+  // Rule: the slice whose [from, to] contains `now` ; failing that, the
+  // first future slice ; failing that, the last past slice (the task is
+  // already over but the operator may still need to report a late saisie).
+  const saisieSliceKeys = useMemo(() => {
+    const byAssignment = new Map<string, typeof slices>();
+    for (const s of slices) {
+      const list = byAssignment.get(s.assignmentId) ?? [];
+      list.push(s);
+      byAssignment.set(s.assignmentId, list);
+    }
+    const keys = new Set<string>();
+    for (const [, list] of byAssignment) {
+      const sorted = list.slice().sort((a, b) => a.from.getTime() - b.from.getTime());
+      const containingNow = sorted.find((s) => s.from <= now && now < s.to);
+      const firstFuture = sorted.find((s) => s.from > now);
+      const lastPast = sorted[sorted.length - 1];
+      const chosen = containingNow ?? firstFuture ?? lastPast;
+      if (chosen) {
+        keys.add(`${chosen.assignmentId}-${chosen.from.getTime()}`);
+      }
+    }
+    return keys;
+  }, [slices, now]);
+
+  const triggers = useProgressTriggers(operatorAssignments, now);
 
   // Hour grid lines (visible range only). Collapse-aware: skip lines whose
   // wall-clock hour falls inside a band (the band cover hides them) and use
@@ -213,15 +242,13 @@ export function FocusOperatorColumn({
         const overrideLeft = slice.position === 'right' ? '50%' : undefined;
         const overrideWidth = slice.position === 'full' ? undefined : '50%';
 
+        const sliceKey = `${slice.assignmentId}-${slice.from.getTime()}`;
+        const showSaisieIndicator = saisieSliceKeys.has(sliceKey);
+
         return (
           <TileSegment
             key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
-            segmentKey={`${slice.assignmentId}-${slice.from.getTime()}`}
-            // taskId enables the CompletionToggleIcon inside TileSegment.
-            // In prod scenario mode the icon is interactive (the operator
-            // ticks the tile to report execution truth); in préprod it
-            // self-hides. Without taskId here, focus-operator tiles had no
-            // affordance to report completion at all.
+            segmentKey={sliceKey}
             taskId={slice.taskId}
             assignmentId={slice.assignmentId}
             label={getProduitLabel(job, element, elementCountByJobId.get(job.id) ?? 1)}
@@ -237,6 +264,13 @@ export function FocusOperatorColumn({
             isMaskedTime={slice.isMasked}
             overrideLeft={overrideLeft}
             overrideWidth={overrideWidth}
+            showSaisieIndicator={showSaisieIndicator}
+            saisieState={triggers[slice.assignmentId] ?? 'inactive'}
+            assignment={assignment}
+            jobHeader={{ reference: job.reference, client: job.client }}
+            taskDuration={isInternalTask(task) ? task.duration : undefined}
+            machineDisplayName={station?.name}
+            now={now}
           />
         );
       })}

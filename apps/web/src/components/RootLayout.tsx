@@ -21,7 +21,6 @@ function RootLayoutInner() {
   const { showToast } = useAutoRecomputeCtx();
   // The .env-readonly class on the shell drives the global CSS that
   // hides planning-only affordances (pin, snowflake) when in prod mode.
-  // CompletionToggleIcon already gates itself in React.
   const { mode: scenarioMode } = useScenarioMode();
 
   // Pipe Mercure real-time updates into the unified compute toaster

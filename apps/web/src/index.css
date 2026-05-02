@@ -737,11 +737,9 @@ html.light [data-testid^="task-tile-"][style*="white"] {
   background: transparent;
 }
 
-/* V1 versioning — when the app shell carries .env-readonly (prod mode),
- * hide planning-only affordances on every tile (grid + JDP). The
- * pin-toggle and snowflake-icon class hooks are wired in Tile,
- * TileSegment and JobDetailsPanel/TaskTile. CompletionToggleIcon
- * gates itself in React, this rule covers the rest. */
+/* When the app shell carries .env-readonly (prod mode), hide planning-only
+ * affordances on every tile (grid + JDP). The pin-toggle and snowflake-icon
+ * class hooks are wired in Tile, TileSegment and JobDetailsPanel/TaskTile. */
 .env-readonly .pin-toggle,
 .env-readonly .snowflake-icon {
   display: none !important;
