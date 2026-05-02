@@ -101,14 +101,15 @@ export interface TileProps {
    */
   machineName?: string;
   /**
-   * V2 — % of the job already delivered by previous fragments. Used by the
-   * VolumeGauge in the saisie modal. Mocked to 30 when absent.
-   * Will be supplied by the engine via `Assignment.cumulativePositionPct`.
+   * V2 — % of the job already delivered by previous fragments. Read from
+   * `assignment.cumulativePositionPct` by default ; this prop overrides
+   * for tests / playgrounds. Falls back to 0 when neither is set.
    */
   cumulBeforeSlotPct?: number;
   /**
-   * V2 — % of the job that this slot delivers. Mocked to 35 when absent.
-   * Will be supplied by the engine alongside `cumulBeforeSlotPct`.
+   * V2 — % of the job that this slot delivers. Read from
+   * `assignment.slotVolumePct` by default ; this prop overrides for
+   * tests / playgrounds. Falls back to 100 when neither is set.
    */
   slotVolumePct?: number;
 }
@@ -199,9 +200,18 @@ export const Tile = memo(function Tile({
   onToggleFrozenOverride,
   sequenceIndex,
   machineName,
-  cumulBeforeSlotPct = 30,   // V2 mock — engine will supply once the
-  slotVolumePct = 35,        // snapshot exposes cumulativePositionPct.
+  cumulBeforeSlotPct: cumulBeforeSlotPctProp,
+  slotVolumePct: slotVolumePctProp,
 }: TileProps) {
+  // V2 progress capture — prefer the snapshot-derived value (computed by
+  // SnapshotBuilder from the parent job's run-volume distribution). Props
+  // remain available so tests / playgrounds can pin specific values.
+  const cumulBeforeSlotPct = cumulBeforeSlotPctProp
+    ?? assignment.cumulativePositionPct
+    ?? 0;
+  const slotVolumePct = slotVolumePctProp
+    ?? assignment.slotVolumePct
+    ?? 100;
   const crosslink = useHoverCrosslink(task.id);
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

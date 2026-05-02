@@ -27,6 +27,8 @@ import { stationCategoryApi } from '../api/stationCategoryApi';
 import { providerApi } from '../api/providerApi';
 import { fluxApi } from '../api/fluxApi';
 import { scheduleApi } from '../api/scheduleApi';
+import { saisieApi } from '../api/saisieApi';
+import { pinApi } from '../api/pinApi';
 
 type TriggerFn = (reason: string) => void;
 
@@ -69,7 +71,16 @@ type AutoRecomputeEndpointName =
   // element has paperStatus not Ready. Reducing it can unblock work.
   | Extract<keyof typeof scheduleApi.endpoints, 'updatePaperLeadTime'>
   // Forme (die) lead-time — same logic for formeStatus.
-  | Extract<keyof typeof scheduleApi.endpoints, 'updateFormeLeadTime'>;
+  | Extract<keyof typeof scheduleApi.endpoints, 'updateFormeLeadTime'>
+  // V2 progress capture — operator saisie d'avancement persists a new
+  // productivityRatio + scheduledEnd on the assignment ; the engine then
+  // propagates the run-only ratio to the remaining fragments of the job.
+  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie'>
+  // V2 progress capture — parameterized pin moves a tile to a target
+  // start. Not a toggle (cf. legacy isPinned flip): the start changes,
+  // so the engine resolves slide-to-nearest on the next replan and
+  // every successor is re-chained.
+  | Extract<keyof typeof pinApi.endpoints, 'pinAtTime'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -101,6 +112,8 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updateElementStatus',
   'updatePaperLeadTime',
   'updateFormeLeadTime',
+  'reportSaisie',
+  'pinAtTime',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {
