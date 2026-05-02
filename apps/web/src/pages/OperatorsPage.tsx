@@ -22,6 +22,7 @@ import { useGetStationsQuery } from '../store/api/stationApi';
 import type { StationResponse } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
 import type { StationCategoryResponse } from '../store/api/stationCategoryApi';
+import { useGetSnapshotQuery } from '../store/api/scheduleApi';
 import {
   RotatingScheduleEditor,
   FluxSelect,
@@ -1197,12 +1198,49 @@ export default function OperatorsPage() {
 
   const { data: stations = [] } = useGetStationsQuery();
   const { data: categories = [] } = useGetStationCategoriesQuery();
+  // Snapshot is consumed for the planned-load KPI per operator. We tolerate
+  // it being unavailable (mock mode, snapshot fetch error) by falling back
+  // to "—" in the column. No suspense boundary; the page renders without
+  // KPI data when the snapshot hasn't loaded yet.
+  const { data: snapshot } = useGetSnapshotQuery();
 
   // Build station name lookup
   const stationById = useMemo(
     () => new Map(stations.map((s) => [s.id, s.name])),
     [stations],
   );
+
+  /**
+   * Per-operator planned load in minutes, computed from the snapshot's
+   * assignments. Each operator entry sums the duration of every operator
+   * segment (from/to) where they appear, across all assignments. This is
+   * a "scheduled hours" KPI — the higher it is, the busier the operator
+   * is on the current plan. Combined with the profile column, run-only
+   * specialists with low load surface as candidates for more work, and
+   * polyvalent ops with high load are prime targets for the caleur volant
+   * borrow pattern (P3b can pull them off mid-run for setups elsewhere).
+   *
+   * Returns Map<operatorId, plannedMinutes>; missing operators imply 0.
+   */
+  const plannedLoadMinutes = useMemo(() => {
+    const map = new Map<string, number>();
+    const assignments = snapshot?.assignments;
+    if (!Array.isArray(assignments)) return map;
+    for (const a of assignments) {
+      if (!a.operators || a.operators.length === 0) continue;
+      for (const op of a.operators) {
+        const fromIso = op.from ?? a.scheduledStart;
+        const toIso = op.to ?? a.scheduledEnd;
+        if (!fromIso || !toIso) continue;
+        const minutes = Math.max(
+          0,
+          (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60000,
+        );
+        map.set(op.operatorId, (map.get(op.operatorId) ?? 0) + minutes);
+      }
+    }
+    return map;
+  }, [snapshot]);
 
   /**
    * Classify an operator's overall profile from their skill matrix:
@@ -1433,6 +1471,9 @@ export default function OperatorsPage() {
                     <th className="text-left px-4 py-3 font-medium">Nom</th>
                     <th className="text-left px-4 py-3 font-medium">Fonction</th>
                     <th className="text-left px-4 py-3 font-medium">Profil</th>
+                    <th className="text-right px-4 py-3 font-medium" title="Heures planifiées sur l'horizon courant — somme des présences opérateur sur les assignments">
+                      Charge
+                    </th>
                     <th className="text-left px-4 py-3 font-medium">Compétences</th>
                     <th className="px-4 py-0" />
                   </tr>
@@ -1440,13 +1481,16 @@ export default function OperatorsPage() {
                 <tbody>
                   {filteredOperators.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center text-flux-text-muted py-12">
+                      <td colSpan={7} className="text-center text-flux-text-muted py-12">
                         Aucun opérateur trouvé
                       </td>
                     </tr>
                   )}
                   {filteredOperators.map((operator) => {
                     const profile = profileForOperator(operator);
+                    const loadMin = plannedLoadMinutes.get(operator.id) ?? 0;
+                    const loadHours = loadMin / 60;
+                    const loadLabel = loadMin > 0 ? `${loadHours.toFixed(1)} h` : '—';
                     const profileBadgeClass =
                       profile === 'Polyvalent'
                         ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
@@ -1482,6 +1526,12 @@ export default function OperatorsPage() {
                         >
                           {profile}
                         </span>
+                      </td>
+                      <td
+                        className="px-4 py-0 text-right font-mono text-flux-text-secondary"
+                        title={loadMin > 0 ? `${Math.round(loadMin)} min planifiées sur l'horizon courant` : 'Aucune assignation sur l\'horizon courant'}
+                      >
+                        {loadLabel}
                       </td>
                       <td className="px-4 py-0 text-flux-text-secondary">
                         {operator.skills.length > 0
