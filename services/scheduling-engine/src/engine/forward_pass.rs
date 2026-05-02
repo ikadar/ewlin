@@ -1283,7 +1283,22 @@ pub fn run_forward_pass(
                         t,
                         needed,
                     );
-                    if window < needed { continue; }
+                    // window > 0 path: legitimately too short (op there
+                    //   briefly). Skip to avoid fragmenting work.
+                    // window = 0 path: no op (or station blocked) at t.
+                    //   Letting the action fall through to
+                    //   assign_action_at_tick lets its station's first-op-
+                    //   availability tick contribute to next_skip_t MIN.
+                    //   Without this, only the highest-urgency action
+                    //   (slack<0 → needed=0) escapes chunk-mini at dead
+                    //   ticks (Sun midnight); its station's late-shift
+                    //   skip_to (e.g. Mon 13:00 for Ricoh-only-Franck)
+                    //   becomes the sole MIN contributor and the outer
+                    //   loop fast-forwards past Mon 06:00 when many other
+                    //   stations DO have morning ops.
+                    if window > 0 && window < needed {
+                        continue;
+                    }
                 }
             }
 
