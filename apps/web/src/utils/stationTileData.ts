@@ -250,10 +250,44 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
 
       let operatorNames: string | undefined;
       if (assignment.operators && assignment.operators.length > 0 && operatorNameMap.size > 0) {
-        operatorNames = assignment.operators
+        // Split operator names by phase when setupEnd is known and the
+        // setup_op differs from the run_op. The engine now naturally emits
+        // distinct entries when its P3a election picks different ops for
+        // calage and roule (caleur volant pattern); we surface that to the
+        // user as "Bernard → Frédéric" instead of a flat comma list.
+        const setupEndIso = assignment.setupEnd as string | null | undefined;
+        const setupEndMs = setupEndIso ? new Date(setupEndIso).getTime() : null;
+        const setupOps = new Set<string>();
+        const runOps = new Set<string>();
+        for (const op of assignment.operators) {
+          const fromMs = op.from ? new Date(op.from).getTime() : null;
+          if (setupEndMs !== null && fromMs !== null && fromMs < setupEndMs) {
+            setupOps.add(op.operatorId);
+          }
+          if (setupEndMs === null || fromMs === null || (op.to ? new Date(op.to).getTime() > setupEndMs : true)) {
+            runOps.add(op.operatorId);
+          }
+        }
+        const allNames = assignment.operators
           .map(op => operatorNameMap.get(op.operatorId))
-          .filter(Boolean)
-          .join(', ') || undefined;
+          .filter(Boolean) as string[];
+        // Differentiated rendering only fires when setupEnd is known AND
+        // the two phase sets are disjoint (i.e. truly different operators);
+        // otherwise we fall back to the flat list to keep the tile spartan.
+        if (setupEndMs !== null && setupOps.size > 0 && runOps.size > 0) {
+          const setupNames = [...setupOps].map(id => operatorNameMap.get(id)).filter(Boolean) as string[];
+          const runNames = [...runOps].map(id => operatorNameMap.get(id)).filter(Boolean) as string[];
+          // Set difference: only show the arrow form when the run set introduces
+          // at least one operator who wasn't in the setup set.
+          const runOnly = runNames.filter(n => !setupNames.includes(n));
+          if (runOnly.length > 0) {
+            operatorNames = `${setupNames.join(', ')} → ${runOnly.join(', ')}`;
+          } else {
+            operatorNames = allNames.join(', ') || undefined;
+          }
+        } else {
+          operatorNames = allNames.join(', ') || undefined;
+        }
       }
 
       cache.set(assignment.id, {
