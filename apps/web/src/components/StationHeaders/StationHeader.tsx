@@ -83,7 +83,9 @@ export function StationHeader({
             onClick={() => onOffScreenClick?.('down')}
           />
         )}
-        <StationSettingsButton stationId={station.id} stationLabel={station.name} />
+        {mode !== 'prod' && (
+          <StationSettingsButton stationId={station.id} stationLabel={station.name} />
+        )}
         {mode === 'prod' && (
           <Link
             to={`/focus/station/${station.id}${location.search}`}

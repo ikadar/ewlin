@@ -32,7 +32,9 @@ export function OperatorHeader({ operator, columnWidth }: OperatorHeaderProps) {
         )}
       </span>
       <div className="flex items-center gap-1 shrink-0">
-        <OperatorSettingsButton operatorId={operator.id} operatorLabel={fullName} />
+        {mode !== 'prod' && (
+          <OperatorSettingsButton operatorId={operator.id} operatorLabel={fullName} />
+        )}
         {mode === 'prod' && (
           <Link
             to={`/focus/operator/${operator.id}${location.search}`}
