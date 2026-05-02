@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Square, CheckSquare, Undo2, Scissors, Merge, Pin } from 'lucide-react';
+import { Eye, Square, CheckSquare, Undo2, Scissors, Merge, Pin, Clock, CalendarDays } from 'lucide-react';
 
 export interface TileContextMenuProps {
   /** Menu position X coordinate (from cursor) */
@@ -15,16 +15,36 @@ export interface TileContextMenuProps {
   onTogglePin: () => void;
   /** Callback for "View details" action */
   onViewDetails: () => void;
-  /** Callback for "Toggle completion" action */
-  onToggleComplete: () => void;
-  /** Callback for "Recall" action (unassign) */
-  onRecall: () => void;
+  /**
+   * Callback for "Toggle completion" action. Optional in V2 — the
+   * progress-capture refactor derives completion from `scheduledEnd < now`
+   * so admin views may stop exposing this toggle. Existing callers pass it
+   * unchanged.
+   */
+  onToggleComplete?: () => void;
+  /**
+   * Callback for "Recall" (unassign) action. Optional — typically only
+   * passed in admin/préprod views ; prod operators don't unassign.
+   */
+  onRecall?: () => void;
   /** Callback for "Split" action */
   onSplit?: () => void;
   /** Callback for "Fuse" action */
   onFuse?: () => void;
   /** Whether this task is part of a split group */
   isSplit?: boolean;
+  /**
+   * V2 progress capture — opens the saisie modal. When provided, a
+   * "Saisir l'avancement" menu item is rendered. Optional so existing
+   * callers (admin/preprod views that don't expose saisie) stay unchanged.
+   */
+  onSaisirAvancement?: () => void;
+  /**
+   * V2 progress capture — opens the SetStartTimeDialog (compact calendar +
+   * 15-min time picker + live faisabilité). Creates a parameterized pin on
+   * confirm. Optional, like onSaisirAvancement.
+   */
+  onDefinirDebut?: () => void;
   /** Callback to close the menu */
   onClose: () => void;
 }
@@ -85,6 +105,8 @@ export function TileContextMenu({
   onSplit,
   onFuse,
   isSplit = false,
+  onSaisirAvancement,
+  onDefinirDebut,
   onClose,
 }: TileContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -166,7 +188,7 @@ export function TileContextMenu({
   };
 
   const handleToggleComplete = () => {
-    onToggleComplete();
+    onToggleComplete?.();
     onClose();
   };
 
@@ -177,7 +199,7 @@ export function TileContextMenu({
 
   const handleRecall = () => {
     if (!isCompleted && !isPinned) {
-      onRecall();
+      onRecall?.();
       onClose();
     }
   };
@@ -189,6 +211,16 @@ export function TileContextMenu({
 
   const handleFuse = () => {
     onFuse?.();
+    onClose();
+  };
+
+  const handleSaisirAvancement = () => {
+    onSaisirAvancement?.();
+    onClose();
+  };
+
+  const handleDefinirDebut = () => {
+    onDefinirDebut?.();
     onClose();
   };
 
@@ -206,25 +238,45 @@ export function TileContextMenu({
         onClick={handleViewDetails}
         testId="context-menu-view-details"
       />
-      <MenuItem
-        icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-        label={isCompleted ? 'Marquer non terminé' : 'Marquer terminé'}
-        onClick={handleToggleComplete}
-        testId="context-menu-toggle-complete"
-      />
+      {onSaisirAvancement && (
+        <MenuItem
+          icon={<Clock className="w-4 h-4" />}
+          label="Saisir l'avancement"
+          onClick={handleSaisirAvancement}
+          testId="context-menu-saisir-avancement"
+        />
+      )}
+      {onToggleComplete && (
+        <MenuItem
+          icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+          label={isCompleted ? 'Marquer non terminé' : 'Marquer terminé'}
+          onClick={handleToggleComplete}
+          testId="context-menu-toggle-complete"
+        />
+      )}
       <MenuItem
         icon={<Pin className="w-4 h-4" />}
         label={isPinned ? 'Désépingler' : 'Épingler'}
         onClick={handleTogglePin}
         testId="context-menu-toggle-pin"
       />
-      <MenuItem
-        icon={<Undo2 className="w-4 h-4" />}
-        label="Rappeler (désassigner)"
-        onClick={handleRecall}
-        disabled={isCompleted || isPinned}
-        testId="context-menu-recall"
-      />
+      {onDefinirDebut && (
+        <MenuItem
+          icon={<CalendarDays className="w-4 h-4" />}
+          label="Définir heure de début…"
+          onClick={handleDefinirDebut}
+          testId="context-menu-definir-debut"
+        />
+      )}
+      {onRecall && (
+        <MenuItem
+          icon={<Undo2 className="w-4 h-4" />}
+          label="Rappeler (désassigner)"
+          onClick={handleRecall}
+          disabled={isCompleted || isPinned}
+          testId="context-menu-recall"
+        />
+      )}
       <Separator />
       {onSplit && !isCompleted && (
         <MenuItem
