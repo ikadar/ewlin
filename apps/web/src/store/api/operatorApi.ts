@@ -7,7 +7,10 @@ import { baseQueryWithFixtureSupport } from './baseApi';
 
 export interface OperatorSkillResponse {
   stationId: string;
+  /** @deprecated Use setupProficiency / runProficiency. Mirrors run proficiency. */
   proficiency: number;
+  setupProficiency: number;
+  runProficiency: number;
 }
 
 /**

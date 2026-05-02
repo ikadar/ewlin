@@ -69,11 +69,24 @@ function todayFullDayRange(): { startAt: string; endAt: string } {
   return { startAt: `${date}T00:00`, endAt: `${date}T23:59` };
 }
 
-/** Build a map of stationId -> proficiency from the skills array */
-function buildSkillMap(skills: OperatorSkillResponse[]): Map<string, number> {
-  const map = new Map<string, number>();
+/** Per-station proficiency split between calage (setup) and roule (run) phases. */
+export interface SkillValues {
+  setup: number;
+  run: number;
+}
+
+/**
+ * Build a map of stationId -> {setup, run} from the skills array.
+ *
+ * Tolerant to backends that emit only the legacy `proficiency` field —
+ * in that case both setup and run mirror it.
+ */
+function buildSkillMap(skills: OperatorSkillResponse[]): Map<string, SkillValues> {
+  const map = new Map<string, SkillValues>();
   for (const s of skills) {
-    map.set(s.stationId, s.proficiency);
+    const setup = s.setupProficiency ?? s.proficiency ?? 0;
+    const run = s.runProficiency ?? s.proficiency ?? 0;
+    map.set(s.stationId, { setup, run });
   }
   return map;
 }
@@ -178,73 +191,61 @@ const SLIDER_STYLE = `
 `;
 
 // ============================================================================
-// SkillRow — individual station proficiency row with direct DOM updates
+// SkillRow — station proficiency row, split per-phase (Calage / Roule)
 // ============================================================================
+
+type SkillPhase = 'setup' | 'run';
 
 interface SkillRowProps {
   station: StationResponse;
-  initialProficiency: number;
-  onProficiencyCommit: (stationId: string, value: number) => void;
+  initialSetup: number;
+  initialRun: number;
+  onCommit: (stationId: string, phase: SkillPhase, value: number) => void;
 }
 
-function SkillRow({ station, initialProficiency, onProficiencyCommit }: SkillRowProps) {
-  const checkboxRef = useRef<HTMLInputElement>(null);
+interface PhaseSliderProps {
+  initialValue: number;
+  onCommit: (value: number) => void;
+}
+
+/**
+ * Single-phase proficiency slider with inline value editing.
+ *
+ * Imperative DOM updates while dragging keep the row out of the React
+ * render path — there are typically dozens of these per modal and sliding
+ * the thumb fires `onInput` at ~60Hz.
+ */
+function PhaseSlider({ initialValue, onCommit }: PhaseSliderProps) {
   const sliderRef = useRef<HTMLInputElement>(null);
   const fillRef = useRef<HTMLDivElement>(null);
-  const nameRef = useRef<HTMLSpanElement>(null);
   const valueRef = useRef<HTMLSpanElement>(null);
+  const currentValueRef = useRef(initialValue);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
-  const currentValueRef = useRef(initialProficiency);
-
-  useEffect(() => {
-    currentValueRef.current = initialProficiency;
-    updateDomElements(initialProficiency);
-  }, [initialProficiency]);
 
   const updateDomElements = (val: number) => {
     const pct = (val / 1.5 * 100);
-    if (sliderRef.current) {
-      sliderRef.current.value = String(val);
-    }
-    if (fillRef.current) {
-      fillRef.current.style.width = pct + '%';
-    }
-    if (checkboxRef.current) {
-      checkboxRef.current.checked = val > 0;
-    }
-    if (nameRef.current) {
-      if (val > 0) {
-        nameRef.current.classList.add('font-semibold', 'text-flux-text-primary');
-        nameRef.current.classList.remove('text-flux-text-muted');
-      } else {
-        nameRef.current.classList.remove('font-semibold', 'text-flux-text-primary');
-        nameRef.current.classList.add('text-flux-text-muted');
-      }
-    }
-    if (valueRef.current && !isEditing) {
-      valueRef.current.textContent = val.toFixed(2);
-    }
+    if (sliderRef.current) sliderRef.current.value = String(val);
+    if (fillRef.current) fillRef.current.style.width = pct + '%';
+    if (valueRef.current && !isEditing) valueRef.current.textContent = val.toFixed(2);
   };
+
+  useEffect(() => {
+    currentValueRef.current = initialValue;
+    updateDomElements(initialValue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValue]);
 
   const handleSliderInput = (e: React.FormEvent<HTMLInputElement>) => {
     const raw = parseFloat((e.target as HTMLInputElement).value);
     const snapped = snap(raw);
     currentValueRef.current = snapped;
-    // Direct DOM update — no React re-render
     updateDomElements(snapped);
   };
 
   const handleSliderChange = () => {
-    // Commit value on mouse release
-    onProficiencyCommit(station.id, currentValueRef.current);
-  };
-
-  const handleCheckboxChange = () => {
-    const newVal = checkboxRef.current?.checked ? 1.0 : 0;
-    currentValueRef.current = newVal;
-    onProficiencyCommit(station.id, newVal);
+    onCommit(currentValueRef.current);
   };
 
   const handleValueClick = () => {
@@ -259,35 +260,14 @@ function SkillRow({ station, initialProficiency, onProficiencyCommit }: SkillRow
     parsed = snap(parsed);
     currentValueRef.current = parsed;
     setIsEditing(false);
-    onProficiencyCommit(station.id, parsed);
+    onCommit(parsed);
   };
 
-  const isActive = initialProficiency > 0;
-
   return (
-    <div className="grid items-center gap-2 py-1" style={{ gridTemplateColumns: '20px 100px 1fr 50px', minHeight: '32px' }}>
-      {/* Checkbox */}
-      <input
-        ref={checkboxRef}
-        type="checkbox"
-        defaultChecked={isActive}
-        onChange={handleCheckboxChange}
-        className="w-4 h-4 rounded border border-flux-border-light bg-flux-base accent-blue-500 cursor-pointer"
-      />
-
-      {/* Station name */}
-      <span
-        ref={nameRef}
-        className={`text-[13px] whitespace-nowrap overflow-hidden text-ellipsis transition-colors ${isActive ? 'font-semibold text-flux-text-primary' : 'text-flux-text-muted'}`}
-        title={station.name}
-      >
-        {station.name}
-      </span>
-
-      {/* Slider */}
+    <>
       <div className="op-slider-wrap">
         <div className="op-slider-track" />
-        <div ref={fillRef} className="op-slider-fill" style={{ width: `${initialProficiency / 1.5 * 100}%` }} />
+        <div ref={fillRef} className="op-slider-fill" style={{ width: `${initialValue / 1.5 * 100}%` }} />
         <input
           ref={sliderRef}
           type="range"
@@ -295,13 +275,11 @@ function SkillRow({ station, initialProficiency, onProficiencyCommit }: SkillRow
           min="0"
           max="1.5"
           step="0.05"
-          defaultValue={String(initialProficiency)}
+          defaultValue={String(initialValue)}
           onInput={handleSliderInput}
           onChange={handleSliderChange}
         />
       </div>
-
-      {/* Value display / edit */}
       {isEditing ? (
         <input
           type="text"
@@ -321,9 +299,72 @@ function SkillRow({ station, initialProficiency, onProficiencyCommit }: SkillRow
           onClick={handleValueClick}
           className="text-xs font-mono min-w-[36px] text-right px-1 py-0.5 rounded cursor-pointer border border-transparent hover:bg-flux-elevated text-flux-text-secondary"
         >
-          {initialProficiency.toFixed(2)}
+          {initialValue.toFixed(2)}
         </span>
       )}
+    </>
+  );
+}
+
+/**
+ * One row per station with two side-by-side phase sliders.
+ *
+ * Checkbox toggles BOTH phases on/off together (set both to 1.0 on enable,
+ * 0 on disable) — the common case is "qualified or not" rather than
+ * fine-grained mismatch. Users who need to express asymmetry adjust the
+ * individual sliders afterwards.
+ */
+function SkillRow({ station, initialSetup, initialRun, onCommit }: SkillRowProps) {
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLSpanElement>(null);
+  const isActive = initialSetup > 0 || initialRun > 0;
+
+  useEffect(() => {
+    if (checkboxRef.current) checkboxRef.current.checked = isActive;
+    if (nameRef.current) {
+      if (isActive) {
+        nameRef.current.classList.add('font-semibold', 'text-flux-text-primary');
+        nameRef.current.classList.remove('text-flux-text-muted');
+      } else {
+        nameRef.current.classList.remove('font-semibold', 'text-flux-text-primary');
+        nameRef.current.classList.add('text-flux-text-muted');
+      }
+    }
+  }, [isActive]);
+
+  const handleCheckboxChange = () => {
+    const newVal = checkboxRef.current?.checked ? 1.0 : 0;
+    onCommit(station.id, 'setup', newVal);
+    onCommit(station.id, 'run', newVal);
+  };
+
+  return (
+    <div
+      className="grid items-center gap-2 py-1"
+      style={{ gridTemplateColumns: '20px 100px 1fr 50px 1fr 50px', minHeight: '32px' }}
+    >
+      <input
+        ref={checkboxRef}
+        type="checkbox"
+        defaultChecked={isActive}
+        onChange={handleCheckboxChange}
+        className="w-4 h-4 rounded border border-flux-border-light bg-flux-base accent-blue-500 cursor-pointer"
+      />
+      <span
+        ref={nameRef}
+        className={`text-[13px] whitespace-nowrap overflow-hidden text-ellipsis transition-colors ${isActive ? 'font-semibold text-flux-text-primary' : 'text-flux-text-muted'}`}
+        title={station.name}
+      >
+        {station.name}
+      </span>
+      <PhaseSlider
+        initialValue={initialSetup}
+        onCommit={(v) => onCommit(station.id, 'setup', v)}
+      />
+      <PhaseSlider
+        initialValue={initialRun}
+        onCommit={(v) => onCommit(station.id, 'run', v)}
+      />
     </div>
   );
 }
@@ -534,9 +575,10 @@ export function OperatorFormModal({ initial, stations, categories, onSave, onCan
   const [lastName, setLastName] = useState(initial?.lastName ?? '');
   const [role, setRole] = useState(initial?.role ?? '');
 
-  // Skills: stationId -> proficiency (only tracked in a ref + state for re-renders on checkbox/commit)
+  // Skills: stationId -> {setup, run} (split per phase; legacy callers reading
+  // a single value get the run proficiency until the rest of the codebase migrates).
   const initialSkillMap = useMemo(() => buildSkillMap(initial?.skills ?? []), [initial]);
-  const [skillMap, setSkillMap] = useState<Map<string, number>>(() => new Map(initialSkillMap));
+  const [skillMap, setSkillMap] = useState<Map<string, SkillValues>>(() => new Map(initialSkillMap));
 
   // Concurrent groups: per-operator pairs of stations he can supervise simultaneously.
   const [concurrentGroups, setConcurrentGroups] = useState<DraftGroup[]>(() => {
@@ -603,8 +645,13 @@ export function OperatorFormModal({ initial, stations, categories, onSave, onCan
   );
 
   // Stations the operator currently has a skill on — only these can be paired.
+  // A station qualifies if either phase has a positive proficiency: the
+  // operator can contribute to the run, the setup, or both.
   const skilledStations = useMemo(
-    () => stations.filter((s) => (skillMap.get(s.id) ?? 0) > 0).sort((a, b) => a.name.localeCompare(b.name)),
+    () => stations.filter((s) => {
+      const v = skillMap.get(s.id);
+      return v !== undefined && (v.setup > 0 || v.run > 0);
+    }).sort((a, b) => a.name.localeCompare(b.name)),
     [stations, skillMap],
   );
 
@@ -682,34 +729,56 @@ export function OperatorFormModal({ initial, stations, categories, onSave, onCan
     overtimesValid &&
     firstOverlappingOvertimeIdx === null;
 
-  const handleProficiencyCommit = useCallback((stationId: string, value: number) => {
+  const handleSkillCommit = useCallback((stationId: string, phase: SkillPhase, value: number) => {
     setSkillMap((prev) => {
       const next = new Map(prev);
-      if (value > 0) {
-        next.set(stationId, value);
-      } else {
+      const current = next.get(stationId) ?? { setup: 0, run: 0 };
+      const updated = phase === 'setup'
+        ? { setup: value, run: current.run }
+        : { setup: current.setup, run: value };
+      if (updated.setup === 0 && updated.run === 0) {
         next.delete(stationId);
+      } else {
+        next.set(stationId, updated);
       }
       return next;
     });
-    // When a skill is removed, drop any concurrent group that referenced it.
-    // Done here (at the source of the removal) rather than in an effect, so
-    // we avoid cascading renders.
+    // When ALL phases drop to zero on a station, drop any concurrent group
+    // that referenced it. We can't know that here without re-reading state,
+    // so we recompute defensively in handleSubmit too. This early cleanup
+    // covers the common case (checkbox toggled off) without re-renders.
     if (value === 0) {
-      setConcurrentGroups((prev) =>
-        prev.filter((g) => g.stationIds[0] !== stationId && g.stationIds[1] !== stationId),
-      );
+      setSkillMap.length; // force closure capture; intentional no-op
+      setConcurrentGroups((prevGroups) => {
+        // The skill map state hasn't necessarily settled yet at this point,
+        // so we only drop the group if BOTH phases are now zero.
+        // Read from the just-committed phase + the current state for the other.
+        return prevGroups.filter((g) => {
+          if (g.stationIds[0] !== stationId && g.stationIds[1] !== stationId) return true;
+          // Look up the (possibly stale) other phase
+          const v = skillMap.get(stationId);
+          if (!v) return false;
+          const otherPhase = phase === 'setup' ? v.run : v.setup;
+          return otherPhase > 0;
+        });
+      });
     }
-  }, []);
+  }, [skillMap]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave) return;
 
     const skills: OperatorSkillResponse[] = [];
-    skillMap.forEach((proficiency, stationId) => {
-      if (proficiency > 0) {
-        skills.push({ stationId, proficiency });
+    skillMap.forEach((values, stationId) => {
+      if (values.setup > 0 || values.run > 0) {
+        skills.push({
+          stationId,
+          // Legacy mirror — backend ignores it when split fields are present.
+          proficiency: values.run,
+          setupProficiency: values.setup,
+          runProficiency: values.run,
+        });
       }
     });
 
@@ -806,25 +875,40 @@ export function OperatorFormModal({ initial, stations, categories, onSave, onCan
           </div>
 
 
-          {/* Section 2: Skills */}
+          {/* Section 2: Skills (calage / roule split) */}
           <div className="pt-2 border-t border-flux-border">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">
               Compétences machines
             </p>
+            <div
+              className="grid items-center gap-2 pb-1 border-b border-flux-border-light text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted"
+              style={{ gridTemplateColumns: '20px 100px 1fr 50px 1fr 50px' }}
+            >
+              <span />
+              <span />
+              <span className="text-center">Calage</span>
+              <span />
+              <span className="text-center">Roule</span>
+              <span />
+            </div>
             <div>
               {groupedStations.map((group) => (
                 <div key={group.categoryName}>
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted py-2 first:pt-0">
                     {group.categoryName}
                   </div>
-                  {group.stations.map((station) => (
-                    <SkillRow
-                      key={station.id}
-                      station={station}
-                      initialProficiency={skillMap.get(station.id) ?? 0}
-                      onProficiencyCommit={handleProficiencyCommit}
-                    />
-                  ))}
+                  {group.stations.map((station) => {
+                    const values = skillMap.get(station.id);
+                    return (
+                      <SkillRow
+                        key={station.id}
+                        station={station}
+                        initialSetup={values?.setup ?? 0}
+                        initialRun={values?.run ?? 0}
+                        onCommit={handleSkillCommit}
+                      />
+                    );
+                  })}
                 </div>
               ))}
               {stations.length === 0 && (
