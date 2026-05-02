@@ -836,6 +836,13 @@ export default function OperatorSchedulePage() {
     return map;
   }, [operators, assignmentsByOperator]);
 
+  // Map assignments by id — saisie + lens renderSlice paths need O(1) lookup.
+  const lensAssignmentMap = useMemo(() => {
+    const map = new Map<string, TaskAssignment>();
+    for (const a of snapshot.assignments) map.set(a.id, a);
+    return map;
+  }, [snapshot.assignments]);
+
   // V2 saisie indicator placement — past-started tasks only. For each
   // (operatorId, assignmentId) pair whose task has started, pick exactly
   // ONE slice to host the indicator. Rule mirrors FocusOperatorColumn:
@@ -893,13 +900,6 @@ export default function OperatorSchedulePage() {
   // ── Timeline magnifying lens ─────────────────────────────────────────────
   const lens = useTimelineLens();
   const lastHoveredSegmentKeyRef = useRef<string | null>(null);
-
-  // Map assignments by id — both renderSlice paths need O(1) lookup.
-  const lensAssignmentMap = useMemo(() => {
-    const map = new Map<string, TaskAssignment>();
-    for (const a of snapshot.assignments) map.set(a.id, a);
-    return map;
-  }, [snapshot.assignments]);
 
   // segmentKey → operatorId, so the onMouseOver delegation handler can
   // resolve a TileSegment DOM element back to its column.
@@ -1032,6 +1032,9 @@ export default function OperatorSchedulePage() {
           recalages={assignment?.recalages}
           jobId={job.id}
           taskId={task.id}
+          assignmentId={assignment?.id}
+          isPinned={assignment?.isPinned ?? false}
+          onTogglePin={scenarioMode !== 'prod' ? handleTogglePin : undefined}
           isSelected={selectedJobId === job.id}
           {...positionProps}
         />
@@ -1040,7 +1043,7 @@ export default function OperatorSchedulePage() {
   }, [
     lens.state.activeColumnId, lensActiveSlices, lensRange.gridStartMs, selectedJobId,
     taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now,
-    elementCountByJobId,
+    elementCountByJobId, scenarioMode, handleTogglePin,
   ]);
 
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
