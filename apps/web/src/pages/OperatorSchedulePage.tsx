@@ -36,6 +36,8 @@ import {
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
+import { useProgressTriggers } from '../hooks/useProgressTriggers';
+import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
 import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
 import { useScenarioMode } from '../contexts/ScenarioContext';
 import { getTasksForJob } from '../utils';
@@ -832,6 +834,45 @@ export default function OperatorSchedulePage() {
     return map;
   }, [operators, assignmentsByOperator]);
 
+  // V2 saisie indicator placement — for each (operatorId, assignmentId) pair,
+  // pick exactly ONE slice to host the indicator + modal. Rule mirrors
+  // FocusOperatorColumn: containing-now → first-future → last-past. Without
+  // this gate, a chunk-split task would surface multiple indicators in the
+  // same column for the same task.
+  const saisieSliceKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const [opId, slices] of allTileSlices.entries()) {
+      const byAssignment = new Map<string, TileSlice[]>();
+      for (const s of slices) {
+        const list = byAssignment.get(s.assignmentId) ?? [];
+        list.push(s);
+        byAssignment.set(s.assignmentId, list);
+      }
+      for (const [, list] of byAssignment) {
+        const sorted = list.slice().sort((a, b) => a.from.getTime() - b.from.getTime());
+        const containingNow = sorted.find((s) => s.from <= now && now < s.to);
+        const firstFuture = sorted.find((s) => s.from > now);
+        const lastPast = sorted[sorted.length - 1];
+        const chosen = containingNow ?? firstFuture ?? lastPast;
+        if (chosen) {
+          keys.add(`${opId}-${chosen.assignmentId}-${chosen.from.getTime()}`);
+        }
+      }
+    }
+    return keys;
+  }, [allTileSlices, now]);
+
+  const saisieTriggers = useProgressTriggers(snapshot.assignments, now);
+
+  // Right-click on a tile opens SetStartTimeDialog (V2 parameterized pin).
+  // The chef-mode multi-action context menu lives on the station grid
+  // (App.tsx) — operator views give a single, focused affordance.
+  const [pinDialogState, setPinDialogState] = useState<{
+    taskId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+  } | null>(null);
+
   // ── Timeline magnifying lens ─────────────────────────────────────────────
   const lens = useTimelineLens();
   const lastHoveredSegmentKeyRef = useRef<string | null>(null);
@@ -1140,6 +1181,21 @@ export default function OperatorSchedulePage() {
       ? safetyOverrideLookup.get(makeSafetyKey(job.id, seqIdx, stationIdForTile)) === true
       : false;
 
+    const showSaisieIndicator = assignment
+      ? saisieSliceKeys.has(`${operatorId}-${assignment.id}-${slice.from.getTime()}`)
+      : false;
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+      if (!assignment) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPinDialogState({
+        taskId: task.id,
+        job: { reference: job.reference, client: job.client },
+        currentScheduledStart: assignment.scheduledStart,
+      });
+    };
+
     return (
       <TileSegment
         key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -1171,6 +1227,14 @@ export default function OperatorSchedulePage() {
         isFrozenOverridden={isOverridden}
         onToggleFrozenOverride={handleToggleFrozenOverride}
         isSelected={selectedJobId === job.id}
+        showSaisieIndicator={showSaisieIndicator}
+        saisieState={assignment ? (saisieTriggers[assignment.taskId] ?? 'inactive') : 'inactive'}
+        assignment={assignment}
+        jobHeader={{ reference: job.reference, client: job.client }}
+        taskDuration={task.duration}
+        machineDisplayName={stationName}
+        now={now}
+        onContextMenu={handleContextMenu}
         {...positionProps}
       />
     );
@@ -1412,6 +1476,19 @@ export default function OperatorSchedulePage() {
 
       {/* ---- Shortcut footer ---- */}
       <ShortcutFooter mode={selectedJobId ? 'operatorJobSelected' : 'operatorDefault'} />
+
+      {/* V2 set-start-time dialog — opened by right-clicking a tile. The
+          dialog auto-fires the pin mutation ; autoRecomputeMiddleware
+          handles the replan. */}
+      {pinDialogState && (
+        <SetStartTimeDialog
+          isOpen={true}
+          onClose={() => setPinDialogState(null)}
+          taskId={pinDialogState.taskId}
+          job={pinDialogState.job}
+          currentScheduledStart={pinDialogState.currentScheduledStart}
+        />
+      )}
     </div>
   );
 }

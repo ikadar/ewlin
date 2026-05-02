@@ -33,6 +33,11 @@ export interface FocusOperatorColumnProps {
   dayCount: number;
   /** Collapse bands (nights/weekends/closures). Empty array if none. */
   collapses: readonly Collapse[];
+  /**
+   * Right-click on any tile bubbles up here so the page (FocusPage) can
+   * mount the SetStartTimeDialog once instead of N times across columns.
+   */
+  onTileContextMenu?: (taskId: string, job: { reference: string; client: string }, currentScheduledStart: string) => void;
 }
 
 /**
@@ -49,6 +54,7 @@ export function FocusOperatorColumn({
   visibleDayRange,
   dayCount,
   collapses,
+  onTileContextMenu,
 }: FocusOperatorColumnProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(320);
@@ -245,6 +251,17 @@ export function FocusOperatorColumn({
         const sliceKey = `${slice.assignmentId}-${slice.from.getTime()}`;
         const showSaisieIndicator = saisieSliceKeys.has(sliceKey);
 
+        const handleContextMenu = (e: React.MouseEvent) => {
+          if (!assignment || !onTileContextMenu) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onTileContextMenu(
+            slice.taskId,
+            { reference: job.reference, client: job.client },
+            assignment.scheduledStart,
+          );
+        };
+
         return (
           <TileSegment
             key={`${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -271,6 +288,7 @@ export function FocusOperatorColumn({
             taskDuration={isInternalTask(task) ? task.duration : undefined}
             machineDisplayName={station?.name}
             now={now}
+            onContextMenu={handleContextMenu}
           />
         );
       })}

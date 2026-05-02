@@ -100,6 +100,12 @@ interface TileSegmentProps {
   machineDisplayName?: string;
   /** Current Date — drives `now`-based gauge derivations. */
   now?: Date;
+  /**
+   * Right-click handler — fires with the mouse event so the parent can
+   * read clientX/clientY for popover positioning. The parent typically
+   * opens the SetStartTimeDialog (V2 parameterized pin).
+   */
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 /**
@@ -167,6 +173,7 @@ export function TileSegment({
   taskDuration,
   machineDisplayName,
   now,
+  onContextMenu,
 }: TileSegmentProps) {
   // Saisie modal state — only meaningful when `showSaisieIndicator` is true.
   // Hooks always run (rules-of-hooks), but the wiring below is gated.
@@ -271,6 +278,7 @@ export function TileSegment({
         right: overrideWidth ? undefined : 0,
       }}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       data-testid={`tile-segment-${segmentKey}`}
       data-job-id={jobId}
       data-pinned={isPinned ? 'true' : 'false'}

@@ -17,6 +17,7 @@ import { ErrorState } from '../components/ErrorState';
 import { useVirtualScroll } from '../hooks';
 import { computeCollapses } from '../utils/computeCollapses';
 import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
+import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
 import { CollapseBand } from '../components/SchedulingGrid/CollapseBand';
 
 const START_HOUR = 0;
@@ -106,6 +107,14 @@ export default function FocusPage({ mode }: FocusPageProps) {
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
+
+  // V2 set-start-time dialog state — opened from a tile right-click
+  // bubbled up by FocusOperatorColumn. Single mount per page.
+  const [pinDialogState, setPinDialogState] = useState<{
+    taskId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+  } | null>(null);
   const dayHeightPx = 24 * PIXELS_PER_HOUR;
 
   // Virtual scroll thinks linearly (`start = floor(scrollTop / dayHeightPx)`).
@@ -370,6 +379,9 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
                   collapses={effectiveCollapses}
+                  onTileContextMenu={(taskId, job, currentScheduledStart) =>
+                    setPinDialogState({ taskId, job, currentScheduledStart })
+                  }
                 />
               )}
               {mode === 'station' && selectedStation && (
@@ -390,6 +402,17 @@ export default function FocusPage({ mode }: FocusPageProps) {
           </div>
         </div>
       </div>
+
+      {/* V2 set-start-time dialog — opened by right-clicking any tile. */}
+      {pinDialogState && (
+        <SetStartTimeDialog
+          isOpen={true}
+          onClose={() => setPinDialogState(null)}
+          taskId={pinDialogState.taskId}
+          job={pinDialogState.job}
+          currentScheduledStart={pinDialogState.currentScheduledStart}
+        />
+      )}
     </div>
   );
 }
