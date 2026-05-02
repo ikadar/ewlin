@@ -18,5 +18,3 @@ export type { TileState, ColorClasses } from './colorUtils';
 export { getFieldValue, valuesMatch, compareSimilarity } from './similarityUtils';
 export type { SimilarityResult } from './similarityUtils';
 
-export { TileTooltip } from './TileTooltip';
-export type { TileTooltipProps } from './TileTooltip';

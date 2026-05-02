@@ -5,7 +5,6 @@ import { SaisieIndicator } from './SaisieIndicator';
 import { ProgressCaptureModal } from '../ProgressCaptureModal/ProgressCaptureModal';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
-import { TileTooltip } from './TileTooltip';
 import { getStateColorClasses, getStateRgb } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
@@ -203,26 +202,9 @@ export const Tile = memo(function Tile({
   cumulBeforeSlotPct = 30,   // V2 mock — engine will supply once the
   slotVolumePct = 35,        // snapshot exposes cumulativePositionPct.
 }: TileProps) {
-  // Tooltip + crosslink reveal moved from hover to double-click. Hover
-  // triggers were too noisy when scanning the grid; dblclick is an
-  // explicit user intent. Single click still selects, right-click still
-  // opens the context menu.
-  const [showTooltip, setShowTooltip] = useState(false);
   const crosslink = useHoverCrosslink(task.id);
-  // Auto-dismiss tooltip on the next document click (deferred to next
-  // tick so the dblclick that opened it doesn't immediately close it).
-  useEffect(() => {
-    if (!showTooltip) return;
-    const close = () => setShowTooltip(false);
-    const t = window.setTimeout(() => document.addEventListener('click', close), 0);
-    return () => {
-      window.clearTimeout(t);
-      document.removeEventListener('click', close);
-    };
-  }, [showTooltip]);
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowTooltip((v) => !v);
     if (isSelected) crosslink.onDoubleClick?.(e);
   };
   const { setupMinutes } = task.duration;
@@ -536,17 +518,6 @@ export const Tile = memo(function Tile({
           </div>
         )}
       </div>
-
-      {/* Fázis D: Rich tooltip (shown after 500ms hover on all tiles) */}
-      <TileTooltip
-        isVisible={showTooltip}
-        job={job}
-        element={element}
-        task={task}
-        assignment={assignment}
-        blockingInfo={blockingInfo}
-        isBlocked={isBlocked}
-      />
 
       {/* V2 progress-capture — modal opens from the SaisieIndicator click. */}
       {FEATURE_PROGRESS_CAPTURE_V2 && (
