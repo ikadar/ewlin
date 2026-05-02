@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planning vertical — réaction de la tuile à la saisie d'avancement</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    html { font-size: 13px; }
+
+    /* ── Flux design tokens ── */
+    :root {
+      --flux-elevated:       rgb(36 36 36);
+      --flux-border:         rgb(42 42 42);
+      --flux-border-light:   rgb(58 58 58);
+      --flux-text-primary:   rgb(245 245 245);
+      --flux-text-secondary: rgb(209 209 209);
+      --flux-text-tertiary:  rgb(161 161 161);
+
+      /* Tile state palette — copied verbatim from
+         apps/web/src/components/Tile/colorUtils.ts                                         */
+      --state-default-rgb:   59,130,246;   /* blue-500 — in-progress / planned */
+      --state-completed-rgb: 34,197,94;    /* green-500 — fait */
+      --state-shipped-rgb:   16,185,129;   /* emerald-500 */
+      --state-late-rgb:      239,68,68;    /* red-500 */
+      --state-conflict-rgb:  245,158,11;   /* amber-500 */
+    }
+    .text-flux-primary    { color: var(--flux-text-primary); }
+    .text-flux-secondary  { color: var(--flux-text-secondary); }
+    .text-flux-tertiary   { color: var(--flux-text-tertiary); }
+
+    /* ── Vertical planning grid ── */
+    .planning-grid {
+      display: flex;
+      background: rgb(9 9 11); /* zinc-950 */
+      border: 1px solid var(--flux-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .time-axis {
+      width: 48px;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(255,255,255,0.05);
+      background: rgba(24, 24, 27, 0.5);
+      position: relative;
+    }
+    .hour-label {
+      position: absolute;
+      left: 0; right: 4px;
+      transform: translateY(-50%);
+      text-align: right;
+      font-size: 10.5px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: var(--flux-text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+    .hour-label::after {
+      content: '';
+      position: absolute;
+      right: -4px; top: 50%;
+      width: 3px; height: 1px;
+      background: rgba(255,255,255,0.10);
+    }
+
+    .station-col {
+      flex: 1;
+      min-width: 220px;
+      position: relative;
+    }
+    .station-header {
+      position: sticky; top: 0;
+      padding: 8px 10px 6px;
+      background: rgb(24 24 27);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--flux-text-primary);
+      z-index: 6;
+    }
+    .station-body {
+      position: relative;
+      /* height set inline based on hours × pxPerHour */
+    }
+
+    /* Hour grid lines inside the station body */
+    .hour-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 1px;
+      background: rgba(255,255,255,0.03);
+      pointer-events: none;
+    }
+
+    /* ── Tile (vertical, mirrors apps/web Tile.tsx structure) ── */
+    .tile {
+      position: absolute;
+      left: 4px; right: 4px;
+      border-left: 4px solid;
+      border-right: 1px solid rgba(255,255,255,0.05);
+      border-top: 1px solid rgba(255,255,255,0.05);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      border-radius: 2px;
+      overflow: hidden;
+      transition: top 220ms ease, height 220ms ease;
+    }
+
+    .tile-default   { border-left-color: rgb(var(--state-default-rgb));   background: rgba(var(--state-default-rgb),   0.12); }
+    .tile-completed { border-left-color: rgb(var(--state-completed-rgb)); background: rgba(var(--state-completed-rgb), 0.09); }
+
+    .tile-label {
+      position: absolute;
+      top: 4px; left: 6px; right: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      line-height: 1.2;
+      color: var(--flux-text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 4;
+    }
+    .tile-default   .tile-label { color: rgb(147,197,253); }
+    .tile-completed .tile-label { color: rgb(134,239,172); }
+
+    .tile-pin {
+      position: absolute;
+      top: 5px; right: 5px;
+      width: 11px; height: 11px;
+      color: rgba(113, 113, 122, 0.8);
+      z-index: 4;
+    }
+
+    .tile-meta {
+      position: absolute;
+      left: 6px; right: 6px; bottom: 4px;
+      font-size: 9.5px;
+      color: var(--flux-text-tertiary);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 4;
+    }
+
+    /* Progress fill — top-down, height = elapsed × HOUR_PX (constant) */
+    .tile-fill {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      transition: height 220ms ease, background 200ms;
+      z-index: 1;
+    }
+    .fill-unknown { background: rgba(var(--state-default-rgb),   0.45); }
+    .fill-ok      { background: rgba(var(--state-completed-rgb), 0.45); }
+    .fill-late    { background: rgba(var(--state-late-rgb),      0.45); }
+
+    /* Theoretical line — horizontal across the tile */
+    .tile-theoretical {
+      position: absolute;
+      left: -1px; right: -1px;
+      height: 1.5px;
+      background: rgba(245, 245, 245, 0.85);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+      transition: top 220ms ease;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .tile-theoretical::before {
+      content: 'attendu';
+      position: absolute;
+      top: -2px;
+      right: 100%;
+      transform: translateY(-50%);
+      margin-right: 4px;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: rgba(245, 245, 245, 0.65);
+      font-weight: 600;
+      white-space: nowrap;
+      background: rgb(9 9 11);
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+
+    /* Now line — horizontal, across the column */
+    .now-line {
+      position: absolute;
+      left: -48px; right: 0;
+      height: 1.5px;
+      background: rgb(217 119 6);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+      z-index: 7;
+      pointer-events: none;
+    }
+    .now-line::before {
+      content: 'now · 10h45';
+      position: absolute;
+      top: -16px;
+      left: -48px;
+      font-size: 9.5px;
+      letter-spacing: 0.06em;
+      color: rgb(217 119 6);
+      font-weight: 700;
+      white-space: nowrap;
+      background: rgb(9 9 11);
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+
+    /* ── Saisie buttons ── */
+    .saisie-btn {
+      padding: 8px 12px;
+      background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .saisie-btn:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+    .saisie-btn.is-active           { background: rgb(var(--state-default-rgb));   border-color: rgba(var(--state-default-rgb), 1);   color: white; }
+    .saisie-btn.is-active.is-ok     { background: rgb(var(--state-completed-rgb)); border-color: rgba(var(--state-completed-rgb), 1); color: white; }
+    .saisie-btn.is-active.is-late   { background: rgb(var(--state-late-rgb));      border-color: rgba(var(--state-late-rgb), 1);      color: white; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen px-8 py-10">
+
+<div class="max-w-[1200px] mx-auto">
+
+  <!-- Header -->
+  <header class="mb-8">
+    <h1 class="text-2xl font-semibold">Planning vertical — réaction de la tuile active à la saisie</h1>
+    <p class="text-zinc-400 mt-2 text-[13px] leading-relaxed max-w-[880px]">
+      Reproduit la mécanique du planning de l'app — colonne par station, temps en
+      <strong>vertical (top → bas)</strong>, 80&nbsp;px/heure, tuile avec bordure gauche colorée + fond léger
+      en l'état de la tuile, label tronqué + icône pin (cf. <code>apps/web/src/components/Tile</code>).
+      La tuile <strong>F2</strong> est complétée par un <strong>remplissage qui descend de son haut jusqu'à
+      <em>now</em></strong> et un <strong>trait fin horizontal</strong> qui marque l'avancement théorique
+      attendu&nbsp;: la couleur du remplissage encode l'état —
+      <span class="text-blue-400 font-semibold">bleu (présumé)</span>,
+      <span class="text-emerald-400 font-semibold">vert (à l'heure / en avance)</span>,
+      <span class="text-red-400 font-semibold">rouge (en retard)</span>.
+    </p>
+    <p class="text-zinc-500 mt-3 text-[12px] leading-relaxed max-w-[880px]">
+      <strong class="text-zinc-300">Note méthodologique&nbsp;:</strong> chaque <em>Enregistrer</em> déclenche
+      un replan complet — l'algo peut alors réordonner les tuiles, les déplacer entre machines, ou casser
+      des cascades distantes. Ce qui est <strong>déterministe et donc UI-légitime</strong>, c'est l'effet sur
+      la tuile active elle-même. Le voisinage est territoire algo et n'est pas représenté ici.
+    </p>
+  </header>
+
+  <!-- Two columns: simulator (left) + planning (right) -->
+  <div class="grid grid-cols-[300px_1fr] gap-6 items-start">
+
+    <!-- Simulator -->
+    <section class="bg-zinc-900 border border-white/5 rounded p-4">
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+        Saisie simulée
+      </div>
+      <div class="text-[11px] text-flux-tertiary mb-3">Heure de fin estimée par l'opérateur sur F2.</div>
+      <div class="flex flex-col gap-2">
+        <button class="saisie-btn" data-end="" id="btn-none">Pas de saisie</button>
+        <button class="saisie-btn" data-end="11.0">11h00 · −1h</button>
+        <button class="saisie-btn" data-end="11.5">11h30 · −30min</button>
+        <button class="saisie-btn" data-end="12.0">12h00 · à l'heure</button>
+        <button class="saisie-btn" data-end="12.5">12h30 · +30min</button>
+        <button class="saisie-btn" data-end="13.0">13h00 · +1h</button>
+      </div>
+      <div class="mt-4 pt-3 border-t border-white/5">
+        <div class="text-[10.5px] uppercase tracking-wider text-flux-tertiary mb-1">État courant</div>
+        <div id="status-line" class="text-[12px] text-flux-secondary leading-relaxed">
+          Aucune saisie — on présume F2 finira à 12h00.
+        </div>
+      </div>
+    </section>
+
+    <!-- Planning -->
+    <section>
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Planning du jour</div>
+      <div class="planning-grid" style="max-width: 360px;">
+        <div class="time-axis" id="time-axis"></div>
+        <div class="station-col">
+          <div class="station-header">Heidelberg</div>
+          <div class="station-body" id="station-body">
+            <!-- Hour grid lines -->
+            <!-- Tiles + now-line injected by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Notes -->
+  <section class="mt-8 bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed mb-6">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Comment lire la tuile F2</div>
+    <ul class="space-y-1.5 list-disc list-inside">
+      <li><strong>Hauteur de la tuile</strong> = durée projetée (s'étend ou se contracte avec la saisie d'heure de fin).</li>
+      <li><strong>Remplissage</strong> = du haut de la tuile jusqu'à <em>now</em> — taille en pixels constante (75&nbsp;min × 80&nbsp;px/h).</li>
+      <li><strong>Trait blanc « attendu »</strong> = position théorique du volume en cours d'après le rythme initialement prévu. Au-dessus du fill = avance, en-dessous = retard.</li>
+      <li><strong>Couleur du remplissage</strong> :
+        <span class="text-blue-400">bleu</span> sans saisie (présumé OK),
+        <span class="text-emerald-400">vert</span> si fill ≥ attendu,
+        <span class="text-red-400">rouge</span> si fill &lt; attendu.
+      </li>
+      <li><strong>Pas de voisine montrée ici</strong> — chaque <em>Enregistrer</em> déclenche un replan, l'algo réordonne le reste du planning. Ce playground ne montre que ce qui est UI-déterministe&nbsp;: la tuile active.</li>
+    </ul>
+  </section>
+
+  <!-- Open questions -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">À ton retour</div>
+    <ol class="list-decimal list-inside space-y-1.5">
+      <li>La <strong>tuile F2</strong> reste sur le bleu <em>default</em> de l'app, et seul le remplissage prend la couleur d'état (bleu / vert / rouge). OK, ou tu veux que la tuile entière change de couleur&nbsp;?</li>
+      <li>Le <strong>label « attendu »</strong> à gauche du trait — visible, ou trop discret&nbsp;? Faut-il un libellé du tout&nbsp;?</li>
+      <li>L'animation de la tuile F2 (extension/contraction) à 220&nbsp;ms — bonne durée, ou on accélère/ralentit&nbsp;?</li>
+      <li>Les <strong>boutons saisie</strong> changent de couleur selon l'état (bleu/vert/rouge) quand actifs — utile, ou trop fort visuellement&nbsp;?</li>
+      <li>Faut-il aussi visualiser <strong>la fin projetée</strong> par un repère temporel (ex. petit triangle dans le time-axis à 12h30) en plus du redimensionnement de la tuile&nbsp;?</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+  // ── Constants ──
+  const START_HOUR    = 8;
+  const END_HOUR      = 16;
+  const HOUR_PX       = 80;
+  const NOW_HOUR      = 10.75;       // 10h45
+
+  const F1_START      = 9.0;
+  const F1_END        = 9.5;
+  const F2_START      = 9.5;
+  const F2_PLAN_END   = 12.0;
+
+  const HOURS_TOTAL   = END_HOUR - START_HOUR;
+  const BODY_HEIGHT   = HOURS_TOTAL * HOUR_PX;
+
+  // ── State ──
+  let projectedF2End = null;         // null = no saisie
+
+  // ── Helpers ──
+  function hToFr(h) {
+    const hr = Math.floor(h);
+    const mn = Math.round((h - hr) * 60);
+    return `${hr}h${String(mn).padStart(2, '0')}`;
+  }
+  function hToY(h) { return (h - START_HOUR) * HOUR_PX; }
+
+  // ── Build static parts ──
+  function buildTimeAxis() {
+    const axis = document.getElementById('time-axis');
+    axis.innerHTML = '';
+    axis.style.height = (BODY_HEIGHT + 36) + 'px'; // +36 = station header height
+    for (let h = START_HOUR; h <= END_HOUR; h++) {
+      const lbl = document.createElement('div');
+      lbl.className = 'hour-label';
+      lbl.style.top = (36 + hToY(h)) + 'px'; // +36 to align with station header
+      lbl.textContent = h + 'h';
+      axis.appendChild(lbl);
+    }
+  }
+
+  function buildStationBody() {
+    const body = document.getElementById('station-body');
+    body.style.height = BODY_HEIGHT + 'px';
+
+    // Hour lines
+    for (let h = START_HOUR + 1; h < END_HOUR; h++) {
+      const line = document.createElement('div');
+      line.className = 'hour-line';
+      line.style.top = hToY(h) + 'px';
+      body.appendChild(line);
+    }
+
+    // F1 — completed
+    const f1 = document.createElement('div');
+    f1.className = 'tile tile-completed';
+    f1.style.top = hToY(F1_START) + 'px';
+    f1.style.height = (F1_END - F1_START) * HOUR_PX + 'px';
+    f1.innerHTML = `
+      <svg class="tile-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+      <div class="tile-label">J-1247 · ACME</div>
+      <div class="tile-meta">${hToFr(F1_START)} → ${hToFr(F1_END)} · fait</div>
+    `;
+    body.appendChild(f1);
+
+    // F2 — active (built dynamically by update())
+    const f2 = document.createElement('div');
+    f2.className = 'tile tile-default';
+    f2.id = 'tile-f2';
+    f2.innerHTML = `
+      <div class="tile-fill fill-unknown" id="f2-fill"></div>
+      <div class="tile-theoretical" id="f2-theoretical"></div>
+      <svg class="tile-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+      <div class="tile-label">J-1247 · ACME</div>
+      <div class="tile-meta" id="f2-meta">9h30 → 12h00 · en cours</div>
+    `;
+    body.appendChild(f2);
+
+    // Now line
+    const now = document.createElement('div');
+    now.className = 'now-line';
+    now.style.top = hToY(NOW_HOUR) + 'px';
+    body.appendChild(now);
+  }
+
+  // ── Dynamic update ──
+  function update() {
+    const projected = projectedF2End ?? F2_PLAN_END;
+    const elapsed = NOW_HOUR - F2_START;
+    const planned = F2_PLAN_END - F2_START;
+    const projectedDur = projected - F2_START;
+
+    // F2 tile size
+    const f2 = document.getElementById('tile-f2');
+    f2.style.top = hToY(F2_START) + 'px';
+    f2.style.height = projectedDur * HOUR_PX + 'px';
+
+    // Fill height = elapsed × HOUR_PX (constant)
+    const fillHeight = elapsed * HOUR_PX;
+    const fill = document.getElementById('f2-fill');
+    fill.style.height = fillHeight + 'px';
+
+    // Theoretical Y inside tile
+    const theoreticalY = elapsed * (projectedDur / planned) * HOUR_PX;
+    const tline = document.getElementById('f2-theoretical');
+    tline.style.top = theoreticalY + 'px';
+
+    // Color
+    let cls;
+    if (projectedF2End === null) cls = 'fill-unknown';
+    else if (fillHeight >= theoreticalY - 0.5) cls = 'fill-ok';
+    else cls = 'fill-late';
+    fill.className = 'tile-fill ' + cls;
+
+    // F2 meta
+    document.getElementById('f2-meta').textContent =
+      `9h30 → ${hToFr(projected)} · en cours`;
+
+    // Buttons active state
+    document.querySelectorAll('.saisie-btn').forEach(btn => {
+      const v = btn.dataset.end;
+      const isActive = (v === '' && projectedF2End === null) ||
+                       (v !== '' && parseFloat(v) === projectedF2End);
+      btn.classList.toggle('is-active', isActive);
+      btn.classList.toggle('is-ok',   isActive && cls === 'fill-ok');
+      btn.classList.toggle('is-late', isActive && cls === 'fill-late');
+    });
+
+    // Status
+    let status;
+    if (projectedF2End === null) {
+      status = 'Aucune saisie — on présume F2 finira à 12h00.';
+    } else {
+      const deltaMin = (projected - F2_PLAN_END) * 60;
+      if (Math.abs(deltaMin) < 1) {
+        status = `L'opérateur confirme à ${hToFr(projected)} — à l'heure.`;
+      } else if (deltaMin < 0) {
+        status = `Fin estimée ${hToFr(projected)} — ${Math.round(-deltaMin)} min en avance.`;
+      } else {
+        status = `Fin estimée ${hToFr(projected)} — ${Math.round(deltaMin)} min en retard.`;
+      }
+    }
+    document.getElementById('status-line').textContent = status;
+  }
+
+  // ── Wire up buttons ──
+  document.querySelectorAll('.saisie-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.end;
+      projectedF2End = v === '' ? null : parseFloat(v);
+      update();
+    });
+  });
+
+  // ── Init ──
+  buildTimeAxis();
+  buildStationBody();
+  update();
+</script>
+
+</body>
+</html>

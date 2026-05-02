@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tuile — icône saisie (3 états) + menu contextuel nettoyé</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    html { font-size: 13px; }
+
+    :root {
+      --flux-elevated:       rgb(36 36 36);
+      --flux-border:         rgb(42 42 42);
+      --flux-border-light:   rgb(58 58 58);
+      --flux-text-primary:   rgb(245 245 245);
+      --flux-text-secondary: rgb(209 209 209);
+      --flux-text-tertiary:  rgb(161 161 161);
+
+      --state-default-rgb:   59,130,246;
+      --state-completed-rgb: 34,197,94;
+      --hourly-rgb:          59,130,246;
+      --tileend-rgb:         245,158,11;   /* amber-500 — icône tile-end */
+      --attention-rgb:       249,115,22;   /* orange-500 — pulse tuile pour tile-end */
+    }
+    .text-flux-primary    { color: var(--flux-text-primary); }
+    .text-flux-secondary  { color: var(--flux-text-secondary); }
+    .text-flux-tertiary   { color: var(--flux-text-tertiary); }
+
+    /* Vertical planning grid — same convention as planning-saisie-effect.html */
+    .planning-grid { display: flex; background: rgb(9 9 11); border: 1px solid var(--flux-border); border-radius: 6px; overflow: hidden; }
+    .time-axis { width: 48px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.05); background: rgba(24,24,27,0.5); position: relative; }
+    .hour-label { position: absolute; left: 0; right: 4px; transform: translateY(-50%); text-align: right; font-size: 10.5px; font-family: ui-monospace, monospace; color: var(--flux-text-tertiary); font-variant-numeric: tabular-nums; }
+    .hour-label::after { content:''; position:absolute; right:-4px; top:50%; width:3px; height:1px; background:rgba(255,255,255,0.10); }
+    .station-col { flex: 1; min-width: 240px; position: relative; }
+    .station-header { position: sticky; top: 0; padding: 8px 10px 6px; background: rgb(24 24 27); border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--flux-text-primary); z-index: 6; }
+    .station-body { position: relative; }
+    .hour-line { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.03); pointer-events: none; }
+
+    /* Tile */
+    .tile {
+      position: absolute; left: 4px; right: 4px;
+      border-left: 4px solid; border-right: 1px solid rgba(255,255,255,0.05);
+      border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05);
+      border-radius: 2px; overflow: hidden;
+      cursor: pointer;
+    }
+    .tile-default   { border-left-color: rgb(var(--state-default-rgb));   background: rgba(var(--state-default-rgb),   0.12); }
+    .tile-completed { border-left-color: rgb(var(--state-completed-rgb)); background: rgba(var(--state-completed-rgb), 0.09); }
+
+    /* Hourly: pulse en opacité pure (pas de changement de couleur). Cycle
+       1,6s aligné sur tile-end pour cohérence rythmique ; la sémantique
+       reste portée par la couleur (présente au tile-end, absente ici). */
+    .tile.tile-hourly-active {
+      animation: pulse-tile-opacity 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse-tile-opacity {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
+
+    /* Tile-end: pulse de la tuile vers et depuis l'orange. Synchronisé
+       avec le pulse de l'icône (1,6s, ease-in-out). Le code orange est
+       distinct des autres états métier (default, completed, late, etc.). */
+    .tile.tile-end-active {
+      animation: pulse-tile-attention 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse-tile-attention {
+      0%, 100% {
+        background: rgba(var(--state-default-rgb), 0.12);
+        border-left-color: rgb(var(--state-default-rgb));
+        box-shadow: 0 0 0 0 rgba(var(--attention-rgb), 0);
+      }
+      50% {
+        background: rgba(var(--attention-rgb), 0.22);
+        border-left-color: rgb(var(--attention-rgb));
+        box-shadow: 0 0 0 2px rgba(var(--attention-rgb), 0.32);
+      }
+    }
+
+    .tile-header-row {
+      position: absolute; top: 4px; left: 6px; right: 6px;
+      display: flex; align-items: center; gap: 6px;
+      z-index: 4;
+    }
+    .tile-label-text {
+      font-size: 11.5px; font-weight: 500; line-height: 1.2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1;
+    }
+    .tile-default   .tile-label-text { color: rgb(147,197,253); }
+    .tile-completed .tile-label-text { color: rgb(134,239,172); }
+
+    .tile-meta {
+      position: absolute; left: 6px; right: 6px; bottom: 4px;
+      font-size: 9.5px; color: var(--flux-text-tertiary);
+      font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Saisie indicator (3 states) */
+    .saisie-icon {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 200ms, opacity 200ms, box-shadow 200ms;
+      position: relative;
+    }
+    .saisie-icon svg { width: 9px; height: 9px; opacity: 0.9; }
+    .saisie-icon.state-inactive {
+      background: transparent;
+      border: 1.5px solid rgba(161,161,170,0.45);
+      opacity: 0.55;
+    }
+    .saisie-icon.state-inactive svg { color: rgba(161,161,170,0.7); }
+    .saisie-icon.state-inactive:hover { opacity: 1; }
+    .saisie-icon.state-hourly {
+      background: rgb(var(--hourly-rgb));
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
+    }
+    .saisie-icon.state-hourly svg { color: white; }
+    .saisie-icon.state-tileend {
+      background: rgb(var(--tileend-rgb));
+      box-shadow: 0 0 0 2px rgba(245,158,11,0.30);
+      animation: pulse-amber 1.6s ease-in-out infinite;
+    }
+    .saisie-icon.state-tileend svg { color: white; }
+
+    @keyframes pulse-amber {
+      0%, 100% {
+        box-shadow: 0 0 0 2px rgba(245,158,11,0.30);
+      }
+      50% {
+        box-shadow: 0 0 0 6px rgba(245,158,11,0.05);
+      }
+    }
+
+    /* Pin icon — keeps existing position next to saisie */
+    .pin-icon {
+      width: 11px; height: 11px;
+      color: rgba(113,113,122,0.7);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .pin-icon:hover { color: rgba(245,158,11,0.8); }
+
+    /* Now line */
+    .now-line {
+      position: absolute; left: -48px; right: 0;
+      height: 1.5px; background: rgb(217 119 6);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+      z-index: 7; pointer-events: none;
+    }
+    .now-line::before {
+      content: 'now'; position: absolute; top: -16px; left: -48px;
+      font-size: 9.5px; letter-spacing: 0.06em; color: rgb(217 119 6);
+      font-weight: 700; background: rgb(9 9 11); padding: 1px 3px; border-radius: 2px;
+    }
+
+    /* Simulator buttons */
+    .sim-btn {
+      padding: 8px 12px; background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary); border-radius: 4px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: background 120ms; text-align: left; width: 100%;
+    }
+    .sim-btn:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+    .sim-btn.is-active.is-inactive { background: rgb(63 63 70); color: white; border-color: rgb(82 82 91); }
+    .sim-btn.is-active.is-hourly   { background: rgb(var(--hourly-rgb));  color: white; border-color: rgb(96 165 250); }
+    .sim-btn.is-active.is-tileend  { background: rgb(var(--tileend-rgb)); color: white; border-color: rgb(252 211 77); }
+
+    /* Context menu — copies the conventions of TileContextMenu.tsx */
+    .ctx-menu {
+      position: fixed; z-index: 9999;
+      background: rgb(39 39 42);  /* zinc-800 */
+      border: 1px solid rgb(63 63 70); /* zinc-700 */
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      padding: 4px 0;
+      min-width: 200px;
+      display: none;
+    }
+    .ctx-menu.open { display: block; }
+    .ctx-item {
+      width: 100%; display: flex; align-items: center; gap: 12px;
+      padding: 8px 12px; font-size: 13px; color: rgb(228 228 231);
+      cursor: pointer; border: none; background: transparent;
+      text-align: left; transition: background 80ms;
+    }
+    .ctx-item:hover { background: rgb(63 63 70); }
+    .ctx-item-icon { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: rgb(161 161 170); }
+    .ctx-sep { height: 1px; background: rgb(63 63 70); margin: 4px 0; }
+
+    /* Toast (after click) */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: rgb(24 24 27);
+      border: 1px solid var(--flux-border-light);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px; color: var(--flux-text-primary);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 200ms, transform 200ms;
+      z-index: 10000;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Schedule dialog (sub-modal for "Définir heure de début…") ── */
+    .sd-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9998;
+      display: none; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .sd-overlay.open { display: flex; }
+
+    .sd-dialog {
+      background: var(--flux-elevated);
+      border: 1px solid var(--flux-border);
+      border-radius: 8px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      width: 100%;
+      max-width: 460px;
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+    }
+    .sd-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--flux-border);
+    }
+    .sd-title { display: flex; align-items: center; gap: 8px; color: var(--flux-text-primary); font-size: 13px; font-weight: 600; }
+    .sd-title svg { color: rgb(96 165 250); }
+    .sd-close-btn { background: transparent; border: none; color: var(--flux-text-tertiary); cursor: pointer; font-size: 20px; line-height: 1; padding: 4px 8px; border-radius: 4px; }
+    .sd-close-btn:hover { background: rgba(255,255,255,0.05); color: var(--flux-text-primary); }
+
+    .sd-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 14px; }
+    .sd-tile-info { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px 10px; }
+    .sd-tile-name { font-size: 12.5px; font-weight: 600; color: var(--flux-text-primary); }
+    .sd-tile-current { font-size: 11px; color: var(--flux-text-tertiary); margin-top: 2px; }
+
+    .sd-section-title {
+      font-size: 10px; letter-spacing: 0.06em;
+      color: var(--flux-text-tertiary); font-weight: 600;
+      margin-bottom: 6px; text-transform: uppercase;
+    }
+
+    /* Calendar */
+    .calendar { background: rgb(28 28 30); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px; }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px; }
+    .cal-nav { background: transparent; border: none; color: var(--flux-text-secondary); cursor: pointer; padding: 2px 10px; font-size: 16px; border-radius: 3px; line-height: 1; }
+    .cal-nav:hover { background: rgba(255,255,255,0.05); color: var(--flux-text-primary); }
+    .cal-month { font-size: 12px; color: var(--flux-text-primary); font-weight: 600; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-dow { text-align: center; font-size: 10px; color: var(--flux-text-tertiary); padding: 4px 2px; font-weight: 600; }
+    .cal-day {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--flux-text-secondary);
+      font-size: 12px; padding: 6px 0;
+      cursor: pointer; border-radius: 4px;
+      text-align: center;
+      font-family: ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      transition: background 80ms;
+    }
+    .cal-day:hover:not(.cal-disabled):not(.cal-empty) { background: rgba(255,255,255,0.05); color: var(--flux-text-primary); }
+    .cal-empty { cursor: default; pointer-events: none; }
+    .cal-disabled { color: rgba(161,161,170,0.25); cursor: not-allowed; }
+    .cal-disabled:hover { background: transparent; }
+    .cal-today { border-color: rgb(217 119 6); }
+    .cal-closure { color: rgba(252,165,165,0.55); border: 1px dashed rgba(239,68,68,0.35); }
+    .cal-selected { background: rgb(37 99 235) !important; color: white !important; border-color: rgb(96 165 250) !important; }
+
+    /* Time control inside the schedule dialog */
+    .sd-time { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .sd-time input {
+      width: 5.5rem; padding: 8px 10px;
+      background: rgb(28 28 30); border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-primary); border-radius: 4px;
+      text-align: center; font-family: ui-monospace, monospace;
+      font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600;
+      outline: none; transition: border-color 120ms;
+    }
+    .sd-time input:focus { border-color: rgb(59 130 246); }
+    .sd-time-step {
+      padding: 8px 12px; background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary); border-radius: 4px;
+      cursor: pointer; font-weight: 600; font-size: 14px; line-height: 1;
+    }
+    .sd-time-step:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+    .sd-time-note { font-size: 11px; color: var(--flux-text-tertiary); margin-left: 4px; }
+
+    /* Feasibility */
+    .feas {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 9px 11px; border-radius: 4px;
+      font-size: 12px; line-height: 1.4;
+    }
+    .feas-ok { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.28); color: rgb(110 231 183); }
+    .feas-warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.28); color: rgb(252 211 77); }
+    .feas-icon { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
+    .feas-content { flex: 1; }
+    .feas-title { font-weight: 600; font-size: 12px; }
+    .feas-detail { font-size: 11px; opacity: 0.85; margin-top: 2px; font-family: ui-monospace, monospace; }
+
+    /* Footer */
+    .sd-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--flux-border); }
+    .sd-btn-secondary {
+      padding: 8px 16px; background: rgb(63 63 70); color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: background 120ms;
+    }
+    .sd-btn-secondary:hover { background: rgb(82 82 91); }
+    .sd-btn-primary {
+      padding: 8px 16px; background: rgb(37 99 235); color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: background 120ms;
+    }
+    .sd-btn-primary:hover { background: rgb(59 130 246); }
+
+    /* ── Progress modal v6 (improved version of tile-progress-modal.html) ── */
+    .pm-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9997;
+      display: none; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .pm-overlay.open { display: flex; }
+
+    .pm-dialog {
+      background: var(--flux-elevated);
+      border: 1px solid var(--flux-border);
+      border-radius: 8px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      width: 100%;
+      max-width: 480px;
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+    }
+
+    .pm-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--flux-border);
+    }
+    .pm-title { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .pm-title svg { color: var(--flux-text-primary); flex-shrink: 0; }
+    .pm-title-text { font-size: 13px; font-weight: 600; color: var(--flux-text-primary); }
+
+    .pm-close-btn {
+      background: transparent; border: none;
+      color: var(--flux-text-tertiary); cursor: pointer;
+      font-size: 20px; line-height: 1;
+      padding: 4px 8px; border-radius: 4px;
+    }
+    .pm-close-btn:hover { background: rgba(255,255,255,0.05); color: var(--flux-text-primary); }
+
+    .pm-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+    .pm-job-name { font-size: 13.5px; font-weight: 600; color: var(--flux-text-primary); }
+    .pm-job-machine { font-size: 11.5px; color: var(--flux-text-tertiary); margin-top: 2px; }
+
+    .pm-slot {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 4px;
+      padding: 10px 12px;
+    }
+    .pm-slot-label {
+      font-size: 10px; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--flux-text-tertiary);
+      font-weight: 600; margin-bottom: 4px;
+    }
+    .pm-slot-range {
+      font-family: ui-monospace, monospace;
+      font-size: 14px; font-weight: 600;
+      color: var(--flux-text-primary);
+    }
+    .pm-slot-expectation {
+      font-size: 12px; color: var(--flux-text-secondary);
+      margin-top: 6px; line-height: 1.4;
+    }
+    .pm-slot-expectation strong { color: var(--flux-text-primary); }
+    .pm-expect-label { font-size: 11px; color: var(--flux-text-tertiary); margin-bottom: 4px; }
+    .pm-expect-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 12px; padding: 1px 0;
+    }
+    .pm-expect-time { color: var(--flux-text-tertiary); font-size: 11.5px; }
+    .pm-expect-time .pm-now-badge {
+      font-size: 10px; padding: 1px 6px; margin-left: 4px;
+      border-radius: 999px;
+      background: rgba(217,119,6,0.15);
+      color: rgb(252,211,77);
+      letter-spacing: 0.04em;
+    }
+    .pm-expect-value {
+      font-family: ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      color: var(--flux-text-primary);
+      font-weight: 600; font-size: 12.5px;
+    }
+
+    /* Toggle text ↔ jauge */
+    .pm-slot-expectation[data-rep="text"]  .pm-expect-gauge { display: none; }
+    .pm-slot-expectation[data-rep="gauge"] .pm-expect-text  { display: none; }
+
+    /* Gauge representation — 100% job scale, with the active slot isolated as a band */
+    .gauge-block { margin-top: 4px; }
+    .gauge-track {
+      position: relative;
+      height: 10px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+      margin: 26px 0 6px;
+    }
+    /* Slot zone — a distinct band on the bar showing this slot's portion of the job */
+    .gauge-slot-zone {
+      position: absolute;
+      top: 0; bottom: 0;
+      background: rgba(255,255,255,0.10);
+      transition: left 220ms ease, width 220ms ease;
+    }
+    .gauge-slot-zone::before, .gauge-slot-zone::after {
+      content: '';
+      position: absolute;
+      top: -3px; bottom: -3px;
+      width: 1.5px;
+      background: rgba(255,255,255,0.45);
+      border-radius: 1px;
+    }
+    .gauge-slot-zone::before { left: 0; }
+    .gauge-slot-zone::after  { right: 0; }
+    /* Slot fill — green, from slot-zone left edge to current expected progress */
+    .gauge-slot-fill {
+      position: absolute;
+      top: 1px; bottom: 1px;
+      left: 0;
+      background: rgba(16,185,129,0.55);
+      border-radius: 1px;
+      transition: width 220ms ease;
+    }
+    /* Cumulative-now marker — vertical line at job-cumulative position */
+    .gauge-marker {
+      position: absolute;
+      top: -4px; bottom: -4px;
+      width: 2px;
+      background: rgb(245 245 245);
+      border-radius: 1px;
+      transition: left 220ms ease;
+    }
+    .gauge-marker-label {
+      position: absolute;
+      bottom: 100%; left: 50%;
+      transform: translateX(-50%);
+      font-size: 10.5px;
+      font-family: ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      color: var(--flux-text-primary);
+      white-space: nowrap;
+      padding: 2px 7px;
+      margin-bottom: 4px;
+      background: rgb(36 36 36);
+      border: 1px solid var(--flux-border-light);
+      border-radius: 3px;
+      font-weight: 600;
+    }
+    .gauge-marker-label::after {
+      content: '';
+      position: absolute;
+      top: 100%; left: 50%;
+      transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid var(--flux-border-light);
+    }
+    .gauge-endpoints {
+      display: flex; justify-content: space-between;
+      font-size: 10.5px;
+      color: var(--flux-text-tertiary);
+      font-family: ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .gauge-endpoints strong { color: var(--flux-text-secondary); }
+    .gauge-slot-info {
+      font-size: 10.5px;
+      color: var(--flux-text-tertiary);
+      margin-top: 6px;
+    }
+    .gauge-slot-info strong { color: var(--flux-text-secondary); font-weight: 600; }
+
+    /* Representation toggle (in simulator panel) */
+    .rep-btn {
+      flex: 1; padding: 6px 10px;
+      background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary);
+      border-radius: 4px;
+      font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: background 120ms;
+    }
+    .rep-btn:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+    .rep-btn.is-active {
+      background: rgb(59 130 246);
+      border-color: rgb(96 165 250);
+      color: white;
+    }
+
+    .pm-question {
+      font-size: 13px; color: var(--flux-text-primary);
+      font-weight: 500; margin-top: 4px;
+    }
+
+    /* Layout en T : À l'heure massif au-dessus, ajustements compacts en dessous */
+    .pm-quick { display: flex; flex-direction: column; gap: 8px; }
+    .pm-adjust-row { display: flex; gap: 6px; }
+
+    /* Base styling — applied primarily to the 6 adjustment buttons (compact) */
+    .pm-quick-btn {
+      padding: 8px 10px;
+      background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary);
+      border-radius: 6px;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: background 120ms, color 120ms, border-color 120ms;
+      font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums;
+      flex: 1;
+    }
+    .pm-quick-btn:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+
+    /* "À l'heure" — massive full-width primary action target.
+       Override most of the base styles for visual dominance. */
+    .pm-quick-btn.is-ontime {
+      width: 100%;
+      flex: none;
+      padding: 16px 20px;
+      background: rgba(16,185,129,0.12);
+      border: 1.5px solid rgba(16,185,129,0.45);
+      color: rgb(167,243,208);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border-radius: 8px;
+    }
+    .pm-quick-btn.is-ontime:hover { background: rgba(16,185,129,0.22); }
+    .pm-quick-btn.is-ontime.is-active {
+      background: rgba(16,185,129,0.32);
+      border-color: rgba(16,185,129,0.70);
+    }
+
+    /* Late-shift quick buttons — amber tint when active */
+    .pm-quick-btn.is-late.is-active {
+      background: rgba(245,158,11,0.18);
+      border-color: rgba(245,158,11,0.50);
+      color: rgb(252,211,77);
+    }
+
+    /* Early-shift quick buttons — emerald tint when active (positive,
+       same family as À l'heure since being early is a good outcome) */
+    .pm-quick-btn.is-early.is-active {
+      background: rgba(16,185,129,0.16);
+      border-color: rgba(16,185,129,0.45);
+      color: rgb(110,231,183);
+    }
+
+    .pm-custom { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pm-custom-label { font-size: 11.5px; color: var(--flux-text-tertiary); }
+    .pm-custom-controls { display: flex; align-items: center; gap: 4px; }
+    .pm-custom input {
+      width: 5rem; padding: 8px 10px;
+      background: rgb(28 28 30);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-primary); border-radius: 4px;
+      text-align: center;
+      font-family: ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 14px; font-weight: 600;
+      outline: none; transition: border-color 120ms;
+    }
+    .pm-custom input:focus { border-color: rgb(59 130 246); }
+    .pm-custom-step {
+      padding: 8px 12px; background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary); border-radius: 4px;
+      cursor: pointer; font-weight: 600; font-size: 14px; line-height: 1;
+    }
+    .pm-custom-step:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+
+    .pm-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; padding: 9px 11px;
+      border-radius: 4px;
+      transition: background 120ms, color 120ms;
+    }
+    .pm-status.is-ontime  { background: rgba(16,185,129,0.08); color: rgb(110,231,183); }
+    .pm-status.is-avance  { background: rgba(16,185,129,0.06); color: rgb(110,231,183); }
+    .pm-status.is-retard  { background: rgba(245,158,11,0.08); color: rgb(252,211,77); }
+    .pm-status svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .pm-footer {
+      display: flex; justify-content: flex-end; gap: 8px;
+      padding: 12px 18px;
+      border-top: 1px solid var(--flux-border);
+    }
+    .pm-btn-secondary {
+      padding: 8px 16px; background: rgb(63 63 70);
+      color: white; border: none; border-radius: 4px;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: background 120ms;
+    }
+    .pm-btn-secondary:hover { background: rgb(82 82 91); }
+    .pm-btn-primary {
+      padding: 8px 16px; background: rgb(37 99 235);
+      color: white; border: none; border-radius: 4px;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: background 120ms;
+    }
+    .pm-btn-primary:hover { background: rgb(59 130 246); }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen px-8 py-10">
+
+<div class="max-w-[1200px] mx-auto">
+
+  <!-- Header -->
+  <header class="mb-8">
+    <h1 class="text-2xl font-semibold">Tuile — icône saisie (3 états) + menu contextuel nettoyé</h1>
+    <p class="text-zinc-400 mt-2 text-[13px] leading-relaxed max-w-[880px]">
+      Deux changements visuels sur la tuile, illustrés ensemble&nbsp;:
+      <strong>(1)</strong> une icône saisie remplace l'ancienne case de complétion ; elle prend trois états selon
+      le contexte (inactive, hourly, tile-end). <strong>(2)</strong> Le clic droit ouvre un menu contextuel
+      simplifié à 3 items pour le contexte prod, conformément aux décisions du doc design.
+    </p>
+    <p class="text-zinc-500 mt-3 text-[12px] leading-relaxed max-w-[880px]">
+      Joue avec le simulateur à gauche pour voir l'icône changer d'état. Clic-droit sur la tuile F2 pour voir
+      le nouveau menu. Click sur l'icône → toast (en vrai, ça ouvrirait la modale d'avancement v5).
+    </p>
+  </header>
+
+  <!-- Two columns: simulator (left) + planning (right) -->
+  <div class="grid grid-cols-[280px_1fr] gap-6 items-start">
+
+    <!-- Simulator -->
+    <section class="bg-zinc-900 border border-white/5 rounded p-4">
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+        État de l'icône saisie
+      </div>
+      <div class="flex flex-col gap-2">
+        <button class="sim-btn is-inactive" data-state="inactive">Inactif (par défaut)</button>
+        <button class="sim-btn is-hourly"   data-state="hourly">Saisie suggérée — hourly</button>
+        <button class="sim-btn is-tileend"  data-state="tileend">Saisie attendue — tile-end</button>
+      </div>
+
+      <div class="mt-5 pt-4 border-t border-white/5">
+        <div class="text-[10.5px] uppercase tracking-wider text-flux-tertiary mb-2">État courant</div>
+        <div id="current-state-label" class="text-[12px] text-flux-secondary leading-relaxed">
+          Aucun trigger actif. L'icône reste cliquable à tout moment pour saisie proactive.
+        </div>
+      </div>
+
+      <div class="mt-5 pt-4 border-t border-white/5">
+        <div class="text-[10.5px] uppercase tracking-wider text-flux-tertiary mb-2">Légende</div>
+        <ul class="text-[11px] text-flux-tertiary space-y-1.5">
+          <li><span class="inline-block w-2.5 h-2.5 rounded-full" style="border:1.5px solid rgba(161,161,170,0.45);background:transparent;"></span>&nbsp; rond gris pâle = inactif</li>
+          <li><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:rgb(59 130 246);"></span>&nbsp; bleu plein (icône) + pulse opacité (tuile) = hourly</li>
+          <li><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:rgb(245 158 11);"></span>&nbsp; amber pulsé (icône) = tile-end</li>
+          <li><span class="inline-block w-2.5 h-2.5 rounded" style="background:rgb(249 115 22);"></span>&nbsp; pulse vers/depuis l'orange (tuile) = tile-end</li>
+        </ul>
+      </div>
+
+      <div class="mt-5 pt-4 border-t border-white/5">
+        <div class="text-[10.5px] uppercase tracking-wider text-flux-tertiary mb-2">
+          Modale &middot; volume attendu
+        </div>
+        <div class="flex gap-2">
+          <button class="rep-btn is-active" data-rep="text">Texte</button>
+          <button class="rep-btn" data-rep="gauge">Jauge</button>
+        </div>
+        <div class="text-[10.5px] text-flux-tertiary mt-2 leading-relaxed">
+          Bascule la représentation du volume attendu dans la modale. Réouvre la modale (clic sur l'icône saisie ou clic-droit → Saisir) pour voir l'effet.
+        </div>
+      </div>
+    </section>
+
+    <!-- Planning -->
+    <section>
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+        Planning (clic droit sur F2 pour le menu, click sur le rond pour la saisie)
+      </div>
+      <div class="planning-grid" style="max-width: 360px;">
+        <div class="time-axis" id="time-axis"></div>
+        <div class="station-col">
+          <div class="station-header">Heidelberg</div>
+          <div class="station-body" id="station-body"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Right-click menu spec -->
+  <section class="mt-8 bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed mb-6">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+      Menu contextuel — avant / après (contexte prod)
+    </div>
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <div class="text-zinc-500 font-semibold text-[12px] mb-2">✕ Avant — 6 items</div>
+        <ol class="list-decimal list-inside space-y-1 text-zinc-400">
+          <li>Voir détails</li>
+          <li>Marquer terminé / non terminé <span class="text-red-400">⟶ retiré</span></li>
+          <li>Épingler / Désépingler</li>
+          <li>Rappeler (désassigner) <span class="text-red-400">⟶ retiré (admin)</span></li>
+          <li>Diviser <span class="text-red-400">⟶ retiré (algo-driven)</span></li>
+          <li>Fusionner <span class="text-red-400">⟶ retiré (algo-driven)</span></li>
+        </ol>
+      </div>
+      <div>
+        <div class="text-emerald-300 font-semibold text-[12px] mb-2">✓ Après — 4 items</div>
+        <ol class="list-decimal list-inside space-y-1">
+          <li>Voir détails</li>
+          <li><strong>Saisir l'avancement</strong> <span class="text-emerald-400 text-[11px]">(nouveau)</span></li>
+          <li>Épingler / Désépingler</li>
+          <li><strong>Définir heure de début…</strong> <span class="text-emerald-400 text-[11px]">(nouveau)</span></li>
+        </ol>
+        <p class="mt-3 text-flux-tertiary text-[11px]">
+          Le 4<sup>e</sup> item ouvre un sub-dialog jour/heure puis crée un pin paramétré. Mécanique :
+          si le créneau est dispo → pin direct ; sinon → slide-to-nearest + warning modale (comportement
+          Pin existant verbatim, on n'invente rien). Permet aussi de <em>déplacer un pin</em> en place
+          sans avoir à unpin → re-pin.
+        </p>
+        <p class="mt-2 text-flux-tertiary text-[11px]">
+          Note : le menu admin/préprod peut conserver les items algo (Rappeler, Diviser, Fusionner).
+          Le composant <code>TileContextMenu</code> les expose déjà comme props optionnelles ; chaque vue
+          ne passe que ce qui lui est pertinent.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Behavior rules -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed mb-6">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+      Règles de l'icône saisie
+    </div>
+    <ul class="space-y-1.5 list-disc list-inside">
+      <li><strong>Inactif</strong> par défaut — petit rond gris, ~55% d'opacité, hover à 100%. Cliquable même sans trigger pour <em>saisie proactive</em> de l'opérateur.</li>
+      <li><strong>Hourly</strong> — apparaît à chaque heure pleine pendant qu'une tuile est in-progress, sauf si une saisie a eu lieu dans les 30 dernières min (debounce). <strong>Double signal subtil</strong> : icône bleu plein + <em>pulse en opacité pure</em> sur la tuile entière (cycle 1,6 s, pas de changement de couleur). Le signal est présent dans le champ visuel sans mobiliser un code couleur.</li>
+      <li><strong>Tile-end</strong> — apparaît quand <code>now ≥ scheduledEnd</code>. <strong>Double signal synchronisé en couleur</strong> : la tuile entière pulse <em>vers et depuis l'orange</em> (cycle 1,6 s), l'icône amber pulse au même rythme. L'orange est distinct des codes métier (default, completed, late, conflict) — il ne signifie qu'« un moment de saisie ». Si l'opérateur n'agit pas, l'auto-completion silencieuse prend le relais.</li>
+      <li><strong>Click → modale</strong> — quel que soit l'état. La modale est la seule porte d'entrée à la saisie.</li>
+      <li><strong>Position de l'icône</strong> — coin haut-gauche du label, au même endroit que l'ancienne <code>CompletionToggleIcon</code>. Suit l'icône Pin.</li>
+    </ul>
+  </section>
+
+  <!-- Open questions -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">À ton retour</div>
+    <ol class="list-decimal list-inside space-y-1.5">
+      <li>L'<strong>icône inactive</strong> à 55% d'opacité — assez discrète, ou trop discrète (risque d'être ignorée pour la saisie proactive)&nbsp;?</li>
+      <li>Le <strong>pulse amber tile-end</strong> à 1,6 s — bon rythme, ou trop rapide / trop lent&nbsp;?</li>
+      <li>L'<strong>ordre dans le menu</strong> contextuel (Détails / Saisir / Épingler) — bon, ou tu préfères Saisir en premier (puisque c'est l'action principale) ?</li>
+      <li>Le <strong>séparateur</strong> dans le menu — utile (pour grouper Détails seul vs Actions), ou superflu sur 3 items&nbsp;?</li>
+      <li>Faut-il <strong>fermer l'icône</strong> immédiatement après une saisie réussie (revenir en inactif), ou attendre quelques secondes pour confirmation visuelle&nbsp;?</li>
+    </ol>
+  </section>
+</div>
+
+<!-- Context menu (portal-like, hidden by default) -->
+<div class="ctx-menu" id="ctx-menu" role="menu">
+  <button class="ctx-item" data-action="details">
+    <span class="ctx-item-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    </span>
+    Voir détails
+  </button>
+  <button class="ctx-item" data-action="saisie">
+    <span class="ctx-item-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+    </span>
+    Saisir l'avancement
+  </button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" data-action="pin">
+    <span class="ctx-item-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="17" x2="12" y2="22"/>
+        <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+      </svg>
+    </span>
+    Épingler
+  </button>
+  <button class="ctx-item" data-action="schedule-start">
+    <span class="ctx-item-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    </span>
+    Définir heure de début…
+  </button>
+</div>
+
+<!-- Schedule dialog (sub-modal opened from "Définir heure de début…") -->
+<div class="sd-overlay" id="sd-overlay">
+  <div class="sd-dialog" role="dialog" aria-labelledby="sd-title-text">
+    <!-- Header -->
+    <div class="sd-header">
+      <div class="sd-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span id="sd-title-text">Définir heure de début</span>
+      </div>
+      <button class="sd-close-btn" id="sd-close-btn" aria-label="Fermer">×</button>
+    </div>
+
+    <!-- Body -->
+    <div class="sd-body">
+      <!-- Tile context -->
+      <div class="sd-tile-info">
+        <div class="sd-tile-name">J-1247 · ACME</div>
+        <div class="sd-tile-current">Actuellement prévu&nbsp;: <span id="sd-current-text">vendredi 1 mai · 9h30</span></div>
+      </div>
+
+      <!-- Calendar -->
+      <div>
+        <div class="sd-section-title">Jour cible</div>
+        <div class="calendar">
+          <div class="cal-header">
+            <button class="cal-nav" data-dir="-1" aria-label="Mois précédent">‹</button>
+            <span class="cal-month" id="cal-month-label"></span>
+            <button class="cal-nav" data-dir="1" aria-label="Mois suivant">›</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </div>
+
+      <!-- Time -->
+      <div>
+        <div class="sd-section-title">Heure cible</div>
+        <div class="sd-time">
+          <button class="sd-time-step" data-delta="-15" aria-label="−15 min">−</button>
+          <input id="sd-time-input" type="text" value="09:30" inputmode="numeric" />
+          <button class="sd-time-step" data-delta="15" aria-label="+15 min">+</button>
+          <span class="sd-time-note">granularité 15 min</span>
+        </div>
+      </div>
+
+      <!-- Feasibility -->
+      <div>
+        <div class="sd-section-title">Faisabilité</div>
+        <div id="sd-feas"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="sd-footer">
+      <button class="sd-btn-secondary" id="sd-cancel-btn">Annuler</button>
+      <button class="sd-btn-primary" id="sd-confirm-btn">Définir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Progress modal v6 (improved version of tile-progress-modal.html) -->
+<div class="pm-overlay" id="pm-overlay">
+  <div class="pm-dialog" role="dialog" aria-labelledby="pm-title-text">
+    <div class="pm-header">
+      <div class="pm-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="pm-title-text" id="pm-title-text">Avancement</span>
+      </div>
+      <button class="pm-close-btn" id="pm-close-btn" aria-label="Fermer">×</button>
+    </div>
+
+    <div class="pm-body">
+      <!-- Job identity -->
+      <div>
+        <div class="pm-job-name">J-1247 · ACME</div>
+        <div class="pm-job-machine">Heidelberg</div>
+      </div>
+
+      <!-- Slot context (neutral framed) -->
+      <div class="pm-slot">
+        <div class="pm-slot-label">Votre créneau</div>
+        <div class="pm-slot-range">9h30 → 12h00</div>
+        <div class="pm-slot-expectation" id="pm-slot-expectation" data-rep="text">
+          <!-- Variante TEXTE -->
+          <div class="pm-expect-text">
+            <div class="pm-expect-label">Volume attendu&nbsp;:</div>
+            <div class="pm-expect-row">
+              <span class="pm-expect-time">
+                <span id="pm-expect-now-time">10h45</span>
+                <span class="pm-now-badge">maintenant</span>
+              </span>
+              <span class="pm-expect-value" id="pm-expect-now-value">≈ 13%</span>
+            </div>
+            <div class="pm-expect-row">
+              <span class="pm-expect-time">12h00 (fin de créneau)</span>
+              <span class="pm-expect-value">35%</span>
+            </div>
+          </div>
+
+          <!-- Variante JAUGE — échelle 100% du job, créneau isolé comme bande distincte -->
+          <div class="pm-expect-gauge">
+            <div class="pm-expect-label">Volume attendu (sur le job entier)&nbsp;:</div>
+            <div class="gauge-block">
+              <div class="gauge-track">
+                <div class="gauge-slot-zone" id="pm-gauge-slot-zone">
+                  <div class="gauge-slot-fill" id="pm-gauge-slot-fill"></div>
+                </div>
+                <div class="gauge-marker" id="pm-gauge-marker">
+                  <div class="gauge-marker-label" id="pm-gauge-marker-label">≈ 43% du job</div>
+                </div>
+              </div>
+              <div class="gauge-endpoints">
+                <span>0%</span>
+                <span><strong>100%</strong>&nbsp;·&nbsp;fin du job</span>
+              </div>
+              <div class="gauge-slot-info">
+                Créneau actif&nbsp;: <strong>35%</strong> du job (de 30% à 65%)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Question -->
+      <div class="pm-question">Quand finirez-vous&nbsp;?</div>
+
+      <!-- Quick action buttons. Layout en T :
+           — À l'heure massif sur toute la largeur (cible primaire dominante)
+           — En dessous : 6 ajustements compacts symétriques (3 avance | 3 retard) -->
+      <div class="pm-quick">
+        <button class="pm-quick-btn is-ontime" data-min="720">À l'heure</button>
+        <div class="pm-adjust-row">
+          <button class="pm-quick-btn is-early" data-min="660">−1h</button>
+          <button class="pm-quick-btn is-early" data-min="690">−30</button>
+          <button class="pm-quick-btn is-early" data-min="705">−15</button>
+          <button class="pm-quick-btn is-late"  data-min="735">+15</button>
+          <button class="pm-quick-btn is-late"  data-min="750">+30</button>
+          <button class="pm-quick-btn is-late"  data-min="780">+1h</button>
+        </div>
+      </div>
+
+      <!-- Custom time (escape hatch) -->
+      <div class="pm-custom">
+        <span class="pm-custom-label">Ou heure personnalisée&nbsp;:</span>
+        <div class="pm-custom-controls">
+          <button class="pm-custom-step" data-delta="-15" aria-label="−15 min">−</button>
+          <input id="pm-time-input" type="text" value="12h00" inputmode="numeric" />
+          <button class="pm-custom-step" data-delta="15" aria-label="+15 min">+</button>
+        </div>
+      </div>
+
+      <!-- Status line (live feedback) -->
+      <div class="pm-status is-ontime" id="pm-status">
+        <svg id="pm-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span id="pm-status-text">Vous finirez à l'heure prévue.</span>
+      </div>
+    </div>
+
+    <div class="pm-footer">
+      <button class="pm-btn-secondary" id="pm-cancel-btn">Annuler</button>
+      <button class="pm-btn-primary" id="pm-confirm-btn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+  // ── Constants ──
+  const START_HOUR = 8, END_HOUR = 16, HOUR_PX = 80, NOW_HOUR = 10.75;
+  const F1_START = 9.0, F1_END = 9.5;
+  const F2_START = 9.5, F2_END = 12.0;
+  const HOURS_TOTAL = END_HOUR - START_HOUR;
+  const BODY_HEIGHT = HOURS_TOTAL * HOUR_PX;
+
+  // ── State ──
+  let saisieState = 'inactive'; // 'inactive' | 'hourly' | 'tileend'
+
+  // ── Helpers ──
+  function hToFr(h) {
+    const hr = Math.floor(h);
+    const mn = Math.round((h - hr) * 60);
+    return `${hr}h${String(mn).padStart(2, '0')}`;
+  }
+  function hToY(h) { return (h - START_HOUR) * HOUR_PX; }
+
+  // ── Build static parts ──
+  function buildTimeAxis() {
+    const axis = document.getElementById('time-axis');
+    axis.innerHTML = '';
+    axis.style.height = (BODY_HEIGHT + 36) + 'px';
+    for (let h = START_HOUR; h <= END_HOUR; h++) {
+      const lbl = document.createElement('div');
+      lbl.className = 'hour-label';
+      lbl.style.top = (36 + hToY(h)) + 'px';
+      lbl.textContent = h + 'h';
+      axis.appendChild(lbl);
+    }
+  }
+
+  const PIN_SVG = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="12" y1="17" x2="12" y2="22"/>
+      <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+    </svg>`;
+  const SAISIE_SVG = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>`;
+
+  function buildStationBody() {
+    const body = document.getElementById('station-body');
+    body.style.height = BODY_HEIGHT + 'px';
+
+    for (let h = START_HOUR + 1; h < END_HOUR; h++) {
+      const line = document.createElement('div');
+      line.className = 'hour-line';
+      line.style.top = hToY(h) + 'px';
+      body.appendChild(line);
+    }
+
+    // F1 (done)
+    const f1 = document.createElement('div');
+    f1.className = 'tile tile-completed';
+    f1.style.top = hToY(F1_START) + 'px';
+    f1.style.height = (F1_END - F1_START) * HOUR_PX + 'px';
+    f1.innerHTML = `
+      <div class="tile-header-row">
+        <span class="saisie-icon state-inactive" data-tile="f1">${SAISIE_SVG}</span>
+        <span class="pin-icon">${PIN_SVG}</span>
+        <span class="tile-label-text">J-1247 · ACME</span>
+      </div>
+      <div class="tile-meta">${hToFr(F1_START)} → ${hToFr(F1_END)} · fait</div>
+    `;
+    body.appendChild(f1);
+
+    // F2 (active)
+    const f2 = document.createElement('div');
+    f2.className = 'tile tile-default';
+    f2.id = 'tile-f2';
+    f2.style.top = hToY(F2_START) + 'px';
+    f2.style.height = (F2_END - F2_START) * HOUR_PX + 'px';
+    f2.innerHTML = `
+      <div class="tile-header-row">
+        <span class="saisie-icon" id="f2-saisie" data-tile="f2">${SAISIE_SVG}</span>
+        <span class="pin-icon">${PIN_SVG}</span>
+        <span class="tile-label-text">J-1247 · ACME</span>
+      </div>
+      <div class="tile-meta">${hToFr(F2_START)} → ${hToFr(F2_END)} · en cours</div>
+    `;
+    body.appendChild(f2);
+
+    // Now line
+    const now = document.createElement('div');
+    now.className = 'now-line';
+    now.style.top = hToY(NOW_HOUR) + 'px';
+    body.appendChild(now);
+  }
+
+  // ── State transitions ──
+  function applyState(state) {
+    saisieState = state;
+    const icon = document.getElementById('f2-saisie');
+    icon.className = 'saisie-icon state-' + state;
+
+    // Tile-level animations driven by state
+    const tile = document.getElementById('tile-f2');
+    tile.classList.toggle('tile-hourly-active', state === 'hourly');
+    tile.classList.toggle('tile-end-active',    state === 'tileend');
+
+    document.querySelectorAll('.sim-btn').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.state === state);
+    });
+
+    const messages = {
+      inactive: 'Aucun trigger actif. L\'icône reste cliquable à tout moment pour saisie proactive.',
+      hourly:   'Heure pleine atteinte sans saisie récente. La tuile pulse doucement en opacité (cycle 1,6s, sans changement de couleur), l\'icône passe au bleu. Signal présent mais pas mobilisateur.',
+      tileend:  'scheduledEnd atteint (12h00). Tuile + icône pulsent ensemble : tuile vers/depuis l\'orange (1,6s), icône amber (1,6s). Auto-completion silencieuse en filet de sécurité si rien ne bouge.',
+    };
+    document.getElementById('current-state-label').textContent = messages[state];
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // ── Wire up ──
+  document.querySelectorAll('.sim-btn').forEach(b => {
+    b.addEventListener('click', () => applyState(b.dataset.state));
+  });
+
+  // Click on saisie icon → opens the progress modal
+  document.addEventListener('click', (e) => {
+    const icon = e.target.closest('.saisie-icon');
+    if (icon) {
+      e.stopPropagation();
+      openProgressModal();
+    }
+  });
+
+  // Right-click on F2 → context menu
+  const ctxMenu = document.getElementById('ctx-menu');
+  function showCtxMenu(x, y) {
+    ctxMenu.classList.add('open');
+    const w = 200, h = 120, pad = 8;
+    let posX = x, posY = y;
+    if (x + w + pad > window.innerWidth) posX = x - w;
+    if (y + h + pad > window.innerHeight) posY = y - h;
+    ctxMenu.style.left = Math.max(pad, posX) + 'px';
+    ctxMenu.style.top  = Math.max(pad, posY) + 'px';
+  }
+  function hideCtxMenu() { ctxMenu.classList.remove('open'); }
+
+  document.addEventListener('contextmenu', (e) => {
+    const tile = e.target.closest('#tile-f2');
+    if (tile) {
+      e.preventDefault();
+      showCtxMenu(e.clientX, e.clientY);
+    } else {
+      hideCtxMenu();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.ctx-menu')) hideCtxMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideCtxMenu();
+  });
+
+  // Context menu actions
+  document.querySelectorAll('.ctx-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      hideCtxMenu();
+
+      if (action === 'schedule-start') {
+        openScheduleDialog();
+        return;
+      }
+      if (action === 'saisie') {
+        openProgressModal();
+        return;
+      }
+
+      const labels = {
+        details: '→ ouvre le JobDetailsPanel',
+        pin:     '→ toggle pin (au scheduledStart courant)',
+      };
+      showToast(labels[action] || action);
+    });
+  });
+
+  // ── Init ──
+  buildTimeAxis();
+  buildStationBody();
+  applyState('inactive');
+
+  // ─────────────────────────────────────────────────────────────────
+  // Schedule dialog logic — sub-modal "Définir heure de début…"
+  // ─────────────────────────────────────────────────────────────────
+
+  const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  const DAYS_FR   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const DOW       = ['L','M','M','J','V','S','D'];
+
+  // Demo constants — today is 2026-05-01 per project context
+  const TODAY = new Date(2026, 4, 1);                       // 1 mai 2026
+  const F2_DAY = new Date(2026, 4, 1);                      // F2 prévue le 1 mai
+  const F2_HOUR_MIN = 9 * 60 + 30;                          // 9h30
+
+  // Working hours (used to mock the closure rule)
+  const WORK_START_MIN = 8 * 60;
+  const WORK_END_MIN   = 18 * 60;
+
+  // ── State ──
+  let calMonth = new Date(F2_DAY.getFullYear(), F2_DAY.getMonth(), 1);
+  let selectedDay = new Date(F2_DAY);
+  let selectedTimeMin = F2_HOUR_MIN;
+
+  // ── Helpers ──
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function frTime(min) { return pad2(Math.floor(min / 60)) + ':' + pad2(min % 60); }
+  function frTimeShort(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    return m === 0 ? `${h}h` : `${h}h${pad2(m)}`;
+  }
+  function frDateLong(date) {
+    return `${DAYS_FR[date.getDay()]} ${date.getDate()} ${MONTHS_FR[date.getMonth()]}`;
+  }
+  function sameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() &&
+           a.getMonth() === b.getMonth() &&
+           a.getDate() === b.getDate();
+  }
+  function isWeekend(date) {
+    const d = date.getDay();
+    return d === 0 || d === 6;
+  }
+  function isPast(date) {
+    return date < TODAY && !sameDay(date, TODAY);
+  }
+  function isClosure(date, timeMin) {
+    if (isWeekend(date)) return true;
+    if (timeMin < WORK_START_MIN || timeMin >= WORK_END_MIN) return true;
+    return false;
+  }
+  function nextOpenSlot(date, timeMin) {
+    let d = new Date(date);
+    let t = timeMin;
+
+    // Outside working hours on this day → snap forward
+    if (t >= WORK_END_MIN) {
+      t = WORK_START_MIN;
+      d.setDate(d.getDate() + 1);
+    } else if (t < WORK_START_MIN) {
+      t = WORK_START_MIN;
+    }
+
+    // Skip weekends
+    while (isWeekend(d)) {
+      d.setDate(d.getDate() + 1);
+    }
+    return { date: d, timeMin: t };
+  }
+
+  // ── Render ──
+  function renderCalendar() {
+    const grid = document.getElementById('cal-grid');
+    const monthLabel = document.getElementById('cal-month-label');
+    monthLabel.textContent = MONTHS_FR[calMonth.getMonth()] + ' ' + calMonth.getFullYear();
+
+    grid.innerHTML = '';
+
+    DOW.forEach(label => {
+      const cell = document.createElement('span');
+      cell.className = 'cal-dow';
+      cell.textContent = label;
+      grid.appendChild(cell);
+    });
+
+    const first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+    const firstIdx = (first.getDay() + 6) % 7; // L=0, ..., D=6
+    for (let i = 0; i < firstIdx; i++) {
+      const cell = document.createElement('span');
+      cell.className = 'cal-day cal-empty';
+      grid.appendChild(cell);
+    }
+
+    const daysInMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(calMonth.getFullYear(), calMonth.getMonth(), day);
+      const btn = document.createElement('button');
+      btn.className = 'cal-day';
+      btn.textContent = day;
+
+      const past = isPast(date);
+      if (past) btn.classList.add('cal-disabled');
+      if (sameDay(date, TODAY)) btn.classList.add('cal-today');
+      if (sameDay(date, selectedDay)) btn.classList.add('cal-selected');
+      if (!past && isWeekend(date)) btn.classList.add('cal-closure');
+
+      btn.addEventListener('click', () => {
+        if (past) return;
+        selectedDay = date;
+        renderCalendar();
+        renderFeasibility();
+      });
+
+      grid.appendChild(btn);
+    }
+  }
+
+  function renderTime() {
+    const input = document.getElementById('sd-time-input');
+    if (document.activeElement !== input) {
+      input.value = frTime(selectedTimeMin);
+    }
+  }
+
+  function renderFeasibility() {
+    const feas = document.getElementById('sd-feas');
+    if (!isClosure(selectedDay, selectedTimeMin)) {
+      feas.innerHTML = `
+        <div class="feas feas-ok">
+          <svg class="feas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <div class="feas-content">
+            <div class="feas-title">Créneau disponible</div>
+            <div class="feas-detail">${frDateLong(selectedDay)} · ${frTimeShort(selectedTimeMin)}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      const next = nextOpenSlot(selectedDay, selectedTimeMin);
+      feas.innerHTML = `
+        <div class="feas feas-warn">
+          <svg class="feas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div class="feas-content">
+            <div class="feas-title">Sera glissé au prochain créneau dispo</div>
+            <div class="feas-detail">${frDateLong(next.date)} · ${frTimeShort(next.timeMin)}</div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // ── Open / close ──
+  function openScheduleDialog() {
+    selectedDay = new Date(F2_DAY);
+    selectedTimeMin = F2_HOUR_MIN;
+    calMonth = new Date(selectedDay.getFullYear(), selectedDay.getMonth(), 1);
+    document.getElementById('sd-current-text').textContent =
+      `${frDateLong(F2_DAY)} · ${frTimeShort(F2_HOUR_MIN)}`;
+    renderCalendar();
+    renderTime();
+    renderFeasibility();
+    document.getElementById('sd-overlay').classList.add('open');
+  }
+  function closeScheduleDialog() {
+    document.getElementById('sd-overlay').classList.remove('open');
+  }
+
+  // ── Wiring ──
+  document.querySelectorAll('.cal-nav').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dir = parseInt(btn.dataset.dir, 10);
+      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + dir, 1);
+      renderCalendar();
+    });
+  });
+
+  const timeInput = document.getElementById('sd-time-input');
+  timeInput.addEventListener('change', () => {
+    const m = timeInput.value.match(/^\s*(\d{1,2})\s*[h:]\s*(\d{0,2})\s*$/);
+    if (!m) { renderTime(); return; }
+    let h = parseInt(m[1], 10);
+    let mm = parseInt(m[2] || '0', 10);
+    let total = h * 60 + mm;
+    // Snap to 15-min granularity
+    total = Math.round(total / 15) * 15;
+    total = Math.max(0, Math.min(23 * 60 + 45, total));
+    selectedTimeMin = total;
+    renderTime();
+    renderFeasibility();
+  });
+  timeInput.addEventListener('blur', () => { renderTime(); });
+
+  document.querySelectorAll('.sd-time-step').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const delta = parseInt(btn.dataset.delta, 10);
+      selectedTimeMin = Math.max(0, Math.min(23 * 60 + 45, selectedTimeMin + delta));
+      renderTime();
+      renderFeasibility();
+    });
+  });
+
+  document.getElementById('sd-cancel-btn').addEventListener('click', closeScheduleDialog);
+  document.getElementById('sd-close-btn').addEventListener('click', closeScheduleDialog);
+
+  document.getElementById('sd-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'sd-overlay') closeScheduleDialog();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('sd-overlay').classList.contains('open')) {
+      closeScheduleDialog();
+    }
+  });
+
+  document.getElementById('sd-confirm-btn').addEventListener('click', () => {
+    const final = isClosure(selectedDay, selectedTimeMin)
+      ? nextOpenSlot(selectedDay, selectedTimeMin)
+      : { date: selectedDay, timeMin: selectedTimeMin };
+    showToast(`✓ Pin paramétré : ${frDateLong(final.date)} · ${frTimeShort(final.timeMin)}`);
+    closeScheduleDialog();
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Progress modal v6 — improved version of tile-progress-modal.html
+  // ─────────────────────────────────────────────────────────────────
+
+  const PM_PLANNED_START_MIN = 9 * 60 + 30;    // 9h30
+  const PM_SETUP_MIN         = 30;             // calage 30 min (mocked here ; en vrai vient de task.duration.setupMinutes)
+  const PM_RUN_START_MIN     = PM_PLANNED_START_MIN + PM_SETUP_MIN; // 10h00
+  const PM_PLANNED_END_MIN   = 12 * 60;        // 12h00
+  const PM_RUN_DURATION_MIN  = PM_PLANNED_END_MIN - PM_RUN_START_MIN; // 120
+  const PM_NOW_MIN           = 10 * 60 + 45;   // 10h45
+  const PM_VOLUME_FOR_SLOT_PCT  = 35;          // % du job que le créneau actif délivre
+  const PM_CUMUL_BEFORE_SLOT_PCT = 30;         // % du job déjà délivré par les fragments antérieurs (mocked)
+
+  /**
+   * Volume théoriquement effectué à `now`, calculé sur la base du *temps de roule
+   * écoulé* (pas du temps de créneau écoulé). Le calage est donc neutre — c'est
+   * cohérent avec la décomposition calage/roule du moteur.
+   */
+  function pmExpectedAtNow() {
+    if (PM_NOW_MIN < PM_RUN_START_MIN) return 0; // encore en calage
+    if (PM_NOW_MIN >= PM_PLANNED_END_MIN) return PM_VOLUME_FOR_SLOT_PCT;
+    const runElapsed = PM_NOW_MIN - PM_RUN_START_MIN;
+    return (runElapsed / PM_RUN_DURATION_MIN) * PM_VOLUME_FOR_SLOT_PCT;
+  }
+
+  let pmTime = PM_PLANNED_END_MIN;
+  let pmRepMode = 'text'; // 'text' or 'gauge' — toggled from the simulator panel
+
+  // SVG sources for status icon (check vs. up-arrow vs. down-arrow)
+  const PM_ICON_CHECK   = '<polyline points="20 6 9 17 4 12"/>';
+  const PM_ICON_UP      = '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>';
+  const PM_ICON_DOWN    = '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>';
+
+  function pmFmtTime(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h}h${String(m).padStart(2, '0')}`;
+  }
+  function pmParseTime(s) {
+    const m = String(s).match(/^\s*(\d{1,2})\s*[h:]\s*(\d{0,2})\s*$/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2] || '0', 10);
+  }
+
+  function pmRender() {
+    const input = document.getElementById('pm-time-input');
+    if (document.activeElement !== input) {
+      input.value = pmFmtTime(pmTime);
+    }
+
+    // Quick-button active states (matched on exact target value)
+    document.querySelectorAll('.pm-quick-btn').forEach(btn => {
+      const target = parseInt(btn.dataset.min, 10);
+      btn.classList.toggle('is-active', target === pmTime);
+    });
+
+    // Status line (live feedback)
+    const status = document.getElementById('pm-status');
+    const statusText = document.getElementById('pm-status-text');
+    const statusIcon = document.getElementById('pm-status-icon');
+    const delta = pmTime - PM_PLANNED_END_MIN;
+
+    if (Math.abs(delta) < 1) {
+      status.className = 'pm-status is-ontime';
+      statusText.textContent = 'Vous finirez à l\'heure prévue.';
+      statusIcon.innerHTML = PM_ICON_CHECK;
+    } else if (delta < 0) {
+      status.className = 'pm-status is-avance';
+      statusText.textContent = `Vous finirez ${Math.abs(delta)} min en avance.`;
+      statusIcon.innerHTML = PM_ICON_DOWN;
+    } else {
+      status.className = 'pm-status is-retard';
+      statusText.textContent = `Vous finirez ${delta} min en retard.`;
+      statusIcon.innerHTML = PM_ICON_UP;
+    }
+  }
+
+  function openProgressModal() {
+    pmTime = PM_PLANNED_END_MIN;
+
+    // Volume attendu à `now` — calculé sur le run écoulé (pas le créneau total).
+    const expectedNow = pmExpectedAtNow();
+
+    // Variante TEXTE
+    document.getElementById('pm-expect-now-time').textContent = pmFmtTime(PM_NOW_MIN);
+    document.getElementById('pm-expect-now-value').textContent =
+      '≈ ' + Math.round(expectedNow) + '%';
+
+    // Variante JAUGE — échelle 100% du job, créneau isolé comme bande
+    const slotStartPct = PM_CUMUL_BEFORE_SLOT_PCT;
+    const slotEndPct   = slotStartPct + PM_VOLUME_FOR_SLOT_PCT;
+    const cumulNowPct  = slotStartPct + expectedNow;
+
+    // Slot zone position (left + width on the 100% bar)
+    document.getElementById('pm-gauge-slot-zone').style.left  = slotStartPct + '%';
+    document.getElementById('pm-gauge-slot-zone').style.width = PM_VOLUME_FOR_SLOT_PCT + '%';
+
+    // Slot fill — relative to slot zone width (so 13/35 = ~37% of zone)
+    const slotFillRatio = Math.max(0, Math.min(1, expectedNow / PM_VOLUME_FOR_SLOT_PCT));
+    document.getElementById('pm-gauge-slot-fill').style.width = (slotFillRatio * 100) + '%';
+
+    // Marker at cumulative job position
+    document.getElementById('pm-gauge-marker').style.left = cumulNowPct + '%';
+    document.getElementById('pm-gauge-marker-label').textContent =
+      '≈ ' + Math.round(cumulNowPct) + '% du job';
+
+    // Apply current representation mode
+    document.getElementById('pm-slot-expectation').dataset.rep = pmRepMode;
+
+    pmRender();
+    document.getElementById('pm-overlay').classList.add('open');
+  }
+  function closeProgressModal() {
+    document.getElementById('pm-overlay').classList.remove('open');
+  }
+
+  // Quick action buttons. Defensive clamp in case a preset would resolve
+  // before "now" (operator can't claim to finish at a past time).
+  document.querySelectorAll('.pm-quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = parseInt(btn.dataset.min, 10);
+      pmTime = Math.max(PM_NOW_MIN, Math.min(23 * 60 + 45, target));
+      pmRender();
+    });
+  });
+
+  // Custom time input
+  const pmTimeInput = document.getElementById('pm-time-input');
+  pmTimeInput.addEventListener('change', () => {
+    const m = pmParseTime(pmTimeInput.value);
+    if (m == null) { pmRender(); return; }
+    pmTime = Math.max(PM_NOW_MIN, Math.min(23 * 60 + 45, m));
+    pmRender();
+  });
+  pmTimeInput.addEventListener('blur', () => { pmRender(); });
+
+  document.querySelectorAll('.pm-custom-step').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const delta = parseInt(btn.dataset.delta, 10);
+      pmTime = Math.max(PM_NOW_MIN, Math.min(23 * 60 + 45, pmTime + delta));
+      pmRender();
+    });
+  });
+
+  // Footer + close + outside-click + escape
+  document.getElementById('pm-cancel-btn').addEventListener('click', closeProgressModal);
+  document.getElementById('pm-close-btn').addEventListener('click', closeProgressModal);
+  document.getElementById('pm-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'pm-overlay') closeProgressModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('pm-overlay').classList.contains('open')) {
+      closeProgressModal();
+    }
+  });
+
+  // Representation toggle (simulator panel)
+  document.querySelectorAll('.rep-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pmRepMode = btn.dataset.rep;
+      document.querySelectorAll('.rep-btn').forEach(b => {
+        b.classList.toggle('is-active', b.dataset.rep === pmRepMode);
+      });
+      // If the modal is open, re-apply the new mode immediately
+      const slot = document.getElementById('pm-slot-expectation');
+      if (slot) slot.dataset.rep = pmRepMode;
+    });
+  });
+
+  document.getElementById('pm-confirm-btn').addEventListener('click', () => {
+    const delta = pmTime - PM_PLANNED_END_MIN;
+    let summary;
+    if (Math.abs(delta) < 1) summary = 'à l\'heure';
+    else if (delta < 0) summary = `${Math.abs(delta)} min en avance`;
+    else summary = `${delta} min en retard`;
+    showToast(`✓ Saisie enregistrée : ${pmFmtTime(pmTime)} (${summary}). Replan déclenché.`);
+    closeProgressModal();
+  });
+</script>
+
+</body>
+</html>

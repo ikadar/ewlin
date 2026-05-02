@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avancement — recueil, affichage planning, flux</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    html { font-size: 13px; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgb(39 39 42);
+      border-radius: 3px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      background: rgb(16 185 129);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px;
+      background: rgb(16 185 129);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+    }
+
+    .fragment {
+      position: absolute;
+      top: 0; bottom: 0;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 4px;
+      overflow: hidden;
+      transition: left 220ms ease, width 220ms ease, background 220ms;
+    }
+    .fragment.done     { background: rgba(16, 185, 129, 0.45); border-color: rgba(16, 185, 129, 0.65); }
+    .fragment.engaged  { background: rgba(16, 185, 129, 0.16); border-color: rgba(16, 185, 129, 0.45); }
+    .fragment.planned  { background: rgba(244, 244, 245, 0.04); border-color: rgba(255,255,255,0.20); border-style: dashed; }
+
+    .fragment-fill {
+      position: absolute; top: 0; bottom: 0; left: 0;
+      background: rgba(16, 185, 129, 0.32);
+      transition: width 220ms ease;
+    }
+    .fragment-label {
+      position: relative;
+      z-index: 1;
+      padding: 6px 8px;
+      font-size: 11px;
+      color: rgb(244 244 245);
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .now-line {
+      position: absolute;
+      top: -10px; bottom: -10px;
+      width: 1.5px;
+      background: rgb(245 158 11);
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
+      transition: left 220ms ease;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .now-line::before {
+      content: 'NOW';
+      position: absolute;
+      top: -16px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: rgb(245 158 11);
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 1px 6px; border-radius: 3px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-done    { background: rgba(16, 185, 129, 0.25); color: rgb(110 231 183); }
+    .badge-engaged { background: rgba(16, 185, 129, 0.12); color: rgb(110 231 183); }
+    .badge-planned { background: rgba(255, 255, 255, 0.06); color: rgb(161 161 170); }
+
+    .step-arrow + .step-arrow::before {
+      content: '→';
+      margin: 0 10px 0 2px;
+      color: rgb(82 82 91);
+    }
+
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+    .delta-pos { color: rgb(248 113 113); }
+    .delta-neg { color: rgb(110 231 183); }
+    .delta-zero { color: rgb(161 161 170); }
+
+    .tile-preview {
+      width: 220px;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 4px;
+      padding: 8px 10px;
+      background: rgb(24 24 27);
+      font-size: 12px;
+    }
+    .tile-old-check {
+      width: 14px; height: 14px;
+      border: 1.5px solid rgb(82 82 91);
+      border-radius: 3px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen px-8 py-10">
+
+<div class="max-w-[1280px] mx-auto">
+
+  <!-- Header -->
+  <header class="mb-8">
+    <h1 class="text-2xl font-semibold">Avancement — recueil, affichage planning, flux</h1>
+    <p class="text-zinc-400 mt-2 text-[13px] leading-relaxed max-w-[920px]">
+      Playground pour valider l'UX de saisie d'avancement opérateur et son effet sur le planning.
+      Modèle&nbsp;: l'algo fragmente un job en sous-tâches&nbsp;; les sous-tâches <em>engagées</em>
+      (commencées) sont persistées, les <em>planifiées</em> restent recalculables.
+      L'opérateur rapporte l'avancement sur le fragment courant&nbsp;; le delta
+      <em>prévision&nbsp;vs.&nbsp;réalisation</em> propage un ratio aux fragments restants du même job.
+    </p>
+  </header>
+
+  <!-- Job context -->
+  <section class="mb-6 bg-zinc-900 border border-white/5 rounded p-4">
+    <div class="flex items-baseline gap-4 mb-3">
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold">Job</div>
+      <div class="text-[14px] font-semibold">J-1247</div>
+      <div class="text-[12px] text-zinc-400">Brochure 200 ex · 32 pages · 130g</div>
+    </div>
+    <div class="grid grid-cols-4 gap-4 text-[12px]">
+      <div>
+        <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide mb-1">Durée de base (JCF)</div>
+        <div id="duration-base" class="font-mono text-zinc-300">12h00</div>
+      </div>
+      <div>
+        <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide mb-1">Durée réaliste</div>
+        <div id="duration-realistic" class="font-mono"></div>
+      </div>
+      <div>
+        <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide mb-1">Fait (cumulé engagé)</div>
+        <div id="duration-done" class="font-mono text-zinc-300"></div>
+      </div>
+      <div>
+        <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide mb-1">Avancement total</div>
+        <div id="job-progress" class="font-mono"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Timeline -->
+  <section class="mb-6 bg-zinc-900 border border-white/5 rounded p-4">
+    <div class="flex items-center justify-between mb-4">
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold">Planning du job</div>
+      <div class="flex items-center gap-3 text-[10.5px]">
+        <span class="badge badge-done">Engagé&nbsp;·&nbsp;fait</span>
+        <span class="badge badge-engaged">Engagé&nbsp;·&nbsp;en cours</span>
+        <span class="badge badge-planned">Planifié&nbsp;·&nbsp;recalculable</span>
+      </div>
+    </div>
+
+    <div class="text-[10.5px] text-zinc-500 mb-2 flex justify-between font-mono" id="timeline-axis"></div>
+    <div class="relative h-16 bg-zinc-950/40 rounded border border-white/5" id="timeline"></div>
+
+    <div class="mt-4 grid grid-cols-3 gap-3" id="fragments-detail"></div>
+  </section>
+
+  <!-- Capture + Impact -->
+  <div class="grid grid-cols-2 gap-4 mb-6">
+
+    <!-- Capture -->
+    <section class="bg-zinc-900 border border-white/5 rounded p-4">
+      <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+        Saisie opérateur — fragment courant
+      </div>
+
+      <!-- Three-level breadcrumb -->
+      <div class="bg-zinc-950 rounded border border-white/5 p-3 mb-4">
+        <div class="text-[11px] text-zinc-500 mb-2">Tu es sur&nbsp;:</div>
+        <div class="flex items-center gap-2 text-[12px] flex-wrap">
+          <span class="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded font-mono">F2&nbsp;/&nbsp;3</span>
+          <span class="text-zinc-500">·</span>
+          <span class="text-zinc-300">représente <span class="font-mono text-zinc-100">33.3%</span> du job total</span>
+        </div>
+        <div class="text-[11px] text-zinc-500 mt-2">
+          Prévu&nbsp;: <span class="font-mono text-zinc-300">4h00</span>
+          · Démarré il y a <span class="font-mono text-zinc-300" id="elapsed-display">1h45</span>
+        </div>
+      </div>
+
+      <!-- Progress slider -->
+      <div class="mb-5">
+        <label class="text-[12px] text-zinc-300 flex justify-between mb-2">
+          <span>Avancement déclaré sur ce fragment</span>
+          <span class="font-mono text-emerald-300" id="progress-pct">31%</span>
+        </label>
+        <input id="progress-slider" type="range" min="0" max="100" value="31" />
+        <div class="text-[10.5px] text-zinc-500 mt-1 flex justify-between">
+          <span>0%</span>
+          <span class="opacity-60" id="expected-marker">attendu&nbsp;: 44%</span>
+          <span>100%</span>
+        </div>
+      </div>
+
+      <!-- Elapsed simulator -->
+      <div class="mb-4 pt-4 border-t border-white/5">
+        <label class="text-[11px] text-zinc-500 flex justify-between mb-2 uppercase tracking-wide">
+          <span>Simulateur · temps écoulé sur F2</span>
+          <span class="font-mono text-zinc-300" id="elapsed-mirror">1h45</span>
+        </label>
+        <input id="elapsed-slider" type="range" min="15" max="240" step="15" value="105" />
+        <div class="text-[10px] text-zinc-500 mt-1">
+          Contrôle de simulation. En vrai, ce serait <code>now − fragment.startedAt</code>.
+        </div>
+      </div>
+
+      <!-- Derived values -->
+      <div class="grid grid-cols-2 gap-2 text-[11px]">
+        <div class="bg-zinc-950 rounded border border-white/5 p-2">
+          <div class="text-zinc-500 mb-1 uppercase tracking-wide text-[10px]">Équivalent fait sur F2</div>
+          <div class="font-mono text-zinc-100" id="frag-done-min">1h14</div>
+        </div>
+        <div class="bg-zinc-950 rounded border border-white/5 p-2">
+          <div class="text-zinc-500 mb-1 uppercase tracking-wide text-[10px]">Reste F2 (réaliste)</div>
+          <div class="font-mono text-zinc-100" id="frag-remaining">3h53</div>
+        </div>
+        <div class="bg-zinc-950 rounded border border-white/5 p-2">
+          <div class="text-zinc-500 mb-1 uppercase tracking-wide text-[10px]">Productivité (réel/prévu)</div>
+          <div class="font-mono" id="productivity">×0.71</div>
+        </div>
+        <div class="bg-zinc-950 rounded border border-white/5 p-2">
+          <div class="text-zinc-500 mb-1 uppercase tracking-wide text-[10px]">Avancement job total</div>
+          <div class="font-mono text-zinc-100" id="total-pct">14.7%</div>
+        </div>
+      </div>
+
+      <button
+        class="mt-4 w-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 rounded py-2 text-[12px] font-semibold transition"
+        id="apply-btn">
+        Confirmer et propager
+      </button>
+    </section>
+
+    <!-- Impact -->
+    <section class="bg-zinc-900 border border-white/5 rounded p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold">
+          Impact sur le planning (preview)
+        </div>
+        <label class="text-[11px] text-zinc-400 inline-flex items-center gap-2">
+          <input id="toggle-propagate" type="checkbox" class="accent-emerald-500" checked />
+          Propager aux fragments suivants
+        </label>
+      </div>
+
+      <div class="space-y-3" id="impact-list"></div>
+
+      <div class="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3 text-[12px]">
+        <div>
+          <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide">Réaliste avant</div>
+          <div class="font-mono">12h00</div>
+        </div>
+        <div>
+          <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide">Réaliste après</div>
+          <div class="font-mono" id="realistic-after"></div>
+        </div>
+        <div>
+          <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide">Delta vs. base</div>
+          <div class="font-mono" id="delta-vs-base"></div>
+        </div>
+        <div>
+          <div class="text-zinc-500 text-[10.5px] uppercase tracking-wide">Replan déclenché</div>
+          <div class="font-mono text-amber-300">Oui — queue F3 réordonnée</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Tile UX comparison -->
+  <section class="mb-6 bg-zinc-900 border border-white/5 rounded p-4">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">
+      Tuile en mode prod — avant / après
+    </div>
+    <div class="flex items-end gap-6 flex-wrap">
+      <div>
+        <div class="text-[10.5px] text-zinc-500 mb-2 uppercase tracking-wide">Avant — case binaire</div>
+        <div class="tile-preview">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold">J-1247 · Brochure 200 ex</span>
+            <span class="tile-old-check"></span>
+          </div>
+          <div class="text-[10.5px] text-zinc-500 mt-1">F2 · 4h00 · presse Heidelberg</div>
+        </div>
+      </div>
+      <div>
+        <div class="text-[10.5px] text-zinc-500 mb-2 uppercase tracking-wide">Après — % continu</div>
+        <div class="tile-preview">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold">J-1247 · Brochure 200 ex</span>
+            <span class="font-mono text-emerald-300 text-[11px]" id="tile-pct">31%</span>
+          </div>
+          <div class="text-[10.5px] text-zinc-500 mt-1 mb-2">F2 · 4h00 · presse Heidelberg</div>
+          <div class="h-1 bg-zinc-800 rounded overflow-hidden">
+            <div id="tile-bar" class="h-full bg-emerald-500" style="width: 31%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="text-[11px] text-zinc-400 max-w-[300px] leading-relaxed">
+        La case à cocher disparaît. Clôture du fragment&nbsp;: 100% strict
+        (ou bouton « clôturer&nbsp;» admin pour traiter le résiduel via durée réaliste).
+      </div>
+    </div>
+  </section>
+
+  <!-- Flow -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 mb-6">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Flux complet</div>
+    <div class="flex items-start text-[11px] text-zinc-300 flex-wrap gap-y-3">
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">1</span>
+        <span>Tuile <em>en cours</em><br/><span class="text-zinc-500">(F2 engagé)</span></span>
+      </div>
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">2</span>
+        <span>Opérateur ouvre<br/>la sheet</span>
+      </div>
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">3</span>
+        <span>Saisie<br/><span class="text-zinc-500">(% sur fragment)</span></span>
+      </div>
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">4</span>
+        <span>Calcul ratio<br/>réel / prévu</span>
+      </div>
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">5</span>
+        <span>Preview impact<br/><span class="text-zinc-500">(F2 + propagation)</span></span>
+      </div>
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">6</span>
+        <span>Confirmation<br/><span class="text-zinc-500">F2 persisté (engagé)</span></span>
+      </div>
+      <div class="step-arrow flex items-start gap-2">
+        <span class="bg-zinc-800 rounded-full w-5 h-5 inline-flex items-center justify-center text-[10px] font-bold flex-shrink-0">7</span>
+        <span>Replan ré-ordonne<br/><span class="text-zinc-500">F3 (recalculable)</span></span>
+      </div>
+    </div>
+
+    <div class="mt-5 pt-4 border-t border-white/5 grid grid-cols-3 gap-3 text-[11px]">
+      <div class="bg-zinc-950 rounded border border-white/5 p-3">
+        <div class="text-zinc-500 uppercase tracking-wide text-[10px] mb-1">Persistance (DB)</div>
+        <div class="text-zinc-300 leading-relaxed">
+          F1, F2 = engagés ⇒ persistés (id stable, audit progress).<br/>
+          F3 = planifié ⇒ pas persisté, regénéré par chaque replan.
+        </div>
+      </div>
+      <div class="bg-zinc-950 rounded border border-white/5 p-3">
+        <div class="text-zinc-500 uppercase tracking-wide text-[10px] mb-1">Propagation</div>
+        <div class="text-zinc-300 leading-relaxed">
+          Ratio appliqué uniquement aux fragments futurs <em>du même job</em>.
+          Pas d'effet direct sur les autres jobs (l'engine les replannifie en aval).
+        </div>
+      </div>
+      <div class="bg-zinc-950 rounded border border-white/5 p-3">
+        <div class="text-zinc-500 uppercase tracking-wide text-[10px] mb-1">Trois niveaux</div>
+        <div class="text-zinc-300 leading-relaxed">
+          (% fragment) × (poids du fragment) = avancement total.
+          Lisible côté opérateur, traçable côté admin.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Decisions encoded -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11px] text-zinc-400 leading-relaxed">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-2">
+      Décisions encodées dans ce playground
+    </div>
+    <ul class="list-disc list-inside space-y-1">
+      <li><strong class="text-zinc-300">Algo-triggered fragmentation</strong> — l'opérateur ne split jamais manuellement, il rapporte juste son avancement sur le fragment courant.</li>
+      <li><strong class="text-zinc-300">Surplus → fragment courant + propagation</strong> — productivité &lt; 1 ⇒ on étend F2 ET on multiplie F3 par le même ratio. Replan absorbe la suite (réordonnance, glissements vers d'autres jobs).</li>
+      <li><strong class="text-zinc-300">Persistance asymétrique</strong> — F1, F2 = engagés (persistés en DB, audit). F3+ = planifiés (regénérables par chaque replan).</li>
+      <li><strong class="text-zinc-300">Trois niveaux d'avancement</strong> — (% fragment) × (% du fragment dans le job) = total. Le rapport opérateur est sur le fragment, pas sur le job.</li>
+      <li><strong class="text-zinc-300">Tuile prod sans coche</strong> — % continu remplace la binaire. Clôture à 100% strict (ou bouton « clôturer » admin).</li>
+    </ul>
+    <div class="mt-3 pt-3 border-t border-white/5 text-zinc-500">
+      Phase suivante&nbsp;: décomposition <em>calage&nbsp;/&nbsp;roule</em> (run vs setup) dans la durée d'un fragment et impact sur le calcul du ratio.
+      Le ratio actuel mélange les deux&nbsp;; or un setup est largement insensible à la productivité d'exécution.
+    </div>
+  </section>
+</div>
+
+<script>
+  // Static job model — three fragments of equal share, each 4h planned
+  const F1_ACTUAL_MIN = 240; // already done
+  const F2_PLANNED_MIN = 240;
+  const F3_PLANNED_MIN = 240;
+  const BASE_TOTAL_MIN = 720;
+
+  function fmtHM(min) {
+    if (!isFinite(min)) return '—';
+    if (min < 0) min = 0;
+    const h = Math.floor(min / 60);
+    const m = Math.round(min % 60);
+    if (h === 0) return `${m}min`;
+    return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`;
+  }
+
+  function compute() {
+    const progressPct = parseInt(document.getElementById('progress-slider').value);
+    const elapsedMin = parseInt(document.getElementById('elapsed-slider').value);
+    const propagate = document.getElementById('toggle-propagate').checked;
+
+    const expectedProgress = (elapsedMin / F2_PLANNED_MIN) * 100;
+    // Productivity = real / expected. Clamp to [0.1, 5] to keep numbers readable.
+    let productivityRatio = expectedProgress > 0 ? (progressPct / expectedProgress) : 1;
+    productivityRatio = Math.max(0.1, Math.min(5, productivityRatio));
+
+    const f2DoneMin = (progressPct / 100) * F2_PLANNED_MIN;
+    const f2RemainingMin = ((100 - progressPct) / 100) * F2_PLANNED_MIN / productivityRatio;
+    const f2RealisticMin = elapsedMin + f2RemainingMin;
+
+    const f3RealisticMin = propagate ? F3_PLANNED_MIN / productivityRatio : F3_PLANNED_MIN;
+
+    const totalDoneMin = F1_ACTUAL_MIN + f2DoneMin;
+    const totalPct = (totalDoneMin / BASE_TOTAL_MIN) * 100;
+    const realisticTotalMin = F1_ACTUAL_MIN + f2RealisticMin + f3RealisticMin;
+
+    return {
+      progressPct, elapsedMin, expectedProgress, productivityRatio, propagate,
+      f2DoneMin, f2RemainingMin, f2RealisticMin, f3RealisticMin,
+      totalDoneMin, totalPct, realisticTotalMin,
+      deltaBase: realisticTotalMin - BASE_TOTAL_MIN
+    };
+  }
+
+  function deltaClass(delta) {
+    if (delta > 1) return 'delta-pos';
+    if (delta < -1) return 'delta-neg';
+    return 'delta-zero';
+  }
+  function deltaSign(delta) {
+    return delta >= 0 ? '+' : '−';
+  }
+
+  function renderTimeline(s) {
+    const tl = document.getElementById('timeline');
+    tl.innerHTML = '';
+    const totalSpan = s.realisticTotalMin;
+
+    let cursor = 0;
+
+    // F1
+    const f1W = (F1_ACTUAL_MIN / totalSpan) * 100;
+    const f1 = document.createElement('div');
+    f1.className = 'fragment done';
+    f1.style.left = '0%';
+    f1.style.width = f1W + '%';
+    f1.innerHTML = `<div class="fragment-label"><div class="font-semibold">F1 · 100%</div><div class="text-[10px] opacity-80">${fmtHM(F1_ACTUAL_MIN)}</div></div>`;
+    tl.appendChild(f1);
+    cursor += f1W;
+
+    // F2
+    const f2W = (s.f2RealisticMin / totalSpan) * 100;
+    const f2DoneRatio = s.f2RealisticMin > 0 ? (s.f2DoneMin / s.f2RealisticMin) * 100 : 0;
+    const f2 = document.createElement('div');
+    f2.className = 'fragment engaged';
+    f2.style.left = cursor + '%';
+    f2.style.width = f2W + '%';
+    f2.innerHTML = `
+      <div class="fragment-fill" style="width: ${f2DoneRatio}%"></div>
+      <div class="fragment-label">
+        <div class="font-semibold">F2 · ${s.progressPct}%</div>
+        <div class="text-[10px] opacity-80">${fmtHM(s.f2RealisticMin)}</div>
+      </div>`;
+    tl.appendChild(f2);
+
+    // Now line — at f1 + elapsed within f2
+    const nowPos = ((F1_ACTUAL_MIN + s.elapsedMin) / totalSpan) * 100;
+    const nowLine = document.createElement('div');
+    nowLine.className = 'now-line';
+    nowLine.style.left = nowPos + '%';
+    tl.appendChild(nowLine);
+
+    cursor += f2W;
+
+    // F3
+    const f3W = (s.f3RealisticMin / totalSpan) * 100;
+    const f3 = document.createElement('div');
+    f3.className = 'fragment planned';
+    f3.style.left = cursor + '%';
+    f3.style.width = f3W + '%';
+    f3.innerHTML = `<div class="fragment-label"><div class="font-semibold opacity-80">F3 · prévu</div><div class="text-[10px] opacity-60">${fmtHM(s.f3RealisticMin)}</div></div>`;
+    tl.appendChild(f3);
+
+    // Axis
+    const axis = document.getElementById('timeline-axis');
+    axis.innerHTML = `<span>0h</span><span>${fmtHM(totalSpan / 4)}</span><span>${fmtHM(totalSpan / 2)}</span><span>${fmtHM(totalSpan * 3 / 4)}</span><span>${fmtHM(totalSpan)}</span>`;
+  }
+
+  function renderFragmentsDetail(s) {
+    const root = document.getElementById('fragments-detail');
+    root.innerHTML = '';
+
+    const cards = [
+      { id: 'F1', label: 'Engagé · fait',     badge: 'badge-done',     planned: 240, realistic: 240,             progress: 100, persisted: true,  delta: 0 },
+      { id: 'F2', label: 'Engagé · en cours', badge: 'badge-engaged',  planned: 240, realistic: s.f2RealisticMin, progress: s.progressPct, persisted: true,  delta: s.f2RealisticMin - 240 },
+      { id: 'F3', label: 'Planifié',          badge: 'badge-planned',  planned: 240, realistic: s.f3RealisticMin, progress: 0,             persisted: false, delta: s.f3RealisticMin - 240 },
+    ];
+
+    cards.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'bg-zinc-950 rounded border border-white/5 p-3';
+      const dCls = deltaClass(c.delta);
+      const deltaStr = Math.abs(c.delta) > 1
+        ? `<span class="${dCls} font-mono text-[10px] ml-1">(${deltaSign(c.delta)}${fmtHM(Math.abs(c.delta))})</span>`
+        : '';
+      div.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold text-[12px]">${c.id}</div>
+          <span class="badge ${c.badge}">${c.label}</span>
+        </div>
+        <div class="text-[10.5px] text-zinc-500 mb-1">Prévu / réaliste</div>
+        <div class="font-mono text-[12px] text-zinc-200">${fmtHM(c.planned)} → ${fmtHM(c.realistic)}${deltaStr}</div>
+        <div class="text-[10.5px] text-zinc-500 mt-2">${c.persisted ? '⚓ persisté en DB' : '↻ recalculé à chaque replan'}</div>
+        ${c.progress > 0 ? `<div class="mt-2"><div class="h-1 bg-zinc-800 rounded overflow-hidden"><div class="h-full bg-emerald-500" style="width: ${c.progress}%"></div></div><div class="text-[10px] text-zinc-500 mt-1 font-mono">${c.progress}% du fragment</div></div>` : ''}
+      `;
+      root.appendChild(div);
+    });
+  }
+
+  function renderImpact(s) {
+    const list = document.getElementById('impact-list');
+    list.innerHTML = '';
+
+    const items = [
+      {
+        label: 'F2 · en cours, engagé',
+        before: '4h00 prévu',
+        after: fmtHM(s.f2RealisticMin),
+        delta: s.f2RealisticMin - 240,
+        kind: 'extend'
+      },
+      {
+        label: 'F3 · planifié, recalculable',
+        before: '4h00 prévu',
+        after: fmtHM(s.f3RealisticMin),
+        delta: s.f3RealisticMin - 240,
+        kind: 'propagate'
+      }
+    ];
+
+    items.forEach(i => {
+      const div = document.createElement('div');
+      div.className = 'bg-zinc-950 rounded border border-white/5 p-3';
+      const dCls = deltaClass(i.delta);
+      div.innerHTML = `
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-[12px] font-semibold">${i.label}</div>
+          <div class="font-mono text-[11px] ${dCls}">${deltaSign(i.delta)}${fmtHM(Math.abs(i.delta))}</div>
+        </div>
+        <div class="text-[11px] text-zinc-400 font-mono">${i.before} → ${i.after}</div>
+        <div class="text-[10px] text-zinc-500 mt-1">${
+          i.kind === 'extend'
+            ? 'Extension du fragment courant — durée réelle observée jusqu\'à maintenant + reste projeté à la productivité observée.'
+            : (s.propagate
+                ? 'Propagation du ratio aux sous-tâches restantes du même job (4h × 1/ratio).'
+                : 'Propagation désactivée — F3 reste à sa durée prévue. Replan absorbe sans héritage.')
+        }</div>
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  function renderHeader(s) {
+    const realisticEl = document.getElementById('duration-realistic');
+    realisticEl.textContent = fmtHM(s.realisticTotalMin);
+    realisticEl.className = 'font-mono ' + (s.deltaBase > 1 ? 'text-red-400' : s.deltaBase < -1 ? 'text-emerald-300' : 'text-zinc-300');
+    document.getElementById('duration-done').textContent = fmtHM(s.totalDoneMin);
+    document.getElementById('job-progress').innerHTML = `<span class="text-emerald-300">${s.totalPct.toFixed(1)}%</span>`;
+  }
+
+  function renderCapture(s) {
+    document.getElementById('progress-pct').textContent = s.progressPct + '%';
+    document.getElementById('elapsed-display').textContent = fmtHM(s.elapsedMin);
+    document.getElementById('elapsed-mirror').textContent = fmtHM(s.elapsedMin);
+    document.getElementById('expected-marker').textContent = `attendu : ${s.expectedProgress.toFixed(0)}%`;
+    document.getElementById('frag-done-min').textContent = fmtHM(s.f2DoneMin);
+    document.getElementById('frag-remaining').textContent = fmtHM(s.f2RemainingMin);
+
+    const prodEl = document.getElementById('productivity');
+    prodEl.textContent = '×' + s.productivityRatio.toFixed(2);
+    prodEl.className = 'font-mono ' + (s.productivityRatio < 0.9 ? 'text-red-400' : s.productivityRatio > 1.1 ? 'text-emerald-300' : 'text-zinc-300');
+
+    document.getElementById('total-pct').textContent = s.totalPct.toFixed(1) + '%';
+
+    // Tile preview mirrors the slider
+    document.getElementById('tile-pct').textContent = s.progressPct + '%';
+    document.getElementById('tile-bar').style.width = s.progressPct + '%';
+  }
+
+  function renderImpactSummary(s) {
+    document.getElementById('realistic-after').textContent = fmtHM(s.realisticTotalMin);
+    const deltaEl = document.getElementById('delta-vs-base');
+    deltaEl.textContent = deltaSign(s.deltaBase) + fmtHM(Math.abs(s.deltaBase));
+    deltaEl.className = 'font-mono ' + (s.deltaBase > 1 ? 'text-red-400' : s.deltaBase < -1 ? 'text-emerald-300' : 'text-zinc-300');
+  }
+
+  function update() {
+    const s = compute();
+    renderHeader(s);
+    renderTimeline(s);
+    renderFragmentsDetail(s);
+    renderCapture(s);
+    renderImpact(s);
+    renderImpactSummary(s);
+  }
+
+  document.getElementById('progress-slider').addEventListener('input', update);
+  document.getElementById('elapsed-slider').addEventListener('input', update);
+  document.getElementById('toggle-propagate').addEventListener('change', update);
+  document.getElementById('apply-btn').addEventListener('click', () => {
+    const btn = document.getElementById('apply-btn');
+    btn.classList.add('pulse');
+    btn.textContent = '✓ Persisté · replan en cours';
+    setTimeout(() => {
+      btn.classList.remove('pulse');
+      btn.textContent = 'Confirmer et propager';
+    }, 1600);
+  });
+
+  update();
+</script>
+
+</body>
+</html>

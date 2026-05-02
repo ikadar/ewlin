@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modale d'avancement — focus prod (v5, simple)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    html { font-size: 13px; }
+
+    /* ── Flux design tokens ── */
+    :root {
+      --flux-elevated:       rgb(36 36 36);
+      --flux-border:         rgb(42 42 42);
+      --flux-border-light:   rgb(58 58 58);
+      --flux-text-primary:   rgb(245 245 245);
+      --flux-text-secondary: rgb(209 209 209);
+      --flux-text-tertiary:  rgb(161 161 161);
+    }
+    .bg-flux-elevated     { background-color: var(--flux-elevated); }
+    .border-flux-border   { border-color:    var(--flux-border); }
+    .text-flux-primary    { color: var(--flux-text-primary); }
+    .text-flux-secondary  { color: var(--flux-text-secondary); }
+    .text-flux-tertiary   { color: var(--flux-text-tertiary); }
+
+    /* Time input */
+    .time-input {
+      width: 7.5rem;
+      padding: 10px 12px;
+      text-align: center;
+      background: rgb(28 28 30);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-primary);
+      border-radius: 4px;
+      font-size: 18px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 120ms;
+    }
+    .time-input:focus { border-color: rgb(59 130 246); }
+
+    .time-step {
+      padding: 10px 14px;
+      background: rgb(45 45 45);
+      border: 1px solid var(--flux-border-light);
+      color: var(--flux-text-secondary);
+      border-radius: 4px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms;
+      line-height: 1;
+    }
+    .time-step:hover { background: rgb(60 60 60); color: var(--flux-text-primary); }
+
+    .ontime-btn {
+      padding: 10px 16px;
+      background: rgba(16, 185, 129, 0.10);
+      border: 1px solid rgba(16, 185, 129, 0.40);
+      color: rgb(110 231 183);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .ontime-btn:hover { background: rgba(16, 185, 129, 0.18); }
+
+    /* Background tile (faint context) */
+    .bg-tile {
+      background: rgba(217, 119, 6, 0.08);
+      border: 1px solid rgba(217, 119, 6, 0.20);
+      border-radius: 6px;
+      padding: 12px 14px;
+      filter: blur(1px);
+      opacity: 0.55;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen px-8 py-10">
+
+<div class="max-w-[1100px] mx-auto">
+
+  <!-- Header -->
+  <header class="mb-8">
+    <h1 class="text-2xl font-semibold">Modale d'avancement — v5, version simple</h1>
+    <p class="text-zinc-400 mt-2 text-[13px] leading-relaxed max-w-[820px]">
+      Réduction au minimum vital&nbsp;: <strong>(1)</strong> on indique à l'opérateur l'objectif attendu sur son créneau,
+      <strong>(2)</strong> on lui demande à quelle heure il pense terminer. C'est tout. Le moteur déduit la productivité
+      implicite, le % de volume réalisé, et la propagation aux fragments suivants à partir de cette unique saisie.
+    </p>
+  </header>
+
+  <!-- Preview frame -->
+  <section class="mb-8">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Aperçu</div>
+    <div class="relative bg-zinc-900 rounded-lg border border-white/5 overflow-hidden" style="height: 600px;">
+
+      <!-- Faint planning context -->
+      <div class="absolute inset-0 p-6 flex flex-col gap-3 select-none">
+        <div class="text-[10.5px] uppercase tracking-wide text-zinc-600">Planning · 9h30 ─ now (10h45) ─ 12h00</div>
+        <div class="bg-tile">
+          <div class="font-semibold text-[13px] text-zinc-200">J-1247 · Brochure 200 ex</div>
+          <div class="text-[11px] text-zinc-400">F2 · Heidelberg · 9h30 → 12h00</div>
+        </div>
+        <div class="bg-tile" style="opacity: 0.30;">
+          <div class="font-semibold text-[13px] text-zinc-300">J-1248 · Carton invitations</div>
+          <div class="text-[11px] text-zinc-400">F1 · Heidelberg · 12h00 → 13h30</div>
+        </div>
+      </div>
+
+      <!-- Backdrop -->
+      <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.5);"></div>
+
+      <!-- Modal -->
+      <div class="absolute inset-0 z-50 flex items-center justify-center p-6">
+        <div class="bg-flux-elevated border border-flux-border rounded-lg shadow-xl"
+             style="max-width: 30rem; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,0.55);">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-flux-border">
+            <div class="flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-flux-primary">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <h2 class="text-flux-primary font-semibold text-sm">Avancement</h2>
+            </div>
+            <button id="close-btn"
+                    class="text-flux-secondary hover:text-flux-primary transition-colors"
+                    aria-label="Fermer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-5 py-5 space-y-5">
+
+            <!-- Job identity -->
+            <div>
+              <div class="text-[14px] font-semibold text-flux-primary">J-1247 · Brochure 200 ex</div>
+              <div class="text-[11.5px] text-flux-tertiary mt-0.5">F2 sur Heidelberg</div>
+            </div>
+
+            <!-- (1) Slot context : the expectation -->
+            <div class="bg-white/[0.03] border border-white/10 rounded-lg px-4 py-3">
+              <div class="text-[10px] font-semibold text-flux-tertiary uppercase tracking-wider mb-1.5">
+                Sur votre créneau
+              </div>
+              <div class="text-[13px] text-flux-primary leading-relaxed">
+                Entre <span class="font-mono font-semibold">9h30</span> et
+                <span class="font-mono font-semibold">12h00</span>, nous attendons de vous que vous ayez traité
+                <span class="text-flux-primary font-semibold">35% du volume</span> de cet élément.
+              </div>
+            </div>
+
+            <!-- (2) The single question -->
+            <div>
+              <label class="block text-[12px] text-flux-secondary mb-3">
+                À quelle heure pensez-vous terminer&nbsp;?
+              </label>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button class="time-step" id="time-down" aria-label="−15 min">−</button>
+                <input id="end-time-input" type="text" value="12h00" class="time-input" inputmode="numeric" />
+                <button class="time-step" id="time-up" aria-label="+15 min">+</button>
+                <button class="ontime-btn ml-1" id="ontime-btn">À l'heure</button>
+              </div>
+
+              <!-- Discreet status (computed from end time) -->
+              <div id="status-line" class="text-[11.5px] text-flux-tertiary mt-3 min-h-[1.4em]">
+                Vous finirez à l'heure prévue.
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex justify-end gap-2 px-5 py-3 border-t border-flux-border">
+            <button id="cancel-btn"
+                    class="px-4 py-2 rounded text-sm bg-zinc-700 hover:bg-zinc-600 text-white font-medium transition-colors">
+              Annuler
+            </button>
+            <button id="save-btn"
+                    class="px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Changes log -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed mb-6">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Ce qui a changé depuis la v4</div>
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <div class="text-emerald-300 font-semibold text-[12px] mb-2">✓ Conservé</div>
+        <ul class="list-disc list-inside space-y-1">
+          <li>Bloc « Sur votre créneau » avec horaire et objectif volume.</li>
+          <li>Champ heure de fin (saisie texte + boutons ±15 min) + bouton <strong>À l'heure</strong>.</li>
+          <li>Ligne de statut discrète (à l'heure / +X min en avance / +X min en retard).</li>
+        </ul>
+      </div>
+      <div>
+        <div class="text-zinc-500 font-semibold text-[12px] mb-2">✕ Retiré</div>
+        <ul class="list-disc list-inside space-y-1 text-zinc-400">
+          <li>Slider segmenté (F1 / F2 / F3) — disparu intégralement.</li>
+          <li>Sync bidirectionnelle — il n'y a plus qu'une seule saisie.</li>
+          <li>Repère « now » sur la barre — plus de barre.</li>
+          <li>Code couleur sémantique de dépassement (vert mélioratif).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- What the engine does -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed mb-6">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">Ce que le moteur fait derrière</div>
+    <p class="mb-2">
+      L'unique saisie de l'opérateur (heure de fin) suffit pour reconstituer toute l'information&nbsp;:
+    </p>
+    <ul class="list-disc list-inside space-y-1">
+      <li><strong>Productivité implicite</strong>&nbsp;: <span class="font-mono text-amber-300">volume_attendu / nouvelle_durée_totale</span>.</li>
+      <li><strong>% de volume réalisé maintenant</strong>&nbsp;: productivité × temps_écoulé.</li>
+      <li><strong>Propagation aux fragments suivants</strong>&nbsp;: ratio (nouvelle_durée / durée_prévue) appliqué à F3, F4…</li>
+      <li><strong>Replan</strong>&nbsp;: déclenché à la sauvegarde si l'écart est significatif.</li>
+    </ul>
+    <p class="mt-2 text-flux-tertiary">
+      L'opérateur ne voit rien de tout ça — il dit juste à quelle heure il termine, et le système gère le reste.
+    </p>
+  </section>
+
+  <!-- Open questions -->
+  <section class="bg-zinc-900 border border-white/5 rounded p-4 text-[11.5px] text-zinc-300 leading-relaxed">
+    <div class="text-[11px] uppercase tracking-[0.1em] text-zinc-500 font-semibold mb-3">À ton retour</div>
+    <ol class="list-decimal list-inside space-y-1.5">
+      <li>La <strong>formulation</strong> du bloc créneau (« Entre 9h30 et 12h00, nous attendons de vous que vous ayez traité 35% du volume… ») — bonne, ou trop verbeuse&nbsp;?</li>
+      <li>Le bouton <strong>À l'heure</strong> — pertinent (raccourci pour le cas le plus fréquent), ou superflu&nbsp;?</li>
+      <li>Les <strong>boutons ±15&nbsp;min</strong> à côté du champ — utiles, ou champ texte seul suffit&nbsp;?</li>
+      <li>La <strong>ligne de statut</strong> sous le champ — utile pour confirmer la saisie, ou bruit (suffit de voir le chiffre)&nbsp;?</li>
+      <li>Le format <strong>« 12h00 »</strong> à la française — OK, ou préférerais-tu <code>12:00</code> (plus universel)&nbsp;?</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+  // ── Time helpers ──
+  function minToFr(min) {
+    min = Math.max(0, Math.round(min));
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${h}h${String(m).padStart(2, '0')}`;
+  }
+  function frToMin(s) {
+    const m = String(s).match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2] || '0', 10);
+  }
+  function fmtMin(min) {
+    const m = Math.round(Math.abs(min));
+    const h = Math.floor(m / 60);
+    const rest = m % 60;
+    if (h === 0) return `${rest} min`;
+    if (rest === 0) return `${h}h`;
+    return `${h}h${String(rest).padStart(2, '0')}`;
+  }
+
+  // ── Demo constants ──
+  const PLANNED_END_MIN = 12 * 60;    // 12h00
+  const NOW_MIN         = 10 * 60 + 45; // 10h45
+  const MAX_LATE_MIN    = NOW_MIN + 8 * 60; // cap at +8h from now
+
+  // ── State ──
+  let endTimeMin = PLANNED_END_MIN;
+
+  // ── Elements ──
+  const endInput   = document.getElementById('end-time-input');
+  const statusLine = document.getElementById('status-line');
+
+  function renderTime() {
+    if (document.activeElement !== endInput) {
+      endInput.value = minToFr(endTimeMin);
+    }
+  }
+
+  function renderStatus() {
+    const delta = endTimeMin - PLANNED_END_MIN;
+    if (Math.abs(delta) <= 2) {
+      statusLine.innerHTML = 'Vous finirez à l\'heure prévue.';
+    } else if (delta < 0) {
+      statusLine.innerHTML = `Vous finirez <span class="text-emerald-300 font-semibold">${fmtMin(-delta)} en avance</span>.`;
+    } else {
+      statusLine.innerHTML = `Vous finirez <span class="text-amber-300 font-semibold">${fmtMin(delta)} en retard</span>.`;
+    }
+  }
+
+  function renderAll() {
+    renderTime();
+    renderStatus();
+  }
+
+  // ── Handlers ──
+  endInput.addEventListener('change', () => {
+    const m = frToMin(endInput.value);
+    if (m == null) { endInput.value = minToFr(endTimeMin); return; }
+    endTimeMin = Math.max(NOW_MIN, Math.min(MAX_LATE_MIN, m));
+    renderAll();
+  });
+  endInput.addEventListener('blur', () => {
+    endInput.value = minToFr(endTimeMin);
+  });
+  document.getElementById('time-up').addEventListener('click', () => {
+    endTimeMin = Math.min(MAX_LATE_MIN, endTimeMin + 15);
+    renderAll();
+  });
+  document.getElementById('time-down').addEventListener('click', () => {
+    endTimeMin = Math.max(NOW_MIN, endTimeMin - 15);
+    renderAll();
+  });
+  document.getElementById('ontime-btn').addEventListener('click', () => {
+    endTimeMin = PLANNED_END_MIN;
+    renderAll();
+  });
+
+  document.getElementById('save-btn').addEventListener('click', () => {
+    const btn = document.getElementById('save-btn');
+    const original = btn.textContent;
+    btn.textContent = '✓ Enregistré';
+    btn.style.opacity = '0.7';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.opacity = '1';
+    }, 1400);
+  });
+  document.getElementById('cancel-btn').addEventListener('click', () => {
+    alert('Annuler — la modale se fermerait sans enregistrer.');
+  });
+  document.getElementById('close-btn').addEventListener('click', () => {
+    alert('Fermer (X) — équivalent à Annuler.');
+  });
+
+  renderAll();
+</script>
+
+</body>
+</html>
