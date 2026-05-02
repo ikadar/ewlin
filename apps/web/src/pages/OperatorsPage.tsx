@@ -737,34 +737,25 @@ export function OperatorFormModal({ initial, stations, categories, onSave, onCan
       const updated = phase === 'setup'
         ? { setup: value, run: current.run }
         : { setup: current.setup, run: value };
-      if (updated.setup === 0 && updated.run === 0) {
+      const stationLeftSkilled = updated.setup > 0 || updated.run > 0;
+      if (!stationLeftSkilled) {
         next.delete(stationId);
+        // Drop any concurrent group that referenced this station, now that
+        // both phases are zero. Done inside the same updater to avoid the
+        // stale-state race that an outer-scope `skillMap.get(stationId)`
+        // would have introduced (the just-set value isn't observable
+        // outside the updater until React reconciles).
+        setConcurrentGroups((prevGroups) =>
+          prevGroups.filter(
+            (g) => g.stationIds[0] !== stationId && g.stationIds[1] !== stationId,
+          ),
+        );
       } else {
         next.set(stationId, updated);
       }
       return next;
     });
-    // When ALL phases drop to zero on a station, drop any concurrent group
-    // that referenced it. We can't know that here without re-reading state,
-    // so we recompute defensively in handleSubmit too. This early cleanup
-    // covers the common case (checkbox toggled off) without re-renders.
-    if (value === 0) {
-      setSkillMap.length; // force closure capture; intentional no-op
-      setConcurrentGroups((prevGroups) => {
-        // The skill map state hasn't necessarily settled yet at this point,
-        // so we only drop the group if BOTH phases are now zero.
-        // Read from the just-committed phase + the current state for the other.
-        return prevGroups.filter((g) => {
-          if (g.stationIds[0] !== stationId && g.stationIds[1] !== stationId) return true;
-          // Look up the (possibly stale) other phase
-          const v = skillMap.get(stationId);
-          if (!v) return false;
-          const otherPhase = phase === 'setup' ? v.run : v.setup;
-          return otherPhase > 0;
-        });
-      });
-    }
-  }, [skillMap]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -785,7 +776,7 @@ export function OperatorFormModal({ initial, stations, categories, onSave, onCan
 
     // Defensive cascade: drop any group whose station IDs are no longer
     // in skilledStations (covers station deletions, not just skill
-    // removals which handleProficiencyCommit already handles).
+    // removals which handleSkillCommit already handles).
     const skilledIds = new Set(skilledStations.map((s) => s.id));
     const concurrentGroupsPayload: ConcurrentGroupPayload[] = concurrentGroups
       .filter((g) => skilledIds.has(g.stationIds[0]) && skilledIds.has(g.stationIds[1]))
