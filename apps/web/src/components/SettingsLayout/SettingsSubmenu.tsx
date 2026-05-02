@@ -22,6 +22,7 @@ const SETTINGS_ITEMS = [
   { label: 'Safety Zone',                 path: '/settings/safety-zone' },
   { label: 'Écart de précédence',         path: '/settings/precedence-gap' },
   { label: 'Délai papier',                path: '/settings/paper-lead-time' },
+  { label: 'Délai forme',                 path: '/settings/forme-lead-time' },
 ];
 
 /**

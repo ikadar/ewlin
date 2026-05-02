@@ -43,6 +43,8 @@ import type {
   UpdatePrecedenceGapRequest,
   PaperLeadTimeConfig,
   UpdatePaperLeadTimeRequest,
+  FormeLeadTimeConfig,
+  UpdateFormeLeadTimeRequest,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
@@ -900,6 +902,23 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Get the global forme (die) lead-time configuration. Same supplier
+     * promise rule shape as paper, separate config row.
+     */
+    getFormeLeadTime: builder.query<FormeLeadTimeConfig, void>({
+      query: () => '/forme-lead-time',
+    }),
+
+    /**
+     * Update the global forme lead-time (admin). Invalidates Snapshot so
+     * the planning re-renders with the new floor on the next compute.
+     */
+    updateFormeLeadTime: builder.mutation<FormeLeadTimeConfig, UpdateFormeLeadTimeRequest>({
+      query: (body) => ({ url: '/forme-lead-time', method: 'PUT', body }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
      * Set (or clear) a safety override on a (jobId, sequenceIndex, stationId) tuple.
      * Optimistically mirrors the override into the snapshot so the tile
      * reflects the cyan-off state immediately.
@@ -1084,4 +1103,6 @@ export const {
   useUpdatePrecedenceGapMutation,
   useGetPaperLeadTimeQuery,
   useUpdatePaperLeadTimeMutation,
+  useGetFormeLeadTimeQuery,
+  useUpdateFormeLeadTimeMutation,
 } = scheduleApi;

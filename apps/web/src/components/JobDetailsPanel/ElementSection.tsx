@@ -7,8 +7,10 @@ import type {
   PlateStatus,
   FormeStatus,
   PaperLeadTimeConfig,
+  FormeLeadTimeConfig,
 } from '@flux/types';
 import { computePaperEarliestStart } from '../../utils/paperGate';
+import { computeFormeEarliestStart } from '../../utils/formeGate';
 
 export interface ElementSectionProps {
   /** The element to display */
@@ -29,6 +31,11 @@ export interface ElementSectionProps {
    * undefined the tooltip falls back to event-date-only meta.
    */
   paperLeadTime?: PaperLeadTimeConfig;
+  /**
+   * Forme (die) lead-time configuration (shop-wide). Same role for the
+   * Forme pill tooltip.
+   */
+  formeLeadTime?: FormeLeadTimeConfig;
   /** Children (task tiles) */
   children: React.ReactNode;
 }
@@ -163,12 +170,17 @@ function paperMeta(element: Element, config: PaperLeadTimeConfig | undefined): s
   return null;
 }
 
-function formeMeta(element: Element): string | null {
-  if (element.formeStatus === 'ordered' && element.formeOrderedAt) {
-    return `Commandée le ${formatShortDate(element.formeOrderedAt)}`;
-  }
+function formeMeta(element: Element, config: FormeLeadTimeConfig | undefined): string | null {
   if (element.formeStatus === 'delivered' && element.formeDeliveredAt) {
     return `Livrée le ${formatShortDate(element.formeDeliveredAt)}`;
+  }
+  const earliest = computeFormeEarliestStart(element, config);
+  if (element.formeStatus === 'ordered' && element.formeOrderedAt) {
+    const base = `Commandée le ${formatShortDate(element.formeOrderedAt)}`;
+    return earliest ? `${base} · Démarrage : ${formatShortDateTime(earliest)}` : base;
+  }
+  if (element.formeStatus === 'to_order' && earliest) {
+    return `Démarrage possible : ${formatShortDateTime(earliest)}`;
   }
   return null;
 }
@@ -277,6 +289,7 @@ function buildBadges(
   element: Element,
   batDeadline: string | null | undefined,
   paperLeadTime: PaperLeadTimeConfig | undefined,
+  formeLeadTime: FormeLeadTimeConfig | undefined,
 ): BadgeSpec[] {
   const badges: BadgeSpec[] = [];
   // 'none' status means "not applicable to this element" (e.g., no BAT
@@ -306,7 +319,7 @@ function buildBadges(
       label: 'FOR',
       tone: paperOrFormeTone(element.formeStatus),
       tipTitle: `Forme · ${FORME_LABEL[element.formeStatus]}`,
-      tipMeta: formeMeta(element),
+      tipMeta: formeMeta(element, formeLeadTime),
     });
   }
   if (element.plateStatus !== 'none') {
@@ -343,9 +356,10 @@ export function ElementSection({
   isSingleElement = false,
   batDeadline,
   paperLeadTime,
+  formeLeadTime,
   children,
 }: ElementSectionProps) {
-  const badges = buildBadges(element, batDeadline, paperLeadTime);
+  const badges = buildBadges(element, batDeadline, paperLeadTime, formeLeadTime);
 
   const precedenceElements = element.prerequisiteElementIds
     .map((id) => allElements.find((e) => e.id === id))

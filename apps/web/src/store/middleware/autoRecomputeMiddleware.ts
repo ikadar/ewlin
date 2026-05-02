@@ -67,7 +67,9 @@ type AutoRecomputeEndpointName =
   | Extract<keyof typeof scheduleApi.endpoints, 'updateElementStatus'>
   // Paper lead-time hours — the global floor that gates tasks whose
   // element has paperStatus not Ready. Reducing it can unblock work.
-  | Extract<keyof typeof scheduleApi.endpoints, 'updatePaperLeadTime'>;
+  | Extract<keyof typeof scheduleApi.endpoints, 'updatePaperLeadTime'>
+  // Forme (die) lead-time — same logic for formeStatus.
+  | Extract<keyof typeof scheduleApi.endpoints, 'updateFormeLeadTime'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -98,6 +100,7 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updateElementPrerequisite',
   'updateElementStatus',
   'updatePaperLeadTime',
+  'updateFormeLeadTime',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {

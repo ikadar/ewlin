@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig, FormeLeadTimeConfig } from '@flux/types';
 import { isMultiElementJob } from '@flux/types';
 import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
@@ -51,6 +51,8 @@ export interface TaskListProps {
   onJumpToOperatorSlice?: (operatorId: string, from: Date) => void;
   /** Paper lead-time configuration (shop-wide); drives the Papier pill tooltip date */
   paperLeadTime?: PaperLeadTimeConfig;
+  /** Forme (die) lead-time configuration (shop-wide); drives the Forme pill tooltip date */
+  formeLeadTime?: FormeLeadTimeConfig;
 }
 
 /**
@@ -79,6 +81,7 @@ export function TaskList({
   snapshotOperators,
   onJumpToOperatorSlice,
   paperLeadTime,
+  formeLeadTime,
 }: TaskListProps) {
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
   const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
@@ -274,6 +277,7 @@ export function TaskList({
             isSingleElement={isSingleElement}
             batDeadline={job.batDeadline ?? null}
             paperLeadTime={paperLeadTime}
+            formeLeadTime={formeLeadTime}
           >
             {renderTaskTiles(elementTasks, element)}
           </ElementSection>

@@ -32,6 +32,7 @@ import {
   useClearJobAssignmentsMutation,
   useBatchSetPinMutation,
   useGetPaperLeadTimeQuery,
+  useGetFormeLeadTimeQuery,
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
@@ -147,6 +148,7 @@ export default function OperatorSchedulePage() {
   // Paper lead-time (shop-wide). Threaded into JobDetailsPanel so the
   // gate pill tooltip displays the configured delay.
   const { data: paperLeadTime } = useGetPaperLeadTimeQuery();
+  const { data: formeLeadTime } = useGetFormeLeadTimeQuery();
   const refetch = scenarioModeForSnapshot === 'prod' ? prodSnapshot.refetch : preprodSnapshot.refetch;
 
   const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
@@ -1208,6 +1210,7 @@ export default function OperatorSchedulePage() {
             categories={snapshot.categories}
             providers={snapshot.providers}
             paperLeadTime={paperLeadTime}
+            formeLeadTime={formeLeadTime}
             onClose={() => setSelectedJobId(null)}
             onRecallTask={handleRecallAssignment}
             onToggleComplete={handleToggleComplete}

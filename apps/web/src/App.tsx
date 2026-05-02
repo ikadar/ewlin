@@ -21,7 +21,7 @@ import { updateSnapshot } from './mock';
 import { buildSequenceIndexLookup } from './utils/safetyZone';
 import { StalenessBadge } from './components/StalenessBadge';
 import { shouldUseFixture } from './mock/testFixtures';
-import { useGetSnapshotQuery, useGetProdSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useGetPaperLeadTimeQuery, useAppSelector, selectIsServiceUnavailable } from './store';
+import { useGetSnapshotQuery, useGetProdSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useGetPaperLeadTimeQuery, useGetFormeLeadTimeQuery, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
 import { useUpdateSTStatusMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
@@ -251,6 +251,7 @@ function AppContent() {
   // Paper lead-time (shop-wide). Used by the JDP to display the gate
   // pill tooltip when an element has paperStatus not Ready.
   const { data: paperLeadTime } = useGetPaperLeadTimeQuery();
+  const { data: formeLeadTime } = useGetFormeLeadTimeQuery();
 
   // Helper to trigger refetch after local updateSnapshot calls
   // This bridges the gap between the mock layer and RTK Query cache
@@ -1986,6 +1987,7 @@ function AppContent() {
           activeTaskId={undefined}
           conflictTaskIds={conflictTaskIds}
           paperLeadTime={paperLeadTime}
+          formeLeadTime={formeLeadTime}
           onJumpToTask={handleJumpToTask}
           onRecallTask={handleRecallAssignment}
           onClose={() => setSelectedJobId(null)}

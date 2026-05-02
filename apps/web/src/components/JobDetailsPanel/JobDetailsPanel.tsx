@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig, FormeLeadTimeConfig } from '@flux/types';
 import { X, Calendar, CalendarCheck } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
@@ -68,6 +68,8 @@ export interface JobDetailsPanelProps {
    * unit-test-friendly.
    */
   paperLeadTime?: PaperLeadTimeConfig;
+  /** Forme (die) lead-time configuration; same role for the Forme pill. */
+  formeLeadTime?: FormeLeadTimeConfig;
 }
 
 /** Format a datetime as DD/MM/YYYY a HHhMM */
@@ -127,6 +129,7 @@ export function JobDetailsPanel({
   snapshotOperators,
   onJumpToOperatorSlice,
   paperLeadTime,
+  formeLeadTime,
 }: JobDetailsPanelProps) {
   // Memoize data filtering for this job
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
@@ -350,6 +353,7 @@ export function JobDetailsPanel({
         elements={jobElements}
         job={job}
         paperLeadTime={paperLeadTime}
+        formeLeadTime={formeLeadTime}
         assignments={jobAssignments}
         stations={stations}
         categories={categories}
