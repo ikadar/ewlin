@@ -1,6 +1,8 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
 import { CompletionToggleIcon } from './CompletionToggleIcon';
+import { SaisieIndicator } from './SaisieIndicator';
+import { ProgressCaptureModal } from '../ProgressCaptureModal/ProgressCaptureModal';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { TileTooltip } from './TileTooltip';
@@ -10,6 +12,10 @@ import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
+import { useNow } from '../../hooks/useNow';
+import { useProgressTriggers } from '../../hooks/useProgressTriggers';
+import { useReportSaisieMutation } from '../../store';
+import { FEATURE_PROGRESS_CAPTURE_V2 } from '../../constants/features';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
@@ -89,6 +95,63 @@ export interface TileProps {
   onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
   /** Flat index of this task within its job (0-based, stable across JCF rebuilds). */
   sequenceIndex?: number;
+  /**
+   * V2 — Display name of the machine for the saisie modal header.
+   * Falls back to `task.stationId` if not provided. The parent (StationGrid)
+   * is best placed to look it up since it has the station registry handy.
+   */
+  machineName?: string;
+  /**
+   * V2 — % of the job already delivered by previous fragments. Used by the
+   * VolumeGauge in the saisie modal. Mocked to 30 when absent.
+   * Will be supplied by the engine via `Assignment.cumulativePositionPct`.
+   */
+  cumulBeforeSlotPct?: number;
+  /**
+   * V2 — % of the job that this slot delivers. Mocked to 35 when absent.
+   * Will be supplied by the engine alongside `cumulBeforeSlotPct`.
+   */
+  slotVolumePct?: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Time helpers — V2 progress capture (used for the saisie modal). Local to
+// Tile because they're tightly coupled to the assignment's scheduledStart/End.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isoToMinFromMidnight(iso: string): number {
+  const d = new Date(iso);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function applyMinToDate(baseIso: string, minutesFromMidnight: number): string {
+  const base = new Date(baseIso);
+  const result = new Date(base);
+  result.setHours(0, 0, 0, 0);
+  result.setMinutes(minutesFromMidnight);
+  return result.toISOString();
+}
+
+/**
+ * Volume already delivered by this slot at `now`, in job-percentage units.
+ * Calage-aware: only the run portion contributes (cf. project_calage_run_ratio).
+ */
+function computeExpectedAtNowPct(
+  scheduledStart: string,
+  scheduledEnd: string,
+  setupMin: number,
+  runMin: number,
+  nowMs: number,
+  slotVolumePct: number,
+): number {
+  const startMs = new Date(scheduledStart).getTime();
+  const setupEndMs = startMs + setupMin * 60_000;
+  if (nowMs <= setupEndMs) return 0;
+  const endMs = new Date(scheduledEnd).getTime();
+  if (nowMs >= endMs) return slotVolumePct;
+  if (runMin === 0) return slotVolumePct;
+  const runElapsedMin = (nowMs - setupEndMs) / 60_000;
+  return Math.min(slotVolumePct, (runElapsedMin / runMin) * slotVolumePct);
 }
 
 /**
@@ -136,6 +199,9 @@ export const Tile = memo(function Tile({
   isFrozenOverridden = false,
   onToggleFrozenOverride,
   sequenceIndex,
+  machineName,
+  cumulBeforeSlotPct = 30,   // V2 mock — engine will supply once the
+  slotVolumePct = 35,        // snapshot exposes cumulativePositionPct.
 }: TileProps) {
   // Tooltip + crosslink reveal moved from hover to double-click. Hover
   // triggers were too noisy when scanning the grid; dblclick is an
@@ -161,6 +227,36 @@ export const Tile = memo(function Tile({
   };
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;
+
+  // ────────────────────────────────────────────────────────────────────────
+  // V2 progress-capture wiring (gated by FEATURE_PROGRESS_CAPTURE_V2).
+  // Hooks are always called (rules-of-hooks compliant) ; their results are
+  // only consumed when the flag is on. Cost is negligible — useNow ticks
+  // every 60 s, useProgressTriggers is a memoized derivation.
+  // ────────────────────────────────────────────────────────────────────────
+  const [pmIsOpen, setPmIsOpen] = useState(false);
+  const now = useNow(60_000);
+  const singleAssignmentArr = useMemo(() => [assignment], [assignment]);
+  const triggers = useProgressTriggers(singleAssignmentArr, now);
+  const saisieState = triggers[assignment.taskId] ?? 'inactive';
+  const [reportSaisie] = useReportSaisieMutation();
+
+  const handleSaisieSave = async (estimatedEndMin: number) => {
+    const iso = applyMinToDate(assignment.scheduledStart, estimatedEndMin);
+    await reportSaisie({ taskId: assignment.taskId, estimatedEndTime: iso }).unwrap();
+  };
+
+  const slotStartMin = isoToMinFromMidnight(assignment.scheduledStart);
+  const slotEndMin = isoToMinFromMidnight(assignment.scheduledEnd);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const expectedAtNowPct = computeExpectedAtNowPct(
+    assignment.scheduledStart,
+    assignment.scheduledEnd,
+    setupMinutes,
+    task.duration.runMinutes ?? 0,
+    now.getTime(),
+    slotVolumePct,
+  );
 
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;
@@ -198,12 +294,27 @@ export const Tile = memo(function Tile({
   const teethCount = computeTeethCount(measuredWidth);
   const clipPath = buildCssClipPath(renderHeight, sawtoothTop, sawtoothBottom, teethCount);
 
-  // Get state-based color classes
-  const colorClasses = getStateColorClasses(tileState);
-  const stateRgb = getStateRgb(tileState);
+  // V2 — derive an "effective" tile state with no-news=good-news auto-completion :
+  // a tile whose scheduledEnd is past `now` reads as completed, regardless of
+  // the explicit `isCompleted` flag. Only kicks in when the V2 flag is on.
+  // Outside V2, behaviour is unchanged.
+  const effectiveTileState =
+    FEATURE_PROGRESS_CAPTURE_V2 &&
+    tileState !== 'shipped' &&
+    tileState !== 'completed' &&
+    new Date(assignment.scheduledEnd).getTime() < now.getTime()
+      ? ('completed' as TileState)
+      : tileState;
 
-  // Completion state
-  const isCompleted = assignment.isCompleted;
+  // Get state-based color classes
+  const colorClasses = getStateColorClasses(effectiveTileState);
+  const stateRgb = getStateRgb(effectiveTileState);
+
+  // Completion state — under V2 the modal-driven, derived completion takes
+  // precedence over the legacy `assignment.isCompleted` flag for display.
+  const isCompleted = FEATURE_PROGRESS_CAPTURE_V2
+    ? effectiveTileState === 'completed' || effectiveTileState === 'shipped'
+    : assignment.isCompleted;
 
   // Handle click — select this job
   const handleClick = () => {
@@ -367,11 +478,18 @@ export const Tile = memo(function Tile({
           data-testid="tile-content"
         >
           {assignment.taskId && (
-            <CompletionToggleIcon
-              taskId={assignment.taskId}
-              isCompleted={isCompleted}
-              tileState={tileState}
-            />
+            FEATURE_PROGRESS_CAPTURE_V2 ? (
+              <SaisieIndicator
+                state={saisieState}
+                onClick={() => setPmIsOpen(true)}
+              />
+            ) : (
+              <CompletionToggleIcon
+                taskId={assignment.taskId}
+                isCompleted={isCompleted}
+                tileState={tileState}
+              />
+            )
           )}
           <span
             onClick={handleTogglePin}
@@ -429,6 +547,23 @@ export const Tile = memo(function Tile({
         blockingInfo={blockingInfo}
         isBlocked={isBlocked}
       />
+
+      {/* V2 progress-capture — modal opens from the SaisieIndicator click. */}
+      {FEATURE_PROGRESS_CAPTURE_V2 && (
+        <ProgressCaptureModal
+          isOpen={pmIsOpen}
+          onClose={() => setPmIsOpen(false)}
+          onSave={handleSaisieSave}
+          job={{ reference: job.reference, client: job.client }}
+          machineName={machineName ?? task.stationId}
+          slotStartMin={slotStartMin}
+          slotEndMin={slotEndMin}
+          cumulBeforeSlotPct={cumulBeforeSlotPct}
+          slotVolumePct={slotVolumePct}
+          expectedAtNowPct={expectedAtNowPct}
+          nowMin={nowMin}
+        />
+      )}
     </div>
   );
 }, arePropsEqual);
