@@ -109,6 +109,19 @@ pub struct TaskInput {
     ///     element of E has batStatus not Ready
     /// In both cases the floor is `Job.batDeadline` converted to tick units.
     /// The engine treats the field neutrally — it doesn't know about BAT.
+    //
+    // V2 progress capture (TODO) — three optional fields are planned here :
+    //   - `realistic_run_minutes: Option<u32>` (operator-derived run)
+    //   - `cumulative_position_pct: Option<f64>` (job-cumulative slot start)
+    //   - `slot_volume_pct: Option<f64>` (slot's share of the job)
+    // They were prototyped in commit 7a495ed-... but reverted because adding
+    // fields to `TaskInput` cascades into ~20 struct literals across the
+    // engine tests that aren't yet using struct-update syntax. The math is
+    // stable in `productivity.rs` ; when the integration lands, plumbing the
+    // fields through is a focused mechanical change, not a design question.
+    // See docs/operator-sandbox/progress-capture-design.md § 4 and
+    // docs/operator-sandbox/progress-capture-impl-plan.md § 4.4 for the
+    // contract.
     #[serde(default)]
     pub earliest_start_tick: Option<usize>,
 }
