@@ -21,6 +21,7 @@ import { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
 import { FluxStationIndicator } from './FluxStationIndicator';
 import { FluxStackedDots } from './FluxStackedDots';
 import { TransporteurCell } from './TransporteurCell';
+import { TruncatedCell } from './TruncatedCell';
 import { FluxTableContext, useFluxTableContext } from './FluxTableContext';
 import { type SortColumn, type SortDirection } from './fluxSort';
 import type { ShipperResponse } from '@/store/api/shipperApi';
@@ -200,7 +201,7 @@ function FluxTableHeader() {
         </th>
         {/* Client — frozen left */}
         <th
-          className={`${stickyHeaderCell} left-[7.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[9.5rem] ${sortableHeader}`}
           title="Client"
           onClick={() => onSortChange('client')}
         >
@@ -208,7 +209,7 @@ function FluxTableHeader() {
         </th>
         {/* Designation — frozen left + right shadow */}
         <th
-          className={`${stickyHeaderCell} left-[16.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[18.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
           title="Désignation"
           onClick={() => onSortChange('designation')}
@@ -424,27 +425,29 @@ const FluxTableRow = memo(function FluxTableRow({
       </td>
 
       {/* ID — frozen left */}
-      <td className={`${stickyCell} left-10 px-4 py-0 text-sm text-flux-text-primary font-mono font-medium whitespace-nowrap`} style={stickyBg}>
-        {job.id}
+      <td className={`${stickyCell} left-10 px-4 py-0 text-sm text-flux-text-primary font-mono font-medium`} style={stickyBg}>
+        <TruncatedCell fullText={job.id} />
       </td>
 
       {/* Client — frozen left */}
-      <td className={`${cellBase} left-[7.5rem] whitespace-nowrap`} style={stickyBg}>
+      <td className={`${cellBase} left-[9.5rem] whitespace-nowrap`} style={stickyBg}>
         {job.client}
       </td>
 
       {/* Designation — frozen left + right shadow */}
       <td
-        className={`${cellBase} left-[16.5rem]`}
+        className={`${cellBase} left-[18.5rem]`}
         style={tint ? { ...LEFT_SHADOW, backgroundColor: tint.sticky } : LEFT_SHADOW}
         data-testid="flux-designation"
       >
-        {job.designation}
-        {isMulti && (
-          <span className="ml-1 text-flux-text-muted" style={{ fontSize: '10px' }}>
-            ({job.elements.length})
-          </span>
-        )}
+        <TruncatedCell fullText={job.designation}>
+          {job.designation}
+          {isMulti && (
+            <span className="ml-1 text-flux-text-muted" style={{ fontSize: '10px' }}>
+              ({job.elements.length})
+            </span>
+          )}
+        </TruncatedCell>
       </td>
 
       {/* Référent */}
@@ -681,15 +684,17 @@ function FluxSubRow({
       <td className={`${subRowStickyCell} left-10`} />
 
       {/* Client — empty */}
-      <td className={`${subRowStickyCell} left-[7.5rem]`} />
+      <td className={`${subRowStickyCell} left-[9.5rem]`} />
 
       {/* Designation — label with arrow prefix */}
       <td
-        className={`${subRowStickyCell} left-[16.5rem] px-4 py-0 text-flux-text-tertiary`}
+        className={`${subRowStickyCell} left-[18.5rem] px-4 py-0 text-flux-text-tertiary`}
         style={LEFT_SHADOW}
         data-testid="flux-sub-designation"
       >
-        <span className="text-xs pl-4 text-flux-text-muted">↳ {element.label}</span>
+        <TruncatedCell fullText={element.label} className="text-xs pl-4 text-flux-text-muted">
+          ↳ {element.label}
+        </TruncatedCell>
       </td>
 
       {/* Référent — empty */}
@@ -829,7 +834,7 @@ export const FluxTable = memo(function FluxTable({
           <colgroup>
             <col style={{ width: '1.5rem' }} />
             <col style={{ width: '1rem' }} />
-            <col style={{ width: '5rem' }} />
+            <col style={{ width: '7rem' }} />
             <col style={{ width: '9rem' }} />
             <col style={{ width: '16rem' }} />
             <col style={{ width: '7rem' }} />
