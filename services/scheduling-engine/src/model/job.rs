@@ -17,6 +17,15 @@ pub struct JobInput {
     pub elements: Vec<ElementInput>,
     #[serde(default)]
     pub required_job_ids: Vec<String>,
+    /// V2 LNS perturbation hint: when true, the V1 conservative-staffing
+    /// brake in the forward pass is bypassed for every action of this job
+    /// — the run phase is allowed to grab up to `max_run_operators` even
+    /// if the task is on time at nominal speed. LNS toggles this flag on
+    /// random non-late jobs to explore "what if we accelerated this one"
+    /// alternatives and keeps the perturbed schedule when it scores better.
+    /// Never serialized from the PHP payload; only set by LNS internally.
+    #[serde(default, skip_serializing)]
+    pub force_max_staffing: bool,
 }
 
 fn default_deadline_priority() -> u8 {

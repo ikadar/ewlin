@@ -24,14 +24,22 @@ pub struct OperatorScheduleData {
 
 /// Station attributes needed during forward pass
 pub struct StationAttrs {
-    pub attention_full: f64,
+    pub attention_setup: f64,
     pub attention_run: f64,
     pub max_run_attention: f64,
     pub masked_time_enabled: bool,
     /// Setup peremption threshold in ticks. If operator is absent this many consecutive
     /// ticks during setup, setup expires and must be redone.
     pub peremption_ticks: u32,
-    pub max_operators: u32,
+    /// Hard floor on bodies for the setup phase (gate). Default 1.
+    pub min_setup_operators: u32,
+    /// Hard cap on bodies for the setup phase (top-N filter). Default 1.
+    pub max_setup_operators: u32,
+    /// Hard floor on bodies for the run phase (gate). Default 1.
+    pub min_run_operators: u32,
+    /// Hard cap on bodies for the run phase (top-N filter). Default falls
+    /// back from attention_run / max_run_attention so the formula stays live.
+    pub max_run_operators: u32,
     /// Max chunk size in ticks. Upper bound for chunk decisions — forces the
     /// engine to re-evaluate scheduling at least every this many ticks.
     pub max_chunk_ticks: u32,
@@ -363,9 +371,9 @@ pub struct Action {
     /// `setup` while `setup_progress < setup_ticks as f64`, then `run`.
     /// Tracked separately from `eat` (real ticks elapsed) because the two
     /// diverge whenever the per-tick setup rate isn't exactly 1.0 — e.g.
-    /// an under-skilled operator (`prof < attention_full`) makes setup
+    /// an under-skilled operator (`prof < attention_setup`) makes setup
     /// progress slower than wall clock, and an over-staffed station
-    /// (`sum_prof > attention_full`) caps it back to 1.0. Only
+    /// (`sum_prof > attention_setup`) caps it back to 1.0. Only
     /// `setup_progress` is authoritative for phase membership.
     pub setup_progress: f64,
     /// Tick at which `setup_progress` first reached `setup_ticks`. `None`
@@ -395,6 +403,11 @@ pub struct Action {
     /// from scratch (which would surface as an unintended handover).
     /// Cleared when `borrow_until_tick` expires.
     pub borrowed_op_to_restore: Option<usize>,
+    /// V2 LNS perturbation flag — when true, the V1 conservative-staffing
+    /// brake is bypassed for this action's run phase. Mirrors the owning
+    /// `JobInput.force_max_staffing` flag, copied at action build time so
+    /// the forward pass doesn't need a back-reference to the job vector.
+    pub force_max_staffing: bool,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -599,8 +612,11 @@ struct ScoredAction {
 /// Priority B, the same `is_pref` tiebreak applies. See
 /// `selection_tests::preferred_operator_beats_higher_proficiency_idle_op`.
 ///
-/// Returns up to `max_operators` operator indices. The caller is
-/// responsible for actually assigning them via grid.assign_operator.
+/// Returns up to `max_operators` operator indices, respecting the
+/// `min_operators` hard floor (returns empty if fewer ops can be found).
+/// The caller is responsible for actually assigning them via
+/// grid.assign_operator and for picking phase-appropriate min/max bounds
+/// (`min/max_setup_operators` for setup, `min/max_run_operators` for run).
 pub fn find_operators_for_station(
     grid: &ScheduleGrid,
     t: usize,
@@ -609,6 +625,7 @@ pub fn find_operators_for_station(
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     preferred_operators: &[usize],
+    min_operators: u32,
     max_operators: u32,
     is_setup_phase: bool,
 ) -> Vec<usize> {
@@ -714,6 +731,15 @@ pub fn find_operators_for_station(
             break;
         }
         result.push(op);
+    }
+
+    // Hard floor: if we cannot reach the minimum staffing, refuse the
+    // assignment for this tick. Returning an empty Vec lets the caller
+    // distinguish "no candidate found" from "a partial assignment", and
+    // the existing stall handling (idle_ticks++, peremption rule) takes
+    // it from there.
+    if (result.len() as u32) < min_operators {
+        return Vec::new();
     }
 
     result
@@ -2228,6 +2254,37 @@ fn assign_action_at_tick(
         }
     }
 
+    // Phase-specific staffing bounds. Setup phase uses min_setup/max_setup
+    // (typically 1/1 = solo); run phase uses min_run/max_run which on
+    // parallelizable stations like a folding table can grow to 5+ corps.
+    //
+    // V1 escalade conditionnelle: don't grab `max_run_operators` greedily
+    // at every tick. Default to the nominal team size (`ceil(attention_run)`)
+    // and only widen the cap to `max_run_operators` when the action is at
+    // risk of finishing past its job deadline at nominal speed. This keeps
+    // the algorithm from siphoning idle operators into a parallelizable
+    // station while other stations would benefit from them more.
+    let (phase_min_ops, phase_max_ops) = if in_setup {
+        (attrs.min_setup_operators, attrs.max_setup_operators)
+    } else {
+        let nominal_cap = (attrs.attention_run.ceil() as u32)
+            .max(attrs.min_run_operators)
+            .min(attrs.max_run_operators);
+        let projected_finish = (t as u64) + actions[action_idx].art as u64;
+        let deadline = actions[action_idx].job_deadline_tick;
+        let needs_escalation = deadline != u64::MAX && projected_finish > deadline;
+        // V2 LNS perturbation override: a force-max flag bypasses the V1
+        // brake entirely. Used by LNS to explore "what if we accelerated
+        // this job even though it's on time" alternatives.
+        let force_max = actions[action_idx].force_max_staffing;
+        let cap = if needs_escalation || force_max {
+            attrs.max_run_operators
+        } else {
+            nominal_cap
+        };
+        (attrs.min_run_operators, cap)
+    };
+
     // Try preferred (magnetism) first, then any fresh selection.
     let mut operators = find_operators_for_station(
         grid,
@@ -2237,7 +2294,8 @@ fn assign_action_at_tick(
         operator_availability,
         operator_groups,
         &preferred_op_indices,
-        attrs.max_operators,
+        phase_min_ops,
+        phase_max_ops,
         in_setup,
     );
     if operators.is_empty() && !preferred_op_indices.is_empty() {
@@ -2249,7 +2307,8 @@ fn assign_action_at_tick(
             operator_availability,
             operator_groups,
             &[],
-            attrs.max_operators,
+            phase_min_ops,
+            phase_max_ops,
             in_setup,
         );
     }
@@ -2460,11 +2519,11 @@ fn advance_action_at_tick(
     // Phase-aware effective rate.
     //
     // Setup phase (setup_progress < setup_ticks): the machine needs
-    // `attention_full` op-units of attention to reach baseline setup
+    // `attention_setup` op-units of attention to reach baseline setup
     // speed (1 setup-tick per real tick). Extra operators don't help —
     // a second op can't physically speed up "the conducteur threading
-    // paper". Cap raw at attention_full, normalise to baseline.
-    //   rate ∈ [0, 1]; equals 1 when fully staffed (sum_prof ≥ attention_full),
+    // paper". Cap raw at attention_setup, normalise to baseline.
+    //   rate ∈ [0, 1]; equals 1 when fully staffed (sum_prof ≥ attention_setup),
     //   strictly less when an under-skilled op is alone.
     //
     // Run phase (setup_progress ≥ setup_ticks): productivity divides by
@@ -2478,7 +2537,7 @@ fn advance_action_at_tick(
     //   (run takes 2× longer, which is the correct under-staffing penalty).
     let setup_progress_before = actions[action_idx].setup_progress;
     let effective_rate = if in_setup_phase {
-        let cap = attrs.attention_full.max(f64::MIN_POSITIVE);
+        let cap = attrs.attention_setup.max(f64::MIN_POSITIVE);
         raw_productivity.min(cap) / cap
     } else {
         let cap = attrs.max_run_attention.max(attrs.attention_run);
@@ -2945,14 +3004,26 @@ fn pre_place_pinned_actions(
         // engine used to emit an empty operators array for every pinned
         // task, so any DB row that ever lost its operators had no way
         // of recovering them on subsequent computes.
-        let max_ops = if station_idx < station_attrs.len() {
-            station_attrs[station_idx].max_operators
-        } else {
-            1
-        };
+        let (min_setup_ops, max_setup_ops, min_run_ops, max_run_ops) =
+            if station_idx < station_attrs.len() {
+                let a = &station_attrs[station_idx];
+                (
+                    a.min_setup_operators,
+                    a.max_setup_operators,
+                    a.min_run_operators,
+                    a.max_run_operators,
+                )
+            } else {
+                (1, 1, 1, 1)
+            };
         let setup_ticks = actions[i].setup_ticks as usize;
         for t in start_t..end_t {
             let in_run_phase = setup_ticks == 0 || (t - start_t) >= setup_ticks;
+            let (phase_min, phase_max) = if in_run_phase {
+                (min_run_ops, max_run_ops)
+            } else {
+                (min_setup_ops, max_setup_ops)
+            };
             let mut ops = find_operators_for_station(
                 grid,
                 t,
@@ -2961,7 +3032,8 @@ fn pre_place_pinned_actions(
                 operator_availability,
                 operator_groups,
                 &actions[i].assigned_operators,
-                max_ops,
+                phase_min,
+                phase_max,
                 !in_run_phase,
             );
             // Availability fallback: if `find_operators_for_station` came
@@ -3019,7 +3091,7 @@ fn pre_place_pinned_actions(
                 fallback.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
                 ops = fallback
                     .into_iter()
-                    .take(max_ops as usize)
+                    .take(phase_max as usize)
                     .map(|(op, _)| op)
                     .collect();
             }
@@ -3389,7 +3461,7 @@ mod selection_tests {
         let groups = vec![vec![]; 2];
 
         let result = find_operators_for_station(
-            &grid, 5, 0, &skills, &avail, &groups, &[], 1, false,
+            &grid, 5, 0, &skills, &avail, &groups, &[], 1, 1, false,
         );
         assert_eq!(result, vec![0]);
     }
@@ -3410,7 +3482,7 @@ mod selection_tests {
 
         // Setup phase: even though pairing would be valid, setup forces solo.
         let result = find_operators_for_station(
-            &grid, 5, 1, &skills, &avail, &groups, &[], 1, true,
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, 1, true,
         );
         assert!(result.is_empty(), "setup must not pair, got {result:?}");
     }
@@ -3428,7 +3500,7 @@ mod selection_tests {
         grid.assign_operator(0, 5, 0, 0.0);
 
         let result = find_operators_for_station(
-            &grid, 5, 1, &skills, &avail, &groups, &[], 1, false,
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, 1, false,
         );
         assert_eq!(result, vec![0]);
     }
@@ -3447,7 +3519,7 @@ mod selection_tests {
         grid.assign_operator(0, 5, 0, 0.0);
 
         let result = find_operators_for_station(
-            &grid, 5, 2, &skills, &avail, &groups, &[], 1, false,
+            &grid, 5, 2, &skills, &avail, &groups, &[], 1, 1, false,
         );
         assert!(result.is_empty(), "no group {{0,2}} → must reject pairing");
     }
@@ -3462,7 +3534,7 @@ mod selection_tests {
         grid.assign_operator(0, 5, 0, 0.0);
 
         let result = find_operators_for_station(
-            &grid, 5, 1, &skills, &avail, &groups, &[], 1, false,
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, 1, false,
         );
         assert!(result.is_empty(), "Frédéric never pairs");
     }
@@ -3487,7 +3559,7 @@ mod selection_tests {
         // Asking for an op for station 1: idle op 1 should be preferred over
         // pairing op 0.
         let result = find_operators_for_station(
-            &grid, 5, 1, &skills, &avail, &groups, &[], 1, false,
+            &grid, 5, 1, &skills, &avail, &groups, &[], 1, 1, false,
         );
         assert_eq!(result, vec![1]);
     }
@@ -3556,7 +3628,7 @@ mod selection_tests {
 
         // Op 0 is preferred (e.g., it was the initial pick at start_t).
         let result = find_operators_for_station(
-            &grid, 5, 0, &skills, &avail, &groups, &[0], 1, false,
+            &grid, 5, 0, &skills, &avail, &groups, &[0], 1, 1, false,
         );
         assert_eq!(
             result,
@@ -3594,9 +3666,69 @@ mod selection_tests {
         let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![]];
 
         let result = find_operators_for_station(
-            &grid, 5, 0, &skills, &avail, &groups, &[], 1, false,
+            &grid, 5, 0, &skills, &avail, &groups, &[], 1, 1, false,
         );
         assert_eq!(result, vec![1], "no preference → highest prof wins");
+    }
+
+    /// `min_operators` gate refuses the assignment when fewer qualified
+    /// idle ops are available than the configured floor. Returning an
+    /// empty Vec lets the caller fall through to the stall + peremption
+    /// machinery (no partial staffing slips through).
+    #[test]
+    fn min_operators_gate_rejects_understaffed_run() {
+        let grid = make_grid(1, 1, 10);
+        let avail = always_available(1, 10);
+        let skills = mk_skills(vec![vec![(0, 1.0)]]);
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![]];
+
+        // 1 qualified idle op, but min_operators = 2 → must refuse.
+        let result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[], 2, 5, false,
+        );
+        assert!(
+            result.is_empty(),
+            "min_operators=2 with only 1 op available → empty, got {result:?}"
+        );
+    }
+
+    /// `min_operators` gate is met when enough ops are available — the
+    /// usual selection logic returns the expected count up to max_operators.
+    #[test]
+    fn min_operators_gate_passes_when_enough_ops() {
+        let grid = make_grid(1, 3, 10);
+        let avail = always_available(3, 10);
+        let skills = mk_skills(vec![vec![(0, 1.0)], vec![(0, 1.0)], vec![(0, 1.0)]]);
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![], vec![]];
+
+        // 3 ops available, min=2, max=3 → all 3 selected.
+        let result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[], 2, 3, false,
+        );
+        assert_eq!(result.len(), 3, "all 3 ops selected, got {result:?}");
+    }
+
+    /// Phase-specific cap: the same station can be limited to 1 op for
+    /// setup but allow 2 in run. Verified via two separate calls that
+    /// honor the caller-provided cap.
+    #[test]
+    fn phase_specific_cap_setup_solo_run_pair() {
+        let grid = make_grid(1, 2, 10);
+        let avail = always_available(2, 10);
+        let skills = mk_skills(vec![vec![(0, 1.0)], vec![(0, 1.0)]]);
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![], vec![]];
+
+        // Setup phase, max = 1: only 1 op selected even though 2 are idle.
+        let setup_result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[], 1, 1, true,
+        );
+        assert_eq!(setup_result.len(), 1, "setup capped at 1, got {setup_result:?}");
+
+        // Run phase on same station, max = 2: both ops selected.
+        let run_result = find_operators_for_station(
+            &grid, 5, 0, &skills, &avail, &groups, &[], 1, 2, false,
+        );
+        assert_eq!(run_result.len(), 2, "run capped at 2, got {run_result:?}");
     }
 }
 
@@ -3649,6 +3781,7 @@ mod peremption_tests {
             outsourced_predecessor_chain: Vec::new(),
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
+            force_max_staffing: false,
         }
     }
 
@@ -3776,12 +3909,15 @@ mod peremption_tests {
         action.chain_remaining_art = action.art;
 
         let attrs = StationAttrs {
-            attention_full: 1.0,
+            attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
             masked_time_enabled: false,
             peremption_ticks,
-            max_operators: 1,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 1,
             max_chunk_ticks: 24,
             chunk_mini_setup_multiplier: 2.0,
             chunk_mini_task_percentage: 0.5,
@@ -3886,12 +4022,15 @@ mod peremption_tests {
         action.start_tick = Some(0);
 
         let attrs = StationAttrs {
-            attention_full: 1.0,
+            attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
             masked_time_enabled: false,
             peremption_ticks: 24,
-            max_operators: 1,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 1,
             max_chunk_ticks: 72,
             chunk_mini_setup_multiplier: 2.0,
             chunk_mini_task_percentage: 0.5,
@@ -3974,12 +4113,12 @@ mod attention_capacity_tests {
     //! Regression tests for the phase-aware productivity model. The
     //! pre-fix engine summed per-operator productivity into a unified
     //! `art` counter regardless of phase, and ignored `attention_run`
-    //! / `attention_full` entirely. That collapsed FIN-on-Hohner from
+    //! / `attention_setup` entirely. That collapsed FIN-on-Hohner from
     //! its physical 60 min (30 setup + 30 run with 2 ops) down to 30 min
     //! (effective_productivity = 2 applied to setup AND run alike).
     //!
     //! Post-fix model:
-    //!   * setup phase: rate = min(sum_prof, attention_full) / attention_full
+    //!   * setup phase: rate = min(sum_prof, attention_setup) / attention_setup
     //!     → ≤ 1.0; fixed real-time when fully staffed (extra ops can't
     //!     speed setup).
     //!   * run phase: rate = min(sum_prof, max_run_attention) / attention_run
@@ -3993,12 +4132,15 @@ mod attention_capacity_tests {
     /// half speed; two ops at baseline).
     fn hohner_attrs() -> StationAttrs {
         StationAttrs {
-            attention_full: 1.0,
+            attention_setup: 1.0,
             attention_run: 2.0,
             max_run_attention: 2.0,
             masked_time_enabled: false,
             peremption_ticks: 0,
-            max_operators: 2,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 2,
             max_chunk_ticks: 96,
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
@@ -4057,6 +4199,7 @@ mod attention_capacity_tests {
             outsourced_predecessor_chain: Vec::new(),
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
+            force_max_staffing: false,
         }
     }
 
@@ -4064,7 +4207,7 @@ mod attention_capacity_tests {
     /// + Ludovic), task = setup_ticks=6 + run_ticks=6 (= 30 min + 30 min
     /// at 5-min ticks). Pre-fix engine completed in 6 ticks (productivity
     /// summed to 2.0 → both phases halved). Post-fix: setup runs at the
-    /// fixed 6-tick rate (capped at attention_full=1), run runs at
+    /// fixed 6-tick rate (capped at attention_setup=1), run runs at
     /// 2.0/2.0 = 1.0 baseline → 6 ticks → 12 ticks total.
     #[test]
     fn fin_with_two_ops_takes_full_60min_not_30min() {
@@ -4124,7 +4267,7 @@ mod attention_capacity_tests {
     /// say Ludovic is unavailable). Pre-fix: completed in 12 ticks
     /// (productivity 1.0 unified, setup_ticks + run_ticks = 12 art at
     /// 1.0/tick). Post-fix: setup is fixed at 6 ticks (one op suffices
-    /// for setup, attention_full=1 satisfied), but run phase scales
+    /// for setup, attention_setup=1 satisfied), but run phase scales
     /// as 1.0/2.0 = 0.5/tick → run takes 12 ticks → 18 ticks total.
     /// This is the correct under-staffing penalty: a station that wants
     /// 2 ops for run-baseline runs at half speed with only 1.
@@ -4179,12 +4322,15 @@ mod attention_capacity_tests {
     #[test]
     fn solo_station_attention_run_one_unchanged_baseline() {
         let attrs = vec![StationAttrs {
-            attention_full: 1.0,
+            attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
             masked_time_enabled: false,
             peremption_ticks: 0,
-            max_operators: 1,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 1,
             max_chunk_ticks: 96,
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
@@ -4434,12 +4580,15 @@ mod safety_zone_chunk_mini_tests {
 
     fn station_attrs_default() -> StationAttrs {
         StationAttrs {
-            attention_full: 1.0,
+            attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
             masked_time_enabled: false,
             peremption_ticks: 0,
-            max_operators: 1,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 1,
             // 5 ticks max chunk = 75 min at 15 min/tick.
             max_chunk_ticks: 5,
             // Defaults: 2.0 × setup, 0.5 × total.
@@ -4504,6 +4653,7 @@ mod safety_zone_chunk_mini_tests {
             outsourced_predecessor_chain: Vec::new(),
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
+            force_max_staffing: false,
         }
     }
 
@@ -4827,12 +4977,15 @@ mod borrow_tests {
 
     fn permissive_attrs() -> StationAttrs {
         StationAttrs {
-            attention_full: 1.0,
+            attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
             masked_time_enabled: false,
             peremption_ticks: 8,
-            max_operators: 1,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 1,
             max_chunk_ticks: 1000,
             // chunk_mini set to 0% so the borrow path's chunk-mini floor doesn't
             // block tests where the donor has barely started its run. The
@@ -4897,6 +5050,7 @@ mod borrow_tests {
             outsourced_predecessor_chain: Vec::new(),
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
+            force_max_staffing: false,
         }
     }
 

@@ -715,6 +715,11 @@ fn place_backward(
         }
 
         let in_run_phase = work_remaining > setup_ticks as f64;
+        let (phase_min, phase_max) = if in_run_phase {
+            (attrs.min_run_operators, attrs.max_run_operators)
+        } else {
+            (attrs.min_setup_operators, attrs.max_setup_operators)
+        };
 
         let operators = super::forward_pass::find_operators_for_station(
             grid,
@@ -724,7 +729,8 @@ fn place_backward(
             operator_availability,
             operator_groups,
             &[],
-            attrs.max_operators,
+            phase_min,
+            phase_max,
             !in_run_phase,
         );
 
@@ -842,7 +848,7 @@ mod tests {
         StationInput {
             id: id.to_string(),
             name: id.to_string(),
-            attention_full: Some(1.0),
+            attention_setup: Some(1.0),
             attention_run: Some(1.0),
             max_run_attention: Some(1.0),
             masked_time_enabled: false,
@@ -856,7 +862,10 @@ mod tests {
             similarity_score_rules: None,
             is_press: false,
             drying_time_minutes: 0,
-            max_operators: Some(1),
+            min_setup_operators: None,
+            max_setup_operators: None,
+            min_run_operators: None,
+            max_run_operators: Some(1),
             capacity: Some(1),
             schedule_exceptions: Vec::new(),
             chunk_mini_setup_multiplier: None,
@@ -922,6 +931,7 @@ mod tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: "elem-1".into(),
                 name: None,
@@ -989,12 +999,15 @@ mod tests {
         let station_attrs: Vec<StationAttrs> = stations
             .iter()
             .map(|s| StationAttrs {
-                attention_full: s.effective_attention_full(),
+                attention_setup: s.effective_attention_setup(),
                 attention_run: s.effective_attention_run(),
                 max_run_attention: s.effective_max_run_attention(),
                 masked_time_enabled: s.masked_time_enabled,
                 peremption_ticks: 0,
-                max_operators: s.effective_max_operators(),
+                min_setup_operators: s.effective_min_setup_operators(),
+                max_setup_operators: s.effective_max_setup_operators(),
+                min_run_operators: s.effective_min_run_operators(),
+                max_run_operators: s.effective_max_run_operators(),
                 max_chunk_ticks: s.effective_max_chunk() / 60u32.max(1),
                 chunk_mini_setup_multiplier: s.effective_chunk_mini_setup_multiplier(),
                 chunk_mini_task_percentage: s.effective_chunk_mini_task_percentage(),
@@ -1078,6 +1091,7 @@ mod tests {
             deadline: Some(deadline),
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -1101,12 +1115,15 @@ mod tests {
         let station_attrs: Vec<StationAttrs> = stations
             .iter()
             .map(|s| StationAttrs {
-                attention_full: s.effective_attention_full(),
+                attention_setup: s.effective_attention_setup(),
                 attention_run: s.effective_attention_run(),
                 max_run_attention: s.effective_max_run_attention(),
                 masked_time_enabled: s.masked_time_enabled,
                 peremption_ticks: 0,
-                max_operators: s.effective_max_operators(),
+                min_setup_operators: s.effective_min_setup_operators(),
+                max_setup_operators: s.effective_max_setup_operators(),
+                min_run_operators: s.effective_min_run_operators(),
+                max_run_operators: s.effective_max_run_operators(),
                 max_chunk_ticks: s.effective_max_chunk() / 60u32.max(1),
                 chunk_mini_setup_multiplier: s.effective_chunk_mini_setup_multiplier(),
                 chunk_mini_task_percentage: s.effective_chunk_mini_task_percentage(),

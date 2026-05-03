@@ -56,7 +56,7 @@ pub fn run_with_fbi(
     let station_attrs: Vec<StationAttrs> = stations
         .iter()
         .map(|s| StationAttrs {
-            attention_full: s.effective_attention_full(),
+            attention_setup: s.effective_attention_setup(),
             attention_run: s.effective_attention_run(),
             max_run_attention: s.effective_max_run_attention(),
             masked_time_enabled: s.masked_time_enabled,
@@ -65,7 +65,10 @@ pub fn run_with_fbi(
             } else {
                 0
             },
-            max_operators: s.effective_max_operators(),
+            min_setup_operators: s.effective_min_setup_operators(),
+            max_setup_operators: s.effective_max_setup_operators(),
+            min_run_operators: s.effective_min_run_operators(),
+            max_run_operators: s.effective_max_run_operators(),
             max_chunk_ticks: if tick_minutes > 0 {
                 (s.effective_max_chunk() + tick_minutes - 1) / tick_minutes
             } else {

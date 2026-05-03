@@ -43,7 +43,7 @@ where
 pub struct StationInput {
     pub id: String,
     pub name: String,
-    pub attention_full: Option<f64>,
+    pub attention_setup: Option<f64>,
     pub attention_run: Option<f64>,
     /// Max useful attention during run phase for parallelizable (labor-paced) stations.
     /// When > attentionRun, extra operators speed up the task proportionally.
@@ -96,7 +96,19 @@ pub struct StationInput {
     /// Drying time in minutes after printing on this station (default: 240 = 4h)
     #[serde(default = "default_drying_time")]
     pub drying_time_minutes: u32,
-    pub max_operators: Option<u32>,
+    /// Hard floor on physical operators required to start the setup phase.
+    /// Default 1 if null. Falls below this → setup refused at this tick.
+    pub min_setup_operators: Option<u32>,
+    /// Hard cap on physical operators selected for the setup phase (top-N
+    /// by setup proficiency). Default 1 if null (setup is typically solo).
+    pub max_setup_operators: Option<u32>,
+    /// Hard floor on physical operators required to start/continue the run
+    /// phase. Default 1 if null. Falls below this → run refused at this tick.
+    pub min_run_operators: Option<u32>,
+    /// Hard cap on physical operators selected for the run phase (top-N
+    /// by run proficiency). Default falls back to a value covering both
+    /// attention_run and max_run_attention so the formula remains live.
+    pub max_run_operators: Option<u32>,
     pub capacity: Option<u32>,
     /// Per-date schedule exceptions (maintenance, holidays, ad-hoc custom hours).
     /// Deserializes to an empty Vec when the JSON field is missing or null.
@@ -165,7 +177,7 @@ mod schedule_exception_tests {
         StationInput {
             id: "s1".into(),
             name: "Station".into(),
-            attention_full: None,
+            attention_setup: None,
             attention_run: None,
             max_run_attention: None,
             masked_time_enabled: false,
@@ -181,7 +193,10 @@ mod schedule_exception_tests {
             similarity_score_rules: None,
             is_press: false,
             drying_time_minutes: 240,
-            max_operators: None,
+            min_setup_operators: None,
+            max_setup_operators: None,
+            min_run_operators: None,
+            max_run_operators: None,
             capacity: None,
             schedule_exceptions: exceptions,
         }
@@ -337,8 +352,8 @@ impl StationInput {
         self.tick_minutes.unwrap_or(15)
     }
 
-    pub fn effective_attention_full(&self) -> f64 {
-        self.attention_full.unwrap_or(1.0)
+    pub fn effective_attention_setup(&self) -> f64 {
+        self.attention_setup.unwrap_or(1.0)
     }
 
     pub fn effective_attention_run(&self) -> f64 {
@@ -375,9 +390,29 @@ impl StationInput {
         self.capacity.unwrap_or(1).max(1)
     }
 
-    pub fn effective_max_operators(&self) -> u32 {
-        self.max_operators.unwrap_or_else(|| {
-            // Must allow enough operators to meet attention_run
+    /// Hard floor on bodies for the setup phase. Default 1.
+    pub fn effective_min_setup_operators(&self) -> u32 {
+        self.min_setup_operators.unwrap_or(1).max(1)
+    }
+
+    /// Hard cap on bodies for the setup phase. Default 1 — setup is solo
+    /// by convention (no productivity gain from extra operators since
+    /// `attention_setup` caps the rate at 1× anyway).
+    pub fn effective_max_setup_operators(&self) -> u32 {
+        self.max_setup_operators.unwrap_or(1).max(1)
+    }
+
+    /// Hard floor on bodies for the run phase. Default 1.
+    pub fn effective_min_run_operators(&self) -> u32 {
+        self.min_run_operators.unwrap_or(1).max(1)
+    }
+
+    /// Hard cap on bodies for the run phase. Default falls back to a value
+    /// covering both attention_run and max_run_attention so the productivity
+    /// formula remains live (extra operators can still contribute up to the
+    /// run-attention cap).
+    pub fn effective_max_run_operators(&self) -> u32 {
+        self.max_run_operators.unwrap_or_else(|| {
             let run_ops = self.effective_attention_run().ceil() as u32;
             let max_run_ops = self.effective_max_run_attention().ceil() as u32;
             run_ops.max(max_run_ops).max(1)

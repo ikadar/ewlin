@@ -351,6 +351,7 @@ mod tests {
             deadline_priority: 2,
             elements,
             required_job_ids: required,
+            force_max_staffing: false,
         }
     }
 
@@ -602,7 +603,7 @@ mod tests {
             StationInput {
                 id: id.into(),
                 name: id.into(),
-                attention_full: Some(1.0),
+                attention_setup: Some(1.0),
                 attention_run: Some(1.0),
                 max_run_attention: None,
                 masked_time_enabled: false,
@@ -616,7 +617,10 @@ mod tests {
                 similarity_score_rules: None,
                 is_press: false,
                 drying_time_minutes: 240,
-                max_operators: None,
+                min_setup_operators: None,
+                max_setup_operators: None,
+                min_run_operators: None,
+                max_run_operators: None,
                 capacity: None,
                 schedule_exceptions: Vec::new(),
                 chunk_mini_setup_multiplier: None,
@@ -733,6 +737,7 @@ mod tests {
                     },
                 ],
                 required_job_ids: vec![],
+                force_max_staffing: false,
             };
             let tier1_dummy = JobInput {
                 id: "j2".into(),
@@ -748,6 +753,7 @@ mod tests {
                     prerequisite_element_ids: vec![],
                 }],
                 required_job_ids: vec![],
+                force_max_staffing: false,
             };
 
             // Per-station dedicated operators — removes the "one op, many
@@ -848,6 +854,7 @@ mod tests {
                     prerequisite_element_ids: vec![],
                 }],
                 required_job_ids: vec![],
+                force_max_staffing: false,
             };
             let j2 = JobInput {
                 id: "j2".into(),
@@ -863,6 +870,7 @@ mod tests {
                     prerequisite_element_ids: vec![],
                 }],
                 required_job_ids: vec![],
+                force_max_staffing: false,
             };
 
             let req = ComputeRequest {

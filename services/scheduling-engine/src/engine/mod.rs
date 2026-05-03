@@ -943,6 +943,11 @@ pub fn build_actions(
                     // and whose calage must be preserved across the gap.
                     borrow_until_tick: None,
                     borrowed_op_to_restore: None,
+                    // V2 LNS perturbation: lifted from the parent JobInput.
+                    // PHP never serializes this — only LNS toggles it on
+                    // randomly chosen on-time jobs to explore alternative
+                    // staffing configurations.
+                    force_max_staffing: job.force_max_staffing,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
@@ -1523,7 +1528,7 @@ mod integration_tests {
         StationInput {
             id: id.to_string(),
             name: name.to_string(),
-            attention_full: Some(1.0),
+            attention_setup: Some(1.0),
             attention_run: Some(1.0),
             max_run_attention: Some(1.0),
             masked_time_enabled: masked_enabled,
@@ -1537,7 +1542,10 @@ mod integration_tests {
             similarity_score_rules: None,
             is_press: false,
             drying_time_minutes: 0,
-            max_operators: Some(1),
+            min_setup_operators: None,
+            max_setup_operators: None,
+            min_run_operators: None,
+            max_run_operators: Some(1),
             capacity: Some(1),
             schedule_exceptions: Vec::new(),
             chunk_mini_setup_multiplier: None,
@@ -1613,6 +1621,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -1942,6 +1951,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: "elem-1".into(),
                 name: None,
@@ -2161,6 +2171,7 @@ mod integration_tests {
             deadline: Some(deadline),
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -2257,6 +2268,7 @@ mod integration_tests {
             deadline: Some(deadline),
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -2326,6 +2338,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -2427,6 +2440,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -2551,6 +2565,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: "elem".into(),
                 name: None,
@@ -2703,6 +2718,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: "e".into(),
                 name: None,
@@ -2815,6 +2831,7 @@ mod integration_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
@@ -2908,6 +2925,7 @@ mod integration_tests {
                 deadline: None,
                 deadline_priority: 2,
                 required_job_ids: Vec::new(),
+                force_max_staffing: false,
                 elements: vec![ElementInput {
                     id: "j-elem".into(),
                     name: None,
@@ -3057,7 +3075,7 @@ mod setup_run_split_e2e_tests {
         StationInput {
             id: id.into(),
             name: name.into(),
-            attention_full: Some(1.0),
+            attention_setup: Some(1.0),
             attention_run: Some(1.0),
             max_run_attention: Some(1.0),
             masked_time_enabled: false,
@@ -3071,7 +3089,10 @@ mod setup_run_split_e2e_tests {
             similarity_score_rules: None,
             is_press: false,
             drying_time_minutes: 0,
-            max_operators: Some(1),
+            min_setup_operators: None,
+            max_setup_operators: None,
+            min_run_operators: None,
+            max_run_operators: Some(1),
             capacity: Some(1),
             schedule_exceptions: Vec::new(),
             chunk_mini_setup_multiplier: None,
@@ -3092,6 +3113,7 @@ mod setup_run_split_e2e_tests {
             deadline: None,
             deadline_priority: 2,
             required_job_ids: Vec::new(),
+            force_max_staffing: false,
             elements: vec![ElementInput {
                 id: format!("{job_id}-elem"),
                 name: None,

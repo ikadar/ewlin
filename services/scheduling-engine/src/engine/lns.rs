@@ -185,7 +185,31 @@ pub fn lns_improve(
             .copied()
             .collect();
 
-        // REPAIR: create modified jobs with new priorities
+        // V2 staffing perturbation: every other iteration, randomly flag
+        // a small slice of late jobs with `force_max_staffing = true` so
+        // the V1 conservative-staffing brake in the forward pass is
+        // bypassed for them. This explores "what if we accelerated this
+        // late job by maxing out the run-phase team" alternatives that
+        // V1's per-action heuristic would otherwise miss when slack is
+        // marginal. The perturbation is only applied to *destroyed*
+        // (imperative) jobs to keep the search focused on what's hurting
+        // the score, and only on alternating iterations so the
+        // primary destroy/destabilize cycle still owns half the budget.
+        let staffing_perturb_active = iteration % 2 == 1;
+        let force_max_targets: HashSet<&str> = if staffing_perturb_active {
+            let candidates: Vec<&str> = destroyed.iter().copied().collect();
+            let n = (candidates.len() / 2).max(1).min(candidates.len());
+            let mut shuffled = candidates.clone();
+            for i in 0..n.min(shuffled.len()) {
+                let j = rng.gen_range(i..shuffled.len());
+                shuffled.swap(i, j);
+            }
+            shuffled[..n].iter().copied().collect()
+        } else {
+            HashSet::new()
+        };
+
+        // REPAIR: create modified jobs with new priorities (and V2 staffing flags)
         let modified_jobs: Vec<JobInput> = jobs
             .iter()
             .map(|j| {
@@ -194,6 +218,9 @@ pub fn lns_improve(
                     m.deadline_priority = 0; // imperative
                 } else if sacrificed.contains(j.id.as_str()) {
                     m.deadline_priority = 3; // flexible
+                }
+                if force_max_targets.contains(j.id.as_str()) {
+                    m.force_max_staffing = true;
                 }
                 m
             })

@@ -169,6 +169,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 outsourced_predecessor_chain,
                 borrow_until_tick: None,
                 borrowed_op_to_restore: None,
+                force_max_staffing: action.force_max_staffing,
             });
 
             prev_chunk_idx = Some(idx);
@@ -259,6 +260,7 @@ mod tests {
             outsourced_predecessor_chain: Vec::new(),
             borrow_until_tick: None,
                 borrowed_op_to_restore: None,
+            force_max_staffing: false,
         }
     }
 
@@ -266,7 +268,7 @@ mod tests {
         StationInput {
             id: format!("s{}", max_chunk_minutes),
             name: "Station".into(),
-            attention_full: None,
+            attention_setup: None,
             attention_run: None,
             max_run_attention: None,
             masked_time_enabled: false,
@@ -280,7 +282,10 @@ mod tests {
             similarity_score_rules: None,
             is_press: false,
             drying_time_minutes: 240,
-            max_operators: None,
+            min_setup_operators: None,
+            max_setup_operators: None,
+            min_run_operators: None,
+            max_run_operators: None,
             capacity: None,
             schedule_exceptions: Vec::new(),
             chunk_mini_setup_multiplier: None,
@@ -415,5 +420,6 @@ pub fn clone_action(a: &Action) -> Action {
         outsourced_predecessor_chain: a.outsourced_predecessor_chain.clone(),
         borrow_until_tick: a.borrow_until_tick,
         borrowed_op_to_restore: a.borrowed_op_to_restore,
+        force_max_staffing: a.force_max_staffing,
     }
 }
