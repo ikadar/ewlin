@@ -113,9 +113,11 @@ pub struct TaskInput {
     pub earliest_start_tick: Option<usize>,
     /// V2 progress capture — operator-derived realistic run duration (minutes).
     /// `Some` when a saisie has produced a productivity ratio for this fragment ;
-    /// the engine should plan with this value instead of `run_minutes`. `None`
-    /// = pre-saisie, fall back to JCF planned run. Setup is unchanged either
-    /// way (calage neutral, see `productivity::ratio_run_only`).
+    /// the engine plans with this value instead of `run_minutes` via
+    /// `effective_run_minutes()`. `None` = pre-saisie, fall back to JCF planned
+    /// run. PHP computes `round(run_minutes × productivity_ratio)` upstream
+    /// (ScheduleComputeController). Setup is unchanged either way (calage
+    /// neutral — bounded by machine + material, not operator pace).
     #[serde(default)]
     pub realistic_run_minutes: Option<u32>,
     /// V2 progress capture — % of the parent job's volume already delivered by
