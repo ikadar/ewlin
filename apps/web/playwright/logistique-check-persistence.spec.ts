@@ -7,7 +7,7 @@ import { test, expect, request, type Page } from '@playwright/test';
 
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 const TEST_USER_EMAIL = 'claude-test@flux.local';
-const TEST_USER_PASSWORD = 'ClaudeTestPass123!';
+const TEST_USER_PASSWORD = 'ClaudeAuditPwd!';
 
 async function authenticate(page: Page): Promise<void> {
   const apiContext = await request.newContext();
