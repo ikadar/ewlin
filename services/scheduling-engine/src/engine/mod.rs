@@ -2766,4 +2766,196 @@ mod integration_tests {
             st.scheduled_end, b.scheduled_start
         );
     }
+
+    /// V2 progress capture — productivity ratio wiring (2026-05-03).
+    ///
+    /// A saisie d'avancement on a 60-min JCF run with a +1h retard produces
+    /// productivityRatio = 2.0. PHP injects realisticRunMinutes = 120 into
+    /// the TaskInput. The engine MUST plan with this value, not the 60-min
+    /// theoretical, otherwise the retard accumulates silently across replans
+    /// (the bug this commit closes).
+    ///
+    /// First test: direct duration scaling on a single task.
+    /// Second test: downstream propagation — a successor task chained behind
+    /// a ratio'd predecessor must shift by the extra minutes.
+    fn make_single_task_job(id: &str, station_id: &str, run_minutes: u32, realistic: Option<u32>) -> JobInput {
+        JobInput {
+            id: id.to_string(),
+            reference: None,
+            description: None,
+            deadline: None,
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                tasks: vec![TaskInput {
+                    id: format!("{id}-task"),
+                    station_id: station_id.to_string(),
+                    setup_minutes: 0,
+                    run_minutes,
+                    sequence_order: 0,
+                    is_pinned: false,
+                    is_frozen_by_safety_zone: false,
+                    pinned_start_tick: None,
+                    pinned_end_tick: None,
+                    outsourced: None,
+                    earliest_start_tick: None,
+                    realistic_run_minutes: realistic,
+                    cumulative_position_pct: None,
+                    slot_volume_pct: None,
+                }],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        }
+    }
+
+    #[test]
+    fn realistic_run_minutes_extends_assignment_duration() {
+        let stations = vec![make_station("s1", "S1", false)];
+        let operator = make_always_on_operator("op", "Op", &[("s1", 1.0)], vec![]);
+
+        // Baseline: no ratio → assignment duration tracks JCF run (60 min).
+        let baseline = ComputeRequest {
+            stations: stations.clone(),
+            operators: vec![operator.clone()],
+            jobs: vec![make_single_task_job("j", "s1", 60, None)],
+            options: options(),
+            station_groups: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+        let baseline_result = compute(&baseline);
+        assert_eq!(baseline_result.assignments.len(), 1, "baseline must place");
+        let (b_start, b_end) = assignment_minutes(&baseline_result.assignments[0]);
+        assert_eq!(b_end - b_start, 60, "baseline assignment must span the JCF 60 min");
+
+        // With realistic = 120 (saisie produced ratio 2.0): the assignment
+        // must now span 120 min — the engine reads effective_run_minutes()
+        // and plans on the realistic duration.
+        let with_ratio = ComputeRequest {
+            stations,
+            operators: vec![operator],
+            jobs: vec![make_single_task_job("j", "s1", 60, Some(120))],
+            options: options(),
+            station_groups: Vec::new(),
+            occupied_slots: Vec::new(),
+        };
+        let ratio_result = compute(&with_ratio);
+        assert_eq!(ratio_result.assignments.len(), 1, "ratio'd job must place");
+        let (r_start, r_end) = assignment_minutes(&ratio_result.assignments[0]);
+        assert_eq!(
+            r_end - r_start,
+            120,
+            "with realistic_run_minutes=Some(120), assignment must span 120 min, not the 60-min JCF",
+        );
+    }
+
+    #[test]
+    fn realistic_run_minutes_propagates_to_downstream_task() {
+        // Two-task job: t1 on s1, t2 on s2 (sequence 1 chains after sequence 0).
+        // We compute twice — baseline (t1 theoretical) vs with-ratio (t1 realistic
+        // = 120 on a 60-min JCF run) — and assert that the downstream successor
+        // t2 shifts by exactly the extra 60 min produced by the saisie.
+        //
+        // Comparing diffs (not absolute values) sidesteps the configurable
+        // precedence_min_gap_ticks — whatever the gap, both computes apply it
+        // identically, so the delta is purely the extra realistic run minutes.
+        let make_request = |realistic_t1: Option<u32>| -> ComputeRequest {
+            let stations = vec![
+                make_station("s1", "S1", false),
+                make_station("s2", "S2", false),
+            ];
+            let operator = make_always_on_operator(
+                "op",
+                "Op",
+                &[("s1", 1.0), ("s2", 1.0)],
+                vec![],
+            );
+            let job = JobInput {
+                id: "j".into(),
+                reference: None,
+                description: None,
+                deadline: None,
+                deadline_priority: 2,
+                required_job_ids: Vec::new(),
+                elements: vec![ElementInput {
+                    id: "j-elem".into(),
+                    name: None,
+                    tasks: vec![
+                        TaskInput {
+                            id: "j-t1".into(),
+                            station_id: "s1".into(),
+                            setup_minutes: 0,
+                            run_minutes: 60,
+                            sequence_order: 0,
+                            is_pinned: false,
+                            is_frozen_by_safety_zone: false,
+                            pinned_start_tick: None,
+                            pinned_end_tick: None,
+                            outsourced: None,
+                            earliest_start_tick: None,
+                            realistic_run_minutes: realistic_t1,
+                            cumulative_position_pct: None,
+                            slot_volume_pct: None,
+                        },
+                        TaskInput {
+                            id: "j-t2".into(),
+                            station_id: "s2".into(),
+                            setup_minutes: 0,
+                            run_minutes: 60,
+                            sequence_order: 1,
+                            is_pinned: false,
+                            is_frozen_by_safety_zone: false,
+                            pinned_start_tick: None,
+                            pinned_end_tick: None,
+                            outsourced: None,
+                            earliest_start_tick: None,
+                            realistic_run_minutes: None,
+                            cumulative_position_pct: None,
+                            slot_volume_pct: None,
+                        },
+                    ],
+                    spec: None,
+                    prerequisite_element_ids: Vec::new(),
+                }],
+            };
+            ComputeRequest {
+                stations,
+                operators: vec![operator],
+                jobs: vec![job],
+                options: options(),
+                station_groups: Vec::new(),
+                occupied_slots: Vec::new(),
+            }
+        };
+
+        let baseline = compute(&make_request(None));
+        let ratio = compute(&make_request(Some(120)));
+
+        let baseline_t2 = baseline.assignments.iter().find(|a| a.task_id == "j-t2")
+            .expect("baseline t2 placed");
+        let ratio_t1 = ratio.assignments.iter().find(|a| a.task_id == "j-t1")
+            .expect("ratio t1 placed");
+        let ratio_t2 = ratio.assignments.iter().find(|a| a.task_id == "j-t2")
+            .expect("ratio t2 placed");
+
+        let (b_t2_start, _) = assignment_minutes(baseline_t2);
+        let (r_t1_start, r_t1_end) = assignment_minutes(ratio_t1);
+        let (r_t2_start, _) = assignment_minutes(ratio_t2);
+
+        assert_eq!(
+            r_t1_end - r_t1_start,
+            120,
+            "with realistic_run_minutes=Some(120), t1 spans 120 min",
+        );
+        assert_eq!(
+            r_t2_start - b_t2_start,
+            60,
+            "downstream t2 must shift by exactly +60 min (the extra realistic \
+             run on t1) compared to the no-ratio baseline; this proves the \
+             saisie-driven retard propagates to successors instead of being \
+             swallowed silently",
+        );
+    }
 }
