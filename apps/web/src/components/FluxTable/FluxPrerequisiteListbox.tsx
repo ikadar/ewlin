@@ -144,6 +144,29 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  // Status `none` = "this element doesn't need this prerequisite". The
+  // decision is owned by JCF (per-element checkbox), so /flux renders
+  // an inert badge with no dropdown — switching the toggle requires
+  // editing the job in JCF.
+  if (status === 'none') {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          padding: '0 5px',
+          minHeight: compact ? '2rem' : '2.25rem',
+          opacity: 0.45,
+        }}
+        title="Pas requis pour cet élément — modifier dans JCF"
+        data-testid="flux-prereq-listbox-inert"
+      >
+        <FluxPrerequisiteBadge status={status} date={date} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'block', width: '100%' }}>
       <button

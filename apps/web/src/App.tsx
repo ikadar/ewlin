@@ -43,7 +43,7 @@ import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory 
 import { getDeadlineDate } from '@flux/types';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
-import { transformJcfToRequest, transformJcfElementToRequest } from './api';
+import { transformJcfToRequest, transformJcfElementToRequest, hasOffsetPressInSequence } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
 import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
@@ -469,6 +469,15 @@ function AppContent() {
         ? null
         : parseInt(jcfDeadlineRelativeDays, 10);
 
+      // Plates is sequence-derived: override needsPlates from JcfElement
+      // state with the live derivation so save reflects the rule
+      // "no Presse offset → no plates" regardless of what the JCF
+      // form may carry from a stale paste / template.
+      const elementsForSave: JcfElement[] = jcfElements.map((el) => ({
+        ...el,
+        needsPlates: hasOffsetPressInSequence(el.sequence, snapshotPostes),
+      }));
+
       if (isEditMode && editingJobId) {
         // v0.5.13b: Update existing job (metadata + elements)
         await updateJob({
@@ -482,7 +491,7 @@ function AppContent() {
             deadlineRelativeWorkingDays: parsedRelativeDays,
             batDeadline: jcfBatDeadline || null,
             deadlinePriority: jcfDeadlinePriority,
-            elements: jcfElements.map(transformJcfElementToRequest),
+            elements: elementsForSave.map(transformJcfElementToRequest),
             ...(jcfQuantity ? { quantity: parseInt(jcfQuantity, 10) } : {}),
             shipperId: jcfShipperId || null,
             requiredJobReferences: jcfRequiredJobs
@@ -497,7 +506,7 @@ function AppContent() {
           jcfClient,
           jcfIntitule,
           jcfDeadline,
-          jcfElements,
+          elementsForSave,
           jcfQuantity,
           jcfShipperId || undefined,
           jcfRequiredJobs || undefined,
@@ -774,6 +783,12 @@ function AppContent() {
           qteFeuilles: el.spec?.qteFeuilles?.toString() ?? '',
           commentaires: el.spec?.commentaires ?? '',
           sequence,
+          // Derive needs* from existing prereq statuses (status !== 'none').
+          // Lets edit-mode JCF reflect the chef's prior decisions.
+          needsBat: el.batStatus !== 'none',
+          needsPaper: el.paperStatus !== 'none',
+          needsForme: el.formeStatus !== 'none',
+          needsPlates: el.plateStatus !== 'none',
         };
       });
       setJcfElements(mappedElements);

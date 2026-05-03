@@ -70,31 +70,32 @@ export interface PrerequisiteOption {
 /**
  * Available options per column for the listbox UI (spec 3.8).
  * Labels match the scheduling view (JobDetailsPanel/prerequisiteOptions.ts).
+ *
+ * `none` is intentionally excluded — the "needed / not needed" decision
+ * is owned by JCF (per-element checkboxes). /flux only progresses
+ * through real states. Cells whose status is `none` render as inert
+ * badges (no dropdown).
  */
 export const COLUMN_OPTIONS: Record<PrerequisiteColumn, PrerequisiteOption[]> = {
   bat: [
-    { value: 'none',           label: 'Pas de BAT' },
     { value: 'waiting_files',  label: 'Attente fichiers' },
     { value: 'files_received', label: 'Fichiers reçus' },
     { value: 'bat_sent',       label: 'BAT envoyé' },
     { value: 'bat_approved',   label: 'BAT OK' },
   ],
   papier: [
-    { value: 'none',      label: 'Pas de papier' },
     { value: 'in_stock',  label: 'En stock' },
     { value: 'to_order',  label: 'À commander' },
     { value: 'ordered',   label: 'Commandé' },
     { value: 'delivered', label: 'Livré' },
   ],
   formes: [
-    { value: 'none',      label: 'Pas de forme' },
     { value: 'in_stock',  label: 'Sur stock' },
     { value: 'to_order',  label: 'À commander' },
     { value: 'ordered',   label: 'Commandée' },
     { value: 'delivered', label: 'Livrée' },
   ],
   plaques: [
-    { value: 'none',    label: 'Pas de plaques' },
     { value: 'to_make', label: 'À faire' },
     { value: 'ready',   label: 'Prêtes' },
   ],
