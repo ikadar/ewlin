@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShortcutFooter } from '@/components/ShortcutFooter/ShortcutFooter';
 import { detectKeyboardLayout, isAltLetter } from '@/utils/keyboardLayout';
 import { useLocation } from 'react-router-dom';
-import { useEnvAwareNavigate } from '@/contexts/ScenarioContext';
+import { useEnvAwareNavigate, useScenarioMode } from '@/contexts/ScenarioContext';
+import { useToast } from '@/hooks/useToast';
 import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
@@ -60,6 +61,13 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const [deleteJob] = useDeleteJobMutation();
   const { data: shippers = [] } = useGetShippersQuery();
   const { data: snapshot } = useGetSnapshotQuery();
+  // /flux reality writes (BAT, papier, formes, plaques, ST, parti, facturé)
+  // are Prod-only. Backend rejects them in Préprod (FluxProdOnlyGuardSubscriber
+  // + JobController inline guard) ; the UI short-circuits with a hint so
+  // users don't see optimistic flickers and silent failures.
+  const { mode } = useScenarioMode();
+  const canEditFluxReality = mode === 'prod';
+  const { showToast } = useToast();
 
   // Late job IDs from schedule snapshot
   const lateJobIds = useMemo(() => {
@@ -164,8 +172,12 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
    * Uses RTK Query mutation with invalidatesTags: refetches jobs on success.
    */
   const handleUpdateSTStatus = useCallback((taskId: string, status: FluxSTStatus) => {
+    if (!canEditFluxReality) {
+      showToast('Bascule en mode Prod pour modifier le statut ST.', 'info');
+      return;
+    }
     void updateSTStatus({ taskId, status });
-  }, [updateSTStatus]);
+  }, [updateSTStatus, canEditFluxReality, showToast]);
 
   /**
    * Update a single element's prerequisite status and persist to the backend.
@@ -180,8 +192,12 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     column: PrerequisiteColumn,
     status: PrerequisiteStatus,
   ) => {
+    if (!canEditFluxReality) {
+      showToast('Bascule en mode Prod pour valider les prérequis.', 'info');
+      return;
+    }
     void updateElementPrerequisite({ jobId, elementId, column, value: status });
-  }, [updateElementPrerequisite]);
+  }, [updateElementPrerequisite, canEditFluxReality, showToast]);
 
   /**
    * Update a job's shipper (transporteur) and persist to the backend.
@@ -193,13 +209,21 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
 
   /** Toggle a job's shipped (Parti) status. */
   const handleToggleShipped = useCallback((jobInternalId: string, shipped: boolean) => {
+    if (!canEditFluxReality) {
+      showToast('Bascule en mode Prod pour cocher Parti.', 'info');
+      return;
+    }
     void toggleJobShipped({ jobInternalId, shipped });
-  }, [toggleJobShipped]);
+  }, [toggleJobShipped, canEditFluxReality, showToast]);
 
   /** Toggle a job's invoiced (Facturé) status. */
   const handleToggleInvoiced = useCallback((jobInternalId: string, invoiced: boolean) => {
+    if (!canEditFluxReality) {
+      showToast('Bascule en mode Prod pour cocher Facturé.', 'info');
+      return;
+    }
     void toggleJobInvoiced({ jobInternalId, invoiced });
-  }, [toggleJobInvoiced]);
+  }, [toggleJobInvoiced, canEditFluxReality, showToast]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {
@@ -335,6 +359,15 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
       <div className="flex-1 overflow-hidden">
         <div className="p-4 h-full">
           <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden flex flex-col">
+            {!canEditFluxReality && (
+              <div
+                className="px-4 py-1.5 bg-amber-950/30 border-b border-amber-700/30 text-amber-200/80 text-[11px] flex items-center gap-2"
+                data-testid="flux-readonly-banner"
+              >
+                <span className="font-medium">Lecture seule en Préprod</span>
+                <span className="text-amber-300/60">— bascule en Prod pour valider BAT/papier/formes/plaques, statut ST, Parti et Facturé.</span>
+              </div>
+            )}
             {/* Toolbar: title + search bar + filter bar */}
             <FluxToolbar
               searchValue={search}

@@ -89,4 +89,50 @@ test.describe('Env-conditional gating', () => {
     expect(resp.status()).toBe(403);
     await apiContext.dispose();
   });
+
+  test('/flux shows the readonly banner in Préprod', async ({ page }) => {
+    await page.goto('/flux');
+    await expect(page.getByTestId('flux-readonly-banner')).toBeVisible();
+  });
+
+  test('/flux hides the readonly banner in Prod', async ({ page }) => {
+    await page.goto('/flux?env=prod');
+    await expect(page.getByTestId('flux-readonly-banner')).toHaveCount(0);
+  });
+
+  test('Backend rejects PATCH /flux/elements/{id} in Préprod', async ({ page }) => {
+    const token = await authenticate(page);
+    const apiContext = await request.newContext();
+    const resp = await apiContext.patch(
+      `${API_BASE_URL}/flux/elements/00000000-0000-0000-0000-000000000000`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Flux-Scenario': 'preprod',
+          'Content-Type': 'application/json',
+        },
+        data: { column: 'bat', value: 'approved' },
+      },
+    );
+    expect(resp.status()).toBe(403);
+    await apiContext.dispose();
+  });
+
+  test('Backend rejects PUT /jobs/{id} with shipped=true in Préprod', async ({ page }) => {
+    const token = await authenticate(page);
+    const apiContext = await request.newContext();
+    const resp = await apiContext.put(
+      `${API_BASE_URL}/jobs/00000000-0000-0000-0000-000000000000`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Flux-Scenario': 'preprod',
+          'Content-Type': 'application/json',
+        },
+        data: { shipped: true },
+      },
+    );
+    expect(resp.status()).toBe(403);
+    await apiContext.dispose();
+  });
 });
