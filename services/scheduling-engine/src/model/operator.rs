@@ -207,6 +207,20 @@ impl OperatorSkill {
             run_proficiency: proficiency,
         }
     }
+
+    /// Construct a skill with explicit, asymmetric setup and run proficiency
+    /// values. Used by integration tests that exercise the caleur-volant
+    /// scenarios where the two phases must differ — e.g. a run-only operator
+    /// (setup=0, run>0) paired with a versatile one. The legacy `proficiency`
+    /// field mirrors `run_proficiency` to keep backward-compat readers stable.
+    pub fn asymmetric(station_id: String, setup_proficiency: f64, run_proficiency: f64) -> Self {
+        OperatorSkill {
+            station_id,
+            proficiency: run_proficiency,
+            setup_proficiency,
+            run_proficiency,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for OperatorSkill {
