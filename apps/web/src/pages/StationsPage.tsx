@@ -220,6 +220,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
               maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              data-testid="station-name-input"
               className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
               placeholder="Ex : Komori G40"
             />
@@ -309,6 +310,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="1" min="1"
                   value={minSetupOperators}
                   onChange={(e) => setMinSetupOperators(e.target.value)}
+                  data-testid="staffing-min-setup-operators"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">Refus de démarrer en dessous</p>
@@ -319,6 +321,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="0.1" min="0" max="2"
                   value={attentionSetup}
                   onChange={(e) => setAttentionSetup(e.target.value)}
+                  data-testid="staffing-attention-setup"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">EOE pour vitesse nominale</p>
@@ -329,6 +332,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="1" min="1"
                   value={maxSetupOperators}
                   onChange={(e) => setMaxSetupOperators(e.target.value)}
+                  data-testid="staffing-max-setup-operators"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">Top-N par skill calage</p>
@@ -344,6 +348,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="1" min="1"
                   value={minRunOperators}
                   onChange={(e) => setMinRunOperators(e.target.value)}
+                  data-testid="staffing-min-run-operators"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">Refus de démarrer en dessous</p>
@@ -354,6 +359,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="0.1" min="0" max="2"
                   value={attentionRun}
                   onChange={(e) => setAttentionRun(e.target.value)}
+                  data-testid="staffing-attention-run"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">EOE pour vitesse nominale</p>
@@ -364,6 +370,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="1" min="1"
                   value={maxRunOperators}
                   onChange={(e) => setMaxRunOperators(e.target.value)}
+                  data-testid="staffing-max-run-operators"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">Top-N par skill roule</p>
@@ -375,6 +382,7 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   value={maxRunAttention}
                   onChange={(e) => setMaxRunAttention(e.target.value)}
                   placeholder="vide = pas de cap"
+                  data-testid="staffing-max-run-attention"
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
                 <p className="text-[11px] text-flux-text-muted mt-1">EOE max utiles (cap mécanique)</p>
