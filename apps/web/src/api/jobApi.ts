@@ -29,6 +29,16 @@ export interface CreateJobElementRequest {
   autres?: string;
   qteFeuilles?: number;
   commentaires?: string;
+  /**
+   * Per-element prerequisite "needed" flags set from JCF. Backend
+   * translates them to initial xxxStatus enums on create, and to
+   * status transitions on update (preserving status when the
+   * boolean matches the current state).
+   */
+  needsBat?: boolean;
+  needsPaper?: boolean;
+  needsForme?: boolean;
+  needsPlates?: boolean;
 }
 
 /**
@@ -171,11 +181,37 @@ function normalizeSequenceDsl(dsl: string): string {
 }
 
 /**
+ * Detect whether an element's sequence contains at least one
+ * "Presse offset" station. Drives the auto-default for needsPlates
+ * — only offset jobs need plates.
+ *
+ * Tokenises the multi-line DSL on the usual delimiters and tests
+ * each token against the offset-press names known to the catalogue
+ * passed in.
+ */
+export function hasOffsetPressInSequence(
+  sequence: string,
+  postePresets: ReadonlyArray<{ name: string; category: string }>,
+): boolean {
+  if (!sequence) return false;
+  const offsetNames = new Set(
+    postePresets
+      .filter((p) => p.category === 'Presse offset')
+      .map((p) => p.name),
+  );
+  if (offsetNames.size === 0) return false;
+  const tokens = sequence.split(/[\s,()\n;|]+/).filter((t) => t.length > 0);
+  return tokens.some((t) => offsetNames.has(t));
+}
+
+/**
  * Transform JCF form element to API request format.
  *
  * Maps frontend field names to backend API field names:
  * - precedences (comma-separated string) → prerequisiteNames (array)
  * - format, papier, pagination sent as spec fields (not combined into label)
+ * - needs* booleans surface the chef's per-element prerequisite
+ *   choices. Backend translates them to initial status enums.
  */
 export function transformJcfElementToRequest(element: JcfElement): CreateJobElementRequest {
   // Parse precedences: "A, B, C" → ["A", "B", "C"]
@@ -188,6 +224,10 @@ export function transformJcfElementToRequest(element: JcfElement): CreateJobElem
     name: element.name,
     sequence: element.sequence ? normalizeSequenceDsl(element.sequence) : undefined,
     prerequisiteNames,
+    needsBat: element.needsBat,
+    needsPaper: element.needsPaper,
+    needsForme: element.needsForme,
+    needsPlates: element.needsPlates,
     ...(element.format ? { format: element.format } : {}),
     ...(element.papier ? { papier: element.papier } : {}),
     ...(element.pagination ? { pagination: parseInt(element.pagination, 10) } : {}),
