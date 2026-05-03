@@ -31,6 +31,7 @@ import App from './App';
 import { RootLayout } from './components/RootLayout';
 import { RequireAuth } from './components/Auth/RequireAuth';
 import { RequirePermission } from './components/Auth/RequirePermission';
+import { RequireEnv } from './components/Auth/RequireEnv';
 import { SettingsLayout } from './components/SettingsLayout/SettingsLayout';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { StationCategoriesPage } from './pages/StationCategoriesPage';
@@ -59,8 +60,6 @@ import { UsersPage } from './pages/UsersPage';
 import { UserGroupsPage } from './pages/UserGroupsPage';
 import { ArchivesPage } from './pages/ArchivesPage';
 import { AuditPage } from './pages/AuditPage';
-import { SimulationsPage } from './pages/SimulationsPage';
-import { SimulationDetailPage } from './pages/SimulationDetailPage';
 import { ScenariosPage } from './pages/ScenariosPage';
 import { ScenarioShell } from './components/ScenarioShell';
 import { HistoryLayout } from './components/HistoryLayout';
@@ -82,7 +81,7 @@ export function AppRoutes() {
       </Route>
 
       {/* V2 scenario shell — full-screen layout outside RootLayout. */}
-      <Route element={<RequireAuth><ScenarioShell /></RequireAuth>}>
+      <Route element={<RequireAuth><RequireEnv allowed="preprod"><ScenarioShell /></RequireEnv></RequireAuth>}>
         <Route path="/scenarios/:id" element={<OperatorSchedulePage />} />
         <Route path="/scenarios/:id/stations" element={<App />} />
         <Route path="/scenarios/:id/flux" element={<FluxPage />} />
@@ -108,8 +107,9 @@ export function AppRoutes() {
         {/* Algorithm stats dashboard */}
         <Route path="/stats" element={<StatsPage />} />
 
-        {/* Logistique — réceptions et expéditions de l'atelier (Phase 1) */}
-        <Route path="/logistique" element={<LogistiquePage />} />
+        {/* Logistique — réceptions et expéditions de l'atelier (Phase 1)
+            Prod-only: hidden from Préprod (cf. RequireEnv). */}
+        <Route path="/logistique" element={<RequireEnv allowed="prod"><LogistiquePage /></RequireEnv>} />
 
         {/* Historique & audit — submenu under HistoryLayout (analogous
             to /settings/*) */}
@@ -120,12 +120,9 @@ export function AppRoutes() {
           <Route path="archives/:id" element={<ArchivesPage />} />
         </Route>
 
-        {/* Simulations — V1 read-only forks (kept temporarily for back-compat) */}
-        <Route path="/simulations" element={<SimulationsPage />} />
-        <Route path="/simulations/:id" element={<SimulationDetailPage />} />
-
-        {/* V2 Scenarios — list + entry point into the dedicated shell */}
-        <Route path="/scenarios" element={<ScenariosPage />} />
+        {/* V2 Scenarios — list + entry point into the dedicated shell.
+            Préprod-only: the /labo experience doesn't apply in Prod. */}
+        <Route path="/scenarios" element={<RequireEnv allowed="preprod"><ScenariosPage /></RequireEnv>} />
 
         {/* Station schedule — verification view */}
         <Route path="/stations" element={<App />} />

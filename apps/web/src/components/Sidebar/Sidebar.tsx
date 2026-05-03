@@ -1,7 +1,7 @@
 import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, FlaskConical, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEnvAwareNavigate } from '../../contexts/ScenarioContext';
+import { useEnvAwareNavigate, useScenarioMode } from '../../contexts/ScenarioContext';
 import { SidebarButton } from './SidebarButton';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAppSelector, useAppDispatch } from '../../store';
@@ -25,6 +25,9 @@ export function Sidebar() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isMock = shouldUseMockMode();
   const canSeeSettings = useHasPermission('settings.view', 'admin.users');
+  const { mode } = useScenarioMode();
+  const canSeeLogistique = mode === 'prod';
+  const canSeeLabo = mode === 'preprod';
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +39,7 @@ export function Sidebar() {
   const isStats = location.pathname.startsWith('/stats');
   const isLogistique = location.pathname.startsWith('/logistique');
   const isHistory = location.pathname.startsWith('/historique');
-  const isScenarios = location.pathname.startsWith('/scenarios') || location.pathname.startsWith('/simulations');
+  const isScenarios = location.pathname.startsWith('/scenarios');
   const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isHistory && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
@@ -94,24 +97,28 @@ export function Sidebar() {
             isActive={isFlux}
             onClick={() => navigate('/flux')}
           />
-          <SidebarButton
-            icon={Truck}
-            label="Logistique"
-            isActive={isLogistique}
-            onClick={() => navigate('/logistique')}
-          />
+          {canSeeLogistique && (
+            <SidebarButton
+              icon={Truck}
+              label="Logistique"
+              isActive={isLogistique}
+              onClick={() => navigate('/logistique')}
+            />
+          )}
           <SidebarButton
             icon={BarChart3}
             label="Statistiques"
             isActive={isStats}
             onClick={() => navigate('/stats')}
           />
-          <SidebarButton
-            icon={FlaskConical}
-            label="Scénarios"
-            isActive={isScenarios}
-            onClick={() => navigate('/scenarios')}
-          />
+          {canSeeLabo && (
+            <SidebarButton
+              icon={FlaskConical}
+              label="Scénarios"
+              isActive={isScenarios}
+              onClick={() => navigate('/scenarios')}
+            />
+          )}
         </div>
 
         {/* Spacer */}

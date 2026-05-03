@@ -15,11 +15,13 @@
 import { useState } from 'react';
 import { Unlock, Lock, Rocket } from 'lucide-react';
 import { useScenarioMode } from '../../contexts/ScenarioContext';
+import { useEnvSwitch } from '../../hooks/useEnvSwitch';
 import { PromotionModal } from '../PromotionModal/PromotionModal';
 import { PromotionUndoToast } from '../PromotionUndoToast/PromotionUndoToast';
 
 export function EnvFloatingControls() {
-  const { mode, setMode } = useScenarioMode();
+  const { mode } = useScenarioMode();
+  const switchEnv = useEnvSwitch();
   const [isModalOpen, setModalOpen] = useState(false);
   const [undoExpiresAt, setUndoExpiresAt] = useState<string | null>(null);
 
@@ -45,7 +47,8 @@ export function EnvFloatingControls() {
             type="button"
             role="tab"
             aria-selected={isPreprod}
-            onClick={() => setMode('preprod')}
+            onClick={() => switchEnv('preprod')}
+            data-testid="env-toggle-preprod"
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] transition ${
               isPreprod
                 ? 'bg-emerald-950/40 text-emerald-100 font-medium'
@@ -59,7 +62,8 @@ export function EnvFloatingControls() {
             type="button"
             role="tab"
             aria-selected={isProd}
-            onClick={() => setMode('prod')}
+            onClick={() => switchEnv('prod')}
+            data-testid="env-toggle-prod"
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] transition ${
               isProd
                 ? 'bg-amber-950/40 text-amber-100 font-medium'
