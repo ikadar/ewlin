@@ -882,6 +882,26 @@ mod tests {
         }
     }
 
+    /// 24/7 operator — used by diagnostics where deadline arithmetic must
+    /// match the integration tests' behaviour (which use make_always_on
+    /// to dodge the default Mon-Fri 8h-17h schedule).
+    fn operator_24_7(id: &str, station_ids: &[&str]) -> OperatorInput {
+        use crate::model::operator::{DaySchedule, OperatingSchedule, TimeSlot};
+        let full = DaySchedule { slots: vec![TimeSlot { start: "00:00".into(), end: "24:00".into() }] };
+        let schedule = OperatingSchedule {
+            monday: Some(full.clone()),
+            tuesday: Some(full.clone()),
+            wednesday: Some(full.clone()),
+            thursday: Some(full.clone()),
+            friday: Some(full.clone()),
+            saturday: Some(full.clone()),
+            sunday: Some(full),
+        };
+        let mut op = operator_all_stations(id, station_ids);
+        op.operating_schedules = Some(vec![schedule]);
+        op
+    }
+
     /// Regression: pinned MIDDLE task. Before the fix the backward pass
     /// ignored `is_pinned`, so `last_tick` for a pinned mid-job task was
     /// computed via ALAP (or came out as 0 on failure) rather than being
@@ -1029,6 +1049,115 @@ mod tests {
             Some(pinned_tick as u64),
             "pinned middle task must have last_tick == pinned_start_tick (got {:?})",
             last_values.get("task-laminate")
+        );
+    }
+
+    /// Diagnostic for the proximity_bonus regression: emit LAST values for
+    /// two same-tier 2-step jobs with very different deadlines (5h vs 48h).
+    /// This is the same scenario as the integration test
+    /// `proximity_bonus_prioritises_tight_deadline_job` — if LAST values
+    /// here are differentiated, the bug is in forward-pass scoring; if
+    /// they collapse to 0 / equal, the bug is in this backward pass.
+    #[test]
+    fn diag_last_values_for_proximity_scenario() {
+        let stations = vec![station("s1"), station("s2")];
+        let alice = operator_24_7("alice", &["s1", "s2"]);
+
+        let start_date = NaiveDate::from_ymd_opt(2026, 4, 22).unwrap();
+        let day_minutes: u64 = 24 * 60;
+
+        // Deadline at 5h after start_date midnight, in compute_last_values
+        // format. parse_deadline_to_ticks uses minutes since start_date 00:00.
+        let deadline_a = format!("2026-04-22T05:00:00");
+        let deadline_b = format!("2026-04-24T00:00:00"); // 48h later
+
+        let make_job = |id: &str, deadline: String| JobInput {
+            id: id.into(),
+            reference: None,
+            description: None,
+            deadline: Some(deadline),
+            deadline_priority: 2,
+            required_job_ids: Vec::new(),
+            elements: vec![ElementInput {
+                id: format!("{id}-elem"),
+                name: None,
+                tasks: vec![
+                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None },
+                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None },
+                ],
+                spec: None,
+                prerequisite_element_ids: Vec::new(),
+            }],
+        };
+
+        let jobs = vec![make_job("B", deadline_b), make_job("A", deadline_a)];
+
+        let station_id_to_idx: HashMap<String, usize> = stations
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.id.clone(), i))
+            .collect();
+
+        let station_attrs: Vec<StationAttrs> = stations
+            .iter()
+            .map(|s| StationAttrs {
+                attention_full: s.effective_attention_full(),
+                attention_run: s.effective_attention_run(),
+                max_run_attention: s.effective_max_run_attention(),
+                masked_time_enabled: s.masked_time_enabled,
+                peremption_ticks: 0,
+                max_operators: s.effective_max_operators(),
+                max_chunk_ticks: s.effective_max_chunk() / 60u32.max(1),
+                chunk_mini_setup_multiplier: s.effective_chunk_mini_setup_multiplier(),
+                chunk_mini_task_percentage: s.effective_chunk_mini_task_percentage(),
+                similarity_criteria: s.similarity_criteria.clone().unwrap_or_default(),
+                similarity_score_rules: s.similarity_score_rules.clone().unwrap_or_default(),
+            })
+            .collect();
+
+        let operator_skills: Vec<Vec<crate::engine::forward_pass::SkillEntry>> = vec![alice.clone()]
+            .iter()
+            .map(|op| {
+                op.skills
+                    .iter()
+                    .filter_map(|sk| {
+                        station_id_to_idx
+                            .get(&sk.station_id)
+                            .map(|&idx| crate::engine::forward_pass::SkillEntry {
+                                station_idx: idx,
+                                setup_proficiency: sk.setup_proficiency,
+                                run_proficiency: sk.run_proficiency,
+                            })
+                    })
+                    .collect()
+            })
+            .collect();
+
+        let operator_groups = build_prepared_groups(&[alice.clone()], &station_id_to_idx);
+
+        let last_values = compute_last_values(
+            &jobs, &stations, &[alice], &station_attrs, &operator_skills,
+            &operator_groups, 60, start_date, (day_minutes / 60) as usize * 3,
+            BackwardOrdering::TierFirst, &[], &[],
+        );
+
+        eprintln!("LAST(A-s1) = {:?}", last_values.get("A-s1"));
+        eprintln!("LAST(A-s2) = {:?}", last_values.get("A-s2"));
+        eprintln!("LAST(B-s1) = {:?}", last_values.get("B-s1"));
+        eprintln!("LAST(B-s2) = {:?}", last_values.get("B-s2"));
+
+        // The bug suggested by the integration test is "LAST=0 for all tasks";
+        // this diagnostic proved the comment was outdated. With a 24/7
+        // operator schedule the backward pass produces correctly differentiated
+        // values: A is small (urgent), B is large (loose). The scoring bug
+        // therefore lives in the forward pass, not here.
+        let last_a_s1 = last_values.get("A-s1").copied().unwrap_or(u64::MAX);
+        let last_b_s1 = last_values.get("B-s1").copied().unwrap_or(u64::MAX);
+        assert!(
+            last_a_s1 < last_b_s1,
+            "diag regression guard: backward pass MUST differentiate LAST \
+             for same-tier jobs with very different deadlines. \
+             Got A-s1={last_a_s1}, B-s1={last_b_s1}"
         );
     }
 }
