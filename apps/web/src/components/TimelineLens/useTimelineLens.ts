@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   LENS_HIDE_GRACE_MS, LENS_AUTO_CLOSE_MS, LENS_DEAD_ZONE_CLOSE_MS,
+  LENS_INTENT_WINDOW_MS,
   computeDwellMs, isTileTriggerable,
 } from './lensConfig';
 import type { LensAnchor } from './TimelineLens';
@@ -53,6 +54,16 @@ export function useTimelineLens() {
   const hideTimerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const closeTimerExpiresAtRef = useRef<number | null>(null);
+
+  // Tracks the last real cursor movement (window-level). Used by
+  // handleTileEnter to filter out mouseover events triggered by DOM
+  // mutations under a stationary cursor — see LENS_INTENT_WINDOW_MS.
+  const lastMouseMoveTsRef = useRef<number>(0);
+  useEffect(() => {
+    const onMove = () => { lastMouseMoveTsRef.current = Date.now(); };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
 
   const clearShowTimer = useCallback(() => {
     if (showTimerRef.current !== null) {
@@ -108,6 +119,15 @@ export function useTimelineLens() {
 
   const handleTileEnter = useCallback((input: TileEnterInput) => {
     const current = stateRef.current;
+
+    // Intent gate: a mouseover under a stationary cursor (DOM mutated
+    // beneath us — snapshot refetch, `now` tick re-flow, virtual scroll)
+    // must not open or re-route the lens. Real movement keeps mousemove
+    // firing every ~16 ms, so a >100 ms gap means the user is parked.
+    if (Date.now() - lastMouseMoveTsRef.current > LENS_INTENT_WINDOW_MS) {
+      return;
+    }
+
     const triggerable = isTileTriggerable(input.tileHeightPx);
     const dwellMs = computeDwellMs(input.tileHeightPx);
 

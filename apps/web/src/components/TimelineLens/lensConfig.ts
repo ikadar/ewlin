@@ -58,6 +58,15 @@ export const LENS_FADE_OUT_MS = 500;
 /** Dwell before auto-closing on a tile that is too tall to trigger the lens. */
 export const LENS_AUTO_CLOSE_MS = 1500;
 
+/** Max delay since last cursor `mousemove` for an open-trigger to count as
+ *  user-intentional. Past this window the cursor is considered stationary,
+ *  so a fresh `mouseover` must be the result of the DOM mutating beneath
+ *  the cursor (snapshot refetch, `now` tick re-flow, virtual scroll, …),
+ *  not the user actually moving onto a tile — we ignore it. During real
+ *  movement `mousemove` fires ~every 16 ms, so 100 ms leaves ample margin
+ *  for slow drags while still blocking layout-driven phantom triggers. */
+export const LENS_INTENT_WINDOW_MS = 100;
+
 /** Dwell before auto-closing when the cursor is parked over a dead zone
  *  (hatched unavailability overlay, hour grid, or any non-tile space in the
  *  column). Shorter than the tall-tile close because empty space is a
