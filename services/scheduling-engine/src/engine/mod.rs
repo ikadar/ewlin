@@ -2122,23 +2122,27 @@ mod integration_tests {
     }
 
     /// Four jobs compete for 1 station. Each takes 2 h (tick=60 min).
-    /// Deadlines spread 3/5/7/9 h from now — listed in reverse (D,C,B,A)
-    /// to confirm input order doesn't override urgency ordering.
-    /// Wrong scheduling order (e.g. D first) would make A late (ends at h+8 > deadline h+3).
+    /// Tier-2 jobs with same priority but different deadlines must be scheduled
+    /// in urgency order (A before D), not in input order. D is listed first
+    /// (loosest deadline) and A last (tightest); the engine's slack-based
+    /// scoring must override this and place A first.
     ///
-    /// IGNORED post-ALAP-removal refactor: the OLD pass achieved 0 late via the
-    /// LNS → boost-to-tier-0 → ALAP pre-placement interaction (see the
-    /// `[FBI] ALAP phase: 3 tasks pre-placed for tier 0+1, final late_jobs=0`
-    /// trace on the pre-refactor HEAD). The new single-path architecture has
-    /// no ALAP pre-placement; the forward pass alone cannot achieve 0 late
-    /// with the current default scoring weights for this specific
-    /// 4-same-priority / 1-machine / tight-deadline configuration. This
-    /// test tracks a scheduler property worth preserving — tight deadlines
-    /// must be honored — but the mechanism it relied on is intentionally
-    /// gone. Re-enable once the forward pass scoring is tuned or LNS gains
-    /// an equivalent mechanism.
+    /// Was previously `#[ignore]`d under the (outdated) belief that the
+    /// forward pass alone couldn't reach 0 late without ALAP pre-placement.
+    /// Diagnostic in 2026-05 (DIAG_PROXIMITY) showed the scoring DOES
+    /// rank A > B > C > D correctly via the urgency formula
+    /// (`raw_urgency = 10000 + |slack|` for slack ≤ 0). The actual failure
+    /// was a tick-rounding interaction: with 60-min ticks, `now_tick =
+    /// ceil(current_minute / 60)` plus the deadline's floor-rounding could
+    /// shave up to ~1h off the available margin per task — and the original
+    /// 2h spacing between deadlines (h+3, h+5, h+7, h+9) had only 1h of
+    /// slack so a single rounding loss tipped a task past its deadline.
+    ///
+    /// Fix: spread deadlines by 4h (h+5, h+9, h+13, h+17) so each task
+    /// has 3h of slack. Robust against any time-of-day the test runs at,
+    /// while still requiring the engine to pick urgency-first ordering
+    /// (placing D first would still cause A to end at h+8 — past h+5).
     #[test]
-    #[ignore]
     fn tight_deadlines_all_scheduled_on_time() {
         let station = make_station("press", "Press", false);
         let alice = make_always_on_operator("alice", "Alice", &[("press", 1.0)], vec![]);
@@ -2160,8 +2164,6 @@ mod integration_tests {
             elements: vec![ElementInput {
                 id: format!("{id}-elem"),
                 name: None,
-                // 2-h task: enough time so A (3 h deadline) must go first,
-                // but scheduling D first would push A to end at h+8 → late.
                 tasks: vec![TaskInput {
                     id: format!("{id}-task"),
                     station_id: "press".to_string(),
@@ -2184,36 +2186,58 @@ mod integration_tests {
         };
 
         let jobs = vec![
-            make_job_with_deadline("D", fmt(9)), // loosest deadline, listed first
-            make_job_with_deadline("C", fmt(7)),
-            make_job_with_deadline("B", fmt(5)),
-            make_job_with_deadline("A", fmt(3)), // tightest deadline, listed last
+            make_job_with_deadline("D", fmt(17)), // loosest, listed first
+            make_job_with_deadline("C", fmt(13)),
+            make_job_with_deadline("B", fmt(9)),
+            make_job_with_deadline("A", fmt(5)),  // tightest, listed last
         ];
 
         let request = ComputeRequest {
             stations: vec![station],
             operators: vec![alice],
             jobs,
-            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
+            options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
         assert_eq!(result.assignments.len(), 4, "all 4 jobs must be scheduled");
-        assert_eq!(result.stats.late_job_count, 0,
-            "wrong schedule order would make A late (ends h+8 > deadline h+3)");
+        assert_eq!(
+            result.stats.late_job_count, 0,
+            "no job must be late — proximity bonus + slack-based scoring \
+             must order A→B→C→D regardless of input order. assignments={:?}",
+            result.assignments.iter().map(|a| (&a.task_id, &a.scheduled_start)).collect::<Vec<_>>()
+        );
+
+        // Order check: A.scheduled_start ≤ B ≤ C ≤ D — the engine picks by
+        // urgency, not input order (which had D first, A last).
+        let by_id = |id: &str| {
+            result.assignments.iter().find(|a| a.task_id == format!("{id}-task")).unwrap()
+        };
+        let a_start = &by_id("A").scheduled_start;
+        let b_start = &by_id("B").scheduled_start;
+        let c_start = &by_id("C").scheduled_start;
+        let d_start = &by_id("D").scheduled_start;
+        assert!(a_start <= b_start, "A must start ≤ B (A={a_start}, B={b_start})");
+        assert!(b_start <= c_start, "B must start ≤ C (B={b_start}, C={c_start})");
+        assert!(c_start <= d_start, "C must start ≤ D (C={c_start}, D={d_start})");
     }
 
     /// Proximity bonus regression: A and B both need S1 then S2 (sequential, 2 h each leg).
-    /// A deadline = 5 h → LAST(A.s1) = 5-2-2 = 1 h (very urgent).
-    /// B deadline = 48 h → very loose.
-    /// B is listed first in input; the engine must still schedule A first.
+    /// A's deadline is much tighter than B's, but B is listed first in input.
+    /// The engine must schedule A first (proximity bonus + slack scoring).
     ///
-    /// NOTE: requires differentiated LAST values. The backward pass currently
-    /// produces LAST=0 for all tasks (known bug). Re-enable when fixed.
+    /// Was previously `#[ignore]`d with the comment "LAST=0 for all tasks
+    /// (known bug)". Diagnostic in 2026-05 disproved that claim: the backward
+    /// pass DOES produce differentiated LAST values (A small, B large).
+    /// The actual failure was that the original deadline of 5h was too tight
+    /// to accommodate the engine's 1-tick precedence-min-gap between A.s1
+    /// and A.s2 plus the now_tick rounding — A was placed first correctly
+    /// but finished late by ~1 tick. Spreading A's deadline to 8h gives the
+    /// scenario enough slack for the precedence guard while still keeping
+    /// A meaningfully more urgent than B (h+48).
     #[test]
-    #[ignore]
     fn proximity_bonus_prioritises_tight_deadline_job() {
         let s1 = make_station("s1", "S1", false);
         let s2 = make_station("s2", "S2", false);
@@ -2245,28 +2269,33 @@ mod integration_tests {
             }],
         };
 
-        // B listed first, A has tight deadline — correct scheduling: A.s1 before B.s1
+        // B listed first, A has tight deadline — correct scheduling: A.s1 before B.s1.
+        // A.deadline = h+8 gives 4h of work + 1h precedence gap + 3h slack for
+        // tick-rounding margin. The slack is generous enough to be robust at
+        // any time-of-day, yet A remains far more urgent than B (h+48).
         let request = ComputeRequest {
             stations: vec![s1, s2],
             operators: vec![alice],
             jobs: vec![
                 make_2step_job("B", fmt(48)), // listed first, loose
-                make_2step_job("A", fmt(5)),  // listed second, tight
+                make_2step_job("A", fmt(8)),  // listed second, tight
             ],
-            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: None, lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
+            options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         };
 
         let result = compute(&request);
         assert_eq!(result.assignments.len(), 4, "all 4 tasks must be assigned");
-        assert_eq!(result.stats.late_job_count, 0, "job-A must not be late");
+        assert_eq!(result.stats.late_job_count, 0,
+            "job-A must not be late. assignments={:?}",
+            result.assignments.iter().map(|a| (&a.task_id, &a.scheduled_start, &a.scheduled_end)).collect::<Vec<_>>());
 
         let a_s1 = result.assignments.iter().find(|a| a.task_id == "A-s1").unwrap();
         let b_s1 = result.assignments.iter().find(|a| a.task_id == "B-s1").unwrap();
         assert!(
             a_s1.scheduled_start <= b_s1.scheduled_start,
-            "A (5 h deadline) must start before B (48 h deadline): A={} B={}",
+            "A (8 h deadline) must start before B (48 h deadline): A={} B={}",
             a_s1.scheduled_start, b_s1.scheduled_start
         );
     }
