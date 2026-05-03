@@ -80,14 +80,21 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
   const [capacity, setCapacity] = useState(String(initial?.capacity ?? 1));
   const [displayOrder, setDisplayOrder] = useState(String(initial?.displayOrder ?? 0));
 
-  // Operator-algorithm attributes
-  const [attentionFull, setAttentionFull] = useState(String(initial?.attentionFull ?? 1));
+  // Operator-algorithm attributes — staffing model with phase-specific bounds
+  // (setup vs run). attentionSetup/attentionRun = équipe nominale ; min/max
+  // operators = plancher/plafond dur de corps physiques par phase ;
+  // maxRunAttention = plafond de vitesse parallélisable (null = pas de cap).
+  const [attentionSetup, setAttentionSetup] = useState(String(initial?.attentionSetup ?? 1));
   const [attentionRun, setAttentionRun] = useState(String(initial?.attentionRun ?? 1));
   const [maskedTimeEnabled, setMaskedTimeEnabled] = useState(initial?.maskedTimeEnabled ?? false);
   const [tickMinutes, setTickMinutes] = useState(String(initial?.tickMinutes ?? 15));
   const [peremptionHours, setPeremptionHours] = useState(String(initial?.peremptionThresholdMinutes != null ? initial.peremptionThresholdMinutes / 60 : 2));
   const [maxChunkHours, setMaxChunkHours] = useState(String(initial?.maxChunkMinutes != null ? initial.maxChunkMinutes / 60 : 7));
-  const [maxOperators, setMaxOperators] = useState(String(initial?.maxOperators ?? 1));
+  const [minSetupOperators, setMinSetupOperators] = useState(String(initial?.minSetupOperators ?? 1));
+  const [maxSetupOperators, setMaxSetupOperators] = useState(String(initial?.maxSetupOperators ?? 1));
+  const [minRunOperators, setMinRunOperators] = useState(String(initial?.minRunOperators ?? 1));
+  const [maxRunOperators, setMaxRunOperators] = useState(String(initial?.maxRunOperators ?? 1));
+  const [maxRunAttention, setMaxRunAttention] = useState(String(initial?.maxRunAttention ?? ''));
 
   interface ExceptionPeriod {
     id: string;
@@ -126,7 +133,37 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isSaving, onCancel]);
 
-  const canSave = name.trim() !== '' && exceptionsValid;
+  // Cross-field staffing validation: respect physical / process orderings.
+  // - min ≤ max for each phase (can't require more bodies than allowed)
+  // - attention ≤ max (the nominal need can't exceed the physical cap)
+  // - max_run_attention (if set) ≥ attention_run (cap can't be below the
+  //   nominal denominator — would otherwise pin every run at sub-1× rate)
+  const staffingValid = useMemo(() => {
+    const num = (s: string) => (s.trim() === '' ? null : parseFloat(s));
+    const minS = num(minSetupOperators);
+    const maxS = num(maxSetupOperators);
+    const minR = num(minRunOperators);
+    const maxR = num(maxRunOperators);
+    const attS = num(attentionSetup);
+    const attR = num(attentionRun);
+    const maxRA = num(maxRunAttention);
+    if (minS != null && maxS != null && minS > maxS) return false;
+    if (minR != null && maxR != null && minR > maxR) return false;
+    if (attS != null && maxS != null && attS > maxS) return false;
+    if (attR != null && maxR != null && attR > maxR) return false;
+    if (maxRA != null && attR != null && maxRA < attR) return false;
+    return true;
+  }, [
+    minSetupOperators,
+    maxSetupOperators,
+    minRunOperators,
+    maxRunOperators,
+    attentionSetup,
+    attentionRun,
+    maxRunAttention,
+  ]);
+
+  const canSave = name.trim() !== '' && exceptionsValid && staffingValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,13 +186,17 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
       displayOrder: parseInt(displayOrder, 10) || 0,
       operatingSchedule: (initial?.operatingSchedule as Record<string, unknown>) ?? null,
       scheduleExceptions: serialisedExceptions.length > 0 ? serialisedExceptions : null,
-      attentionFull: attentionFull.trim() ? parseFloat(attentionFull) : null,
+      attentionSetup: attentionSetup.trim() ? parseFloat(attentionSetup) : null,
       attentionRun: attentionRun.trim() ? parseFloat(attentionRun) : null,
       maskedTimeEnabled,
       tickMinutes: tickMinutes.trim() ? parseInt(tickMinutes, 10) : null,
       peremptionThresholdMinutes: peremptionHours.trim() ? Math.round(parseFloat(peremptionHours) * 60) : null,
       maxChunkMinutes: maxChunkHours.trim() ? Math.round(parseFloat(maxChunkHours) * 60) : null,
-      maxOperators: maxOperators.trim() ? parseInt(maxOperators, 10) : null,
+      minSetupOperators: minSetupOperators.trim() ? parseInt(minSetupOperators, 10) : null,
+      maxSetupOperators: maxSetupOperators.trim() ? parseInt(maxSetupOperators, 10) : null,
+      minRunOperators: minRunOperators.trim() ? parseInt(minRunOperators, 10) : null,
+      maxRunOperators: maxRunOperators.trim() ? parseInt(maxRunOperators, 10) : null,
+      maxRunAttention: maxRunAttention.trim() ? parseFloat(maxRunAttention) : null,
     });
   };
 
@@ -244,30 +285,8 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
           <div className="pt-2 border-t border-flux-border">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-3">Algorithme opérateur</p>
 
-            {/* Attention calage + roulage (always visible) */}
-            <div className="grid grid-cols-2 gap-4 mb-3">
-              <div>
-                <label className="block text-sm text-flux-text-secondary mb-1">Attention calage</label>
-                <input
-                  type="number" step="0.1" min="0" max="2"
-                  value={attentionFull}
-                  onChange={(e) => setAttentionFull(e.target.value)}
-                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-flux-text-secondary mb-1">Attention roulage</label>
-                <input
-                  type="number" step="0.1" min="0" max="2"
-                  value={attentionRun}
-                  onChange={(e) => setAttentionRun(e.target.value)}
-                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                />
-              </div>
-            </div>
-
             {/* Masked time switch */}
-            <div className="flex items-center gap-2.5 mb-3">
+            <div className="flex items-center gap-2.5 mb-4">
               <button
                 type="button"
                 onClick={() => setMaskedTimeEnabled(!maskedTimeEnabled)}
@@ -281,8 +300,95 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
               </span>
             </div>
 
+            {/* Calage staffing — 3 fields */}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-2">Calage</p>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Effectif min</label>
+                <input
+                  type="number" step="1" min="1"
+                  value={minSetupOperators}
+                  onChange={(e) => setMinSetupOperators(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">Refus de démarrer en dessous</p>
+              </div>
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Effectif nominal</label>
+                <input
+                  type="number" step="0.1" min="0" max="2"
+                  value={attentionSetup}
+                  onChange={(e) => setAttentionSetup(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">EOE pour vitesse nominale</p>
+              </div>
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Effectif max</label>
+                <input
+                  type="number" step="1" min="1"
+                  value={maxSetupOperators}
+                  onChange={(e) => setMaxSetupOperators(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">Top-N par skill calage</p>
+              </div>
+            </div>
+
+            {/* Run staffing — 4 fields including speed cap */}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-2">Roule</p>
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Effectif min</label>
+                <input
+                  type="number" step="1" min="1"
+                  value={minRunOperators}
+                  onChange={(e) => setMinRunOperators(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">Refus de démarrer en dessous</p>
+              </div>
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Effectif nominal</label>
+                <input
+                  type="number" step="0.1" min="0" max="2"
+                  value={attentionRun}
+                  onChange={(e) => setAttentionRun(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">EOE pour vitesse nominale</p>
+              </div>
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Effectif max</label>
+                <input
+                  type="number" step="1" min="1"
+                  value={maxRunOperators}
+                  onChange={(e) => setMaxRunOperators(e.target.value)}
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">Top-N par skill roule</p>
+              </div>
+              <div>
+                <label className="block text-sm text-flux-text-secondary mb-1">Plafond vitesse</label>
+                <input
+                  type="number" step="0.5" min="0"
+                  value={maxRunAttention}
+                  onChange={(e) => setMaxRunAttention(e.target.value)}
+                  placeholder="vide = pas de cap"
+                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                />
+                <p className="text-[11px] text-flux-text-muted mt-1">EOE max utiles (cap mécanique)</p>
+              </div>
+            </div>
+            {!staffingValid && (
+              <p className="text-[11px] text-red-400 mb-3">
+                Vérifiez l'ordre staffing : min ≤ effectif nominal ≤ max sur chaque phase, et plafond vitesse ≥ effectif nominal roule.
+              </p>
+            )}
+
             {/* Timing fields */}
-            <div className="grid grid-cols-3 gap-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-flux-text-muted mb-2">Timing</p>
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm text-flux-text-secondary mb-1">Pas de temps (min)</label>
                 <input
@@ -307,15 +413,6 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
                   type="number" step="0.5" min="0"
                   value={maxChunkHours}
                   onChange={(e) => setMaxChunkHours(e.target.value)}
-                  className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-flux-text-secondary mb-1">Max opérateurs</label>
-                <input
-                  type="number" step="1" min="1"
-                  value={maxOperators}
-                  onChange={(e) => setMaxOperators(e.target.value)}
                   className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
                 />
               </div>
