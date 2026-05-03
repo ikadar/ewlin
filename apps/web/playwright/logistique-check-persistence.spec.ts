@@ -29,7 +29,8 @@ async function authenticate(page: Page): Promise<void> {
 test.describe('/logistique — check persistence', () => {
   test.beforeEach(async ({ page }) => {
     await authenticate(page);
-    await page.goto('/logistique');
+    // /logistique is Prod-only since the env-gating release.
+    await page.goto('/logistique?env=prod');
     await page.waitForSelector('h1:has-text("Logistique")');
     await page.waitForTimeout(2500);
     // Switch to "Cette semaine" so we have data regardless of today's date
