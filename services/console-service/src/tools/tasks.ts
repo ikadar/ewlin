@@ -100,6 +100,32 @@ export const updateTaskDurationTool: ToolDefinition = {
   },
 };
 
+export const recordTaskProgressTool: ToolDefinition = {
+  name: 'record_task_progress',
+  description:
+    "Enregistre un avancement déclaré sur une tâche, exprimé en pourcentage (0..100) du temps de roule. Usage typique : l'opérateur ou le chef dit en langage naturel \"on est à 70% sur la task X du job Y\". Écrit l'ancrage (recordedProgressPct + recordedAt) directement sur la tâche, SANS recalculer scheduledEnd ni le ratio de productivité — pas de replan déclenché. Pour reporter une heure de fin estimée (qui DÉCLENCHE un replan), utiliser saisie via la modale ou un autre tool. La tâche est résolue via resolve_task_in_job.",
+  inputSchema: z.object({
+    taskId: uuidField('resolve_task_in_job').describe("UUID de la tâche."),
+    taskLabel: z.string().min(1).describe("Nom lisible (ex 'MBO XL du job 12345')."),
+    progressPct: z
+      .number()
+      .min(0)
+      .max(100)
+      .describe("Pourcentage d'avancement déclaré, 0..100."),
+  }),
+  handler: async (input, ctx) => {
+    const preview = `Avancement enregistré : ${input.taskLabel} à ${Math.round(input.progressPct)}%`;
+    if (ctx.dryRun) {
+      return { ok: true, preview, data: { dryRun: true, ...input } };
+    }
+    const result = await ctx.php.post<unknown>(
+      `/api/v1/scenarios/prod/record-progress/${input.taskId}`,
+      { progressPct: input.progressPct },
+    );
+    return { ok: true, preview, data: { task: result } };
+  },
+};
+
 export const replaceTaskStationTool: ToolDefinition = {
   name: 'replace_task_station',
   description:
