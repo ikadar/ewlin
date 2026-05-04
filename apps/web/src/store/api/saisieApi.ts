@@ -36,6 +36,11 @@ export interface ReportSaisieResult {
   lastSaisieAt: string;
 }
 
+export interface ClearRecordedProgressResult {
+  /** Number of tasks whose anchor was nulled (zero when nothing to do). */
+  cleared: number;
+}
+
 export const saisieApi = createApi({
   reducerPath: 'saisieApi',
   baseQuery: baseQueryWithFixtureSupport,
@@ -72,7 +77,27 @@ export const saisieApi = createApi({
         }
       },
     }),
+    /**
+     * Reset the optimistic progress anchor on every task. Wired to the
+     * CTRL+ALT+Z dialog's "Réinitialiser aussi les saisies d'avancement"
+     * checkbox (off by default — the gesture is destructive).
+     */
+    clearRecordedProgress: builder.mutation<ClearRecordedProgressResult, void>({
+      query: () => ({
+        url: '/scenarios/prod/clear-recorded-progress',
+        method: 'POST',
+      }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          // No optimistic patch — the snapshot fetch will reflect the
+          // backend rollback if the request failed.
+        }
+      },
+    }),
   }),
 });
 
-export const { useReportSaisieMutation } = saisieApi;
+export const { useReportSaisieMutation, useClearRecordedProgressMutation } = saisieApi;

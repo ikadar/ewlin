@@ -56,6 +56,17 @@ export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDi
           />
           Inclure les tuiles avec flocon actif (safety zone)
         </label>
+        {/* Opt-in : saisies represent real recorded work, never default-on. */}
+        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 text-sm">
+          <input
+            type="checkbox"
+            checked={state.resetRecordedProgress}
+            onChange={(e) => onUpdate((prev) => prev ? { ...prev, resetRecordedProgress: e.target.checked } : prev)}
+            className="rounded-[3px] accent-red-500"
+            data-testid="mass-unschedule-reset-progress"
+          />
+          Réinitialiser aussi les saisies d'avancement
+        </label>
       </ModalBody>
       <ModalFooter hint="Maintenir 1.2 s pour confirmer.">
         <ModalCancelButton onClick={onDismiss}>Annuler</ModalCancelButton>

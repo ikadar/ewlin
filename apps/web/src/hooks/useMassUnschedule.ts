@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { isInternalTask } from '@flux/types';
 import type { ScheduleSnapshot } from '@flux/types';
 import { useClearAllAssignmentsMutation } from '../store';
+import { useClearRecordedProgressMutation } from '../store/api/saisieApi';
 import {
   buildOverrideLookup,
   buildSequenceIndexLookup,
@@ -18,10 +19,18 @@ export interface MassUnscheduleState {
   /** Default true on every modal open (opt-out). Uncheck to preserve.
    *  Mirrors the `includeFrozen` flag on the clearAllAssignments endpoint. */
   includeFrozen: boolean;
+  /**
+   * Default **false** on every modal open (opt-IN). Saisies d'avancement
+   * represent real recorded work ; the chef must explicitly tick this box
+   * to discard them. When true, the confirm action also fires the
+   * clear-recorded-progress endpoint after the mass unschedule resolves.
+   */
+  resetRecordedProgress: boolean;
 }
 
 export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
   const [clearAllAssignments] = useClearAllAssignmentsMutation();
+  const [clearRecordedProgress] = useClearRecordedProgressMutation();
   const [confirmState, setConfirmState] = useState<MassUnscheduleState | null>(null);
 
   const getClearableCount = useCallback((
@@ -70,19 +79,23 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
       includeInProgress: true,
       includePinned: true,
       includeFrozen: true,
+      resetRecordedProgress: false, // opt-in : never on by default.
     });
   }, [getClearableCount]);
 
   const confirm = useCallback(async () => {
     if (!confirmState) return;
-    const { includeInProgress, includePinned, includeFrozen } = confirmState;
+    const { includeInProgress, includePinned, includeFrozen, resetRecordedProgress } = confirmState;
     setConfirmState(null);
-    return clearAllAssignments({
+    await clearAllAssignments({
       includeInProgress,
       includePinned,
       includeFrozen,
     }).unwrap();
-  }, [confirmState, clearAllAssignments]);
+    if (resetRecordedProgress) {
+      await clearRecordedProgress().unwrap();
+    }
+  }, [confirmState, clearAllAssignments, clearRecordedProgress]);
 
   const dismiss = useCallback(() => setConfirmState(null), []);
 
