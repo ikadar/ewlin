@@ -1257,6 +1257,7 @@ export default function OperatorSchedulePage() {
         isSelected={selectedJobId === job.id}
         onContextMenu={handleContextMenu}
         progressFill={progressFill}
+        taskBadgePct={assignment?.taskSlotVolumePct ?? 100}
         {...positionProps}
       />
     );

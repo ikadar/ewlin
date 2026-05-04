@@ -8,6 +8,7 @@
 
 import { Pin } from 'lucide-react';
 import { ProgressFill } from './ProgressFill';
+import { TaskBadge } from './TaskBadge';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -90,6 +91,13 @@ interface TileSegmentProps {
    * and on read-only callsites that don't surface progress.
    */
   progressFill?: { pct: number; isLate: boolean };
+  /**
+   * Task-scale badge percent (Q10 of 2026-05-04 mindmap). Geometric,
+   * static between replans : what share of the parent task this
+   * segment represents. 100 by default (unsplit task) ; chunk-split
+   * derivations should be supplied by the parent.
+   */
+  taskBadgePct?: number;
 }
 
 /**
@@ -152,6 +160,7 @@ export function TileSegment({
   onToggleFrozenOverride,
   onContextMenu,
   progressFill,
+  taskBadgePct = 100,
 }: TileSegmentProps) {
   // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
   // selected-job segments only. Was a hover trigger; switched to dblclick
@@ -246,6 +255,11 @@ export function TileSegment({
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
         }}
       />
+
+      {/* Task badge (Q10 of 2026-05-04 mindmap) — share of the parent
+          task this segment represents. forceShow so 100% is visible on
+          unsplit tasks. */}
+      <TaskBadge pct={taskBadgePct} forceShow />
 
       {/* Optimistic fond-vert overlay. Sits between the body bg and the
           calage overlays so progress shows under the calage band, but

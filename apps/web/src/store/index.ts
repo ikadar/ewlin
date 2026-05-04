@@ -333,11 +333,13 @@ export type { ProdCompletionToggleResult } from './api/prodCompletionApi';
 
 export {
   useReportSaisieMutation,
+  useClearRecordedProgressMutation,
   saisieApi,
 } from './api/saisieApi';
 export type {
   ReportSaisieRequest,
   ReportSaisieResult,
+  ClearRecordedProgressResult,
 } from './api/saisieApi';
 
 export {

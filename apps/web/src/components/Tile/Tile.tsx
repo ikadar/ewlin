@@ -7,6 +7,7 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import { ProgressFill } from './ProgressFill';
+import { TaskBadge } from './TaskBadge';
 import { computeOptimisticProgress } from './saisieMath';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
@@ -352,6 +353,13 @@ export const Tile = memo(function Tile({
             )}
           </svg>
         )}
+
+        {/* Task badge (Q10 of 2026-05-04 mindmap) — share of the task this
+            tile represents. Always rendered (forceShow) so the chef sees
+            "100%" on unsplit tasks even before they start ; chunk-split
+            FE breakdown by activeWindow is a follow-up (currently every
+            tile reads `taskSlotVolumePct` = 100 from the engine). */}
+        <TaskBadge pct={assignment.taskSlotVolumePct ?? 100} forceShow />
 
         {/* Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Vertical
             top-down on the planning grid ; lives inside the clipped body

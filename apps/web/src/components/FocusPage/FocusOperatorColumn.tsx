@@ -314,6 +314,7 @@ export function FocusOperatorColumn({
             overrideWidth={overrideWidth}
             onContextMenu={handleContextMenu}
             progressFill={progressFill}
+            taskBadgePct={assignment?.taskSlotVolumePct ?? 100}
           />
         );
       })}

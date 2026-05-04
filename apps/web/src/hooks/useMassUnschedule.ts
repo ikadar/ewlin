@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 import { isInternalTask } from '@flux/types';
 import type { ScheduleSnapshot } from '@flux/types';
-import { useClearAllAssignmentsMutation } from '../store';
-import { useClearRecordedProgressMutation } from '../store/api/saisieApi';
+import { useClearAllAssignmentsMutation, useClearRecordedProgressMutation } from '../store';
 import {
   buildOverrideLookup,
   buildSequenceIndexLookup,
