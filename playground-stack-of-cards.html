@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Stack-of-cards — opérateur (playground)</title>
+    <style>
+      :root {
+        --bg: #0b0d10;
+        --bg-card: #14181d;
+        --bg-card-soft: #1a2027;
+        --border: #2a313a;
+        --text: #e7eaef;
+        --text-soft: #9aa3ad;
+        --text-mute: #6b727b;
+        --accent: #2563eb;
+        --green: #22c55e;
+        --green-soft: rgba(34, 197, 94, 0.18);
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.45);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px; line-height: 1.4;
+        height: 100%;
+        overflow: hidden;
+      }
+      .wrap {
+        display: grid;
+        grid-template-columns: 380px 1fr;
+        height: 100vh;
+      }
+      .controls {
+        background: #0e1217;
+        border-right: 1px solid var(--border);
+        padding: 18px 18px 24px;
+        overflow-y: auto;
+      }
+      .controls h1 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+      .controls h1 .sub { color: var(--text-mute); font-weight: 400; font-size: 12px; }
+      .controls h2 { font-size: 12px; margin: 18px 0 8px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+      .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+      .row label { flex: 1; color: var(--text-soft); }
+      .row input[type="range"] { flex: 1; }
+      .row input[type="number"], .row input[type="text"] {
+        background: var(--bg-card); border: 1px solid var(--border);
+        color: var(--text); padding: 4px 8px; border-radius: 4px;
+        width: 80px; font-family: ui-monospace, monospace;
+      }
+      .row .val { font-family: ui-monospace, monospace; color: var(--text); width: 64px; text-align: right; }
+      button.action {
+        display: block; width: 100%;
+        background: var(--bg-card); border: 1px solid var(--border);
+        color: var(--text); padding: 8px 12px; border-radius: 6px;
+        font-size: 13px; cursor: pointer; margin: 4px 0;
+        transition: background 0.15s;
+      }
+      button.action:hover { background: var(--bg-card-soft); }
+      .copy-prompt {
+        margin-top: 18px;
+        background: var(--bg-card); border: 1px solid var(--border);
+        padding: 10px; border-radius: 6px;
+        font-family: ui-monospace, monospace; font-size: 11px;
+        color: var(--text-soft);
+        white-space: pre-wrap;
+        max-height: 200px; overflow-y: auto;
+      }
+
+      /* === Stage (right side, mobile-frame) === */
+      .stage {
+        display: flex; align-items: center; justify-content: center;
+        background:
+          radial-gradient(ellipse at top, rgba(37, 99, 235, 0.08), transparent 60%),
+          var(--bg);
+        position: relative;
+      }
+      .device {
+        width: 360px; height: 720px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 36px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: var(--shadow);
+      }
+      .device-status-bar {
+        position: absolute; top: 0; left: 0; right: 0; height: 28px;
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 0 22px;
+        font-size: 11px; color: var(--text-mute);
+        background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
+        z-index: 100;
+      }
+      .stage-header {
+        position: absolute; top: 28px; left: 0; right: 0;
+        padding: 8px 18px 10px;
+        display: flex; align-items: center; gap: 10px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(11, 13, 16, 0.85);
+        backdrop-filter: blur(8px);
+        z-index: 90;
+      }
+      .stage-header .title { font-weight: 600; font-size: 13px; }
+      .stage-header .sub { color: var(--text-mute); font-size: 11px; margin-top: 2px; }
+
+      /* === The pile === */
+      .pile {
+        position: absolute;
+        top: 80px; bottom: 0; left: 0; right: 0;
+        padding: 14px 14px 24px;
+        overflow: hidden;
+      }
+
+      .card {
+        position: absolute;
+        left: 14px; right: 14px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        cursor: grab;
+        will-change: transform, opacity;
+        transition: transform 0.32s cubic-bezier(.2,.8,.2,1), opacity 0.32s, top 0.32s, height 0.32s;
+        user-select: none;
+      }
+      .card.dragging { transition: none; cursor: grabbing; }
+      .card.top {
+        top: 0;
+        height: 380px;
+        z-index: 30;
+        background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-soft) 100%);
+        box-shadow: var(--shadow);
+      }
+      .card.peek-1 {
+        top: 360px;
+        height: 280px;
+        z-index: 20;
+        transform: scale(0.96);
+        opacity: 0.85;
+      }
+      .card.peek-2 {
+        top: 460px;
+        height: 220px;
+        z-index: 10;
+        transform: scale(0.92);
+        opacity: 0.55;
+      }
+      .card.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .card.peek-rising {
+        top: 540px;
+        opacity: 0.4;
+      }
+
+      .card-head {
+        display: flex; align-items: baseline; gap: 8px;
+        margin-bottom: 6px;
+      }
+      .card-head .ref { font-weight: 700; font-size: 14px; }
+      .card-head .client { color: var(--text-soft); font-size: 12px; }
+      .card-machine { color: var(--text-mute); font-size: 11px; margin-bottom: 12px; }
+      .card-time {
+        display: flex; gap: 12px; align-items: baseline;
+        margin: 14px 0 8px;
+        font-family: ui-monospace, monospace;
+      }
+      .card-time .start { font-size: 22px; font-weight: 700; }
+      .card-time .arrow { color: var(--text-mute); font-size: 14px; }
+      .card-time .end { font-size: 16px; color: var(--text-soft); }
+      .card-progress {
+        margin-top: 18px; height: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px; overflow: hidden;
+      }
+      .card-progress .fill {
+        height: 100%;
+        background: var(--green);
+        transition: width 0.3s;
+      }
+      .card-progress .fill.late { background: var(--red); }
+
+      /* End-approach prompt */
+      .endprompt {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 10px;
+      }
+      .countdown {
+        text-align: center;
+        font-family: ui-monospace, monospace;
+        font-size: 28px; font-weight: 700;
+        color: var(--amber);
+        margin-bottom: 8px;
+      }
+      .countdown.urgent { color: var(--red); animation: pulse 1.4s infinite; }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+      .endprompt-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .btn-plus5 {
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        color: #fcd34d;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: ui-monospace, monospace;
+        text-align: center;
+      }
+      .btn-plus5:hover { background: rgba(245, 158, 11, 0.25); }
+      .btn-plus5 .sub { display: block; font-size: 10px; opacity: 0.8; margin-top: 2px; }
+      .btn-done {
+        background: rgba(34, 197, 94, 0.18);
+        border: 1px solid rgba(34, 197, 94, 0.5);
+        color: #86efac;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .btn-done:hover { background: rgba(34, 197, 94, 0.28); }
+
+      .swipe-hint {
+        position: absolute; bottom: 8px; left: 0; right: 0;
+        text-align: center; color: var(--text-mute); font-size: 10px;
+        pointer-events: none;
+      }
+
+      /* Done announcement (transient) */
+      .toast {
+        position: absolute;
+        top: 80px; left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: rgba(34, 197, 94, 0.92);
+        color: white; padding: 10px 18px;
+        border-radius: 999px; font-weight: 600;
+        opacity: 0;
+        transition: all 0.32s cubic-bezier(.2,.8,.2,1);
+        z-index: 200;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="controls">
+        <h1>Stack-of-cards <span class="sub">— playground opérateur</span></h1>
+        <p style="color:var(--text-mute);font-size:12px;margin:8px 0 0;">
+          Q2 du mindmap 2026-05-04. Pile de cards swipable, current task au-dessus, futures en dessous.
+          Countdown + boutons "+5 min" cumulatif + "terminé" + preview de la card du dessous.
+        </p>
+
+        <h2>Tâche en cours (top card)</h2>
+        <div class="row">
+          <label>Heure simulée</label>
+          <input type="time" id="now" value="14:30" />
+        </div>
+        <div class="row">
+          <label>Fin théorique</label>
+          <input type="time" id="end-time" value="14:45" />
+        </div>
+        <div class="row">
+          <label>Durée segment (min)</label>
+          <input type="number" id="duration" value="120" min="15" max="480" />
+          <span class="val" id="duration-val">120</span>
+        </div>
+        <div class="row">
+          <label>Avancement %</label>
+          <input type="range" id="progress" min="0" max="100" value="60" />
+          <span class="val" id="progress-val">60%</span>
+        </div>
+        <div class="row">
+          <label>En retard ?</label>
+          <input type="checkbox" id="late" />
+        </div>
+
+        <h2>Seuil de fin imminente</h2>
+        <p style="color:var(--text-mute);font-size:11px;margin:0 0 6px;">
+          End-prompt apparaît quand restant &lt; max(10 min, 15% × durée).
+        </p>
+        <div class="row">
+          <label>Forcer affichage</label>
+          <input type="checkbox" id="force-prompt" checked />
+        </div>
+
+        <h2>Cumulative +5 min</h2>
+        <p style="color:var(--text-mute);font-size:11px;margin:0 0 6px;">
+          Chaque clic incrémente le compteur visuel : +5 → +10 → +15… Commit 800 ms après le dernier clic.
+        </p>
+        <div class="row">
+          <label>Compteur en cours</label>
+          <span class="val" id="plus5-val">0 min</span>
+        </div>
+
+        <h2>Actions</h2>
+        <button class="action" id="action-done">Marquer "terminé" — la card du dessous monte</button>
+        <button class="action" id="action-reset">Reset</button>
+
+        <h2>Prompt à copier</h2>
+        <p style="color:var(--text-mute);font-size:11px;margin:0 0 6px;">
+          Copie pour itérer sur Claude.
+        </p>
+        <div class="copy-prompt" id="prompt"></div>
+      </div>
+
+      <div class="stage">
+        <div class="device">
+          <div class="device-status-bar">
+            <span id="status-time">14:30</span>
+            <span>Atelier · Frédéric</span>
+          </div>
+          <div class="stage-header">
+            <div>
+              <div class="title">Mes tâches</div>
+              <div class="sub">3 à venir aujourd'hui</div>
+            </div>
+          </div>
+          <div class="pile" id="pile">
+            <!-- Cards injected by JS -->
+          </div>
+          <div class="toast" id="toast">Tâche terminée ✓</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const STATE = {
+        cards: [
+          { id: 'a', ref: 'J-12345', client: 'Imprimerie Dupont', machine: 'MBO XL', start: '14:00', end: '14:45', durationMin: 45 },
+          { id: 'b', ref: 'J-12346', client: 'ACME Print', machine: 'Heidelberg SM52', start: '14:45', end: '16:00', durationMin: 75 },
+          { id: 'c', ref: 'J-12347', client: 'Carton Solutions', machine: 'Plieuse Stahl', start: '16:00', end: '17:30', durationMin: 90 },
+          { id: 'd', ref: 'J-12348', client: 'Atelier 3000', machine: 'Encarteuse Müller', start: '17:30', end: '18:00', durationMin: 30 },
+        ],
+        plus5Counter: 0,
+        plus5Timer: null,
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const pile = $('pile');
+
+      function timeToMin(t) {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+      }
+      function minToTime(min) {
+        const h = Math.floor(min / 60) % 24;
+        const m = Math.round(min) % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+
+      function renderCards() {
+        pile.innerHTML = '';
+        const top = STATE.cards[0];
+        const peek1 = STATE.cards[1];
+        const peek2 = STATE.cards[2];
+
+        if (top) pile.appendChild(buildTopCard(top));
+        if (peek1) pile.appendChild(buildPeekCard(peek1, 'peek-1'));
+        if (peek2) pile.appendChild(buildPeekCard(peek2, 'peek-2'));
+
+        attachSwipe();
+      }
+
+      function buildTopCard(c) {
+        const el = document.createElement('div');
+        el.className = 'card top';
+        el.dataset.id = c.id;
+        const now = $('now').value;
+        const endTime = $('end-time').value;
+        const duration = parseInt($('duration').value);
+        const progress = parseInt($('progress').value);
+        const late = $('late').checked;
+
+        const remainingMin = Math.max(0, timeToMin(endTime) - timeToMin(now));
+        const threshold = Math.max(10, duration * 0.15);
+        const showPrompt = $('force-prompt').checked || remainingMin < threshold;
+
+        el.innerHTML = `
+          <div class="card-head">
+            <span class="ref">${c.ref}</span>
+            <span class="client">· ${c.client}</span>
+          </div>
+          <div class="card-machine">${c.machine}</div>
+          <div class="card-time">
+            <span class="start">${c.start}</span>
+            <span class="arrow">→</span>
+            <span class="end">${c.end}</span>
+          </div>
+          <div class="card-progress">
+            <div class="fill ${late && progress < 100 ? 'late' : ''}" style="width:${progress}%"></div>
+          </div>
+          ${showPrompt ? `
+            <div class="endprompt">
+              <div class="countdown ${remainingMin <= 5 ? 'urgent' : ''}">${remainingMin > 0 ? `${remainingMin}:00` : 'fini'}</div>
+              <div class="endprompt-actions">
+                <button class="btn-plus5" id="btn-plus5">
+                  +5 min de plus
+                  <span class="sub" id="plus5-sub">${STATE.plus5Counter > 0 ? `(${STATE.plus5Counter} min en attente)` : ''}</span>
+                </button>
+                <button class="btn-done" id="btn-done-card">Terminé</button>
+              </div>
+            </div>
+          ` : ''}
+          <div class="swipe-hint">↕ glisser pour basculer</div>
+        `;
+
+        // Bind plus5 button
+        setTimeout(() => {
+          const plus5 = el.querySelector('#btn-plus5');
+          if (plus5) plus5.addEventListener('click', onPlus5);
+          const doneCard = el.querySelector('#btn-done-card');
+          if (doneCard) doneCard.addEventListener('click', popTop);
+        });
+
+        return el;
+      }
+
+      function buildPeekCard(c, klass) {
+        const el = document.createElement('div');
+        el.className = `card ${klass}`;
+        el.dataset.id = c.id;
+        el.innerHTML = `
+          <div class="card-head">
+            <span class="ref">${c.ref}</span>
+            <span class="client">· ${c.client}</span>
+          </div>
+          <div class="card-machine">${c.machine}</div>
+          <div class="card-time">
+            <span class="start">${c.start}</span>
+            <span class="arrow">→</span>
+            <span class="end">${c.end}</span>
+          </div>
+        `;
+        return el;
+      }
+
+      function onPlus5() {
+        STATE.plus5Counter += 5;
+        const sub = document.getElementById('plus5-sub');
+        if (sub) sub.textContent = `(${STATE.plus5Counter} min en attente)`;
+        $('plus5-val').textContent = `${STATE.plus5Counter} min`;
+
+        // Debounce 800 ms before commit. Each subsequent click resets the
+        // timer ; final value commits when the user stops clicking.
+        if (STATE.plus5Timer) clearTimeout(STATE.plus5Timer);
+        STATE.plus5Timer = setTimeout(() => {
+          // Commit : extend the end time by the cumulative amount.
+          const endInput = $('end-time');
+          const newEnd = timeToMin(endInput.value) + STATE.plus5Counter;
+          endInput.value = minToTime(newEnd);
+          STATE.cards[0].end = endInput.value;
+          showToast(`+${STATE.plus5Counter} min reportés`);
+          STATE.plus5Counter = 0;
+          STATE.plus5Timer = null;
+          renderCards();
+          updateOutputs();
+        }, 800);
+      }
+
+      function popTop() {
+        const removed = STATE.cards.shift();
+        showToast('Tâche terminée ✓');
+        renderCards();
+        if (removed) console.log('done', removed.id);
+      }
+
+      function showToast(msg) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 1400);
+      }
+
+      // Vertical swipe up = "terminé", down = "skip" (peek next).
+      function attachSwipe() {
+        const top = pile.querySelector('.card.top');
+        if (!top) return;
+        let startY = 0;
+        let dy = 0;
+        let dragging = false;
+
+        const onDown = (e) => {
+          dragging = true;
+          startY = (e.touches ? e.touches[0].clientY : e.clientY);
+          top.classList.add('dragging');
+        };
+        const onMove = (e) => {
+          if (!dragging) return;
+          const y = (e.touches ? e.touches[0].clientY : e.clientY);
+          dy = y - startY;
+          top.style.transform = `translateY(${dy}px)`;
+          top.style.opacity = Math.max(0.4, 1 - Math.abs(dy) / 360);
+        };
+        const onUp = () => {
+          if (!dragging) return;
+          dragging = false;
+          top.classList.remove('dragging');
+          if (Math.abs(dy) > 120) {
+            // Threshold : commit the swipe.
+            top.style.transform = `translateY(${dy > 0 ? 800 : -800}px)`;
+            top.style.opacity = '0';
+            setTimeout(popTop, 280);
+          } else {
+            top.style.transform = '';
+            top.style.opacity = '';
+          }
+          dy = 0;
+        };
+
+        top.addEventListener('mousedown', onDown);
+        top.addEventListener('touchstart', onDown, { passive: true });
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: true });
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchend', onUp);
+      }
+
+      function updateOutputs() {
+        $('status-time').textContent = $('now').value;
+        $('progress-val').textContent = $('progress').value + '%';
+        $('duration-val').textContent = $('duration').value;
+        $('plus5-val').textContent = `${STATE.plus5Counter} min`;
+        $('prompt').textContent = buildPrompt();
+      }
+
+      function buildPrompt() {
+        return [
+          'Stack-of-cards opérateur — implé React',
+          '',
+          'Configuration playground :',
+          `- ${STATE.cards.length} cards en pile`,
+          `- top card : ${STATE.cards[0]?.ref ?? '(vide)'}`,
+          `- now=${$('now').value} end=${$('end-time').value} duration=${$('duration').value}min progress=${$('progress').value}% late=${$('late').checked}`,
+          '',
+          'Comportements clés à respecter :',
+          '- swipe up sur top card = "terminé" (déclenche record_task_progress 100% + popTop)',
+          '- bouton "+5 min" cumulatif : compteur visuel s\'incrémente, debounce 800ms avant commit',
+          '- "Terminé" pop la card et fait monter la peek-1 → top, peek-2 → peek-1, suivante → peek-2',
+          '- countdown apparaît si remaining < max(10min, 15% × duration), passe en rouge à ≤5min',
+          '- preview de la card du dessous remonte légèrement depuis le bas (peek-1 plus visible)',
+          '',
+          'Décisions du mindmap (project_progress_visualization.md + project_operator_focus_replacement.md) :',
+          '- Q2 : remplace FocusOperatorColumn / FocusStationColumn / FocusPage',
+          '- Q3 : debounce + compteur visuel pour +5min',
+          '- Q7 : pull/derived (pas de tick backend)',
+        ].join('\n');
+      }
+
+      // Bind input handlers.
+      ['now','end-time','duration','progress','late','force-prompt'].forEach(id => {
+        $(id).addEventListener('input', () => {
+          renderCards();
+          updateOutputs();
+        });
+      });
+      $('action-done').addEventListener('click', popTop);
+      $('action-reset').addEventListener('click', () => {
+        location.reload();
+      });
+
+      renderCards();
+      updateOutputs();
+    </script>
+  </body>
+</html>
