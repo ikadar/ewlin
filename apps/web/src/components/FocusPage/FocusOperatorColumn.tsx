@@ -8,6 +8,7 @@ import type {
 import { TileSegment } from '../Tile/TileSegment';
 import { computeTileState } from '../Tile';
 import { isCompletedEffective } from '../Tile/colorUtils';
+import { computeOptimisticProgress } from '../Tile/saisieMath';
 import { timeToYPosition } from '../TimelineColumn';
 import {
   computeTileSlices,
@@ -248,6 +249,21 @@ export function FocusOperatorColumn({
           ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
           : false;
 
+        // Optimistic fond-vert per segment. Even though chunk-split tiles
+        // share the same task-level anchor, the fill is rendered identically
+        // on each chunk — they collectively visualise the task progress.
+        const progressFill = (assignment && isInternalTask(task))
+          ? computeOptimisticProgress(
+              assignment.scheduledStart,
+              assignment.scheduledEnd,
+              task.duration.setupMinutes,
+              task.duration.runMinutes,
+              task.recordedProgressPct,
+              task.recordedAt,
+              now.getTime(),
+            )
+          : undefined;
+
         const handleOpenSaisie = assignment && isInternalTask(task)
           ? () =>
               saisieModal.open({
@@ -297,6 +313,7 @@ export function FocusOperatorColumn({
             overrideLeft={overrideLeft}
             overrideWidth={overrideWidth}
             onContextMenu={handleContextMenu}
+            progressFill={progressFill}
           />
         );
       })}

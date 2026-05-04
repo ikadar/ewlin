@@ -84,6 +84,7 @@ import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../components/StationColumns/OvertimeOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
+import { computeOptimisticProgress } from '../components/Tile/saisieMath';
 import { SafetyBand } from '../components/SafetyBand';
 import { buildSequenceIndexLookup, isInSafetyZone, makeSafetyKey } from '../utils/safetyZone';
 import { useSetSafetyOverrideMutation } from '../store';
@@ -1179,6 +1180,21 @@ export default function OperatorSchedulePage() {
       ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
       : false;
 
+    // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed per
+    // segment so chunk-split chunks each visualise the same task-level
+    // anchor uniformly. Skipped for non-internal tasks and unplaced tiles.
+    const progressFill = (assignment && task && isInternalTask(task))
+      ? computeOptimisticProgress(
+          assignment.scheduledStart,
+          assignment.scheduledEnd,
+          task.duration.setupMinutes,
+          task.duration.runMinutes,
+          task.recordedProgressPct,
+          task.recordedAt,
+          now.getTime(),
+        )
+      : undefined;
+
     const handleOpenSaisie = assignment
       ? () =>
           saisieModal.open({
@@ -1240,6 +1256,7 @@ export default function OperatorSchedulePage() {
         onToggleFrozenOverride={handleToggleFrozenOverride}
         isSelected={selectedJobId === job.id}
         onContextMenu={handleContextMenu}
+        progressFill={progressFill}
         {...positionProps}
       />
     );

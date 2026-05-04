@@ -6,6 +6,8 @@ import { getStateColorClasses, getStateRgb } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
+import { ProgressFill } from './ProgressFill';
+import { computeOptimisticProgress } from './saisieMath';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
@@ -350,6 +352,25 @@ export const Tile = memo(function Tile({
             )}
           </svg>
         )}
+
+        {/* Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Vertical
+            top-down on the planning grid ; lives inside the clipped body
+            so the fill respects sawtooth teeth. Hidden on completed /
+            shipped tiles where it would just confirm what the state color
+            already says. */}
+        {!isCompleted && (() => {
+          const { pct, isLate } = computeOptimisticProgress(
+            assignment.scheduledStart,
+            assignment.scheduledEnd,
+            setupMinutes,
+            task.duration.runMinutes ?? 0,
+            task.recordedProgressPct,
+            task.recordedAt,
+            now.getTime(),
+          );
+          if (pct === 0 && !isLate) return null;
+          return <ProgressFill pct={pct} isLate={isLate} direction="vertical" />;
+        })()}
       </div>
 
       {/* Label overlay — mirrors TileSegment's content layout so the station

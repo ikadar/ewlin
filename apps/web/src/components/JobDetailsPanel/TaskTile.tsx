@@ -4,6 +4,9 @@ import { Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
+import { useNow } from '../../hooks/useNow';
+import { ProgressFill } from '../Tile/ProgressFill';
+import { computeOptimisticProgress } from '../Tile/saisieMath';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -133,6 +136,28 @@ export const TaskTile = memo(function TaskTile({
 }: TaskTileProps) {
   // JDP ↔ grid hover crosslink — heartbeat pulse on the paired tile(s)
   const crosslink = useHoverCrosslink(task.id);
+  const now = useNow(60_000);
+
+  // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed once per
+  // task here ; each operator sub-tile mirrors the same task-level value
+  // so the chef sees a coherent progression across the per-operator rows.
+  // Hidden when the task is completed (the state color already conveys it)
+  // or when no assignment exists (unplaced).
+  const fondVert = (
+    !isCompleted
+    && task.type === 'Internal'
+    && assignment
+  )
+    ? computeOptimisticProgress(
+        assignment.scheduledStart,
+        assignment.scheduledEnd,
+        (task as InternalTask).duration.setupMinutes,
+        (task as InternalTask).duration.runMinutes,
+        (task as InternalTask).recordedProgressPct,
+        (task as InternalTask).recordedAt,
+        now.getTime(),
+      )
+    : null;
 
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
@@ -344,13 +369,20 @@ export const TaskTile = memo(function TaskTile({
                   tabIndex={isClickable ? 0 : undefined}
                   onClick={isClickable ? jumpToSlice : undefined}
                   onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToSlice(e); } } : undefined}
-                  className={`flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px] ${
+                  className={`relative flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px] overflow-hidden ${
                     isClickable ? 'cursor-pointer hover:bg-zinc-700/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30' : ''
                   }`}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                  <span className="text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
-                  <span className="text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
+                  {fondVert && (fondVert.pct > 0 || fondVert.isLate) && (
+                    <ProgressFill
+                      pct={fondVert.pct}
+                      isLate={fondVert.isLate}
+                      direction="horizontal"
+                    />
+                  )}
+                  <div className="relative w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                  <span className="relative text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
+                  <span className="relative text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
                 </div>
               );
             })}

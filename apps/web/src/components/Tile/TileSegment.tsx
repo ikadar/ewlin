@@ -7,6 +7,7 @@
  */
 
 import { Pin } from 'lucide-react';
+import { ProgressFill } from './ProgressFill';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -80,6 +81,15 @@ interface TileSegmentProps {
    * opens a TileContextMenu with the V2 affordances.
    */
   onContextMenu?: (e: React.MouseEvent) => void;
+  /**
+   * Optimistic fond-vert data (Q4-Q7 of 2026-05-04 mindmap). When
+   * supplied, the segment renders a vertical top-down green fill driven
+   * by `pct` ; the un-filled complement turns red when `isLate`. Parent
+   * (FocusOperatorColumn / OperatorSchedulePage) computes the values via
+   * `computeOptimisticProgress(...)` from saisieMath. Absent on tests
+   * and on read-only callsites that don't surface progress.
+   */
+  progressFill?: { pct: number; isLate: boolean };
 }
 
 /**
@@ -141,6 +151,7 @@ export function TileSegment({
   isSelected = false,
   onToggleFrozenOverride,
   onContextMenu,
+  progressFill,
 }: TileSegmentProps) {
   // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
   // selected-job segments only. Was a hover trigger; switched to dblclick
@@ -235,6 +246,18 @@ export function TileSegment({
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
         }}
       />
+
+      {/* Optimistic fond-vert overlay. Sits between the body bg and the
+          calage overlays so progress shows under the calage band, but
+          above the run base color. Hidden when the task is completed
+          (state color carries the meaning) or no progress signal. */}
+      {progressFill && (progressFill.pct > 0 || progressFill.isLate) && tileState !== 'completed' && tileState !== 'shipped' && (
+        <ProgressFill
+          pct={progressFill.pct}
+          isLate={progressFill.isLate}
+          direction="vertical"
+        />
+      )}
 
       {/* Calage phase overlays (initial setup + post-peremption re-calages).
           Same CSS rule applies to both via data-testid in index.css:
