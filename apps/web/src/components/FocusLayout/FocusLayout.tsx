@@ -23,9 +23,8 @@ function FocusLayoutInner() {
  * intentionally stripped so the mobile-first focus view stays distraction-free.
  *
  * ScenarioProvider is mounted here (mirroring RootLayout) so any tile
- * inside /focus/* can call `useScenarioMode()` — notably the
- * SaisieIndicator embedded in TileSegment, which the operator uses
- * to report execution truth from the focus view.
+ * inside /focus/* can call `useScenarioMode()` and progress-capture surfaces
+ * (right-click context menu, ProgressCaptureModal) work from the focus view.
  */
 export function FocusLayout() {
   return (

@@ -7,7 +7,6 @@
  */
 
 import { Pin } from 'lucide-react';
-import { SaisieIndicator, type SaisieState } from './SaisieIndicator';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -76,21 +75,6 @@ interface TileSegmentProps {
   /** Callback when the Sky snowflake is clicked. Receives (jobId, sequenceIndex, stationId). */
   onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
   /**
-   * Iff true, this segment hosts the saisie indicator. The parent picks
-   * ONE segment per task (the chunk-split + past-start rule: hide when
-   * scheduledStart > now ; otherwise containing-now → last-past) so a
-   * chunk-split task never shows multiple indicators.
-   */
-  showSaisieIndicator?: boolean;
-  /** Saisie state (inactive/due/overdue) for the indicator badge. */
-  saisieState?: SaisieState;
-  /**
-   * Click handler for the saisie indicator. Parent calls
-   * `useSaisieModal().open({...})` here, with the assignment + task data
-   * captured in its closure scope.
-   */
-  onOpenSaisie?: () => void;
-  /**
    * Right-click handler — fires with the mouse event so the parent can
    * read clientX/clientY for popover positioning. The parent typically
    * opens a TileContextMenu with the V2 affordances.
@@ -156,9 +140,6 @@ export function TileSegment({
   isFrozenOverridden = false,
   isSelected = false,
   onToggleFrozenOverride,
-  showSaisieIndicator = false,
-  saisieState = 'inactive',
-  onOpenSaisie,
   onContextMenu,
 }: TileSegmentProps) {
   // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
@@ -310,12 +291,6 @@ export function TileSegment({
       >
         <div className="flex items-baseline gap-1.5">
         <div className="text-[11px] font-medium leading-tight truncate flex-1 min-w-0" style={{ color: colors.text }}>
-          {taskId && showSaisieIndicator && (
-            <SaisieIndicator
-              state={saisieState}
-              onClick={() => onOpenSaisie?.()}
-            />
-          )}
           {onTogglePin && assignmentId && (
             <span
               onClick={(e) => {

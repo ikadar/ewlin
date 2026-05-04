@@ -7,6 +7,7 @@ import type {
 } from '@flux/types';
 import { TileSegment } from '../Tile/TileSegment';
 import { computeTileState } from '../Tile';
+import { isCompletedEffective } from '../Tile/colorUtils';
 import { timeToYPosition } from '../TimelineColumn';
 import {
   computeTileSlices,
@@ -16,7 +17,6 @@ import {
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
 import { getProduitLabel } from '../../utils/tileLabelResolver';
-import { useProgressTriggers } from '../../hooks/useProgressTriggers';
 import { useSaisieModal } from '../../contexts/SaisieModalContext';
 import type { Collapse } from '../SchedulingGrid/collapseConfig';
 
@@ -118,41 +118,6 @@ export function FocusOperatorColumn({
     [snapshot.lateJobs],
   );
 
-  // Saisie indicator placement — past-started tasks only (rien à reporter
-  // sur du futur). For each task that has started, pick ONE slice to host
-  // the indicator: containing-now → last-past. Chunk-split tasks never
-  // surface multiple indicators.
-  const assignmentById = useMemo(() => {
-    const m = new Map<string, TaskAssignment>();
-    for (const a of operatorAssignments) m.set(a.id, a);
-    return m;
-  }, [operatorAssignments]);
-
-  const saisieSliceKeys = useMemo(() => {
-    const byAssignment = new Map<string, typeof slices>();
-    for (const s of slices) {
-      const list = byAssignment.get(s.assignmentId) ?? [];
-      list.push(s);
-      byAssignment.set(s.assignmentId, list);
-    }
-    const keys = new Set<string>();
-    for (const [aId, list] of byAssignment) {
-      const a = assignmentById.get(aId);
-      if (!a) continue;
-      // Gate: the saisie indicator only makes sense once the task has started.
-      if (new Date(a.scheduledStart).getTime() > now.getTime()) continue;
-      const sorted = list.slice().sort((s1, s2) => s1.from.getTime() - s2.from.getTime());
-      const containingNow = sorted.find((s) => s.from <= now && now < s.to);
-      const lastPast = sorted[sorted.length - 1];
-      const chosen = containingNow ?? lastPast;
-      if (chosen) {
-        keys.add(`${chosen.assignmentId}-${chosen.from.getTime()}`);
-      }
-    }
-    return keys;
-  }, [slices, now, assignmentById]);
-
-  const triggers = useProgressTriggers(operatorAssignments, now);
   const saisieModal = useSaisieModal();
 
   // Hour grid lines (visible range only). Collapse-aware: skip lines whose
@@ -260,22 +225,25 @@ export function FocusOperatorColumn({
         const bottom = timeToYPosition(slice.to, startHour, pixelsPerHour, gridStartDate, collapses);
         const height = Math.max(bottom - top, 8);
 
-        const isLate =
-          lateJobIds.has(job.id) ||
-          (!assignment?.isCompleted && slice.to < now);
+        // No-news = good-news: a slice crossing into the past without being
+        // explicitly flagged otherwise reads as completed. Green outranks
+        // late/conflict for past tiles — there's nothing left to act on.
+        const isCompletedNow = assignment
+          ? isCompletedEffective(assignment.isCompleted, assignment.scheduledEnd, now.getTime())
+          : slice.to < now;
+        const isLate = !isCompletedNow && lateJobIds.has(job.id);
         const tileState = computeTileState(
           false,
           isLate,
           false,
           false,
-          assignment?.isCompleted ?? false,
+          isCompletedNow,
         );
 
         const overrideLeft = slice.position === 'right' ? '50%' : undefined;
         const overrideWidth = slice.position === 'full' ? undefined : '50%';
 
         const sliceKey = `${slice.assignmentId}-${slice.from.getTime()}`;
-        const showSaisieIndicator = saisieSliceKeys.has(sliceKey);
         const hasStarted = assignment
           ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
           : false;
@@ -328,9 +296,6 @@ export function FocusOperatorColumn({
             isMaskedTime={slice.isMasked}
             overrideLeft={overrideLeft}
             overrideWidth={overrideWidth}
-            showSaisieIndicator={showSaisieIndicator}
-            saisieState={triggers[slice.assignmentId] ?? 'inactive'}
-            onOpenSaisie={handleOpenSaisie}
             onContextMenu={handleContextMenu}
           />
         );

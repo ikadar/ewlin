@@ -1,6 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
-import { SaisieIndicator } from './SaisieIndicator';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
 import { getStateColorClasses, getStateRgb } from './colorUtils';
@@ -10,8 +9,6 @@ import { SimilarityBadge } from './SimilarityBadge';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
-import { useProgressTriggers } from '../../hooks/useProgressTriggers';
-import { useSaisieModal } from '../../contexts/SaisieModalContext';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
@@ -91,6 +88,8 @@ export interface TileProps {
   onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
   /** Flat index of this task within its job (0-based, stable across JCF rebuilds). */
   sequenceIndex?: number;
+  /** Human-readable station/machine label, surfaced in the saisie modal. */
+  stationName?: string;
 }
 
 /**
@@ -138,6 +137,7 @@ export const Tile = memo(function Tile({
   isFrozenOverridden = false,
   onToggleFrozenOverride,
   sequenceIndex,
+  stationName,
 }: TileProps) {
   const crosslink = useHoverCrosslink(task.id);
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -147,20 +147,7 @@ export const Tile = memo(function Tile({
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Progress-capture wiring. useNow ticks every 60 s ; useProgressTriggers
-  // is a memoized derivation.
-  // ────────────────────────────────────────────────────────────────────────
   const now = useNow(60_000);
-  const singleAssignmentArr = useMemo(() => [assignment], [assignment]);
-  const triggers = useProgressTriggers(singleAssignmentArr, now);
-  const saisieState = triggers[assignment.taskId] ?? 'inactive';
-  const saisieModal = useSaisieModal();
-
-  // Gate: the saisie indicator is only meaningful once the task has
-  // started. Future tasks have nothing to report — surfacing the icon
-  // would just add noise.
-  const hasStarted = new Date(assignment.scheduledStart).getTime() <= now.getTime();
 
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;
@@ -376,20 +363,6 @@ export const Tile = memo(function Tile({
           className={`${colorClasses.text} text-[11px] font-medium leading-tight truncate`}
           data-testid="tile-content"
         >
-          {assignment.taskId && hasStarted && (
-            <SaisieIndicator
-              state={saisieState}
-              onClick={() =>
-                saisieModal.open({
-                  assignment,
-                  taskDuration: { setupMinutes, runMinutes: task.duration.runMinutes ?? 0 },
-                  job: { reference: job.reference, client: job.client },
-                  machineName: task.stationId,
-                  now,
-                })
-              }
-            />
-          )}
           {onTogglePin && (
             <span
               onClick={handleTogglePin}

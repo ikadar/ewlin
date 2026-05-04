@@ -745,53 +745,6 @@ html.light [data-testid^="task-tile-"][style*="white"] {
   display: none !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   V2 progress-capture — saisie indicator + tile-level pulses
-   See docs/operator-sandbox/progress-capture-design.md
-   ───────────────────────────────────────────────────────────────── */
-
-/* Saisie indicator — amber pulse on tile-end state. 1.6s synchronized with the
-   tile's orange pulse so both signals breathe together. */
-@keyframes saisie-pulse-amber {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.30);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.05);
-  }
-}
-.animate-saisie-pulse {
-  animation: saisie-pulse-amber 1.6s ease-in-out infinite;
-}
-
-/* Tile-level hourly pulse — pure opacity oscillation (no color change). The
-   semantic stays carried by the saisie indicator's blue color. */
-@keyframes tile-hourly-opacity {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
-}
-.tile-hourly-active {
-  animation: tile-hourly-opacity 1.6s ease-in-out infinite;
-}
-
-/* Tile-level tile-end pulse — toward and from orange. Reserved for the
-   "moment de saisie" state, distinct from any business-state code. */
-@keyframes tile-end-orange {
-  0%, 100% {
-    background-color: var(--tile-end-rest-bg, transparent);
-    border-left-color: var(--tile-end-rest-border, currentColor);
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
-  }
-  50% {
-    background-color: rgba(249, 115, 22, 0.22);
-    border-left-color: rgb(249, 115, 22);
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.32);
-  }
-}
-.tile-end-active {
-  animation: tile-end-orange 1.6s ease-in-out infinite;
-}
-
 /* VolumeGauge — slot context inside ProgressCaptureModal. The bar is the
    100% scale of the job ; the active slot is isolated as a distinct band. */
 .volume-gauge { margin-top: 4px; }

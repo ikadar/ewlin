@@ -36,7 +36,6 @@ import {
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
-import { useProgressTriggers } from '../hooks/useProgressTriggers';
 import { useSaisieModal } from '../contexts/SaisieModalContext';
 import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
 import { TileContextMenu } from '../components/Tile';
@@ -80,6 +79,7 @@ import {
   computeTileState,
   timeToYPosition,
 } from '../components';
+import { isCompletedEffective } from '../components/Tile/colorUtils';
 import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../components/StationColumns/OvertimeOverlay';
@@ -843,37 +843,6 @@ export default function OperatorSchedulePage() {
     return map;
   }, [snapshot.assignments]);
 
-  // V2 saisie indicator placement — past-started tasks only. For each
-  // (operatorId, assignmentId) pair whose task has started, pick exactly
-  // ONE slice to host the indicator. Rule mirrors FocusOperatorColumn:
-  // containing-now → last-past. Future tasks don't surface an indicator
-  // (rien à reporter).
-  const saisieSliceKeys = useMemo(() => {
-    const keys = new Set<string>();
-    for (const [opId, slices] of allTileSlices.entries()) {
-      const byAssignment = new Map<string, TileSlice[]>();
-      for (const s of slices) {
-        const list = byAssignment.get(s.assignmentId) ?? [];
-        list.push(s);
-        byAssignment.set(s.assignmentId, list);
-      }
-      for (const [aId, list] of byAssignment) {
-        const a = lensAssignmentMap.get(aId);
-        if (!a) continue;
-        if (new Date(a.scheduledStart).getTime() > now.getTime()) continue;
-        const sorted = list.slice().sort((s1, s2) => s1.from.getTime() - s2.from.getTime());
-        const containingNow = sorted.find((s) => s.from <= now && now < s.to);
-        const lastPast = sorted[sorted.length - 1];
-        const chosen = containingNow ?? lastPast;
-        if (chosen) {
-          keys.add(`${opId}-${chosen.assignmentId}-${chosen.from.getTime()}`);
-        }
-      }
-    }
-    return keys;
-  }, [allTileSlices, now, lensAssignmentMap]);
-
-  const saisieTriggers = useProgressTriggers(snapshot.assignments, now);
   const saisieModal = useSaisieModal();
 
   // Right-click opens TileContextMenu. "Saisir l'avancement" shows only
@@ -974,11 +943,12 @@ export default function OperatorSchedulePage() {
       const stationName = station?.name;
       const assignment = lensAssignmentMap.get(slice.assignmentId);
 
-      const isLate = lateJobIds.has(job.id) ||
-        (!assignment?.isCompleted && slice.to.getTime() < now.getTime());
-      const tileState = computeTileState(
-        false, isLate, false, false, assignment?.isCompleted ?? false,
-      );
+      // No-news = good-news on past tiles (cf. progress-capture-design § 6).
+      const isCompletedNow = assignment
+        ? isCompletedEffective(assignment.isCompleted, assignment.scheduledEnd, now.getTime())
+        : slice.to.getTime() < now.getTime();
+      const isLate = !isCompletedNow && lateJobIds.has(job.id);
+      const tileState = computeTileState(false, isLate, false, false, isCompletedNow);
 
       // Direct time-diff from the lens origin — NOT `timeToYPosition`, which
       // treats the `startDate` arg as midnight and positions by hour-of-day.
@@ -1162,8 +1132,12 @@ export default function OperatorSchedulePage() {
 
     const assignment = snapshot.assignments.find(a => a.id === slice.assignmentId);
 
-    const isLate = lateJobIds.has(job.id) || (!assignment?.isCompleted && new Date(slice.to) < now);
-    const tileState = computeTileState(false, isLate, false, false, assignment?.isCompleted ?? false);
+    // No-news = good-news on past tiles (cf. progress-capture-design § 6).
+    const isCompletedNow = assignment
+      ? isCompletedEffective(assignment.isCompleted, assignment.scheduledEnd, now.getTime())
+      : new Date(slice.to).getTime() < now.getTime();
+    const isLate = !isCompletedNow && lateJobIds.has(job.id);
+    const tileState = computeTileState(false, isLate, false, false, isCompletedNow);
 
     const segTop = timeToYPosition(slice.from, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
     const segBottom = timeToYPosition(slice.to, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
@@ -1201,9 +1175,6 @@ export default function OperatorSchedulePage() {
       ? safetyOverrideLookup.get(makeSafetyKey(job.id, seqIdx, stationIdForTile)) === true
       : false;
 
-    const showSaisieIndicator = assignment
-      ? saisieSliceKeys.has(`${operatorId}-${assignment.id}-${slice.from.getTime()}`)
-      : false;
     const hasStarted = assignment
       ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
       : false;
@@ -1268,9 +1239,6 @@ export default function OperatorSchedulePage() {
         isFrozenOverridden={isOverridden}
         onToggleFrozenOverride={handleToggleFrozenOverride}
         isSelected={selectedJobId === job.id}
-        showSaisieIndicator={showSaisieIndicator}
-        saisieState={assignment ? (saisieTriggers[assignment.taskId] ?? 'inactive') : 'inactive'}
-        onOpenSaisie={handleOpenSaisie}
         onContextMenu={handleContextMenu}
         {...positionProps}
       />

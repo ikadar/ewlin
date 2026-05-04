@@ -1,13 +1,9 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import type { Task, TaskAssignment, Station, Job, OutsourcedProvider, OutsourcedTask, InternalTask } from '@flux/types';
 import { Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
-import { useNow } from '../../hooks/useNow';
-import { useProgressTriggers } from '../../hooks/useProgressTriggers';
-import { useSaisieModal } from '../../contexts/SaisieModalContext';
-import { SaisieIndicator } from '../Tile/SaisieIndicator';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -138,20 +134,6 @@ export const TaskTile = memo(function TaskTile({
   // JDP ↔ grid hover crosslink — heartbeat pulse on the paired tile(s)
   const crosslink = useHoverCrosslink(task.id);
 
-  // V2 progress capture — hooks always run (rules-of-hooks). The icon
-  // appears only on past-started internal tasks ; click delegates to the
-  // page-level SaisieModalProvider so a single modal mounts per layout.
-  const now = useNow(60_000);
-  const assignmentArr = useMemo(
-    () => (assignment ? [assignment] : []),
-    [assignment],
-  );
-  const triggers = useProgressTriggers(assignmentArr, now);
-  const saisieState = assignment ? (triggers[assignment.taskId] ?? 'inactive') : 'inactive';
-  const saisieModal = useSaisieModal();
-  const hasStarted = !!assignment
-    && new Date(assignment.scheduledStart).getTime() <= now.getTime();
-
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
     const style = TILE_STYLES[tileState];
@@ -250,22 +232,6 @@ export const TaskTile = memo(function TaskTile({
   // Get display name (station name for internal tasks)
   const displayName = station?.name || 'Unknown';
 
-  // Saisie modal opener — closes over the current assignment + task. The
-  // SaisieModalProvider (mounted in RootLayout) renders the actual modal.
-  // The legacy `onToggleComplete` callback stays on the props for the JDP
-  // context-menu path, gated separately at the JobDetailsPanel level.
-  const internalTask = task as InternalTask;
-  const handleOpenSaisie = assignment
-    ? () =>
-        saisieModal.open({
-          assignment,
-          taskDuration: internalTask.duration,
-          job: { reference: job.reference, client: job.client },
-          machineName: station?.name ?? task.stationId ?? 'Atelier',
-          now,
-        })
-    : undefined;
-
   // Pin icon click handler
   const handleTogglePin = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -313,12 +279,6 @@ export const TaskTile = memo(function TaskTile({
       >
         <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
           <div className="flex items-center gap-1.5 min-w-0">
-            {hasStarted && handleOpenSaisie && (
-              <SaisieIndicator
-                state={saisieState}
-                onClick={handleOpenSaisie}
-              />
-            )}
             <span
               onClick={handleTogglePin}
               className={`pin-toggle p-1 -m-1 rounded shrink-0 cursor-pointer inline-flex items-center transition-colors hover:bg-white/5 ${
