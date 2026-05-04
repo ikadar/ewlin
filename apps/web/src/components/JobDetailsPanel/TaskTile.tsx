@@ -6,6 +6,7 @@ import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../Flux
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
 import { ProgressFill } from '../Tile/ProgressFill';
+import { TaskBadge } from '../Tile/TaskBadge';
 import { computeOptimisticProgress } from '../Tile/saisieMath';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
@@ -355,6 +356,20 @@ export const TaskTile = memo(function TaskTile({
               const fromTime = fromDate ? fromDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
               const toTime = toDate ? toDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
               const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
+
+              // Per-operator badge — share of the parent task this operator
+              // handles, by wallclock ratio. Single op covering whole task →
+              // 100. Two sequential ops half-each → 50 / 50. Masked-time
+              // concurrent → 100 / 100 (overlap, sum > 100 by design).
+              const opBadgePct = ((): number => {
+                if (!assignment || !fromDate || !toDate) return 100;
+                const totalMs = new Date(assignment.scheduledEnd).getTime()
+                  - new Date(assignment.scheduledStart).getTime();
+                if (totalMs <= 0) return 100;
+                const opMs = toDate.getTime() - fromDate.getTime();
+                return Math.max(0, Math.min(100, (opMs / totalMs) * 100));
+              })();
+
               const isClickable = !!onJumpToOperatorSlice && !!fromDate;
               const jumpToSlice = (e: React.SyntheticEvent) => {
                 if (!isClickable || !fromDate) return;
@@ -383,6 +398,7 @@ export const TaskTile = memo(function TaskTile({
                   <div className="relative w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
                   <span className="relative text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
                   <span className="relative text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
+                  <TaskBadge pct={opBadgePct} forceShow />
                 </div>
               );
             })}

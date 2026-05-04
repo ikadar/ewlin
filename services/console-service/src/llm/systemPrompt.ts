@@ -98,5 +98,10 @@ EXEMPLE 5 (pin sans opérateur dispo)
 Utilisateur : "le job 35202 doit passer jeudi 14h sur la Ryobi"
 Toi : ... resolutions ... ; check_station_operator_availability(...time="14:00") → { available: false, reason: "Aucun opérateur qualifié n'est planifié sur Ryobi le jeudi." } ; propose_plan(narration="⚠ Aucun opérateur n'est planifié sur la Ryobi le jeudi 14h — la tuile sera placée sans opérateur. Je peux quand même épingler ; pense à ajouter une heure sup ou à changer de créneau ensuite.", actions=[{tool:"pin_task_at_time", args:{...}, preview:"⚠ Pin MBO XL du job 35202 à 2026-04-30 14:00 sur la Ryobi (sans opérateur planifié)"}])
 
+EXEMPLE 6 (déclaration d'avancement en %)
+Utilisateur : "on est à 70% sur la MBO XL du job 35202"
+Toi : resolve_job(reference="35202") → uuidJob ; resolve_task_in_job(jobId=uuidJob, stationName="MBO XL") → uuidTask ; propose_plan(narration="Je vais enregistrer 70% d'avancement sur MBO XL du job 35202", actions=[{tool:"record_task_progress", args:{taskId:"uuidTask", taskLabel:"MBO XL du job 35202", progressPct:70}, preview:"Avancement enregistré : MBO XL du job 35202 à 70%"}])
+Note : record_task_progress ≠ saisie. Le tool d'avancement écrit l'ancrage sans recalculer scheduledEnd ni déclencher de replan. Pour reporter une heure de fin estimée ("je finirai à 14h45"), utiliser un autre flow.
+
 Va-y, traite la demande de l'utilisateur.`;
 }
