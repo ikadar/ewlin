@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, type MutableRefObject } from
 import { GitBranch, Minus, Plus } from 'lucide-react';
 import { DEFAULT_ELEMENT, generateElementName } from './types';
 import type { JcfElement, JcfFieldKey, JcfLinkableField } from './types';
-import { hasOffsetPressInSequence } from '../../api/jobApi';
+import { hasOffsetPressInSequence, hasTypoPressInSequence } from '../../api/jobApi';
 import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagation';
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
@@ -379,7 +379,7 @@ export function JcfElementsTable({
     [rows, elements.length, focusCell],
   );
 
-  // ── Prereq checkbox change (boolean fields, bypass CellContent) ──
+  // ── Prereq switch change (boolean fields, bypass CellContent) ──
 
   type PrereqKey = 'needsBat' | 'needsPaper' | 'needsForme' | 'needsPlates';
 
@@ -391,6 +391,29 @@ export function JcfElementsTable({
       onElementsChange(updated);
     },
     [elements, onElementsChange],
+  );
+
+  /**
+   * Resolves the displayed value of a prereq switch. needsForme and
+   * needsPlates start as `null` ("auto") so the chef sees the smart
+   * default, computed from the sequence ; once they click, the value
+   * becomes concrete and the smart default no longer applies.
+   */
+  const resolvePrereqValue = useCallback(
+    (element: JcfElement, key: PrereqKey): boolean => {
+      if (key === 'needsBat') return element.needsBat;
+      if (key === 'needsPaper') return element.needsPaper;
+      if (key === 'needsForme') {
+        if (element.needsForme !== null) return element.needsForme;
+        return !hasTypoPressInSequence(element.sequence, postePresets);
+      }
+      if (key === 'needsPlates') {
+        if (element.needsPlates !== null) return element.needsPlates;
+        return hasOffsetPressInSequence(element.sequence, postePresets);
+      }
+      return false;
+    },
+    [postePresets],
   );
 
   // ── Cell change ──
@@ -660,10 +683,11 @@ export function JcfElementsTable({
       })}
 
       {/* Prerequisite "needs" toggles — chef declares per element which
-          prereqs apply. Backend translates them to initial xxxStatus
-          enums. needsPlates is read-only and purely derived from the
-          sequence (Presse offset detection) per the print-shop rule
-          "no offset → no plates". */}
+          prereqs apply via switches. Forme defaults to "oui" unless
+          the sequence contains a Typo press ; Plaques defaults to
+          "non" unless the sequence contains a Presse offset.  Once
+          the chef clicks a switch the value becomes concrete and the
+          smart default no longer applies. */}
       {(['needsBat', 'needsPaper', 'needsForme', 'needsPlates'] as const).map((key) => {
         const labels: Record<typeof key, string> = {
           needsBat: 'BAT requis',
@@ -671,7 +695,6 @@ export function JcfElementsTable({
           needsForme: 'Forme requise',
           needsPlates: 'Plaques requises',
         };
-        const isAutoDerived = key === 'needsPlates';
         return (
           <div
             key={key}
@@ -684,16 +707,14 @@ export function JcfElementsTable({
               className="px-[10px] py-[5px] text-sm text-zinc-500 border-r border-zinc-800 flex items-center sticky left-0 bg-zinc-950/90 z-10"
             >
               {labels[key]}
-              {isAutoDerived && (
-                <span className="ml-2 text-[10px] text-zinc-600 italic">(auto)</span>
-              )}
             </div>
-            {/* Data cells — checkbox per element */}
+            {/* Data cells — switch per element */}
             {elements.map((element, elementIndex) => {
               const isLastElement = elementIndex === elements.length - 1;
-              const checked = isAutoDerived
-                ? hasOffsetPressInSequence(element.sequence, postePresets)
-                : element[key];
+              const checked = resolvePrereqValue(element, key);
+              const isAutoDefault =
+                (key === 'needsForme' && element.needsForme === null)
+                || (key === 'needsPlates' && element.needsPlates === null);
               return (
                 <div
                   key={`${elementIndex}-${key}`}
@@ -703,29 +724,45 @@ export function JcfElementsTable({
                   data-testid={`jcf-cell-${elementIndex}-${key}`}
                 >
                   <label
-                    className={`flex items-center gap-2 ${
-                      isAutoDerived
-                        ? 'cursor-not-allowed text-zinc-500'
-                        : 'cursor-pointer text-zinc-400 hover:text-zinc-200'
-                    } text-xs select-none`}
+                    className="flex items-center gap-2 cursor-pointer text-xs select-none text-zinc-400 hover:text-zinc-200"
                     title={
-                      isAutoDerived
-                        ? 'Auto: dérivé de la présence d’une presse offset dans la séquence'
+                      isAutoDefault
+                        ? key === 'needsForme'
+                          ? 'Auto : "oui" sauf si la séquence contient une machine de catégorie Typo'
+                          : 'Auto : "non" sauf si la séquence contient une presse offset'
                         : undefined
                     }
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={isAutoDerived}
-                      onChange={(e) =>
-                        !isAutoDerived
-                        && handlePrereqToggle(elementIndex, key, e.target.checked)
-                      }
-                      className="w-[14px] h-[14px] cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
-                      data-testid={`jcf-checkbox-${elementIndex}-${key}`}
-                    />
-                    <span>{checked ? 'Oui' : 'Non'}</span>
+                    <span className="relative inline-block">
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={checked}
+                        onChange={(e) =>
+                          handlePrereqToggle(elementIndex, key, e.target.checked)
+                        }
+                        className="sr-only peer"
+                        data-testid={`jcf-switch-${elementIndex}-${key}`}
+                      />
+                      <span
+                        className={`block w-[28px] h-[16px] rounded-full transition-colors ${
+                          checked ? 'bg-emerald-600' : 'bg-zinc-700'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span
+                        className={`pointer-events-none absolute top-[2px] left-[2px] w-[12px] h-[12px] rounded-full bg-white shadow transition-transform ${
+                          checked ? 'translate-x-[12px]' : 'translate-x-0'
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span>
+                      {checked ? 'Oui' : 'Non'}
+                      {isAutoDefault && (
+                        <span className="ml-1 text-[10px] text-zinc-600 italic">(auto)</span>
+                      )}
+                    </span>
                   </label>
                 </div>
               );

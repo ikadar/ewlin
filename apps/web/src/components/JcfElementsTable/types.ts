@@ -17,19 +17,28 @@ export interface JcfElement {
   commentaires: string;
   sequence: string;
   /**
-   * Per-element prerequisite "needed" flags. The chef toggles these in
-   * JCF (under the sequence row) — they map to initial prerequisite
-   * status on the backend (none vs first-real-state). Plaques is
-   * auto-derived from the sequence (presence of a Presse offset
-   * station) and rendered read-only.
+   * Per-element prerequisite "needed" flags. The chef toggles these
+   * via switches in JCF (under the sequence row) — they map to
+   * initial prerequisite status on the backend (none vs first-
+   * real-state).
    *
-   * Defaults: needsBat = true, needsPaper / needsForme = false,
-   * needsPlates derived at save time.
+   * Defaults:
+   *   needsBat   = true (always)
+   *   needsPaper = true (always)
+   *   needsForme = `null` → smart default "true unless sequence
+   *                contains a machine of category 'typo'"
+   *   needsPlates = `null` → smart default "false unless sequence
+   *                contains a machine of category 'Presse offset'"
+   *
+   * `null` on needsForme / needsPlates means "use smart default".
+   * As soon as the chef clicks a switch the value becomes concrete
+   * and the smart default no longer applies (sequence edits don't
+   * auto-flip a manually-set switch).
    */
   needsBat: boolean;
   needsPaper: boolean;
-  needsForme: boolean;
-  needsPlates: boolean;
+  needsForme: boolean | null;
+  needsPlates: boolean | null;
   /**
    * Link state for propagation from previous element (v0.4.35).
    * When a field is linked, it inherits and auto-updates from the previous element.
@@ -60,9 +69,9 @@ export const DEFAULT_ELEMENT: JcfElement = {
   commentaires: '',
   sequence: '',
   needsBat: true,
-  needsPaper: false,
-  needsForme: false,
-  needsPlates: false,
+  needsPaper: true,
+  needsForme: null,
+  needsPlates: null,
 };
 
 export function generateElementName(elements: JcfElement[]): string {

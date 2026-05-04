@@ -181,27 +181,43 @@ function normalizeSequenceDsl(dsl: string): string {
 }
 
 /**
- * Detect whether an element's sequence contains at least one
- * "Presse offset" station. Drives the auto-default for needsPlates
- * — only offset jobs need plates.
- *
- * Tokenises the multi-line DSL on the usual delimiters and tests
- * each token against the offset-press names known to the catalogue
- * passed in.
+ * Detect whether the sequence contains at least one station whose
+ * category exactly matches `category`. Drives the JCF smart defaults
+ * for needsForme (typo) and needsPlates (Presse offset).
+ */
+function sequenceHasCategory(
+  sequence: string,
+  postePresets: ReadonlyArray<{ name: string; category: string }>,
+  category: string,
+): boolean {
+  if (!sequence) return false;
+  const matchingNames = new Set(
+    postePresets.filter((p) => p.category === category).map((p) => p.name),
+  );
+  if (matchingNames.size === 0) return false;
+  const tokens = sequence.split(/[\s,()\n;|]+/).filter((t) => t.length > 0);
+  return tokens.some((t) => matchingNames.has(t));
+}
+
+/**
+ * Plaques smart default: only offset jobs need plates.
  */
 export function hasOffsetPressInSequence(
   sequence: string,
   postePresets: ReadonlyArray<{ name: string; category: string }>,
 ): boolean {
-  if (!sequence) return false;
-  const offsetNames = new Set(
-    postePresets
-      .filter((p) => p.category === 'Presse offset')
-      .map((p) => p.name),
-  );
-  if (offsetNames.size === 0) return false;
-  const tokens = sequence.split(/[\s,()\n;|]+/).filter((t) => t.length > 0);
-  return tokens.some((t) => offsetNames.has(t));
+  return sequenceHasCategory(sequence, postePresets, 'Presse offset');
+}
+
+/**
+ * Forme smart default: typo presses use the formes inline, so
+ * the chef-side "Forme requise" toggle defaults to OFF in that case.
+ */
+export function hasTypoPressInSequence(
+  sequence: string,
+  postePresets: ReadonlyArray<{ name: string; category: string }>,
+): boolean {
+  return sequenceHasCategory(sequence, postePresets, 'Typo');
 }
 
 /**

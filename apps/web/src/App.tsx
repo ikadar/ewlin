@@ -43,7 +43,7 @@ import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory 
 import { getDeadlineDate } from '@flux/types';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
-import { transformJcfToRequest, transformJcfElementToRequest, hasOffsetPressInSequence } from './api';
+import { transformJcfToRequest, transformJcfElementToRequest, hasOffsetPressInSequence, hasTypoPressInSequence } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
 import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
@@ -469,13 +469,22 @@ function AppContent() {
         ? null
         : parseInt(jcfDeadlineRelativeDays, 10);
 
-      // Plates is sequence-derived: override needsPlates from JcfElement
-      // state with the live derivation so save reflects the rule
-      // "no Presse offset → no plates" regardless of what the JCF
-      // form may carry from a stale paste / template.
+      // Resolve "auto" prereq switches (null on JcfElement) to a
+      // concrete boolean before saving — Forme defaults to "oui"
+      // unless the sequence contains a Typo press, Plates defaults
+      // to "non" unless the sequence contains a Presse offset. Once
+      // the chef has clicked a switch, the value is already concrete
+      // and these expressions become a no-op.
       const elementsForSave: JcfElement[] = jcfElements.map((el) => ({
         ...el,
-        needsPlates: hasOffsetPressInSequence(el.sequence, snapshotPostes),
+        needsForme:
+          el.needsForme !== null
+            ? el.needsForme
+            : !hasTypoPressInSequence(el.sequence, snapshotPostes),
+        needsPlates:
+          el.needsPlates !== null
+            ? el.needsPlates
+            : hasOffsetPressInSequence(el.sequence, snapshotPostes),
       }));
 
       if (isEditMode && editingJobId) {

@@ -45,25 +45,26 @@ test.describe('JCF — per-element prerequisite needs toggles', () => {
     await expect(page.getByTestId('jcf-row-needsPlates')).toBeVisible();
   });
 
-  test('BAT is checked by default, others unchecked', async ({ page }) => {
-    await expect(page.getByTestId('jcf-checkbox-0-needsBat')).toBeChecked();
-    await expect(page.getByTestId('jcf-checkbox-0-needsPaper')).not.toBeChecked();
-    await expect(page.getByTestId('jcf-checkbox-0-needsForme')).not.toBeChecked();
-    await expect(page.getByTestId('jcf-checkbox-0-needsPlates')).not.toBeChecked();
+  test('BAT/Papier on by default, Forme on (no typo in empty seq), Plates off (no offset)', async ({ page }) => {
+    await expect(page.getByTestId('jcf-switch-0-needsBat')).toBeChecked();
+    await expect(page.getByTestId('jcf-switch-0-needsPaper')).toBeChecked();
+    // Forme: smart default = "oui" (sequence is empty, no typo)
+    await expect(page.getByTestId('jcf-switch-0-needsForme')).toBeChecked();
+    // Plates: smart default = "non" (sequence is empty, no offset)
+    await expect(page.getByTestId('jcf-switch-0-needsPlates')).not.toBeChecked();
   });
 
-  test('Plates checkbox is disabled (auto-derived from sequence)', async ({ page }) => {
-    await expect(page.getByTestId('jcf-checkbox-0-needsPlates')).toBeDisabled();
-  });
+  test('User can toggle each switch independently', async ({ page }) => {
+    await page.getByTestId('jcf-switch-0-needsBat').click({ force: true });
+    await expect(page.getByTestId('jcf-switch-0-needsBat')).not.toBeChecked();
 
-  test('User can toggle BAT off and Papier/Forme on', async ({ page }) => {
-    await page.getByTestId('jcf-checkbox-0-needsBat').click();
-    await expect(page.getByTestId('jcf-checkbox-0-needsBat')).not.toBeChecked();
+    await page.getByTestId('jcf-switch-0-needsPaper').click({ force: true });
+    await expect(page.getByTestId('jcf-switch-0-needsPaper')).not.toBeChecked();
 
-    await page.getByTestId('jcf-checkbox-0-needsPaper').click();
-    await expect(page.getByTestId('jcf-checkbox-0-needsPaper')).toBeChecked();
+    await page.getByTestId('jcf-switch-0-needsForme').click({ force: true });
+    await expect(page.getByTestId('jcf-switch-0-needsForme')).not.toBeChecked();
 
-    await page.getByTestId('jcf-checkbox-0-needsForme').click();
-    await expect(page.getByTestId('jcf-checkbox-0-needsForme')).toBeChecked();
+    await page.getByTestId('jcf-switch-0-needsPlates').click({ force: true });
+    await expect(page.getByTestId('jcf-switch-0-needsPlates')).toBeChecked();
   });
 });

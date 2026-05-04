@@ -7,6 +7,7 @@ export {
   transformJcfToRequest,
   transformJcfElementToRequest,
   hasOffsetPressInSequence,
+  hasTypoPressInSequence,
   JobApiError,
 } from './jobApi';
 
