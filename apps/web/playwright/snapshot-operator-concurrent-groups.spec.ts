@@ -55,6 +55,10 @@ test('snapshot operators expose concurrentGroups field (data + UI)', async ({ pa
   const snapshot = await snapshotRes.json();
 
   expect(Array.isArray(snapshot.operators)).toBe(true);
+  // Guard against trivially-passing iteration on an empty payload — if the
+  // DB had no operators the for-of below would assert nothing.
+  expect(snapshot.operators.length, 'snapshot must have operators to test').toBeGreaterThan(0);
+
   for (const op of snapshot.operators) {
     expect(op.concurrentGroups, `operator ${op.id} concurrentGroups`).toBeDefined();
     expect(Array.isArray(op.concurrentGroups)).toBe(true);
@@ -89,13 +93,16 @@ test('snapshot operators expose concurrentGroups field (data + UI)', async ({ pa
     timeout: 15_000,
   });
 
-  // The operators table renders one row per operator. Wait until at least
-  // one row appears so the snapshot has been consumed.
-  await page.waitForSelector('tbody tr', { timeout: 15_000 });
+  // The operators table renders one data row per operator with a
+  // cursor-pointer class (distinct from the empty-state row). Wait until
+  // at least one data row appears so the snapshot has been consumed.
+  await page.waitForSelector('tr.cursor-pointer', { timeout: 15_000 });
 
   // No runtime errors that mention the concurrent-groups consumption path.
+  // The regex stays specific to the field name to avoid masking unrelated
+  // test failures behind a paranoid filter.
   const fatalErrors = consoleErrors.filter((msg) =>
-    /concurrentGroups|concurrent_groups|cannot read prop/i.test(msg),
+    /concurrentGroups|concurrent_groups/i.test(msg),
   );
   expect(fatalErrors, `unexpected runtime errors: ${fatalErrors.join(' | ')}`).toEqual([]);
 });
