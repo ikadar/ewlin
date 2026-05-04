@@ -329,6 +329,10 @@ mod tests {
             realistic_run_minutes: None,
             cumulative_position_pct: None,
             slot_volume_pct: None,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 
@@ -665,6 +669,10 @@ mod tests {
                 realistic_run_minutes: None,
                 cumulative_position_pct: None,
                 slot_volume_pct: None,
+                is_in_progress: false,
+                task_elapsed_ticks: 0,
+                forced_start_tick: None,
+                already_eaten_ticks: 0,
             }
         }
 
@@ -684,6 +692,10 @@ mod tests {
                 realistic_run_minutes: None,
                 cumulative_position_pct: None,
                 slot_volume_pct: None,
+                is_in_progress: false,
+                task_elapsed_ticks: 0,
+                forced_start_tick: None,
+                already_eaten_ticks: 0,
             }
         }
 

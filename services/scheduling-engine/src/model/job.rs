@@ -141,6 +141,38 @@ pub struct TaskInput {
     /// the gauge. `None` → FE falls back to a default.
     #[serde(default)]
     pub slot_volume_pct: Option<f64>,
+    /// D — split-at-NOW: explicit "this pin is in-progress" flag emitted by
+    /// PHP for assignments where `scheduledStart < now < scheduledEnd && !isCompleted`.
+    /// When true, `pre_place_pinned_actions` clears the pin, frees `pinned_end_tick`,
+    /// records `forced_start_tick = pinned_start_tick`, and credits
+    /// `already_eaten_ticks = task_elapsed_ticks` to the chunk-mini guard.
+    /// The past pre-NOW portion stays verbatim (immutable start tick) ; the
+    /// future post-NOW portion enters the scoring loop and may be interrupted
+    /// or rescheduled. Supersedes the legacy "tile crossing now stays verbatim
+    /// end-to-end" rule (cf. memory `feedback_in_progress_committed.md`).
+    #[serde(default)]
+    pub is_in_progress: bool,
+    /// D — split-at-NOW: number of ticks already elapsed for this task at
+    /// compute time, i.e. `now_tick - pinned_start_tick`. Only meaningful
+    /// when `is_in_progress = true`. Used by the chunk-mini guard to credit
+    /// past committed work so a small post-NOW window doesn't trigger a
+    /// fragmentation rejection.
+    #[serde(default)]
+    pub task_elapsed_ticks: u32,
+    /// D — split-at-NOW: hard tick at which the action MUST be considered
+    /// to have started, regardless of the engine's optimisation. Set by
+    /// `pre_place_pinned_actions` when honouring an in-progress pin and
+    /// consulted by the scoring loop. Independent of `pinned_start_tick`
+    /// because the latter implies a fully pinned (start+end) extent ; the
+    /// former locks only the start.
+    #[serde(default)]
+    pub forced_start_tick: Option<usize>,
+    /// D — split-at-NOW: chunk-mini credit. When the chunk-mini guard
+    /// evaluates a placement, it subtracts this value from `chunk_mini_ticks`
+    /// before checking `needed`. Equal to `task_elapsed_ticks` for in-progress
+    /// pins, zero otherwise.
+    #[serde(default)]
+    pub already_eaten_ticks: u32,
 }
 
 /// Provider parameters needed to compute departure & return ticks of a
@@ -228,6 +260,10 @@ mod task_input_v2_helpers_tests {
             realistic_run_minutes: realistic,
             cumulative_position_pct: None,
             slot_volume_pct: None,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 

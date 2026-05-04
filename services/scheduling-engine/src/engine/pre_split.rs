@@ -170,6 +170,13 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 borrow_until_tick: None,
                 borrowed_op_to_restore: None,
                 force_max_staffing: action.force_max_staffing,
+                // D — split-at-NOW: pinned tasks are never chunked (see
+                // comment on `is_pinned: false` above), so an in-progress
+                // pin can never reach pre_split. Defaults are correct.
+                is_in_progress: false,
+                task_elapsed_ticks: 0,
+                forced_start_tick: None,
+                already_eaten_ticks: 0,
             });
 
             prev_chunk_idx = Some(idx);
@@ -259,8 +266,12 @@ mod tests {
             setup_end_tick: None,
             outsourced_predecessor_chain: Vec::new(),
             borrow_until_tick: None,
-                borrowed_op_to_restore: None,
+            borrowed_op_to_restore: None,
             force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 
@@ -421,5 +432,9 @@ pub fn clone_action(a: &Action) -> Action {
         borrow_until_tick: a.borrow_until_tick,
         borrowed_op_to_restore: a.borrowed_op_to_restore,
         force_max_staffing: a.force_max_staffing,
+        is_in_progress: a.is_in_progress,
+        task_elapsed_ticks: a.task_elapsed_ticks,
+        forced_start_tick: a.forced_start_tick,
+        already_eaten_ticks: a.already_eaten_ticks,
     }
 }

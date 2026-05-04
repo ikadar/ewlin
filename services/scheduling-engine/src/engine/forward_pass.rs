@@ -408,6 +408,28 @@ pub struct Action {
     /// `JobInput.force_max_staffing` flag, copied at action build time so
     /// the forward pass doesn't need a back-reference to the job vector.
     pub force_max_staffing: bool,
+    /// D — split-at-NOW: explicit in-progress flag mirroring
+    /// `TaskInput.is_in_progress`. Honoured by `pre_place_pinned_actions`
+    /// to apply the split-at-NOW rule (pin cleared, end freed, forced
+    /// start preserved, chunk-mini credit recorded) instead of pinning
+    /// the tile verbatim end-to-end.
+    pub is_in_progress: bool,
+    /// D — split-at-NOW: ticks already elapsed for this task at compute
+    /// time. Only meaningful when `is_in_progress` is true. Mirrors
+    /// `TaskInput.task_elapsed_ticks`.
+    pub task_elapsed_ticks: u32,
+    /// D — split-at-NOW: hard start tick imposed on the scoring loop.
+    /// `Some(t)` means "the action must be treated as starting at exactly
+    /// `t`" ; the loop refuses any `t' != t`. Set by
+    /// `pre_place_pinned_actions` when handling an in-progress pin so the
+    /// past stays verbatim while the future portion is mutable.
+    pub forced_start_tick: Option<usize>,
+    /// D — split-at-NOW: credit subtracted from `chunk_mini_ticks` by the
+    /// chunk-mini guard before evaluating `needed`. Recorded by
+    /// `pre_place_pinned_actions` from the task's `task_elapsed_ticks` so
+    /// a tile with most of its work already done isn't blocked by the
+    /// fragmentation rule on its remaining sliver.
+    pub already_eaten_ticks: u32,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -1190,6 +1212,17 @@ pub fn run_forward_pass(
             if let Some(est) = action.earliest_start_tick {
                 if t < est { continue; }
             }
+            // D — split-at-NOW: the action carries a `forced_start_tick`
+            // when `pre_place_pinned_actions` has split an in-progress
+            // pin. The past portion is committed (immutable start tick),
+            // so the scoring loop must only attempt placement at exactly
+            // that tick. Skip on either side: t < forced — too early,
+            // wait for the cursor to reach the past tick ; t > forced —
+            // we've already missed the slot, leaving the action
+            // unplaced is correct (PHP keeps the DB row verbatim).
+            if let Some(forced) = action.forced_start_tick {
+                if t != forced { continue; }
+            }
             // Precedence guard: predecessor must finish strictly BEFORE the
             // successor's first tick. The strict-gap requirement adds 1
             // tick of mandatory separation on top of any explicit
@@ -1290,7 +1323,17 @@ pub fn run_forward_pass(
                 let chunk_mini_ticks = setup_floor
                     .max(task_floor)
                     .min(attrs.max_chunk_ticks.max(1));
-                let needed = action.art.min(chunk_mini_ticks) as usize;
+                // D — split-at-NOW credit: an in-progress pin enters
+                // the scoring loop with `already_eaten_ticks` ticks of
+                // committed past work. The chunk-mini floor counts the
+                // ENTIRE chunk (past + future), so the engine only
+                // needs `chunk_mini_ticks - already_eaten_ticks` more
+                // ticks of contiguous future window. Saturating to
+                // zero means an action whose past credit already meets
+                // the floor passes the guard trivially.
+                let effective_chunk_mini =
+                    chunk_mini_ticks.saturating_sub(action.already_eaten_ticks);
+                let needed = action.art.min(effective_chunk_mini) as usize;
                 // Work window must cover station freedom, operator
                 // availability, AND (if the scoring task is both more
                 // urgent and already past its LAST) tier-preempt
@@ -2183,7 +2226,15 @@ fn assign_action_at_tick(
         let chunk_mini_ticks = setup_floor
             .max(task_floor)
             .min(attrs.max_chunk_ticks.max(1));
-        let needed = action.art.min(chunk_mini_ticks) as usize;
+        // D — split-at-NOW credit: an in-progress action carries
+        // `already_eaten_ticks` of committed past work. The chunk-mini
+        // floor applies to the ENTIRE chunk (past + future), so the
+        // post-NOW resume window only needs `chunk_mini - already_eaten`
+        // contiguous ticks. When the credit covers the whole floor the
+        // guard becomes a no-op (saturating sub → 0 → needed = 0 → skip).
+        let effective_chunk_mini =
+            chunk_mini_ticks.saturating_sub(action.already_eaten_ticks);
+        let needed = action.art.min(effective_chunk_mini) as usize;
         if needed > 1 {
             let cap = (grid.num_ticks.saturating_sub(t)).min(needed);
             let mut window = 0usize;
@@ -2701,6 +2752,59 @@ fn pre_place_pinned_actions(
                 continue;
             }
         };
+
+        // ============================================================
+        // D — split-at-NOW for in-progress pins.
+        //
+        // When PHP flags this pin as in-progress (the assignment had
+        // scheduledStart < now < scheduledEnd && !isCompleted), the
+        // past portion is committed (cannot be undone) and the future
+        // portion must remain mutable so the engine can interrupt /
+        // re-station / peremption-replan around it.
+        //
+        // Strategy:
+        //   - Free the pin entirely (clear `is_pinned` + `pinned_end_tick`)
+        //   - Record `forced_start_tick = pinned_start_tick` so the
+        //     scoring loop only attempts placement at the original tick
+        //     (the past stays verbatim)
+        //   - Record `already_eaten_ticks = task_elapsed_ticks` so the
+        //     chunk-mini guard credits the past committed work and
+        //     doesn't reject a small post-NOW remainder
+        //
+        // Legacy fallback: when PHP doesn't yet emit the explicit
+        // `is_in_progress` flag (mid-rollout), infer it via
+        // `start_t < now_tick`. The two paths converge as soon as
+        // PHP emits the flag — at which point the heuristic becomes
+        // a belt-and-suspenders no-op because the explicit branch
+        // wins.
+        //
+        // Cf. docs/operator-sandbox/engine-split-at-now-plan.md and
+        // memory `feedback_in_progress_committed.md` (Q1 2026-05-04).
+        // Supersedes 2026-04-28 "tile crossing now stays verbatim
+        // end-to-end" which is encoded in the (now-flipped) tests
+        // `in_progress_safety_zone_pin_skips_chunk_mini_guard`,
+        // `in_progress_pin_with_short_remaining_window_still_kept`,
+        // `in_progress_pin_below_earliest_start_is_kept`.
+        let detected_in_progress = actions[i].is_in_progress || start_t < now_tick;
+        if detected_in_progress {
+            let elapsed = if actions[i].task_elapsed_ticks > 0 {
+                actions[i].task_elapsed_ticks
+            } else {
+                now_tick.saturating_sub(start_t) as u32
+            };
+            actions[i].is_pinned = false;
+            actions[i].is_frozen_by_safety_zone = false;
+            actions[i].pinned_end_tick = None;
+            actions[i].forced_start_tick = Some(start_t);
+            actions[i].already_eaten_ticks = elapsed;
+            // Normalize the explicit fields so downstream consumers
+            // (and any cloned actions) see a consistent state.
+            actions[i].is_in_progress = true;
+            actions[i].task_elapsed_ticks = elapsed;
+            continue;
+        }
+        // ============================================================
+
         let total_ticks = (actions[i].setup_ticks + actions[i].run_ticks) as usize;
         // Honour PHP's explicit pinned_end_tick (derived from
         // assignment.scheduledEnd) when provided. This eliminates the
@@ -2741,13 +2845,12 @@ fn pre_place_pinned_actions(
         // user or safety-zone intent. When a pin sits below this floor,
         // degrade it and emit a warning so the displacement is visible.
         //
-        // In-progress exemption (start_t < now_tick): the work is already
-        // happening, the floor was either satisfied earlier or the user
-        // has acknowledged the constraint by letting the task run. The
-        // engine cannot undo committed physical work.
+        // In-progress pins (start_t < now_tick OR is_in_progress) are
+        // intercepted at the top of this loop by the split-at-NOW
+        // handler — by the time we reach here, no in-progress pin
+        // remains, so the BAT guard applies uniformly.
         if let Some(est) = actions[i].earliest_start_tick {
-            let in_progress = start_t < now_tick;
-            if !in_progress && start_t < est {
+            if start_t < est {
                 let pin_minutes = start_t as u64 * tick_minutes as u64;
                 let est_minutes = est as u64 * tick_minutes as u64;
                 let message = if actions[i].is_frozen_by_safety_zone {
@@ -2787,26 +2890,19 @@ fn pre_place_pinned_actions(
         // `!is_frozen_by_safety_zone`) reflect explicit intent and are
         // out of scope (see `Pin = créneau, pas opérateur`).
         //
-        // In-progress exemption: when `start_t < now_tick` the operator
-        // has already started the work in the real world. The placement
-        // is committed; the engine cannot undo physical setup time.
-        // Skip the chunk-mini check — preserving the tile (and its
-        // end_tick) is more important than re-validating fragmentation.
-        // PHP also routes in-progress assignments through this branch
-        // by extending the safety-zone condition to
-        // `scheduledStart < now < scheduledEnd && !isCompleted`.
+        // In-progress pins are handled by the split-at-NOW branch at
+        // the top of this loop and are no longer in scope here (the
+        // pin has been cleared, control has continued past this guard).
         //
-        // Otherwise (upcoming-frozen pin, start_t >= now_tick): eat=0
-        // is implicit (pre_place runs before the forward-pass loop has
-        // incremented eat) and the operator hasn't started yet, so
-        // degrading the pin costs no wasted setup.
+        // Upcoming-frozen pin (start_t >= now_tick): eat=0 is implicit
+        // (pre_place runs before the forward-pass loop has incremented
+        // eat) and the operator hasn't started yet, so degrading the
+        // pin costs no wasted setup.
         //
         // On chunk-mini fail: degrade the pin (clear flags + tick
         // hints), emit a warning, fall through to the scoring loop
         // which re-places under normal rules.
-        let is_in_progress_pin = start_t < now_tick;
         if actions[i].is_frozen_by_safety_zone
-            && !is_in_progress_pin
             && station_idx < station_attrs.len()
         {
             let attrs = &station_attrs[station_idx];
@@ -3782,6 +3878,10 @@ mod peremption_tests {
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
             force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 
@@ -4200,6 +4300,10 @@ mod attention_capacity_tests {
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
             force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 
@@ -4823,6 +4927,10 @@ mod safety_zone_chunk_mini_tests {
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
             force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 
@@ -4966,15 +5074,21 @@ mod safety_zone_chunk_mini_tests {
     }
 
     #[test]
-    fn in_progress_safety_zone_pin_skips_chunk_mini_guard() {
+    fn in_progress_safety_zone_pin_split_at_now() {
+        // D — split-at-NOW (Q1 2026-05-04, supersedes 2026-04-28
+        // "tile crossing now stays verbatim end-to-end").
+        //
         // In-progress pin: pinned_start_tick (60) is in the past
         // relative to now_tick (66). Operator started at tick 60 and is
-        // about to finish at tick 68. Without the in-progress exemption
-        // the chunk-mini guard would degrade this pin and the tile
-        // would jump elsewhere — wrong: the work is physically
-        // committed, the engine cannot undo it.
+        // theoretically about to finish at tick 68. Under the new rule
+        // the past portion stays verbatim (forced_start_tick = 60) but
+        // the future portion (post-NOW) is freed: the engine clears the
+        // pin entirely and records `already_eaten_ticks = 6` so the
+        // scoring loop can replan the remaining run with the chunk-mini
+        // credit.
         //
-        // The pin must survive the guard verbatim, end_tick stays at 68.
+        // Detected via the legacy `start_t < now_tick` heuristic since
+        // the explicit `is_in_progress` flag isn't set on the action.
         let action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
         let availability = restricted_availability(200, &[(60, 68)]);
 
@@ -4986,30 +5100,60 @@ mod safety_zone_chunk_mini_tests {
             /*now_tick=*/ 66,
         );
 
-        assert!(actions[0].is_pinned, "in-progress pin must be preserved");
-        assert!(actions[0].is_frozen_by_safety_zone, "frozen flag preserved");
-        assert_eq!(
-            actions[0].start_tick,
-            Some(60),
-            "start_tick verbatim (no shift on in-progress)"
-        );
-        assert_eq!(
-            actions[0].end_tick,
-            Some(68),
-            "end_tick verbatim — operator finishes when scheduled"
+        assert!(!actions[0].is_pinned, "pin must be cleared by split-at-NOW");
+        assert!(
+            !actions[0].is_frozen_by_safety_zone,
+            "frozen flag cleared by split-at-NOW"
         );
         assert!(
-            !warnings.iter().any(|w| w.message.contains("safety-zone retiré")),
-            "no degradation warning on in-progress pin: {warnings:?}"
+            actions[0].is_in_progress,
+            "is_in_progress normalized to true after split"
+        );
+        assert_eq!(
+            actions[0].forced_start_tick,
+            Some(60),
+            "forced_start_tick anchors the past start verbatim"
+        );
+        assert_eq!(
+            actions[0].already_eaten_ticks, 6,
+            "already_eaten_ticks = now_tick (66) - pinned_start_tick (60)"
+        );
+        assert_eq!(
+            actions[0].task_elapsed_ticks, 6,
+            "task_elapsed_ticks normalized from heuristic"
+        );
+        assert!(
+            actions[0].pinned_end_tick.is_none(),
+            "pinned_end_tick freed so the engine can replan"
+        );
+        assert!(
+            actions[0].pinned_start_tick.is_some(),
+            "pinned_start_tick kept for diagnostic"
+        );
+        assert!(
+            actions[0].start_tick.is_none(),
+            "start_tick stays None — scoring loop will place at forced_start_tick"
+        );
+        assert!(
+            actions[0].end_tick.is_none(),
+            "end_tick stays None — engine picks the new end"
+        );
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("retiré")),
+            "no degradation warning on split-at-NOW: {warnings:?}"
         );
     }
 
     #[test]
-    fn in_progress_pin_with_short_remaining_window_still_kept() {
+    fn in_progress_pin_short_window_split_at_now() {
         // Pathological case: a tile crossing now with very little time
-        // left. Even when only 1 tick remains in the future, the
-        // in-progress exemption keeps the pin verbatim — the past 7
-        // ticks of work are physically done.
+        // left in its theoretical run (1 tick remaining). The legacy
+        // verbatim rule kept the pin at end_tick=68, hiding any drift.
+        // Under split-at-NOW the future portion is freed regardless of
+        // how short it is — the engine receives the credit and can
+        // legitimately decide to terminate the action shortly after
+        // now_tick or extend it past tick 68 if the run is going slower
+        // than planned.
         let action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
         let availability = restricted_availability(200, &[(60, 68)]);
 
@@ -5021,11 +5165,17 @@ mod safety_zone_chunk_mini_tests {
             /*now_tick=*/ 67,
         );
 
-        assert!(
-            actions[0].is_pinned,
-            "1-tick-remaining in-progress pin must still be preserved"
+        assert!(!actions[0].is_pinned, "pin cleared even with 1 tick remaining");
+        assert_eq!(
+            actions[0].forced_start_tick,
+            Some(60),
+            "forced_start_tick anchors the past"
         );
-        assert_eq!(actions[0].end_tick, Some(68));
+        assert_eq!(
+            actions[0].already_eaten_ticks, 7,
+            "credit covers most of the chunk-mini floor"
+        );
+        assert!(actions[0].pinned_end_tick.is_none(), "future end is mutable");
     }
 
     // ============================================================
@@ -5108,12 +5258,17 @@ mod safety_zone_chunk_mini_tests {
     }
 
     #[test]
-    fn in_progress_pin_below_earliest_start_is_kept() {
+    fn in_progress_pin_below_earliest_start_split_at_now() {
         // Edge case: a pin whose start is in the past relative to now
-        // (in-progress) AND below earliest_start_tick. The in-progress
-        // exemption wins — the work is already happening, the engine
-        // cannot undo it. The earliest_start floor only applies to
-        // FUTURE placements.
+        // (in-progress) AND below earliest_start_tick. The split-at-NOW
+        // handler runs FIRST, intercepting the action before the BAT
+        // floor guard can degrade it. The work is already happening
+        // physically — the engine cannot undo it, regardless of what
+        // the BAT-deadline rule would say about a fresh placement.
+        //
+        // The earliest_start floor still applies to truly-future pins
+        // (covered by `safety_zone_pin_before_earliest_start_is_degraded`
+        // and `user_pin_before_earliest_start_is_degraded_with_warning`).
         let mut action = make_action(0, 0, 4, 4, 50, /*is_frozen_by_safety_zone=*/ true);
         action.earliest_start_tick = Some(80);
         let availability = restricted_availability(200, &[(0, 200)]);
@@ -5126,11 +5281,132 @@ mod safety_zone_chunk_mini_tests {
             /*now_tick=*/ 55, // 55 > 50, so the pin is in-progress
         );
 
-        assert!(actions[0].is_pinned, "in-progress pin must NOT be degraded by earliest_start");
-        assert_eq!(actions[0].start_tick, Some(50), "start_tick verbatim");
+        assert!(!actions[0].is_pinned, "split-at-NOW intercepts before BAT floor");
+        assert!(actions[0].is_in_progress, "is_in_progress normalized");
+        assert_eq!(
+            actions[0].forced_start_tick,
+            Some(50),
+            "past start preserved despite earliest_start_tick=80"
+        );
+        assert_eq!(
+            actions[0].already_eaten_ticks, 5,
+            "credit = 55 - 50 = 5"
+        );
         assert!(
             !warnings.iter().any(|w| w.message.contains("retiré")),
-            "no degradation warning on in-progress pin: {warnings:?}"
+            "no BAT-degradation warning on in-progress pin: {warnings:?}"
+        );
+    }
+
+    // ============================================================
+    // D — split-at-NOW: explicit `is_in_progress` flag path tests
+    // ============================================================
+
+    #[test]
+    fn in_progress_pin_explicit_flag_credits_already_eaten_ticks() {
+        // PHP-side flag-driven path: when PHP emits `is_in_progress = true`
+        // and `task_elapsed_ticks = 8`, the engine MUST honour the explicit
+        // values rather than the `start_t < now_tick` heuristic.
+        //
+        // Setup: pin at tick 60, now_tick = 60 (exactly NOW — the legacy
+        // heuristic would NOT detect this as in-progress because
+        // `start_t < now_tick` is false). The explicit flag still triggers
+        // split-at-NOW, with the explicit task_elapsed_ticks = 8 carried
+        // over to already_eaten_ticks.
+        let mut action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 8;
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 60, // legacy heuristic would miss this
+        );
+
+        assert!(!actions[0].is_pinned, "explicit flag triggers split-at-NOW");
+        assert_eq!(
+            actions[0].already_eaten_ticks, 8,
+            "explicit task_elapsed_ticks (8) preferred over derived (0)"
+        );
+        assert_eq!(
+            actions[0].forced_start_tick,
+            Some(60),
+            "past start preserved"
+        );
+    }
+
+    #[test]
+    fn in_progress_pin_past_start_immutable_after_split() {
+        // The plan's verbatim rule: tenter de modifier `pinned_start_tick`
+        // doit être ignoré, le passé reste verbatim. Concretely the
+        // `forced_start_tick` carries the pre-split start tick AND
+        // `pinned_start_tick` stays populated for diagnostic — neither
+        // value is ever changed after split-at-NOW.
+        let action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
+        let availability = restricted_availability(200, &[(60, 68)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 65,
+        );
+
+        assert_eq!(
+            actions[0].pinned_start_tick,
+            Some(60),
+            "pinned_start_tick preserved as diagnostic — past portion immutable"
+        );
+        assert_eq!(
+            actions[0].forced_start_tick,
+            Some(60),
+            "forced_start_tick mirrors the pre-split start"
+        );
+    }
+
+    #[test]
+    fn in_progress_pin_chunk_mini_guard_credit_value() {
+        // Smoke test for the chunk-mini credit: `already_eaten_ticks`
+        // is recorded so the scoring-loop / continuation chunk-mini
+        // guards can subtract it from `chunk_mini_ticks` and accept
+        // smaller post-NOW windows. With task_elapsed_ticks = 8 and
+        // a station chunk_mini = 5 (default), the effective floor is
+        // saturating-sub'd to 0, exempting the action entirely.
+        //
+        // The full guard logic is exercised by integration tests; this
+        // test asserts the precondition (the credit field is populated
+        // correctly) so future regressions on the pre_place side are
+        // caught early.
+        let mut action = make_action(0, 0, 4, 4, 60, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 8;
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 68,
+        );
+
+        assert_eq!(actions[0].already_eaten_ticks, 8);
+        // Mirror the chunk-mini computation against `station_attrs_default()`:
+        //   chunk_mini_setup_multiplier=2.0 × setup_ticks=4 → setup_floor=8
+        //   chunk_mini_task_percentage=0.5 × total=8        → task_floor=4
+        //   max(setup_floor, task_floor)=8 ; capped at max_chunk_ticks=5 → 5
+        // With credit 8 ≥ chunk_mini 5, effective_chunk_mini = 0 (guard exempt).
+        let setup_floor = (2.0_f64 * 4.0_f64).ceil() as u32;
+        let task_floor = (0.5_f64 * 8.0_f64).ceil() as u32;
+        let chunk_mini = setup_floor.max(task_floor).min(5_u32);
+        let effective = chunk_mini.saturating_sub(actions[0].already_eaten_ticks);
+        assert_eq!(
+            effective, 0,
+            "credit ≥ chunk_mini ⇒ guard exempt (no future-window restriction)"
         );
     }
 }
@@ -5220,6 +5496,10 @@ mod borrow_tests {
             borrow_until_tick: None,
             borrowed_op_to_restore: None,
             force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
         }
     }
 
