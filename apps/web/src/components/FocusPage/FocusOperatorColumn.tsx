@@ -264,6 +264,21 @@ export function FocusOperatorColumn({
             )
           : undefined;
 
+        // Per-tile badge breakdown : each chunk-split slice gets a share
+        // proportional to its wallclock duration. For unsplit tasks (one
+        // slice = full assignment), the ratio collapses to 100. Sum
+        // across slices of the same task ≈ taskSlotVolumePct (= 100).
+        const sliceBadgePct = ((): number => {
+          if (!assignment) return 100;
+          const totalMs = new Date(assignment.scheduledEnd).getTime()
+            - new Date(assignment.scheduledStart).getTime();
+          if (totalMs <= 0) return 100;
+          const sliceMs = slice.to.getTime() - slice.from.getTime();
+          const ratio = Math.max(0, Math.min(1, sliceMs / totalMs));
+          const taskSlot = assignment.taskSlotVolumePct ?? 100;
+          return ratio * taskSlot;
+        })();
+
         const handleOpenSaisie = assignment && isInternalTask(task)
           ? () =>
               saisieModal.open({
@@ -314,7 +329,7 @@ export function FocusOperatorColumn({
             overrideWidth={overrideWidth}
             onContextMenu={handleContextMenu}
             progressFill={progressFill}
-            taskBadgePct={assignment?.taskSlotVolumePct ?? 100}
+            taskBadgePct={sliceBadgePct}
           />
         );
       })}

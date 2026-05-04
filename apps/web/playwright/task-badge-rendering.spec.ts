@@ -58,14 +58,34 @@ test('task badge renders on planning tiles', async ({ page }) => {
   const text = (await first.textContent())?.trim();
   expect(text).toBe(`${pct}%`);
 
-  // Layer-1 invariant : the engine emits taskSlotVolumePct = 100 on
-  // every assignment, so every visible badge should read 100 in the
-  // current state of the implementation.
+  // Per-tile badge invariant : each value is in (0, 100]. Unsplit tasks
+  // collapse to 100 ; chunk-split tasks emit fractional values whose
+  // sum across the slices of the same task ≈ taskSlotVolumePct (= 100).
   const allPcts = await badges.evaluateAll((els) =>
     els.map((e) => Number(e.getAttribute('data-pct'))),
   );
   expect(allPcts.length).toBeGreaterThan(0);
   for (const p of allPcts) {
-    expect(p).toBe(100);
+    expect(p).toBeGreaterThan(0);
+    expect(p).toBeLessThanOrEqual(100);
+  }
+
+  // Cross-tile sum invariant : grouped by task-id (data-flux-task-id),
+  // the sum of badges should be ≈ 100 for any task whose tiles are all
+  // visible. For viewport-clipped tasks the sum may be less ; we only
+  // assert no group exceeds 100 + rounding tolerance.
+  const byTask = await badges.evaluateAll((els) => {
+    const groups: Record<string, number> = {};
+    for (const el of els) {
+      const tile = el.closest('[data-flux-task-id]');
+      const taskId = tile?.getAttribute('data-flux-task-id');
+      if (!taskId) continue;
+      groups[taskId] = (groups[taskId] ?? 0) + Number(el.getAttribute('data-pct'));
+    }
+    return groups;
+  });
+  for (const [taskId, sum] of Object.entries(byTask)) {
+    // Allow 2% tolerance for rounding (each badge rounds to integer).
+    expect(sum, `task ${taskId} badges sum ≤ 100 + tolerance`).toBeLessThanOrEqual(102);
   }
 });

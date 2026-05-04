@@ -1195,6 +1195,20 @@ export default function OperatorSchedulePage() {
         )
       : undefined;
 
+    // Per-tile badge breakdown — share of the parent task this chunk
+    // covers, by wallclock ratio. Unsplit task → 100 ; chunk-split →
+    // sum across slices ≈ taskSlotVolumePct (= 100).
+    const sliceBadgePct = ((): number => {
+      if (!assignment) return 100;
+      const totalMs = new Date(assignment.scheduledEnd).getTime()
+        - new Date(assignment.scheduledStart).getTime();
+      if (totalMs <= 0) return 100;
+      const sliceMs = slice.to.getTime() - slice.from.getTime();
+      const ratio = Math.max(0, Math.min(1, sliceMs / totalMs));
+      const taskSlot = assignment.taskSlotVolumePct ?? 100;
+      return ratio * taskSlot;
+    })();
+
     const handleOpenSaisie = assignment
       ? () =>
           saisieModal.open({
@@ -1257,7 +1271,7 @@ export default function OperatorSchedulePage() {
         isSelected={selectedJobId === job.id}
         onContextMenu={handleContextMenu}
         progressFill={progressFill}
-        taskBadgePct={assignment?.taskSlotVolumePct ?? 100}
+        taskBadgePct={sliceBadgePct}
         {...positionProps}
       />
     );
