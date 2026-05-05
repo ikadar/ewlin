@@ -356,6 +356,8 @@ export function FocusStationColumn({
           height: cached.height,
           calageGeometries: cached.calageGeometries,
         }];
+        const activeWindows = assignment.activeWindows;
+        const useChunkWindows = !!cached.chunks && !!activeWindows && activeWindows.length === segments.length;
         return segments.map((seg, i) => (
           <Tile
             key={cached.chunks ? `${assignment.id}-chunk-${i}` : assignment.id}
@@ -366,6 +368,8 @@ export function FocusStationColumn({
             top={seg.top}
             height={seg.height}
             calageGeometries={seg.calageGeometries}
+            windowStart={useChunkWindows ? activeWindows![i].start : undefined}
+            windowEnd={useChunkWindows ? activeWindows![i].end : undefined}
             similarityResults={cached.similarityResults}
             similarityScore={cached.similarityScore}
             category={cached.category}
@@ -379,6 +383,7 @@ export function FocusStationColumn({
             operatorNames={cached.operatorNames}
             sawtoothTop={interrupt?.top}
             sawtoothBottom={interrupt?.bottom}
+            stationName={station.name}
           />
         ));
       })}

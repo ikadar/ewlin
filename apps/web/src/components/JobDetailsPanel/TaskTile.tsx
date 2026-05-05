@@ -7,7 +7,7 @@ import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
 import { ProgressFill, computeProgressBgGradient } from '../Tile/ProgressFill';
 import { TaskBadge } from '../Tile/TaskBadge';
-import { computeOptimisticProgress } from '../Tile/saisieMath';
+import { computeChunkProgress } from '../Tile/saisieMath';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -139,28 +139,17 @@ export const TaskTile = memo(function TaskTile({
   const crosslink = useHoverCrosslink(task.id);
   const now = useNow(60_000);
 
-  // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed once per
-  // task here ; each operator sub-tile mirrors the same task-level value
-  // so the chef sees a coherent progression across the per-operator rows.
-  //
-  // Completed tasks (silent-completion : now > scheduledEnd, or explicit
-  // isCompleted) keep rendering the fond-vert at 100% so the JDP rows
-  // match the planning's fully-green state. Without this, past-end task
-  // rows looked blank/caduque in the JDP while the planning showed them
-  // as green ("done") — visual inconsistency the chef caught immediately.
-  const fondVert = (task.type === 'Internal' && assignment)
-    ? (isCompleted
-        ? { pct: 100, isLate: false }
-        : computeOptimisticProgress(
-            assignment.scheduledStart,
-            assignment.scheduledEnd,
-            (task as InternalTask).duration.setupMinutes,
-            (task as InternalTask).duration.runMinutes,
-            (task as InternalTask).recordedProgressPct,
-            (task as InternalTask).recordedAt,
-            now.getTime(),
-          ))
-    : null;
+  // Per-operator-stint fond-vert is computed inside the operator-row map
+  // below (see `computeChunkProgress(op.from, op.to, ...)`). Earlier
+  // versions of this component computed a single task-level pct here and
+  // mirrored it across every sub-row : the chef saw a future stint
+  // already-partly-green (because the task envelope had elapsed into it
+  // from above) and a past stint only-partly-green (because the envelope
+  // hadn't reached its end). Per-stint wallclock matches "this row is
+  // done / running / hasn't started", which is what the chef reads each
+  // row as. Saisie stays task-level and is reflected via the engine's
+  // window reshuffle on recompute, not folded back into the visualization.
+  const taskIsCompleted = (task.type === 'Internal' && assignment) ? isCompleted : false;
 
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
   if (task.type === 'Outsourced') {
@@ -388,9 +377,22 @@ export const TaskTile = memo(function TaskTile({
                 onJumpToOperatorSlice!(op.operatorId, fromDate);
                 pulseTaskTiles(task.id);
               };
+              // Per-stint wallclock fond-vert : each operator row computes
+              // its own progress against its own from..to window. Past stints
+              // clamp to 100, future stints to 0, the active stint fills
+              // linearly. Completed/silent-completed tasks short-circuit to
+              // 100 so the whole task reads fully green when it should
+              // (matches the parent tile's completed colour). The gradient
+              // at pct=100 collapses to a uniform fond-vert — the row's
+              // base bg is zinc, so without rendering the gradient at 100%
+              // the row would fall back to grey while the parent reads green.
+              const fondVert = (op.from && op.to)
+                ? (taskIsCompleted
+                    ? { pct: 100, isLate: false }
+                    : computeChunkProgress(op.from, op.to, now.getTime()))
+                : null;
               const showRowGradient = !!fondVert
-                && (fondVert.pct > 0 || fondVert.isLate)
-                && fondVert.pct < 100;
+                && (fondVert.pct > 0 || fondVert.isLate);
               const rowBaseBg = 'rgba(63, 63, 70, 0.45)'; // ≈ bg-zinc-700/45
               const rowBg = showRowGradient && fondVert
                 ? computeProgressBgGradient(fondVert.pct, fondVert.isLate, 'horizontal', rowBaseBg)

@@ -116,3 +116,51 @@ export function computeOptimisticProgress(
   const isLate = pct < 100 && nowMs > theoreticalEndMs;
   return { pct, isLate };
 }
+
+/**
+ * Per-window (chunk or operator stint) wallclock progress at `now`.
+ *
+ * Why a separate helper from `computeOptimisticProgress` :
+ *
+ * - `computeOptimisticProgress` is task-scoped : it returns a single pct
+ *   for the whole task envelope, blending wallclock + saisie anchor
+ *   extrapolation. Mirroring that single value across every chunk / sub-row
+ *   makes a future stint look partially-green (the envelope's wallclock has
+ *   elapsed into it from above) and a past stint look partially-green
+ *   (the envelope's wallclock hasn't reached the task's end yet) — both
+ *   wrong from the chef's POV : he wants "this stint is done / running /
+ *   hasn't started" per row.
+ *
+ * - This helper is window-scoped : each chunk / sub-row has its own
+ *   start..end and computes from `(now - start) / (end - start)`. Past
+ *   windows clamp to 100, future windows to 0, the active window grows
+ *   linearly. Same shape as `computeOptimisticProgress` (returns
+ *   `{ pct, isLate }`) so callsites can swap calls trivially.
+ *
+ * Saisie (`recordedProgressPct`) deliberately doesn't enter the per-window
+ * computation : it's a task-level fact that already shapes the engine's
+ * re-estimation (productivity ratio → realisticRunMinutes → reshuffled
+ * window boundaries). Folding it back here would double-count — the
+ * window timestamps after a recompute already encode the saisie-aware
+ * truth. `isLate` is structurally false in pure wallclock mode (we clamp
+ * to 100 the moment `now ≥ end`), kept in the return shape only for API
+ * symmetry with `computeOptimisticProgress`.
+ */
+export function computeChunkProgress(
+  windowStartIso: string,
+  windowEndIso: string,
+  nowMs: number,
+): { pct: number; isLate: boolean } {
+  const startMs = new Date(windowStartIso).getTime();
+  const endMs = new Date(windowEndIso).getTime();
+  const windowMs = Math.max(0, endMs - startMs);
+  let pct: number;
+  if (windowMs === 0 || nowMs >= endMs) {
+    pct = 100;
+  } else if (nowMs <= startMs) {
+    pct = 0;
+  } else {
+    pct = ((nowMs - startMs) / windowMs) * 100;
+  }
+  return { pct, isLate: false };
+}

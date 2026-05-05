@@ -551,9 +551,20 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
         const height = ((new Date(end).getTime() - new Date(start).getTime()) / 3_600_000) * LENS_PIXELS_PER_HOUR;
         return { top, height };
       };
-      const segments = a.activeWindows && a.activeWindows.length >= 2
-        ? a.activeWindows.map((w, i) => ({ key: `lens-${a.id}-chunk-${i}`, ...projectLinear(w.start, w.end) }))
-        : [{ key: `lens-${a.id}`, ...projectLinear(a.scheduledStart, a.scheduledEnd) }];
+      const useChunks = a.activeWindows && a.activeWindows.length >= 2;
+      const segments = useChunks
+        ? a.activeWindows!.map((w, i) => ({
+            key: `lens-${a.id}-chunk-${i}`,
+            windowStart: w.start,
+            windowEnd: w.end,
+            ...projectLinear(w.start, w.end),
+          }))
+        : [{
+            key: `lens-${a.id}`,
+            windowStart: undefined as string | undefined,
+            windowEnd: undefined as string | undefined,
+            ...projectLinear(a.scheduledStart, a.scheduledEnd),
+          }];
       return segments.map((seg) => (
         <Tile
           key={seg.key}
@@ -563,6 +574,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           element={cached.element}
           top={seg.top}
           height={seg.height}
+          windowStart={seg.windowStart}
+          windowEnd={seg.windowEnd}
           isSelected={false}
           similarityResults={cached.similarityResults}
           similarityScore={cached.similarityScore}
@@ -582,10 +595,11 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
           sawtoothBottom={interrupt?.bottom}
           overrideLeft={`40px`}
           overrideWidth={`calc(100% - 44px)`}
+          stationName={stationMap.get(cached.task.stationId)?.name}
         />
       ));
     });
-  }, [lens.state.activeColumnId, lensActiveAssignments, tileDataCache, taskInterruption, lensRange.gridStartMs, displayMode]);
+  }, [lens.state.activeColumnId, lensActiveAssignments, tileDataCache, stationMap, taskInterruption, lensRange.gridStartMs, displayMode]);
 
   const lensUnavailabilitySegments = useMemo(() => {
     if (!lens.state.activeColumnId) return [];
@@ -863,6 +877,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                       height: cached.height,
                       calageGeometries: cached.calageGeometries,
                     }];
+                    const activeWindows = assignment.activeWindows;
+                    const useChunkWindows = !!cached.chunks && !!activeWindows && activeWindows.length === segments.length;
                     return segments.map((seg, i) => (
                       <Tile
                         key={cached.chunks ? `${assignment.id}-chunk-${i}` : assignment.id}
@@ -873,6 +889,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         top={seg.top}
                         height={seg.height}
                         calageGeometries={seg.calageGeometries}
+                        windowStart={useChunkWindows ? activeWindows![i].start : undefined}
+                        windowEnd={useChunkWindows ? activeWindows![i].end : undefined}
                         isSelected={selectedJobId === cached.jobId}
                         similarityResults={cached.similarityResults}
                         similarityScore={cached.similarityScore}
@@ -895,6 +913,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         isFrozenOverridden={isOverridden}
                         sequenceIndex={sequenceIndex}
                         onToggleFrozenOverride={onToggleFrozenOverride}
+                        stationName={stationMap.get(cached.task.stationId)?.name}
                       />
                     ));
                   })}

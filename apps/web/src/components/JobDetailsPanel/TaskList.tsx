@@ -5,6 +5,7 @@ import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
+import { isCompletedEffective } from '../Tile/colorUtils';
 
 export interface TaskListProps {
   /** Tasks to display */
@@ -180,10 +181,16 @@ export function TaskList({
 
       // Compute tile state for state-based coloring
       const isScheduled = !!assignment;
-      // Outsourced tasks use task.status (shared with Flux ST column); internal use assignment
+      // Outsourced tasks use task.status (shared with Flux ST column); internal
+      // tasks use the assignment flag combined with the silent-completion
+      // rule (no-news = good-news : a scheduled task whose end is past now
+      // reads as completed even without the explicit flag). Logic centralised
+      // in `isCompletedEffective` — same helper drives station grid, focus
+      // view and minimap, so the JDP can no longer drift.
       const isCompleted = task.type === 'Outsourced'
         ? task.status === 'Completed'
-        : (assignment?.isCompleted ?? false);
+        : isScheduled
+          && isCompletedEffective(assignment!.isCompleted, assignment!.scheduledEnd, Date.now());
       const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
       const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < new Date();

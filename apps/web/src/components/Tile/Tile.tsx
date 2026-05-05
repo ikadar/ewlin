@@ -2,13 +2,13 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
-import { getStateColorClasses, getStateRgb } from './colorUtils';
+import { getStateColorClasses, getStateRgb, isCompletedEffective } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import { ProgressFill, computeProgressBgGradient, computeProgressBorderImage } from './ProgressFill';
 import { TaskBadge } from './TaskBadge';
-import { computeOptimisticProgress } from './saisieMath';
+import { computeOptimisticProgress, computeChunkProgress } from './saisieMath';
 import { getStateInlineColors } from './colorUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
@@ -94,6 +94,16 @@ export interface TileProps {
   sequenceIndex?: number;
   /** Human-readable station/machine label, surfaced in the saisie modal. */
   stationName?: string;
+  /**
+   * When this tile is one chunk of an `activeWindows`-split assignment, the
+   * caller passes the chunk's own time bounds here. The fond-vert + late
+   * detection then run against this window instead of the assignment
+   * envelope so each chunk shows its own wallclock progress (past chunks
+   * fully green, future chunks blank, the active chunk partially filled).
+   * Undefined for normal continuous tiles — the assignment envelope is used.
+   */
+  windowStart?: string;
+  windowEnd?: string;
 }
 
 /**
@@ -142,6 +152,8 @@ export const Tile = memo(function Tile({
   onToggleFrozenOverride,
   sequenceIndex,
   stationName,
+  windowStart,
+  windowEnd,
 }: TileProps) {
   const crosslink = useHoverCrosslink(task.id);
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -191,10 +203,20 @@ export const Tile = memo(function Tile({
 
   // No-news = good-news auto-completion : a tile whose scheduledEnd is past
   // `now` reads as completed regardless of the explicit `isCompleted` flag.
+  // Logic centralised in `isCompletedEffective` so JDP, station grid, focus
+  // view and minimap all agree on the silent-completion frontier.
+  // For chunk tiles, a chunk is considered effectively completed once its
+  // OWN window has ended — otherwise a future chunk of a partly-past
+  // assignment would also flip to completed-green, contradicting the
+  // "this stint hasn't started" reading the chef expects.
+  const completionEndIso = windowEnd ?? assignment.scheduledEnd;
+  const baseEffectivelyCompleted = isCompletedEffective(
+    assignment.isCompleted,
+    completionEndIso,
+    now.getTime(),
+  );
   const effectiveTileState =
-    tileState !== 'shipped' &&
-    tileState !== 'completed' &&
-    new Date(assignment.scheduledEnd).getTime() < now.getTime()
+    tileState !== 'shipped' && tileState !== 'completed' && baseEffectivelyCompleted
       ? ('completed' as TileState)
       : tileState;
 
@@ -206,18 +228,26 @@ export const Tile = memo(function Tile({
   // `assignment.isCompleted` flag still feeds `tileState` upstream.
   const isCompleted = effectiveTileState === 'completed' || effectiveTileState === 'shipped';
 
-  // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed once here
-  // so the body bg + border-image can carry the gradient AND the label text
-  // can switch to the completed-state colour for the green portion.
-  const progress = !isCompleted ? computeOptimisticProgress(
-    assignment.scheduledStart,
-    assignment.scheduledEnd,
-    setupMinutes,
-    task.duration.runMinutes ?? 0,
-    task.recordedProgressPct,
-    task.recordedAt,
-    now.getTime(),
-  ) : null;
+  // Fond-vert : two flavours.
+  //   - Chunk tile (windowStart/End passed) : per-window wallclock progress —
+  //     past chunks 100, future chunks 0, active chunk fills linearly. The
+  //     saisie remains task-level and is reflected by the engine reshuffling
+  //     window boundaries on recompute, so we don't blend it in here.
+  //   - Continuous tile : the original task-level optimistic projection
+  //     blends wallclock + saisie anchor extrapolation.
+  const progress = isCompleted
+    ? null
+    : windowStart && windowEnd
+      ? computeChunkProgress(windowStart, windowEnd, now.getTime())
+      : computeOptimisticProgress(
+          assignment.scheduledStart,
+          assignment.scheduledEnd,
+          setupMinutes,
+          task.duration.runMinutes ?? 0,
+          task.recordedProgressPct,
+          task.recordedAt,
+          now.getTime(),
+        );
   const showGradient = progress !== null
     && (progress.pct > 0 || progress.isLate)
     && progress.pct < 100;
