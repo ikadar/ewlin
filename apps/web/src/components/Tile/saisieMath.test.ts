@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeChunkProgress, computeOptimisticProgress } from './saisieMath';
+import {
+  computeChunkProgress,
+  computeOptimisticProgress,
+  computeUnplacedOptimisticProgress,
+} from './saisieMath';
 
 describe('computeChunkProgress (per-window wallclock)', () => {
   const WINDOW_START = '2026-05-05T11:15:00.000Z';
@@ -145,5 +149,124 @@ describe('computeOptimisticProgress (geometric fill, smooth across calage + run)
       now,
     );
     expect(out.pct).toBeCloseTo(70.83, 1);
+  });
+});
+
+describe('computeUnplacedOptimisticProgress (cross-scenario, no assignment)', () => {
+  // The Préprod-tile-lifted use case : the task has an anchor + ratio on
+  // its own row, but no scheduledStart/End in the current scenario. The
+  // helper extrapolates purely from task fields.
+
+  it('returns 0 when no anchor exists', () => {
+    const now = new Date('2026-05-05T10:30:00.000Z').getTime();
+    expect(
+      computeUnplacedOptimisticProgress(null, null, null, 60, now),
+    ).toBe(0);
+  });
+
+  it('returns the recorded value verbatim when no recordedAt yet', () => {
+    const now = new Date('2026-05-05T10:30:00.000Z').getTime();
+    expect(
+      computeUnplacedOptimisticProgress(50, null, 1, 60, now),
+    ).toBe(50);
+  });
+
+  it('extrapolates linearly from anchor at productivity 1.0', () => {
+    // Saisie at 10:00 reports 50% on a 60-min nominal run. 30 min later,
+    // 30/60 × 100 = +50 → 100% at productivity 1.0. We clamp at 100.
+    const now = new Date('2026-05-05T10:30:00.000Z').getTime();
+    expect(
+      computeUnplacedOptimisticProgress(
+        50,
+        '2026-05-05T10:00:00.000Z',
+        1,
+        60,
+        now,
+      ),
+    ).toBeCloseTo(100, 5);
+  });
+
+  it('slows extrapolation when productivity ratio > 1 (operator slower)', () => {
+    // Same as above but ratio = 2 → realistic run = 120 min. 30 min on 120
+    // = 25% delta → recordedPct + 25 = 75.
+    const now = new Date('2026-05-05T10:30:00.000Z').getTime();
+    expect(
+      computeUnplacedOptimisticProgress(
+        50,
+        '2026-05-05T10:00:00.000Z',
+        2,
+        60,
+        now,
+      ),
+    ).toBeCloseTo(75, 5);
+  });
+
+  it('defaults productivity to 1.0 when null', () => {
+    const now = new Date('2026-05-05T10:15:00.000Z').getTime();
+    // 15 min on 60 min nominal = 25% delta from anchor.
+    expect(
+      computeUnplacedOptimisticProgress(
+        50,
+        '2026-05-05T10:00:00.000Z',
+        null,
+        60,
+        now,
+      ),
+    ).toBeCloseTo(75, 5);
+  });
+
+  it('clamps at 100 when extrapolation overshoots', () => {
+    const now = new Date('2026-05-05T15:00:00.000Z').getTime();
+    expect(
+      computeUnplacedOptimisticProgress(
+        50,
+        '2026-05-05T10:00:00.000Z',
+        1,
+        60,
+        now,
+      ),
+    ).toBe(100);
+  });
+
+  it('clamps at 0 when anchor is post-now (clock skew)', () => {
+    const now = new Date('2026-05-05T10:00:00.000Z').getTime();
+    // Saisie at 10:30 (in the future relative to now). Delta is negative.
+    // recordedPct=10 + (-30/60)*100 = 10 - 50 = -40 → clamp 0.
+    expect(
+      computeUnplacedOptimisticProgress(
+        10,
+        '2026-05-05T10:30:00.000Z',
+        1,
+        60,
+        now,
+      ),
+    ).toBe(0);
+  });
+
+  it('returns recorded pct when runMinutes is 0 (no denominator)', () => {
+    const now = new Date('2026-05-05T10:30:00.000Z').getTime();
+    expect(
+      computeUnplacedOptimisticProgress(
+        42,
+        '2026-05-05T10:00:00.000Z',
+        1,
+        0,
+        now,
+      ),
+    ).toBe(42);
+  });
+
+  it('treats non-positive productivity as default 1.0 (defensive)', () => {
+    const now = new Date('2026-05-05T10:30:00.000Z').getTime();
+    // ratio = 0 would div-by-zero ; 1.0 fallback gives 30/60 = +50 → 100.
+    expect(
+      computeUnplacedOptimisticProgress(
+        50,
+        '2026-05-05T10:00:00.000Z',
+        0,
+        60,
+        now,
+      ),
+    ).toBe(100);
   });
 });

@@ -161,6 +161,46 @@ export function computeOptimisticProgress(
 }
 
 /**
+ * Cross-scenario / unplaced extrapolation. When a task has no assignment in
+ * the current scenario (typically Préprod tile lifted, but the task is still
+ * running in Prod), the regular `computeOptimisticProgress` can't anchor on
+ * a `scheduledEnd`. This helper extrapolates from the task's own anchor pair
+ * (`recordedProgressPct` + `recordedAt`) using the task-level productivity
+ * ratio (1.0 default) and the JCF-immutable `runMinutes` as denominator :
+ *
+ *   realisticRunMs = runMinutes × ratio × 60_000
+ *   pct = recordedProgressPct + ((now - recordedAt) / realisticRunMs) × 100
+ *
+ * The pair on the task is shared across scenarios — that's the whole point
+ * of promoting it from `task_assignments` to `tasks` (cf. migration
+ * 20260505200000). When no anchor exists yet (no saisie), returns 0 — the
+ * caller then renders a flat blue tile (status quo).
+ *
+ * Sticky past 100 % : we clamp upward but never reset to 0 after a
+ * recorded saisie, mirroring the silence-is-consent invariant in
+ * `computeOptimisticProgress`.
+ */
+export function computeUnplacedOptimisticProgress(
+  recordedProgressPct: number | null | undefined,
+  recordedAt: string | null | undefined,
+  productivityRatio: number | null | undefined,
+  runMin: number,
+  nowMs: number,
+): number {
+  if (recordedProgressPct == null || recordedAt == null) {
+    return Math.max(0, Math.min(100, recordedProgressPct ?? 0));
+  }
+  const ratio = productivityRatio != null && productivityRatio > 0 ? productivityRatio : 1;
+  const realisticRunMs = Math.max(0, runMin) * ratio * 60_000;
+  if (realisticRunMs <= 0) {
+    return Math.max(0, Math.min(100, recordedProgressPct));
+  }
+  const anchorMs = new Date(recordedAt).getTime();
+  const delta = ((nowMs - anchorMs) / realisticRunMs) * 100;
+  return Math.max(0, Math.min(100, recordedProgressPct + delta));
+}
+
+/**
  * Per-window (chunk or operator stint) wallclock progress at `now`.
  *
  * Why a separate helper from `computeOptimisticProgress` :

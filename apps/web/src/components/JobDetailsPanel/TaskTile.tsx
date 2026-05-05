@@ -7,7 +7,7 @@ import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
 import { ProgressFill, computeProgressBgGradient } from '../Tile/ProgressFill';
 import { TaskBadge } from '../Tile/TaskBadge';
-import { computeChunkProgress } from '../Tile/saisieMath';
+import { computeChunkProgress, computeUnplacedOptimisticProgress } from '../Tile/saisieMath';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
 
@@ -442,14 +442,21 @@ export const TaskTile = memo(function TaskTile({
     }
   };
 
-  // Static recorded progress for unplaced tasks. No schedule means no
-  // optimistic extrapolation — the value is whatever the chef (or operator
-  // via prod) declared, frozen at fork time in préprod. The gradient is
-  // horizontal (left → right) so the green portion grows like a status bar
-  // rather than eating the tile vertically. Outsourced tasks don't carry
-  // the field, so progress only renders on internal tasks.
+  // Live recorded progress for unplaced tasks. Even without an assignment in
+  // the current scenario (Préprod tile lifted), the task carries its own
+  // anchor pair (recordedProgressPct + recordedAt) and the operator's
+  // productivity ratio — enough to extrapolate live progress between
+  // saisies. Falls back to the frozen anchor value when no productivity
+  // data is available yet. Outsourced tasks don't carry the fields, so
+  // progress only renders on internal tasks.
   const unplacedRecordedPct = task.type === 'Internal'
-    ? Math.max(0, Math.min(100, (task as InternalTask).recordedProgressPct ?? 0))
+    ? computeUnplacedOptimisticProgress(
+        (task as InternalTask).recordedProgressPct,
+        (task as InternalTask).recordedAt,
+        (task as InternalTask).productivityRatio,
+        (task as InternalTask).duration.runMinutes,
+        now.getTime(),
+      )
     : 0;
   const showUnplacedProgress = unplacedRecordedPct > 0;
   const unplacedBaseBg = 'rgba(59, 130, 246, 0.12)'; // mirrors TILE_STYLES.unplaced.bg
