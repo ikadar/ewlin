@@ -1196,17 +1196,19 @@ export default function OperatorSchedulePage() {
       : undefined;
 
     // Per-tile badge breakdown — share of the parent task this chunk
-    // covers, by wallclock ratio. Unsplit task → 100 ; chunk-split →
-    // sum across slices ≈ taskSlotVolumePct (= 100).
+    // covers. Denominator is the REALISTIC task duration (or theoretical
+    // setup+run as fallback), NOT the wallclock envelope ; otherwise a
+    // task crossing overnight (18h envelope, 75min real work) renders
+    // every per-tile badge at 3-4% instead of the true ~40-50%.
     const sliceBadgePct = ((): number => {
-      if (!assignment) return 100;
-      const totalMs = new Date(assignment.scheduledEnd).getTime()
-        - new Date(assignment.scheduledStart).getTime();
-      if (totalMs <= 0) return 100;
-      const sliceMs = slice.to.getTime() - slice.from.getTime();
-      const ratio = Math.max(0, Math.min(1, sliceMs / totalMs));
-      const taskSlot = assignment.taskSlotVolumePct ?? 100;
-      return ratio * taskSlot;
+      if (!assignment || !task) return 100;
+      const realisticMin = assignment.realisticDurationMinutes
+        ?? (isInternalTask(task)
+          ? task.duration.setupMinutes + task.duration.runMinutes
+          : 0);
+      if (realisticMin <= 0) return 100;
+      const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
+      return Math.max(0, Math.min(100, (sliceMin / realisticMin) * 100));
     })();
 
     const handleOpenSaisie = assignment

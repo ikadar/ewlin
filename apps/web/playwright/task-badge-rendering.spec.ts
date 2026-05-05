@@ -58,9 +58,13 @@ test('task badge renders on planning tiles', async ({ page }) => {
   const text = (await first.textContent())?.trim();
   expect(text).toBe(`${pct}%`);
 
-  // Per-tile badge invariant : each value is in (0, 100]. Unsplit tasks
-  // collapse to 100 ; chunk-split tasks emit fractional values whose
-  // sum across the slices of the same task ≈ taskSlotVolumePct (= 100).
+  // Per-tile badge invariant : each value is in (0, 100]. The numerator
+  // is the slice's wallclock duration, the denominator is the task's
+  // realistic duration (or theoretical setup+run as fallback). Clamped
+  // per-tile so a slice that wallclock-spans more than realistic — which
+  // happens when an overnight collapse stretches the operator's window
+  // beyond the actual work duration — still reads 100% rather than
+  // overflowing.
   const allPcts = await badges.evaluateAll((els) =>
     els.map((e) => Number(e.getAttribute('data-pct'))),
   );
@@ -70,22 +74,9 @@ test('task badge renders on planning tiles', async ({ page }) => {
     expect(p).toBeLessThanOrEqual(100);
   }
 
-  // Cross-tile sum invariant : grouped by task-id (data-flux-task-id),
-  // the sum of badges should be ≈ 100 for any task whose tiles are all
-  // visible. For viewport-clipped tasks the sum may be less ; we only
-  // assert no group exceeds 100 + rounding tolerance.
-  const byTask = await badges.evaluateAll((els) => {
-    const groups: Record<string, number> = {};
-    for (const el of els) {
-      const tile = el.closest('[data-flux-task-id]');
-      const taskId = tile?.getAttribute('data-flux-task-id');
-      if (!taskId) continue;
-      groups[taskId] = (groups[taskId] ?? 0) + Number(el.getAttribute('data-pct'));
-    }
-    return groups;
-  });
-  for (const [taskId, sum] of Object.entries(byTask)) {
-    // Allow 2% tolerance for rounding (each badge rounds to integer).
-    expect(sum, `task ${taskId} badges sum ≤ 100 + tolerance`).toBeLessThanOrEqual(102);
-  }
+  // Cross-tile sum is intentionally NOT asserted here : in operator-row
+  // views the same task can surface in multiple sub-tiles whose sum ≠
+  // 100% by design (chunk-split overnight, masked-time concurrency).
+  // The strict invariant lives at the engine layer (taskSlotVolumePct)
+  // not the FE rendering breakdown.
 });

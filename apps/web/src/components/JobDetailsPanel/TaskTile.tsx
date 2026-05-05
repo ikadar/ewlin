@@ -358,16 +358,22 @@ export const TaskTile = memo(function TaskTile({
               const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
 
               // Per-operator badge — share of the parent task this operator
-              // handles, by wallclock ratio. Single op covering whole task →
-              // 100. Two sequential ops half-each → 50 / 50. Masked-time
-              // concurrent → 100 / 100 (overlap, sum > 100 by design).
+              // handles. Denominator is the task's REALISTIC duration (or
+              // theoretical setup+run as fallback), NOT the wallclock
+              // envelope : a chunk-split task crossing overnight has a
+              // ~18h envelope but only ~75 min of actual work, and using
+              // the envelope makes every operator badge collapse to 3-4%
+              // instead of the true ~40-50% share.
               const opBadgePct = ((): number => {
                 if (!assignment || !fromDate || !toDate) return 100;
-                const totalMs = new Date(assignment.scheduledEnd).getTime()
-                  - new Date(assignment.scheduledStart).getTime();
-                if (totalMs <= 0) return 100;
-                const opMs = toDate.getTime() - fromDate.getTime();
-                return Math.max(0, Math.min(100, (opMs / totalMs) * 100));
+                const realisticMin = assignment.realisticDurationMinutes
+                  ?? (task.type === 'Internal'
+                    ? (task as InternalTask).duration.setupMinutes
+                      + (task as InternalTask).duration.runMinutes
+                    : 0);
+                if (realisticMin <= 0) return 100;
+                const opMin = (toDate.getTime() - fromDate.getTime()) / 60_000;
+                return Math.max(0, Math.min(100, (opMin / realisticMin) * 100));
               })();
 
               const isClickable = !!onJumpToOperatorSlice && !!fromDate;

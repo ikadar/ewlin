@@ -2771,12 +2771,15 @@ fn pre_place_pinned_actions(
         //     chunk-mini guard credits the past committed work and
         //     doesn't reject a small post-NOW remainder
         //
-        // Legacy fallback: when PHP doesn't yet emit the explicit
-        // `is_in_progress` flag (mid-rollout), infer it via
-        // `start_t < now_tick`. The two paths converge as soon as
-        // PHP emits the flag — at which point the heuristic becomes
-        // a belt-and-suspenders no-op because the explicit branch
-        // wins.
+        // Triggered by PHP's explicit `is_in_progress` flag, OR by the
+        // legacy heuristic "start in the past AND (end is None OR end is
+        // in the future)". The end-side condition is the upgrade over
+        // the original heuristic : without it, every pin that finished
+        // in the past (the typical integration-test case where a pin
+        // covers ticks 5..6 and now_tick is 14+) was mis-classified as
+        // in-progress, freeing its pinned_end_tick and breaking the
+        // tests. End-in-future correctly distinguishes "the work is
+        // happening now" from "the work was done earlier".
         //
         // Cf. docs/operator-sandbox/engine-split-at-now-plan.md and
         // memory `feedback_in_progress_committed.md` (Q1 2026-05-04).
@@ -2785,8 +2788,11 @@ fn pre_place_pinned_actions(
         // `in_progress_safety_zone_pin_skips_chunk_mini_guard`,
         // `in_progress_pin_with_short_remaining_window_still_kept`,
         // `in_progress_pin_below_earliest_start_is_kept`.
-        let detected_in_progress = actions[i].is_in_progress || start_t < now_tick;
-        if detected_in_progress {
+        let derived_end = actions[i].pinned_end_tick.unwrap_or_else(|| {
+            start_t + (actions[i].setup_ticks + actions[i].run_ticks) as usize
+        });
+        let crosses_now_heuristic = start_t < now_tick && derived_end > now_tick;
+        if actions[i].is_in_progress || crosses_now_heuristic {
             let elapsed = if actions[i].task_elapsed_ticks > 0 {
                 actions[i].task_elapsed_ticks
             } else {
@@ -2797,8 +2803,6 @@ fn pre_place_pinned_actions(
             actions[i].pinned_end_tick = None;
             actions[i].forced_start_tick = Some(start_t);
             actions[i].already_eaten_ticks = elapsed;
-            // Normalize the explicit fields so downstream consumers
-            // (and any cloned actions) see a consistent state.
             actions[i].is_in_progress = true;
             actions[i].task_elapsed_ticks = elapsed;
             continue;

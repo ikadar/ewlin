@@ -264,19 +264,21 @@ export function FocusOperatorColumn({
             )
           : undefined;
 
-        // Per-tile badge breakdown : each chunk-split slice gets a share
-        // proportional to its wallclock duration. For unsplit tasks (one
-        // slice = full assignment), the ratio collapses to 100. Sum
-        // across slices of the same task ≈ taskSlotVolumePct (= 100).
+        // Per-tile badge breakdown : each chunk-split slice's share of
+        // the parent task. Denominator is the REALISTIC task duration
+        // (or theoretical setup+run as fallback), NOT the wallclock
+        // envelope — a chunk-split task crossing overnight has a 18h
+        // envelope but only ~75 min of actual work, and dividing by the
+        // envelope makes per-tile badges collapse to single-digit %.
         const sliceBadgePct = ((): number => {
           if (!assignment) return 100;
-          const totalMs = new Date(assignment.scheduledEnd).getTime()
-            - new Date(assignment.scheduledStart).getTime();
-          if (totalMs <= 0) return 100;
-          const sliceMs = slice.to.getTime() - slice.from.getTime();
-          const ratio = Math.max(0, Math.min(1, sliceMs / totalMs));
-          const taskSlot = assignment.taskSlotVolumePct ?? 100;
-          return ratio * taskSlot;
+          const realisticMin = assignment.realisticDurationMinutes
+            ?? (isInternalTask(task)
+              ? task.duration.setupMinutes + task.duration.runMinutes
+              : 0);
+          if (realisticMin <= 0) return 100;
+          const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
+          return Math.max(0, Math.min(100, (sliceMin / realisticMin) * 100));
         })();
 
         const handleOpenSaisie = assignment && isInternalTask(task)
