@@ -137,7 +137,7 @@ import { baseQueryWithFixtureSupport } from './baseApi';
  * Extended snapshot type that includes server-side config values.
  * lookbackDays is served by the PHP API but not yet in @flux/types.
  */
-interface SnapshotWithConfig extends ScheduleSnapshot {
+export interface SnapshotWithConfig extends ScheduleSnapshot {
   lookbackDays?: number;
 }
 
