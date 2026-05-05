@@ -139,6 +139,44 @@ services:
       - flux-network
 
   # ===========================================
+  # PHP Scheduler (Symfony Messenger consumer)
+  # Reuses the php image to run the recurring tasks declared in
+  # `App\Scheduler\MainSchedule` — currently the per-minute progress
+  # tick that refreshes `tasks.recorded_progress_pct` on every
+  # in-flight Prod assignment.
+  # ===========================================
+  php-scheduler:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: flux-php-scheduler
+    restart: unless-stopped
+    volumes:
+      - ./services/php-api:/var/www/html:cached
+    environment:
+      DATABASE_URL: mysql://${MARIADB_USER}:${MARIADB_PASSWORD}@mariadb:3306/${MARIADB_DATABASE}?serverVersion=10.11.0-MariaDB
+      REDIS_URL: redis://redis:6379
+      APP_ENV: ${APP_ENV:-dev}
+      APP_SECRET: ${APP_SECRET:-change_me_in_production}
+      MERCURE_URL: http://mercure:3000/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://localhost:${MERCURE_PORT:-3000}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
+      TZ: Europe/Paris
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      php:
+        condition: service_healthy
+    # `--time-limit=3600` recycles the worker every hour so a leaked
+    # connection or runaway memory footprint can't accumulate
+    # indefinitely. `--memory-limit=128M` is a second belt for the
+    # same reason. The container's `restart: unless-stopped` brings
+    # the worker back up automatically after each recycle.
+    command: ["bin/console", "messenger:consume", "scheduler_default", "-vv", "--time-limit=3600", "--memory-limit=128M"]
+    networks:
+      - flux-network
+
+  # ===========================================
   # Nginx Web Server
   # ===========================================
   nginx:
