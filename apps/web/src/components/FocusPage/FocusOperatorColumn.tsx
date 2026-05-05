@@ -8,7 +8,7 @@ import type {
 import { TileSegment } from '../Tile/TileSegment';
 import { computeTileState } from '../Tile';
 import { isCompletedEffective } from '../Tile/colorUtils';
-import { computeOptimisticProgress } from '../Tile/saisieMath';
+import { computeChunkProgress } from '../Tile/saisieMath';
 import { timeToYPosition } from '../TimelineColumn';
 import {
   computeTileSlices,
@@ -249,36 +249,45 @@ export function FocusOperatorColumn({
           ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
           : false;
 
-        // Optimistic fond-vert per segment. Even though chunk-split tiles
-        // share the same task-level anchor, the fill is rendered identically
-        // on each chunk — they collectively visualise the task progress.
+        // Per-slice wallclock fond-vert : each segment computes its own
+        // progress from its slice.from..slice.to window. Past slices clamp
+        // to 100, future slices to 0, the active slice fills linearly.
+        // Earlier this used `computeOptimisticProgress` against the
+        // assignment envelope and broadcast the same value across every
+        // slice — chunk 1 (already past) showed only the envelope-relative
+        // pct and chunk 2 (in the future) was already partially green
+        // because the envelope had elapsed into it from above. Saisie
+        // remains task-level and reshapes window boundaries on engine
+        // recompute, never folded back into per-slice math.
         const progressFill = (assignment && isInternalTask(task))
-          ? computeOptimisticProgress(
-              assignment.scheduledStart,
-              assignment.scheduledEnd,
-              task.duration.setupMinutes,
-              task.duration.runMinutes,
-              task.recordedProgressPct,
-              task.recordedAt,
-              now.getTime(),
-            )
+          ? (isCompletedNow
+              ? { pct: 100, isLate: false }
+              : computeChunkProgress(
+                  slice.from.toISOString(),
+                  slice.to.toISOString(),
+                  now.getTime(),
+                ))
           : undefined;
 
-        // Per-tile badge breakdown : each chunk-split slice's share of
-        // the parent task. Denominator is the REALISTIC task duration
-        // (or theoretical setup+run as fallback), NOT the wallclock
-        // envelope — a chunk-split task crossing overnight has a 18h
-        // envelope but only ~75 min of actual work, and dividing by the
-        // envelope makes per-tile badges collapse to single-digit %.
+        // Per-slice badge breakdown : each slice's share of the
+        // operator-time invested on this assignment. Denominator is the
+        // sum of every operator stint window (assignment.operators[]) so
+        // the badges sum to 100% across all slices regardless of how
+        // many operators worked the task. Earlier this used
+        // `realisticDurationMinutes` (a single-stint figure) which made
+        // a 30-min slice show 100% and a 15-min slice show 50% on a task
+        // whose two stints together totalled 45 min — the chef expected
+        // 67% / 33% (matching the JDP per-operator badges, same model).
         const sliceBadgePct = ((): number => {
-          if (!assignment) return 100;
-          const realisticMin = assignment.realisticDurationMinutes
-            ?? (isInternalTask(task)
-              ? task.duration.setupMinutes + task.duration.runMinutes
-              : 0);
-          if (realisticMin <= 0) return 100;
+          if (!assignment?.operators?.length) return 100;
+          const opWindowMinutes = (op: { from?: string; to?: string }): number => {
+            if (!op.from || !op.to) return 0;
+            return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
+          };
+          const totalOpMin = assignment.operators.reduce((s, op) => s + opWindowMinutes(op), 0);
+          if (totalOpMin <= 0) return 100;
           const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
-          return Math.max(0, Math.min(100, (sliceMin / realisticMin) * 100));
+          return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
         })();
 
         const handleOpenSaisie = assignment && isInternalTask(task)

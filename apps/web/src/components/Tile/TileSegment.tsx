@@ -183,10 +183,14 @@ export function TileSegment({
   const colors = getStateInlineColors(tileState);
   // Fond-vert visibility gate. Hidden on completed/shipped tiles where the
   // state color already conveys the message. The visual is painted by the
-  // bg + border divs below via inline linear-gradient.
+  // bg + border divs below via inline linear-gradient. The 100% threshold
+  // was previously a hard cap, but the gradient at 100% collapses to a
+  // uniform fond-vert which we WANT to render on past-window slices that
+  // haven't been promoted to `completed` upstream (e.g. on the operator
+  // grid where slice tileState stays `default` even though the slice's
+  // own window is past).
   const showGradient = !!progressFill
     && (progressFill.pct > 0 || progressFill.isLate)
-    && progressFill.pct < 100
     && tileState !== 'completed'
     && tileState !== 'shipped';
   // Label colour follows the green portion when partial progress is rendered.
