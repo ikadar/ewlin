@@ -44,23 +44,48 @@ export function computeTaskProgressPct(
 }
 
 /**
- * Optimistic fond-vert progress at `now`, anchored on the last firm saisie
- * when one exists. Two operating modes :
+ * Geometric fond-vert fill fraction over the WHOLE tile (calage + run).
+ * Returned as a percentage 0–100, designed to feed the 2-stop vertical
+ * gradient `linear-gradient(green 0% → green pct% | base pct% → base 100%)`
+ * without any further math at the call-site.
+ *
+ * Why geometric and not run-only :
+ *
+ * The user-facing % (cf. `computeTaskProgressPct`) is run-only by design —
+ * calage is fixed-duration and the productivity ratio scales runMinutes
+ * only. But the planning tile's vertical extent encodes both calage AND
+ * run (calage is the top `setupMs/totalMs` slice of the tile). If the
+ * gradient consumes the run-only pct directly, the green/base boundary
+ * lands at `runPct%` of the TOTAL height instead of at the now-line, and
+ * the gap between green and now-line is pinned to the calage height when
+ * `runPct ≈ 0` — exactly what the user observed.
+ *
+ * Geometric fill solves this : we paint the calage zone wallclock-style
+ * (cPct = wallclock progress through setup) and the run zone via the
+ * task's run-only pct (rPct, optionally extrapolated from a saisie),
+ * then combine into a single fraction of total tile filled :
+ *
+ *   - In calage  : fillFraction = s × cPct/100
+ *   - In run     : fillFraction = s + r × rPct/100   (calage fully filled)
+ *
+ * where s = setupMs / totalMs, r = 1 - s. Because tile height is linear
+ * in time, a 2-stop gradient with `pct = fillFraction × 100` lands the
+ * green/base boundary at the now-line exactly when wallclock-aligned,
+ * and follows the saisie anchor when one is present.
+ *
+ * Two operating modes for the run-zone pct :
  *
  * 1. **No saisie ever** (`recordedProgressPct == null`) — pure clock-driven
- *    extrapolation : 0 during setup, linear 0→100 across the run window,
- *    100 once `now ≥ scheduledEnd`. Identical to `computeTaskProgressPct`.
+ *    extrapolation across the run window.
  *
  * 2. **Saisie present** — extrapolate from the anchor :
- *    `pct = recordedProgressPct + (now - recordedAt) / runMin × 100`,
- *    clamped to [0, 100]. The anchor is sticky : even when `now` walks past
- *    `scheduledEnd`, the FE keeps growing the fill from the latest declared
- *    truth rather than snapping to 100 immediately. This matches the
- *    silence-is-consent philosophy : without a fresh contradiction, the
- *    optimistic projection holds.
+ *    `rPct = recordedProgressPct + (now - recordedAt) / runWindowMs × 100`,
+ *    clamped to [0, 100]. Sticky past `scheduledEnd` to honour
+ *    silence-is-consent (no fresh contradiction → optimistic projection
+ *    holds).
  *
- * `isLate` flags the R1 visualization : when the tile's wall-clock end
- * has passed but the fill hasn't reached 100, the un-filled complement
+ * `isLate` flags the R1 visualization : when the tile's theoretical end
+ * has passed but fill hasn't reached 100, the un-filled complement
  * should render in red rather than the default tile background.
  *
  * Cf. `project_progress_visualization.md` for the locked decisions
@@ -78,42 +103,60 @@ export function computeOptimisticProgress(
   const startMs = new Date(scheduledStart).getTime();
   const setupEndMs = startMs + setupMin * 60_000;
   const endMs = new Date(scheduledEnd).getTime();
-  // Wallclock-based fraction : the fond-vert reaches the now-line exactly,
-  // never beyond it. The earlier formula divided by `runMin` (theoretical)
-  // which can be smaller than the realistic run window when scheduledEnd
-  // reflects a saisie-extended end ; in that case pct grew faster than
-  // wallclock and the green spilled past the now-line on the planning view.
-  // Using `endMs - setupEndMs` (the actual run window in ms) keeps the
-  // visual aligned with where now() lies in the tile.
+  const totalMs = Math.max(0, endMs - startMs);
+  const setupMs = setupMin * 60_000;
   const runWindowMs = Math.max(0, endMs - setupEndMs);
 
-  let pct: number;
-  if (recordedProgressPct == null || recordedAt == null) {
-    if (nowMs <= setupEndMs || runWindowMs === 0) {
-      pct = 0;
-    } else if (nowMs >= endMs) {
-      pct = 100;
-    } else {
-      pct = Math.min(100, Math.max(0, ((nowMs - setupEndMs) / runWindowMs) * 100));
-    }
+  // Geometric structure of the tile : calage occupies the top `setupFraction`,
+  // run occupies the rest. Both are time-linear so pixel/ms ratios are equal.
+  const setupFraction = totalMs > 0 ? Math.min(1, setupMs / totalMs) : 0;
+  const runFraction = 1 - setupFraction;
+
+  let fillFraction: number; // 0..1, share of the WHOLE tile painted green
+  let isLate = false;
+
+  if (totalMs === 0) {
+    fillFraction = 1;
+  } else if (nowMs <= startMs) {
+    fillFraction = 0;
+  } else if (nowMs < setupEndMs) {
+    // In calage : wallclock fraction through setup × setup proportion.
+    const setupProgress = setupMs > 0 ? (nowMs - startMs) / setupMs : 1;
+    fillFraction = Math.min(setupFraction, setupProgress * setupFraction);
   } else {
-    // Anchor-driven : extrapolate the saisie's recorded pct forward by
-    // the wallclock fraction since the anchor — same denominator as the
-    // pure clock case so the post-saisie green also can't overshoot now.
-    const anchorMs = new Date(recordedAt).getTime();
-    if (runWindowMs === 0) {
-      pct = 100;
+    // In run (or past it) : calage fully filled, run zone fills with run pct.
+    let runPct: number;
+    if (recordedProgressPct == null || recordedAt == null) {
+      if (runWindowMs === 0) {
+        runPct = 100;
+      } else if (nowMs >= endMs) {
+        runPct = 100;
+      } else {
+        runPct = ((nowMs - setupEndMs) / runWindowMs) * 100;
+      }
     } else {
-      const delta = ((nowMs - anchorMs) / runWindowMs) * 100;
-      pct = Math.min(100, Math.max(0, recordedProgressPct + delta));
+      // Anchor-driven : extrapolate the saisie pct by the wallclock
+      // fraction since the anchor — same denominator as the clock case so
+      // the post-saisie green also can't overshoot the now-line.
+      const anchorMs = new Date(recordedAt).getTime();
+      if (runWindowMs === 0) {
+        runPct = 100;
+      } else {
+        const delta = ((nowMs - anchorMs) / runWindowMs) * 100;
+        runPct = recordedProgressPct + delta;
+      }
     }
+    runPct = Math.min(100, Math.max(0, runPct));
+    fillFraction = setupFraction + (runPct / 100) * runFraction;
+
+    // R1 : theoretical end past but fill < 100 → un-filled complement red.
+    // Theoretical end uses the JCF-immutable runMin so saisie-extended
+    // scheduledEnd doesn't suppress the late signal.
+    const theoreticalEndMs = setupEndMs + runMin * 60_000;
+    isLate = fillFraction < 1 && nowMs > theoreticalEndMs;
   }
 
-  // R1 : "rouge complément" when the theoretical end is past but the work
-  // hasn't reached 100. Theoretical end uses the JCF-immutable runMin so
-  // saisie-extended scheduledEnd doesn't suppress the late signal.
-  const theoreticalEndMs = setupEndMs + runMin * 60_000;
-  const isLate = pct < 100 && nowMs > theoreticalEndMs;
+  const pct = Math.min(100, Math.max(0, fillFraction * 100));
   return { pct, isLate };
 }
 

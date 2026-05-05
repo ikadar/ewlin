@@ -73,24 +73,77 @@ describe('computeChunkProgress (per-window wallclock)', () => {
   });
 });
 
-describe('computeOptimisticProgress (task-scoped, regression guard)', () => {
-  // Sanity check that the existing task-level helper still behaves as
-  // documented after the chunk helper sat next to it. Light coverage —
-  // the per-window helper above is the new addition.
-  it('returns 0 during setup', () => {
-    const start = '2026-05-05T10:00:00.000Z';
-    const end = '2026-05-05T11:00:00.000Z';
-    const now = new Date('2026-05-05T10:05:00.000Z').getTime();
+describe('computeOptimisticProgress (geometric fill, smooth across calage + run)', () => {
+  // The pct returned is the fraction of the WHOLE tile that should render
+  // as fond-vert : it lands the green/base boundary at the now-line when
+  // wallclock-aligned, both during calage AND during run.
+  const start = '2026-05-05T10:00:00.000Z';
+  const end = '2026-05-05T11:00:00.000Z'; // 60 min total
+  // setup = 15 min ⇒ setupFraction = 0.25
+  // run   = 45 min ⇒ runFraction   = 0.75
+
+  it('returns 0 before tileStart', () => {
+    const now = new Date('2026-05-05T09:55:00.000Z').getTime();
     const out = computeOptimisticProgress(start, end, 15, 45, null, null, now);
     expect(out.pct).toBe(0);
   });
 
+  it('fills proportionally through calage at wallclock pace', () => {
+    // 5 min into a 15 min calage = 1/3 through setup zone.
+    // setup zone occupies 25% of the tile, so fillFraction = 1/3 × 0.25 ≈ 0.0833.
+    const now = new Date('2026-05-05T10:05:00.000Z').getTime();
+    const out = computeOptimisticProgress(start, end, 15, 45, null, null, now);
+    expect(out.pct).toBeCloseTo(8.33, 1);
+  });
+
+  it('reaches exactly setupFraction at the calage/run boundary', () => {
+    // setupEnd : calage fully filled, run still 0%.
+    // fillFraction = 0.25, pct = 25%.
+    const now = new Date('2026-05-05T10:15:00.000Z').getTime();
+    const out = computeOptimisticProgress(start, end, 15, 45, null, null, now);
+    expect(out.pct).toBeCloseTo(25, 5);
+  });
+
+  it('aligns the green/base boundary with the now-line during run (wallclock)', () => {
+    // 22.5 min into 45 min run = 50% run progress.
+    // fillFraction = 0.25 + 0.5 × 0.75 = 0.625, pct = 62.5%.
+    // (now - tileStart) / totalMs = (15 + 22.5) / 60 = 0.625 ✓
+    const now = new Date('2026-05-05T10:37:30.000Z').getTime();
+    const out = computeOptimisticProgress(start, end, 15, 45, null, null, now);
+    expect(out.pct).toBeCloseTo(62.5, 5);
+  });
+
   it('returns 100 once now ≥ scheduledEnd with no saisie', () => {
-    const start = '2026-05-05T10:00:00.000Z';
-    const end = '2026-05-05T11:00:00.000Z';
     const now = new Date('2026-05-05T11:30:00.000Z').getTime();
     const out = computeOptimisticProgress(start, end, 15, 45, null, null, now);
     expect(out.pct).toBe(100);
     expect(out.isLate).toBe(false);
+  });
+
+  it('handles tiles without calage (setupMin = 0) — pure run-zone fill', () => {
+    // Pas de calage → setupFraction = 0, runFraction = 1.
+    // fillFraction = 0 + rPct/100 × 1 = rPct/100.
+    const noCalageEnd = '2026-05-05T10:45:00.000Z'; // 45 min run only
+    // 22.5 min in = 50% run → fillFraction = 0.5
+    const now = new Date('2026-05-05T10:22:30.000Z').getTime();
+    const out = computeOptimisticProgress(start, noCalageEnd, 0, 45, null, null, now);
+    expect(out.pct).toBeCloseTo(50, 5);
+  });
+
+  it('saisie anchor extrapolates from recordedProgressPct, restricted to run zone', () => {
+    // Saisie at 10:30 reports 50% run done.
+    // 5 min later (10:35), wallclock delta on a 45-min run window = 11.1%.
+    // rPct = 50 + 11.1 = 61.1, fillFraction = 0.25 + 0.611 × 0.75 ≈ 0.708.
+    const now = new Date('2026-05-05T10:35:00.000Z').getTime();
+    const out = computeOptimisticProgress(
+      start,
+      end,
+      15,
+      45,
+      50,
+      '2026-05-05T10:30:00.000Z',
+      now,
+    );
+    expect(out.pct).toBeCloseTo(70.83, 1);
   });
 });

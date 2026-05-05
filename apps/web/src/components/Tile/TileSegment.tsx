@@ -295,7 +295,9 @@ export function TileSegment({
 
       {/* Calage phase overlays (initial setup + post-peremption re-calages).
           Same CSS rule applies to both via data-testid in index.css:
-          1px dashed red border-bottom. */}
+          1px dashed red border-bottom. No fill : the overlay carries only
+          the divider so the parent's progress gradient shows through —
+          past calage reads as done (vert), future calage as base. */}
       {calageOverlays.map((ov) => (
         <div
           key={ov.key}
@@ -305,7 +307,6 @@ export function TileSegment({
             // Recalage bands must be at least 4 px tall so they're visible
             // even for a 1-tick (15 min at 64 px/h ≈ 16 px) re-setup zone.
             height: `${Math.max(ov.height, ov.kind === 'recalage' ? 4 : 2)}px`,
-            background: colors.bg,
           }}
           data-testid={ov.kind === 'setup' ? 'tile-setup-section' : 'tile-recalage-section'}
         />

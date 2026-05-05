@@ -371,12 +371,15 @@ export const Tile = memo(function Tile({
             rendered bounds instead of bleeding into the neighbour below.
             When no geometries are supplied (focus view, tests), fall back
             to the previous linear `setupMinutes` projection so those
-            callsites keep working. */}
+            callsites keep working. No fill : the overlay carries only
+            the dotted/dashed border-bottom (cf. index.css) so the parent
+            gradient shows through — past calage thus reads as done (vert)
+            in alignment with `now()`, future calage stays on the base bg. */}
         {calageGeometries && calageGeometries.length > 0 ? (
           calageGeometries.map((geom, idx) => (
             <div
               key={geom.kind === 'setup' ? 'setup' : `recalage-${idx}`}
-              className={`absolute left-0 right-0 ${colorClasses.runBg}`}
+              className="absolute left-0 right-0"
               style={{ top: `${geom.top}px`, height: `${geom.height}px` }}
               data-testid={geom.kind === 'setup' ? 'tile-setup-section' : 'tile-recalage-section'}
             />
@@ -384,7 +387,7 @@ export const Tile = memo(function Tile({
         ) : (
           hasSetup && (
             <div
-              className={`absolute left-0 right-0 ${colorClasses.runBg}`}
+              className="absolute left-0 right-0"
               style={{
                 top: 0,
                 height: `${setupHeight}px`,
