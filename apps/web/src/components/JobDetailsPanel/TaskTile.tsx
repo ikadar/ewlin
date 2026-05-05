@@ -142,22 +142,24 @@ export const TaskTile = memo(function TaskTile({
   // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed once per
   // task here ; each operator sub-tile mirrors the same task-level value
   // so the chef sees a coherent progression across the per-operator rows.
-  // Hidden when the task is completed (the state color already conveys it)
-  // or when no assignment exists (unplaced).
-  const fondVert = (
-    !isCompleted
-    && task.type === 'Internal'
-    && assignment
-  )
-    ? computeOptimisticProgress(
-        assignment.scheduledStart,
-        assignment.scheduledEnd,
-        (task as InternalTask).duration.setupMinutes,
-        (task as InternalTask).duration.runMinutes,
-        (task as InternalTask).recordedProgressPct,
-        (task as InternalTask).recordedAt,
-        now.getTime(),
-      )
+  //
+  // Completed tasks (silent-completion : now > scheduledEnd, or explicit
+  // isCompleted) keep rendering the fond-vert at 100% so the JDP rows
+  // match the planning's fully-green state. Without this, past-end task
+  // rows looked blank/caduque in the JDP while the planning showed them
+  // as green ("done") — visual inconsistency the chef caught immediately.
+  const fondVert = (task.type === 'Internal' && assignment)
+    ? (isCompleted
+        ? { pct: 100, isLate: false }
+        : computeOptimisticProgress(
+            assignment.scheduledStart,
+            assignment.scheduledEnd,
+            (task as InternalTask).duration.setupMinutes,
+            (task as InternalTask).duration.runMinutes,
+            (task as InternalTask).recordedProgressPct,
+            (task as InternalTask).recordedAt,
+            now.getTime(),
+          ))
     : null;
 
   // v0.5.11: Outsourced tasks render as mini-form with state-based styling
@@ -335,7 +337,21 @@ export const TaskTile = memo(function TaskTile({
             )}
           </span>
         </div>
-        {operatorAssignments && operatorAssignments.length > 0 && (
+        {operatorAssignments && operatorAssignments.length > 0 && (() => {
+          // Pre-compute the sum of all operator windows so per-row badges
+          // can normalise against it and sum to 100% per task. Dividing
+          // each window by the task's realistic duration (the previous
+          // approach) overshot in masked-time : two ops working
+          // concurrently both span the full task, and 100% + 100% = 200%
+          // — illogical from the chef's POV. Sum-normalised badges read
+          // as "this operator's share of the operator-time invested",
+          // which always totals 100% regardless of overlap.
+          const opWindowMinutes = (op: { from?: string; to?: string }): number => {
+            if (!op.from || !op.to) return 0;
+            return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
+          };
+          const totalOpMin = operatorAssignments.reduce((s, op) => s + opWindowMinutes(op), 0);
+          return (
           <div className="flex flex-col pt-0 pl-[11px] pr-[10px] pb-2 gap-[3px]">
             {[...operatorAssignments].sort((a, b) => {
               // Chronological order by start time. Absent `from` is pushed
@@ -357,23 +373,12 @@ export const TaskTile = memo(function TaskTile({
               const toTime = toDate ? toDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
               const timeRange = fromTime && toTime ? `${dateStr} ${fromTime}–${toTime}` : '';
 
-              // Per-operator badge — share of the parent task this operator
-              // handles. Denominator is the task's REALISTIC duration (or
-              // theoretical setup+run as fallback), NOT the wallclock
-              // envelope : a chunk-split task crossing overnight has a
-              // ~18h envelope but only ~75 min of actual work, and using
-              // the envelope makes every operator badge collapse to 3-4%
-              // instead of the true ~40-50% share.
+              // Sum-normalised share of operator-time. Sum across rows of
+              // a task = 100% by construction.
               const opBadgePct = ((): number => {
-                if (!assignment || !fromDate || !toDate) return 100;
-                const realisticMin = assignment.realisticDurationMinutes
-                  ?? (task.type === 'Internal'
-                    ? (task as InternalTask).duration.setupMinutes
-                      + (task as InternalTask).duration.runMinutes
-                    : 0);
-                if (realisticMin <= 0) return 100;
+                if (totalOpMin <= 0 || !fromDate || !toDate) return 100;
                 const opMin = (toDate.getTime() - fromDate.getTime()) / 60_000;
-                return Math.max(0, Math.min(100, (opMin / realisticMin) * 100));
+                return Math.max(0, Math.min(100, (opMin / totalOpMin) * 100));
               })();
 
               const isClickable = !!onJumpToOperatorSlice && !!fromDate;
@@ -419,7 +424,8 @@ export const TaskTile = memo(function TaskTile({
               );
             })}
           </div>
-        )}
+          );
+        })()}
       </button>
     );
   }
