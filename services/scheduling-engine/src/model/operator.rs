@@ -9,7 +9,11 @@ pub struct OperatorInput {
     pub id: String,
     pub first_name: String,
     pub last_name: String,
-    #[serde(default = "default_role")]
+    /// Free-text label (e.g. "Conducteur offset", "Façonnier"). Not read by
+    /// the engine — kept only so the input round-trips. PHP's column is
+    /// nullable, so accept both missing and explicit `null`: `default`
+    /// handles the absence path, `deserialize_with` handles the null path.
+    #[serde(default = "default_role", deserialize_with = "deserialize_string_null_as_default")]
     pub role: String,
     #[serde(default)]
     pub operating_schedules: Option<Vec<OperatingSchedule>>,
@@ -49,6 +53,13 @@ where
     T: Deserialize<'de>,
 {
     Option::<Vec<T>>::deserialize(deserializer).map(|opt| opt.unwrap_or_default())
+}
+
+fn deserialize_string_null_as_default<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer).map(|opt| opt.unwrap_or_else(default_role))
 }
 
 /// Naive local datetime range during which the operator is unavailable.
@@ -420,5 +431,39 @@ mod concurrent_group_tests {
         let g = make_group(&["a", "b"], &[("a", 0.9), ("b", 1.6)]);
         let err = g.validate("op-1").unwrap_err();
         assert!(err.contains("out of range"), "got: {err}");
+    }
+}
+
+#[cfg(test)]
+mod role_deserialization_tests {
+    use super::*;
+
+    fn base_json(role_fragment: &str) -> String {
+        format!(
+            r#"{{
+                "id": "op-1",
+                "firstName": "Jane",
+                "lastName": "Doe"{role_fragment}
+            }}"#
+        )
+    }
+
+    #[test]
+    fn missing_role_uses_default() {
+        let op: OperatorInput = serde_json::from_str(&base_json("")).unwrap();
+        assert_eq!(op.role, "operator");
+    }
+
+    #[test]
+    fn explicit_null_role_uses_default() {
+        let op: OperatorInput = serde_json::from_str(&base_json(", \"role\": null")).unwrap();
+        assert_eq!(op.role, "operator");
+    }
+
+    #[test]
+    fn provided_role_is_kept() {
+        let op: OperatorInput =
+            serde_json::from_str(&base_json(", \"role\": \"Façonnier\"")).unwrap();
+        assert_eq!(op.role, "Façonnier");
     }
 }
