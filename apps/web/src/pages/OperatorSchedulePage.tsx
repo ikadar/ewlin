@@ -84,7 +84,7 @@ import { JobDetailsPanel } from '../components/JobDetailsPanel/JobDetailsPanel';
 import { UnavailabilityOverlay } from '../components/StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../components/StationColumns/OvertimeOverlay';
 import { TileSegment } from '../components/Tile/TileSegment';
-import { computeOptimisticProgress } from '../components/Tile/saisieMath';
+import { computeChunkProgress } from '../components/Tile/saisieMath';
 import { SafetyBand } from '../components/SafetyBand';
 import { buildSequenceIndexLookup, isInSafetyZone, makeSafetyKey } from '../utils/safetyZone';
 import { useSetSafetyOverrideMutation } from '../store';
@@ -1180,35 +1180,40 @@ export default function OperatorSchedulePage() {
       ? new Date(assignment.scheduledStart).getTime() <= now.getTime()
       : false;
 
-    // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed per
-    // segment so chunk-split chunks each visualise the same task-level
-    // anchor uniformly. Skipped for non-internal tasks and unplaced tiles.
+    // Per-slice wallclock fond-vert : each segment computes its own
+    // progress from its slice.from..slice.to window. Past slices clamp
+    // to 100, future slices to 0, the active slice fills linearly.
+    // Mirrors `FocusOperatorColumn` and the JDP per-stint model — the
+    // earlier task-level `computeOptimisticProgress` against the envelope
+    // made every chunk show the same fractional fill, contradicting
+    // "stint 1 done, stint 2 not started".
     const progressFill = (assignment && task && isInternalTask(task))
-      ? computeOptimisticProgress(
-          assignment.scheduledStart,
-          assignment.scheduledEnd,
-          task.duration.setupMinutes,
-          task.duration.runMinutes,
-          task.recordedProgressPct,
-          task.recordedAt,
-          now.getTime(),
-        )
+      ? (isCompletedNow
+          ? { pct: 100, isLate: false }
+          : computeChunkProgress(
+              slice.from.toISOString(),
+              slice.to.toISOString(),
+              now.getTime(),
+            ))
       : undefined;
 
-    // Per-tile badge breakdown — share of the parent task this chunk
-    // covers. Denominator is the REALISTIC task duration (or theoretical
-    // setup+run as fallback), NOT the wallclock envelope ; otherwise a
-    // task crossing overnight (18h envelope, 75min real work) renders
-    // every per-tile badge at 3-4% instead of the true ~40-50%.
+    // Per-slice badge breakdown : each slice's share of the operator-time
+    // invested on this assignment. Denominator is the sum of every
+    // `assignment.operators[].(to - from)` window so badges sum to 100%
+    // across every slice of every operator on the task. Earlier this
+    // used `realisticDurationMinutes` (single-stint figure) and produced
+    // values like 100% / 50% on a task whose two stints together totalled
+    // 45 min — JDP's 67% / 33% (sum-normalised) is the correct shape.
     const sliceBadgePct = ((): number => {
-      if (!assignment || !task) return 100;
-      const realisticMin = assignment.realisticDurationMinutes
-        ?? (isInternalTask(task)
-          ? task.duration.setupMinutes + task.duration.runMinutes
-          : 0);
-      if (realisticMin <= 0) return 100;
+      if (!assignment?.operators?.length) return 100;
+      const opWindowMinutes = (op: { from?: string; to?: string }): number => {
+        if (!op.from || !op.to) return 0;
+        return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
+      };
+      const totalOpMin = assignment.operators.reduce((s, op) => s + opWindowMinutes(op), 0);
+      if (totalOpMin <= 0) return 100;
       const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
-      return Math.max(0, Math.min(100, (sliceMin / realisticMin) * 100));
+      return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
     })();
 
     const handleOpenSaisie = assignment
