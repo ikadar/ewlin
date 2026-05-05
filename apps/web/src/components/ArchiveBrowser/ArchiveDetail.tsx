@@ -138,7 +138,9 @@ export function ArchiveDetail({ archiveId, onRestored }: ArchiveDetailProps) {
         <button
           type="button"
           onClick={() => setRestoreOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-violet-600 hover:bg-violet-500 text-white"
+          disabled={detail.restoreAvailable === false}
+          title={detail.restoreAvailable === false ? 'Archive antérieure à T6 — non restaurable' : undefined}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-violet-600 hover:bg-violet-500 text-white disabled:bg-zinc-700 disabled:hover:bg-zinc-700 disabled:text-zinc-400 disabled:cursor-not-allowed"
           data-testid="archive-restore-trigger"
         >
           <RotateCcw size={13} />

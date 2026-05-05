@@ -69,8 +69,18 @@ export interface ArchiveListResponse {
 }
 
 export interface ArchiveDetail extends ArchiveSummary {
-  /** Decoded JSON snapshot — null if the archive payload was malformed. */
+  /**
+   * Schedule snapshot rebuilt from the archive's task_assignments + the
+   * canonical entity tables. Null for pre-T6 archives whose planning
+   * data was only in the now-dropped JSON payload column.
+   */
   payload: Record<string, unknown> | null;
+  /**
+   * False for pre-T6 archives (their task_assignments were never
+   * persisted). The restore button must be disabled in that case — the
+   * backend will reject the call with a DomainException otherwise.
+   */
+  restoreAvailable: boolean;
 }
 
 export interface ArchiveRestoreResult {
