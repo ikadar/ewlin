@@ -434,20 +434,49 @@ export const TaskTile = memo(function TaskTile({
     }
   };
 
+  // Static recorded progress for unplaced tasks. No schedule means no
+  // optimistic extrapolation — the value is whatever the chef (or operator
+  // via prod) declared, frozen at fork time in préprod. The gradient is
+  // horizontal (left → right) so the green portion grows like a status bar
+  // rather than eating the tile vertically. Outsourced tasks don't carry
+  // the field, so progress only renders on internal tasks.
+  const unplacedRecordedPct = task.type === 'Internal'
+    ? Math.max(0, Math.min(100, (task as InternalTask).recordedProgressPct ?? 0))
+    : 0;
+  const showUnplacedProgress = unplacedRecordedPct > 0;
+  const unplacedBaseBg = 'rgba(59, 130, 246, 0.12)'; // mirrors TILE_STYLES.unplaced.bg
+  const unplacedRowBg = showUnplacedProgress
+    ? computeProgressBgGradient(unplacedRecordedPct, false, 'horizontal', unplacedBaseBg)
+    : undefined;
+
   // Handle click for pick & place
-  const baseClassName = `border-l-4 ${style.bg} select-none transition-all duration-150 cursor-default`;
+  const baseClassName = `border-l-4 ${showUnplacedProgress ? '' : style.bg} select-none transition-all duration-150 cursor-default`;
+  const unplacedTileStyle: React.CSSProperties = {
+    ...tileInlineStyle,
+    borderLeftColor: showUnplacedProgress ? '#22c55e' : tileInlineStyle.borderLeftColor,
+    ...(showUnplacedProgress ? { background: unplacedRowBg } : {}),
+  };
 
   return (
     <div
       className={baseClassName}
-      style={tileInlineStyle}
+      style={unplacedTileStyle}
       data-testid={`task-tile-${task.id}`}
       onContextMenu={handleUnplacedContextMenu}
       {...crosslink}
     >
+      {/* Marker so Playwright + dev tools can detect the static progress
+          rendering. Visual carried by the row's inline `background`. */}
+      {showUnplacedProgress && (
+        <ProgressFill
+          pct={unplacedRecordedPct}
+          isLate={false}
+          direction="horizontal"
+        />
+      )}
       <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`font-medium truncate min-w-0 ${style.nameColor}`}>
+          <span className={`font-medium truncate min-w-0 ${showUnplacedProgress ? 'text-green-300' : style.nameColor}`}>
             {displayName}
           </span>
           {task.type === 'Internal' && (task as InternalTask).splitGroupId && (
