@@ -109,6 +109,24 @@ Items to address for code quality and maintainability:
 |----|------|-------------|----------|
 | TD-001 | Submodule CI/CD | Individual CI/CD pipelines for submodules | P1 |
 | TD-002 | Hard validation blocks | Currently warnings-only; may want hard blocks post-MVP | P2 |
+| TD-003 | Doctrine result_cache stale | Snapshot endpoint occasionally serves entities lagging behind a fresh DB write (observed during clear-recorded-progress + saisie roundtrips). No regression caused by feature work, but worth a focused investigation when symptoms reappear. | P2 |
+
+---
+
+## Post-progress-capture roadmap
+
+Items deferred from the "Plan and replan" 2026-05-04 mindmap session — features intentionally not bundled with the core delivery so they get the focused attention they deserve. Added 2026-05-05.
+
+| ID | Item | Description | Priority | Source |
+|----|------|-------------|----------|--------|
+| PC-001 | **Vue anomalies chef d'atelier** | Standalone observability surface : tasks past their theoretical end without saisie, in-progress tiles whose remaining time crossed the chunk-mini floor, BAT deadlines that just passed, etc. Currently the chef "se débrouille" via the existing modale + IA palette per `modele-capture-progres-decisions.md` ; promote it when the experience shows the optional confort UI is missed. | P2 | `docs/roadmap/vue-anomalies-chef-atelier.md` |
+| PC-002 | **Long-term assignment archivage** | Today `Schedule.assignments` is a single LONGTEXT JSON per scenario. Past-end completed assignments accumulate forever (no cron purge). At ~600 bytes each, the snapshot bloats linearly ; perf degrades around 10k entries. Migrate to a dedicated `assignment_history` table with a daily cron that moves entries older than ~90 days out of the JSON. Keeps the live schedule snappy while preserving real history. | P2 | conversation 2026-05-05 |
+| PC-003 | **Stack-of-cards React** | Playground HTML (`playground-stack-of-cards.html`) validated. Implement the operator-side React app per `project_operator_focus_replacement.md` : pile + countdown + +5 min cumulatif + terminé + swipe. Replaces `FocusOperatorColumn` / `FocusStationColumn` / `FocusPage`. Gated until the chef has played with the playground and approved the gestures + animations. | P2 | mindmap Q2 |
+| PC-004 | **Chunk-split breakdown engine-side** | Today the per-tile badge for chunk-split tasks is computed FE-side via wallclock ratio (`sliceMin / realisticMin × 100`). Productivity-correct formula = `(segmentRunMin × prodSegment) / theoreticalRunMin × 100` should ideally be emitted by the engine per activeWindow. FE then becomes a pure consumer. | P3 | mindmap correction tour 4 |
+| PC-005 | **D engine — cross-station resched of in-progress tiles** | The split-at-NOW IMPLEMENTED 2026-05-05 keeps the future portion on the same station. Q1 mindmap also envisioned the engine being able to migrate the post-NOW segment onto a different station ; needs an extra TaskAction split (one for past, one for post-NOW with free station). Test scaffold dropped : `in_progress_pin_resched_to_different_station`. | P3 | `feedback_in_progress_committed.md` "Known gaps" |
+| PC-006 | **JDP unplaced badge — deadline-aware vert/rouge** | Currently shows static `recordedProgressPct` from prod's anchor. Could enrich with a "rouge" signal based on `job.workshopExitDate` proximity ; the user evoked this and we deferred. | P3 | conversation 2026-05-05 |
+| PC-007 | **MassUnscheduleDialog UI Playwright spec** | Skipped because the planning page bootstrap is too slow in headed mode (timeout intermittent). API contract covered by `clear-recorded-progress.spec.ts`. Re-attempt once the dev-server cold start is reliably <10 s. | P3 | conversation 2026-05-05 |
+| PC-008 | **`record_task_progress` IA palette e2e** | Tool registered + system prompt example added 2026-05-05. Add a Playwright e2e that goes through the LLM round-trip (talk to console-service `/execute` with "on est à 70% sur task X", assert the tool was selected). Currently only the underlying PHP endpoint is e2e-tested. | P3 | mindmap IA |
 
 ---
 
