@@ -1,25 +1,31 @@
-/**
- * RTK Query slice — read-only snapshot of the engaged Prod plan.
- *
- * GET /api/v1/scenarios/prod/snapshot
- *   Returns the frozen plan blob merged with the live completion
- *   overlay. Same shape as the regular /api/v1/schedule/snapshot
- *   payload (built by SnapshotBuilder + serialised at promotion time).
- *
- * Returns null when no promotion has happened yet (server returns 204
- * No Content). Consumers should show an empty state in that case.
- */
 import { createApi } from '@reduxjs/toolkit/query/react';
-import type { ScheduleSnapshot } from '@flux/types';
-import { baseQueryWithFixtureSupport } from './baseApi';
 
+import { realBaseQuery } from './realBaseQuery';
+import type { ScheduleSnapshot } from '../../types/snapshot';
+
+/**
+ * T4 — Prod snapshot is no longer served by a dedicated controller +
+ * payload deserialiser. The data lives natively in the DB tables and
+ * the regular `/schedule/snapshot` endpoint returns the right Prod
+ * view because `realBaseQuery` adds `X-Flux-Scenario: prod` whenever
+ * the FE is in Prod mode (URL `?env=prod` or `/scenarios/{prod_uuid}`).
+ *
+ * This file is kept as a thin compatibility wrapper around that
+ * endpoint so existing consumers (`useGetProdSnapshotQuery`) can stay
+ * unchanged. `archiveApi` / `promotionApi` invalidation calls also
+ * keep working because the tag still exists.
+ */
 export const prodSnapshotApi = createApi({
   reducerPath: 'prodSnapshotApi',
-  baseQuery: baseQueryWithFixtureSupport,
+  baseQuery: realBaseQuery,
   tagTypes: ['ProdSnapshot'],
   endpoints: (builder) => ({
     getProdSnapshot: builder.query<ScheduleSnapshot | null, void>({
-      query: () => '/scenarios/prod/snapshot',
+      query: () => ({
+        url: '/schedule/snapshot',
+        // realBaseQuery already injects the X-Flux-Scenario header
+        // based on the URL — no override needed here.
+      }),
       providesTags: ['ProdSnapshot'],
     }),
   }),
