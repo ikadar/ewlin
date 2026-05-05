@@ -5,7 +5,7 @@ import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
-import { ProgressFill } from '../Tile/ProgressFill';
+import { ProgressFill, computeProgressBgGradient } from '../Tile/ProgressFill';
 import { TaskBadge } from '../Tile/TaskBadge';
 import { computeOptimisticProgress } from '../Tile/saisieMath';
 
@@ -383,6 +383,13 @@ export const TaskTile = memo(function TaskTile({
                 onJumpToOperatorSlice!(op.operatorId, fromDate);
                 pulseTaskTiles(task.id);
               };
+              const showRowGradient = !!fondVert
+                && (fondVert.pct > 0 || fondVert.isLate)
+                && fondVert.pct < 100;
+              const rowBaseBg = 'rgba(63, 63, 70, 0.45)'; // ≈ bg-zinc-700/45
+              const rowBg = showRowGradient && fondVert
+                ? computeProgressBgGradient(fondVert.pct, fondVert.isLate, 'horizontal', rowBaseBg)
+                : undefined;
               return (
                 <div
                   key={i}
@@ -390,11 +397,14 @@ export const TaskTile = memo(function TaskTile({
                   tabIndex={isClickable ? 0 : undefined}
                   onClick={isClickable ? jumpToSlice : undefined}
                   onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToSlice(e); } } : undefined}
-                  className={`relative flex items-center gap-[7px] bg-zinc-700/45 rounded-[3px] px-[7px] py-[3px] overflow-hidden ${
+                  className={`relative flex items-center gap-[7px] ${showRowGradient ? '' : 'bg-zinc-700/45'} rounded-[3px] px-[7px] py-[3px] overflow-hidden ${
                     isClickable ? 'cursor-pointer hover:bg-zinc-700/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30' : ''
                   }`}
+                  style={showRowGradient ? { background: rowBg } : undefined}
                 >
-                  {fondVert && (fondVert.pct > 0 || fondVert.isLate) && (
+                  {/* Marker for tests + dev tools — visual carried by the
+                      row's inline `background` gradient above. */}
+                  {showRowGradient && fondVert && (
                     <ProgressFill
                       pct={fondVert.pct}
                       isLate={fondVert.isLate}
@@ -402,7 +412,7 @@ export const TaskTile = memo(function TaskTile({
                     />
                   )}
                   <div className="relative w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                  <span className="relative text-[11.5px] text-zinc-300 truncate flex-1">{displayName}</span>
+                  <span className={`relative text-[11.5px] truncate flex-1 ${showRowGradient ? 'text-green-200' : 'text-zinc-300'}`}>{displayName}</span>
                   <span className="relative text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
                   <TaskBadge pct={opBadgePct} forceShow />
                 </div>

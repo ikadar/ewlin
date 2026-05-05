@@ -1,23 +1,32 @@
 /**
- * ProgressFill — optimistic fond-vert overlay for tiles.
+ * ProgressFill — fond-vert + helpers for partial-progress tile rendering.
  *
- * Renders one absolutely-positioned div that fills the tile by `pct` percent
- * along the chosen axis. `isLate` flips the un-filled complement to red
- * (R1 of 2026-05-04 mindmap : "complément du fond vert vire rouge quand
- * la fin théorique est passée et le travail n'est pas terminé").
+ * The visual strategy is a SINGLE linear-gradient that REPLACES the tile's
+ * body bg (and optionally its left border) rather than overlaying a
+ * translucent green on top of the existing rgba(blue) bg. Stacking two
+ * rgbas would compound their opacity and break visual identity with the
+ * fully-completed state. With a gradient-as-replacement, the top portion
+ * carries exactly `rgba(34,197,94, 0.09)` (the completed run-bg) on the
+ * page bg — pixel-perfect match with a fully-green tile.
  *
- * Two layouts share the same component to keep the visual language uniform :
+ * `isLate` swaps the un-filled complement to red (R1 of 2026-05-04
+ * mindmap : "complément du fond vert vire rouge quand la fin théorique
+ * est passée et le travail n'est pas terminé").
+ *
+ * Direction :
  *   - **vertical** (Tile, planning grid) : green eats from the TOP DOWN
  *     (Q6 — direction du temps, le passé en haut, le futur en bas).
  *   - **horizontal** (TaskTile, JDP sub-tile) : green eats from the LEFT
- *     (gauche → droite), aligned with the JDP's reading direction.
+ *     (gauche → droite).
  *
- * The component is *purely* visual — it does no time math. The caller passes
- * `(pct, isLate)` derived from `computeOptimisticProgress(...)` (saisieMath.ts).
- *
- * Pointer-events are disabled so the fill never intercepts clicks meant
- * for the tile body (pin toggle, context menu, double-click pulse). The
- * fill sits behind the content overlay via z-index.
+ * Helpers :
+ *   - `computeProgressBgGradient(...)` — returns the `background` CSS value
+ *     to inline on the body wrapper.
+ *   - `computeProgressBorderImage(...)` — returns a `border-image` CSS
+ *     value so the left border tracks the gradient.
+ *   - `<ProgressFill />` — back-compat thin wrapper that renders a tagged
+ *     div ; kept so Playwright tests can detect "progress is rendered"
+ *     without rebuilding around the new inline-gradient approach.
  */
 import type { ReactElement } from 'react';
 
@@ -28,46 +37,91 @@ export interface ProgressFillProps {
   isLate: boolean;
   /** Fill axis. Vertical = planning tile, horizontal = JDP sub-tile. */
   direction: 'vertical' | 'horizontal';
+  /**
+   * Tile state's background rgba — matches `getStateInlineColors(state).bg`.
+   * Used for the un-filled complement so the bottom portion of a partially
+   * progressed tile is visually indistinguishable from a fully-default tile.
+   */
+  baseBg: string;
 }
 
-const FILL_GREEN = 'rgba(34, 197, 94, 0.18)';     // tailwind green-500 @18%
-const COMPLEMENT_RED = 'rgba(239, 68, 68, 0.16)'; // tailwind red-500 @16%
+/** Completed-state run-bg, mirrors `getStateInlineColors('completed').bg`. */
+export const COMPLETED_RUN_BG = 'rgba(34, 197, 94, 0.09)';
+/** Completed-state border, mirrors `getStateInlineColors('completed').border`. */
+export const COMPLETED_BORDER = '#22c55e';
+/** Late-state run-bg, mirrors `getStateInlineColors('late').bg`. */
+export const LATE_RUN_BG = 'rgba(239, 68, 68, 0.09)';
+/** Late-state border, mirrors `getStateInlineColors('late').border`. */
+export const LATE_BORDER = '#ef4444';
 
-export function ProgressFill({ pct, isLate, direction }: ProgressFillProps): ReactElement {
+/**
+ * Build the `background` value for a tile's body wrapper that has
+ * partial progress. The result is a single linear-gradient — apply it
+ * inline on the body element, leaving the Tailwind runBg class off (or
+ * letting inline win over the class).
+ */
+export function computeProgressBgGradient(
+  pct: number,
+  isLate: boolean,
+  direction: 'vertical' | 'horizontal',
+  baseBg: string,
+): string {
   const clamped = Math.min(100, Math.max(0, pct));
-  const fillSize = `${clamped}%`;
-  const complementSize = `${100 - clamped}%`;
+  const complementBg = isLate ? LATE_RUN_BG : baseBg;
+  const axis = direction === 'vertical' ? 'to bottom' : 'to right';
+  return `linear-gradient(${axis},
+    ${COMPLETED_RUN_BG} 0%,
+    ${COMPLETED_RUN_BG} ${clamped}%,
+    ${complementBg} ${clamped}%,
+    ${complementBg} 100%)`;
+}
 
-  const fillStyle: React.CSSProperties = direction === 'vertical'
-    ? { top: 0, left: 0, right: 0, height: fillSize, backgroundColor: FILL_GREEN }
-    : { top: 0, bottom: 0, left: 0, width: fillSize, backgroundColor: FILL_GREEN };
+/**
+ * Build the `borderImage` value so the left-border color tracks the
+ * gradient. Caller must ensure `borderStyle: solid` is set ; pair with
+ * `border-image-slice: 1` (included in the returned string).
+ */
+export function computeProgressBorderImage(
+  pct: number,
+  isLate: boolean,
+  direction: 'vertical' | 'horizontal',
+  baseBorder: string,
+): string {
+  const clamped = Math.min(100, Math.max(0, pct));
+  const complementBorder = isLate ? LATE_BORDER : baseBorder;
+  const axis = direction === 'vertical' ? 'to bottom' : 'to right';
+  return `linear-gradient(${axis},
+    ${COMPLETED_BORDER} 0%,
+    ${COMPLETED_BORDER} ${clamped}%,
+    ${complementBorder} ${clamped}%,
+    ${complementBorder} 100%) 1`;
+}
 
-  const complementStyle: React.CSSProperties = direction === 'vertical'
-    ? { bottom: 0, left: 0, right: 0, height: complementSize, backgroundColor: COMPLEMENT_RED }
-    : { top: 0, bottom: 0, right: 0, width: complementSize, backgroundColor: COMPLEMENT_RED };
-
+/**
+ * Back-compat marker component. Renders a no-pointer-events tagged div
+ * that carries `data-progress-pct` and `data-late` so Playwright + dev
+ * tools can detect that progress is being rendered on the parent tile.
+ * Visually inert : the actual fond-vert is now painted by the parent
+ * via inline `background: linear-gradient(...)`.
+ *
+ * Kept so the existing Playwright `task-badge-rendering` and
+ * `fond-vert-rendering` selectors keep working through the visual
+ * refactor.
+ */
+export function ProgressFill({
+  pct,
+  isLate,
+  direction,
+}: Omit<ProgressFillProps, 'baseBg'>): ReactElement {
+  const clamped = Math.min(100, Math.max(0, pct));
   return (
     <div
-      className="absolute inset-0 pointer-events-none overflow-hidden"
+      className="absolute inset-0 pointer-events-none"
       data-testid="progress-fill"
       data-pct={clamped.toFixed(1)}
       data-late={isLate ? 'true' : 'false'}
       data-direction={direction}
-    >
-      {clamped > 0 && (
-        <div
-          className="absolute"
-          style={fillStyle}
-          data-testid="progress-fill-green"
-        />
-      )}
-      {isLate && clamped < 100 && (
-        <div
-          className="absolute"
-          style={complementStyle}
-          data-testid="progress-fill-red"
-        />
-      )}
-    </div>
+      style={{ display: 'none' }}
+    />
   );
 }

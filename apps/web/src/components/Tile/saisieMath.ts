@@ -75,22 +75,44 @@ export function computeOptimisticProgress(
   recordedAt: string | null | undefined,
   nowMs: number,
 ): { pct: number; isLate: boolean } {
+  const startMs = new Date(scheduledStart).getTime();
+  const setupEndMs = startMs + setupMin * 60_000;
   const endMs = new Date(scheduledEnd).getTime();
+  // Wallclock-based fraction : the fond-vert reaches the now-line exactly,
+  // never beyond it. The earlier formula divided by `runMin` (theoretical)
+  // which can be smaller than the realistic run window when scheduledEnd
+  // reflects a saisie-extended end ; in that case pct grew faster than
+  // wallclock and the green spilled past the now-line on the planning view.
+  // Using `endMs - setupEndMs` (the actual run window in ms) keeps the
+  // visual aligned with where now() lies in the tile.
+  const runWindowMs = Math.max(0, endMs - setupEndMs);
 
   let pct: number;
   if (recordedProgressPct == null || recordedAt == null) {
-    pct = computeTaskProgressPct(scheduledStart, scheduledEnd, setupMin, runMin, nowMs);
-  } else {
-    const anchorMs = new Date(recordedAt).getTime();
-    if (runMin <= 0) {
+    if (nowMs <= setupEndMs || runWindowMs === 0) {
+      pct = 0;
+    } else if (nowMs >= endMs) {
       pct = 100;
     } else {
-      const elapsedSinceAnchorMin = (nowMs - anchorMs) / 60_000;
-      const delta = (elapsedSinceAnchorMin / runMin) * 100;
+      pct = Math.min(100, Math.max(0, ((nowMs - setupEndMs) / runWindowMs) * 100));
+    }
+  } else {
+    // Anchor-driven : extrapolate the saisie's recorded pct forward by
+    // the wallclock fraction since the anchor — same denominator as the
+    // pure clock case so the post-saisie green also can't overshoot now.
+    const anchorMs = new Date(recordedAt).getTime();
+    if (runWindowMs === 0) {
+      pct = 100;
+    } else {
+      const delta = ((nowMs - anchorMs) / runWindowMs) * 100;
       pct = Math.min(100, Math.max(0, recordedProgressPct + delta));
     }
   }
 
-  const isLate = pct < 100 && nowMs > endMs;
+  // R1 : "rouge complément" when the theoretical end is past but the work
+  // hasn't reached 100. Theoretical end uses the JCF-immutable runMin so
+  // saisie-extended scheduledEnd doesn't suppress the late signal.
+  const theoreticalEndMs = setupEndMs + runMin * 60_000;
+  const isLate = pct < 100 && nowMs > theoreticalEndMs;
   return { pct, isLate };
 }

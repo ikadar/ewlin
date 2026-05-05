@@ -7,7 +7,7 @@
  */
 
 import { Pin } from 'lucide-react';
-import { ProgressFill } from './ProgressFill';
+import { ProgressFill, computeProgressBgGradient } from './ProgressFill';
 import { TaskBadge } from './TaskBadge';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
@@ -181,6 +181,16 @@ export function TileSegment({
     stationId !== undefined &&
     sequenceIndex !== undefined;
   const colors = getStateInlineColors(tileState);
+  // Fond-vert visibility gate. Hidden on completed/shipped tiles where the
+  // state color already conveys the message. The visual is painted by the
+  // bg + border divs below via inline linear-gradient.
+  const showGradient = !!progressFill
+    && (progressFill.pct > 0 || progressFill.isLate)
+    && progressFill.pct < 100
+    && tileState !== 'completed'
+    && tileState !== 'shipped';
+  // Label colour follows the green portion when partial progress is rendered.
+  const labelTextColor = showGradient ? '#86efac' : colors.text;
   const extTop = sawtoothTop ? SAW_AMPLITUDE : 0;
   const extBottom = sawtoothBottom ? SAW_AMPLITUDE : 0;
   // Teeth are rendered INWARD: the rendered box matches the segment's time
@@ -238,11 +248,17 @@ export function TileSegment({
       data-flux-task-id={crosslink['data-flux-task-id']}
       onDoubleClick={handleDoubleClick}
     >
-      {/* Background + left border, clipped by CSS polygon */}
+      {/* Background + left border, clipped by CSS polygon. When a partial
+          fond-vert is active, both bg and left border carry a vertical
+          linear-gradient (top = completed-state colours, bottom = the
+          tile's own state) — pixel-perfect identical to a fully-completed
+          tile in the green portion. */}
       <div
         className="absolute inset-0"
         style={{
-          background: colors.bg,
+          background: showGradient && progressFill
+            ? computeProgressBgGradient(progressFill.pct, progressFill.isLate, 'vertical', colors.bg)
+            : colors.bg,
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
           borderRadius: (!sawtoothTop && !sawtoothBottom) ? '2px' : undefined,
         }}
@@ -251,7 +267,9 @@ export function TileSegment({
         className="absolute left-0 top-0 bottom-0"
         style={{
           width: `${TILE_BORDER_WIDTH_PX}px`,
-          background: colors.border,
+          background: showGradient && progressFill
+            ? computeProgressBgGradient(progressFill.pct, progressFill.isLate, 'vertical', colors.border)
+            : colors.border,
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
         }}
       />
@@ -261,11 +279,9 @@ export function TileSegment({
           unsplit tasks. */}
       <TaskBadge pct={taskBadgePct} forceShow />
 
-      {/* Optimistic fond-vert overlay. Sits between the body bg and the
-          calage overlays so progress shows under the calage band, but
-          above the run base color. Hidden when the task is completed
-          (state color carries the meaning) or no progress signal. */}
-      {progressFill && (progressFill.pct > 0 || progressFill.isLate) && tileState !== 'completed' && tileState !== 'shipped' && (
+      {/* Marker for tests + dev tools. Visual carried by the bg + border
+          divs above. */}
+      {showGradient && progressFill && (
         <ProgressFill
           pct={progressFill.pct}
           isLate={progressFill.isLate}
@@ -327,7 +343,7 @@ export function TileSegment({
         style={{ top: `${contentTop}px`, bottom: `${contentBottom}px` }}
       >
         <div className="flex items-baseline gap-1.5">
-        <div className="text-[11px] font-medium leading-tight truncate flex-1 min-w-0" style={{ color: colors.text }}>
+        <div className="text-[11px] font-medium leading-tight truncate flex-1 min-w-0" style={{ color: labelTextColor }}>
           {onTogglePin && assignmentId && (
             <span
               onClick={(e) => {

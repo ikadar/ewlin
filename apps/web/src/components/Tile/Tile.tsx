@@ -6,9 +6,10 @@ import { getStateColorClasses, getStateRgb } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
-import { ProgressFill } from './ProgressFill';
+import { ProgressFill, computeProgressBgGradient, computeProgressBorderImage } from './ProgressFill';
 import { TaskBadge } from './TaskBadge';
 import { computeOptimisticProgress } from './saisieMath';
+import { getStateInlineColors } from './colorUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
 import { useNow } from '../../hooks/useNow';
@@ -205,6 +206,35 @@ export const Tile = memo(function Tile({
   // `assignment.isCompleted` flag still feeds `tileState` upstream.
   const isCompleted = effectiveTileState === 'completed' || effectiveTileState === 'shipped';
 
+  // Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Computed once here
+  // so the body bg + border-image can carry the gradient AND the label text
+  // can switch to the completed-state colour for the green portion.
+  const progress = !isCompleted ? computeOptimisticProgress(
+    assignment.scheduledStart,
+    assignment.scheduledEnd,
+    setupMinutes,
+    task.duration.runMinutes ?? 0,
+    task.recordedProgressPct,
+    task.recordedAt,
+    now.getTime(),
+  ) : null;
+  const showGradient = progress !== null
+    && (progress.pct > 0 || progress.isLate)
+    && progress.pct < 100;
+  const baseInline = getStateInlineColors(effectiveTileState);
+  const bodyBg = showGradient && progress
+    ? computeProgressBgGradient(progress.pct, progress.isLate, 'vertical', baseInline.bg)
+    : undefined;
+  const bodyBorderImage = showGradient && progress
+    ? computeProgressBorderImage(progress.pct, progress.isLate, 'vertical', baseInline.border)
+    : undefined;
+  // Label text follows the green portion when progress is shown — the
+  // label sits at the top of the tile so it's always inside the green
+  // band when partial progress is rendered. This matches the visual of
+  // a fully-completed tile (`text-green-300`) so the partial-progress
+  // tile reads consistently with the all-green case.
+  const labelTextClass = showGradient ? 'text-green-300' : colorClasses.text;
+
   // Handle click — select this job
   const handleClick = () => {
     onSelect?.(job.id);
@@ -286,10 +316,22 @@ export const Tile = memo(function Tile({
       {/* Clipped body wrapper. The clip-path is applied here (not on the root)
           so that the folder-tab and other overflow-outside children (label
           overlay, tooltip) are not clipped away on tiles with teeth. The
-          left border lives inside the wrapper so it follows the tooth shape. */}
+          left border lives inside the wrapper so it follows the tooth shape.
+          When fond-vert is partial, the body bg + left border carry the
+          green→default linear-gradient inline (replacing the Tailwind
+          runBg + border-l-* classes) so the top portion is pixel-perfect
+          identical to a fully-completed tile. */}
       <div
-        className={`absolute inset-0 ${borderStyleClass} ${colorClasses.border} ${colorClasses.runBg}`}
-        style={{ clipPath, borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px` }}
+        className={`absolute inset-0 ${borderStyleClass} ${showGradient ? '' : colorClasses.border} ${showGradient ? '' : colorClasses.runBg}`}
+        style={{
+          clipPath,
+          borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px`,
+          ...(showGradient ? {
+            background: bodyBg,
+            borderLeftStyle: 'solid' as const,
+            borderImage: bodyBorderImage,
+          } : {}),
+        }}
       >
         {/* Calage overlays (initial setup + post-peremption recalages).
             The station grid supplies collapse-aware geometries precomputed
@@ -361,24 +403,13 @@ export const Tile = memo(function Tile({
             tile reads `taskSlotVolumePct` = 100 from the engine). */}
         <TaskBadge pct={assignment.taskSlotVolumePct ?? 100} forceShow />
 
-        {/* Optimistic fond-vert (Q4-Q7 of 2026-05-04 mindmap). Vertical
-            top-down on the planning grid ; lives inside the clipped body
-            so the fill respects sawtooth teeth. Hidden on completed /
-            shipped tiles where it would just confirm what the state color
-            already says. */}
-        {!isCompleted && (() => {
-          const { pct, isLate } = computeOptimisticProgress(
-            assignment.scheduledStart,
-            assignment.scheduledEnd,
-            setupMinutes,
-            task.duration.runMinutes ?? 0,
-            task.recordedProgressPct,
-            task.recordedAt,
-            now.getTime(),
-          );
-          if (pct === 0 && !isLate) return null;
-          return <ProgressFill pct={pct} isLate={isLate} direction="vertical" />;
-        })()}
+        {/* Optimistic fond-vert marker (Q4-Q7 of 2026-05-04 mindmap).
+            The visual is painted by the body wrapper above via inline
+            `background: linear-gradient(...)` + `borderImage` ; this
+            sentinel only carries data attributes for tests + dev tools. */}
+        {showGradient && progress && (
+          <ProgressFill pct={progress.pct} isLate={progress.isLate} direction="vertical" />
+        )}
       </div>
 
       {/* Label overlay — mirrors TileSegment's content layout so the station
@@ -389,7 +420,7 @@ export const Tile = memo(function Tile({
         style={{ top: `${extTop + 2}px`, bottom: `${extBottom + 2}px` }}
       >
         <div
-          className={`${colorClasses.text} text-[11px] font-medium leading-tight truncate`}
+          className={`${labelTextClass} text-[11px] font-medium leading-tight truncate`}
           data-testid="tile-content"
         >
           {onTogglePin && (
