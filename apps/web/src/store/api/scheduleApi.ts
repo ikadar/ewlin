@@ -119,6 +119,105 @@ interface UpdateElementStatusRequest {
 }
 
 /**
+ * GET /api/v1/jobs/{id} response shape.
+ *
+ * Mirrors `services/php-api/src/DTO/Job/JobResponse::toArray()`. Used by
+ * `JcfModificationModal` to populate the per-element edit cards.
+ *
+ * Element shapes carry the *current* gate statuses (not boolean
+ * `needsX` flags) — the modal derives `needsX = status !== 'none'`.
+ *
+ * Tasks are returned as a flat list ; the FE re-groups them per
+ * element via `element.taskIds`.
+ */
+export interface JobDetailsResponse {
+  id: string;
+  reference: string;
+  client: string;
+  description: string;
+  status: string;
+  workshopExitDate: string | null;
+  quantity: number | null;
+  fullyScheduled: boolean;
+  color: string;
+  notes: string | null;
+  paperType: string | null;
+  paperFormat: string | null;
+  paperWeight: number | null;
+  inking: string | null;
+  referent: string | null;
+  shipperId: string | null;
+  shipperName: string | null;
+  shipped: boolean;
+  shippedAt: string | null;
+  batDeadline: string | null;
+  deadlinePriority: number;
+  deadlineRelativeWorkingDays: number | null;
+  requiredJobIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  elements: JobDetailsElement[];
+  tasks: JobDetailsTask[];
+}
+
+export interface JobDetailsElement {
+  id: string;
+  name: string;
+  label: string | null;
+  prerequisiteElementIds: string[];
+  taskIds: string[];
+  spec: unknown;
+  paperStatus: string;
+  batStatus: string;
+  plateStatus: string;
+  formeStatus: string;
+  isBlocked: boolean;
+  paperOrderedAt: string | null;
+  paperDeliveredAt: string | null;
+  filesReceivedAt: string | null;
+  batSentAt: string | null;
+  batApprovedAt: string | null;
+  formeOrderedAt: string | null;
+  formeDeliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobDetailsTask {
+  id: string;
+  sequenceOrder: number;
+  taskType: string;
+  status: string;
+  stationId: string | null;
+  setupMinutes: number | null;
+  runMinutes: number | null;
+  totalMinutes: number;
+  providerId: string | null;
+  actionType: string | null;
+  durationOpenDays: number | null;
+  manualDeparture: string | null;
+  manualReturn: string | null;
+  comment: string | null;
+  rawDsl: string | null;
+}
+
+/**
+ * PUT /api/v1/elements/{id}/sequence — Pillar B JCF modification.
+ *
+ * Mirrors `services/php-api/src/DTO/Element/UpdateElementSequenceRequest`.
+ * All non-DSL fields are optional ; null means "don't touch".
+ */
+export interface UpdateElementSequenceArg {
+  elementId: string;
+  dsl: string;
+  commentaires?: string | null;
+  needsBat?: boolean | null;
+  needsPaper?: boolean | null;
+  needsForme?: boolean | null;
+  needsPlates?: boolean | null;
+}
+
+/**
  * Response from updateElementStatus mutation.
  * Mirrors PHP ElementController::updatePrerequisites response.
  */
@@ -275,6 +374,60 @@ export const scheduleApi = createApi({
         url: `/jobs/${jobId}`,
         method: 'PUT',
         body,
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Get the full details of a single job, including its elements and
+     * tasks. Used by `JcfModificationModal` to seed its per-element
+     * edit cards. Real mode: GET /jobs/{id}.
+     *
+     * Cached per job id — invalidated on any mutation that touches
+     * the snapshot (assignments, sequence edits, gate flips…). The
+     * RTK Query default keepUnusedData semantics keep the cache warm
+     * across modal open/close cycles for the same job.
+     */
+    getJob: builder.query<JobDetailsResponse, string>({
+      query: (jobId) => `/jobs/${jobId}`,
+      providesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Apply a Pillar B JCF modification on an Element : new DSL for
+     * the remaining sequence + optional gate `needsX` flips +
+     * optional comment. Real mode: PUT /elements/{id}/sequence.
+     *
+     * Returns 410 if the element has already been cancelled (the FE
+     * surfaces this as "élément supprimé entre-temps, recharge la
+     * page").
+     */
+    updateElementSequence: builder.mutation<{ elementId: string; auditCount: number }, UpdateElementSequenceArg>({
+      query: ({ elementId, dsl, commentaires, needsBat, needsPaper, needsForme, needsPlates }) => ({
+        url: `/elements/${elementId}/sequence`,
+        method: 'PUT',
+        body: {
+          dsl,
+          ...(commentaires !== undefined ? { commentaires, commentairesProvided: true } : {}),
+          ...(needsBat !== undefined && needsBat !== null ? { needsBat } : {}),
+          ...(needsPaper !== undefined && needsPaper !== null ? { needsPaper } : {}),
+          ...(needsForme !== undefined && needsForme !== null ? { needsForme } : {}),
+          ...(needsPlates !== undefined && needsPlates !== null ? { needsPlates } : {}),
+        },
+      }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
+    /**
+     * Cancel an Element. The element row stays in the database with
+     * `status = Cancelled` ; tasks become Cancelled too, wall data is
+     * preserved. Real mode: DELETE /elements/{id}. Idempotent — a
+     * second DELETE on a cancelled element returns 200.
+     */
+    deleteElement: builder.mutation<{ elementId: string; status: string }, string>({
+      query: (elementId) => ({
+        url: `/elements/${elementId}`,
+        method: 'DELETE',
       }),
       invalidatesTags: ['Snapshot'],
     }),
@@ -1075,6 +1228,10 @@ export const {
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
   useUpdateJobMutation,
+  useGetJobQuery,
+  useLazyGetJobQuery,
+  useUpdateElementSequenceMutation,
+  useDeleteElementMutation,
   useDeleteJobMutation,
   useClearJobAssignmentsMutation,
   useClearAllAssignmentsMutation,

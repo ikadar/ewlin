@@ -157,6 +157,10 @@ export {
   useLazyLookupByReferenceQuery,
   useCreateJobMutation,
   useUpdateJobMutation,
+  useGetJobQuery,
+  useLazyGetJobQuery,
+  useUpdateElementSequenceMutation,
+  useDeleteElementMutation,
   useDeleteJobMutation,
   useClearJobAssignmentsMutation,
   useClearAllAssignmentsMutation,
@@ -189,7 +193,7 @@ export {
   useUpdateFormeLeadTimeMutation,
   scheduleApi,
 } from './api/scheduleApi';
-export type { SavedScheduleItem, ComputeScheduleResult } from './api/scheduleApi';
+export type { SavedScheduleItem, ComputeScheduleResult, JobDetailsResponse, JobDetailsElement, JobDetailsTask, UpdateElementSequenceArg } from './api/scheduleApi';
 
 export { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation, templateApi } from './api/templateApi';
 

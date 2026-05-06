@@ -14,6 +14,7 @@ import {
   getMultiElementStationData,
   sortStationDataBySeverity,
   getFluxJobStatus,
+  isReadyToShip,
 } from './fluxAggregation';
 import { FluxJobStatusDot } from './FluxJobStatusDot';
 import { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
@@ -112,6 +113,13 @@ interface FluxTableProps {
   onToggleExpand?: (jobId: string) => void;
   onDeleteJob?: (jobId: string) => void;
   onEditJob?: (jobId: string) => void;
+  /**
+   * When false, hide the "Modifier" affordance (Prod scenario : the
+   * job shape is locked, only wall gates can be saisied). The
+   * FluxProdOnlyGuardSubscriber backend rejects edits even if a stale
+   * UI manages to fire one ; this prop is the user-facing mirror.
+   */
+  canEditJobShape?: boolean;
   /** Update a job's shipper (transporteur). */
   onUpdateShipper?: (jobInternalId: string, shipperId: string | null) => void;
   /** Available shippers for the inline dropdown. */
@@ -357,17 +365,33 @@ const FluxTableRow = memo(function FluxTableRow({
 
   // Job-level status for dot + row tint
   const jobStatus = getFluxJobStatus(job, ctx.lateJobIds, ctx.conflictJobIds);
+  const isShipped = job.parti.shipped;
+  const isReady = !isShipped && isReadyToShip(job);
 
-  // Row background tint: only conflict / late get a colored row — planned and
-  // unplanned rows render flat, the dot alone conveys their status.
-  const ROW_TINT: Partial<Record<typeof jobStatus, { tr: string; sticky: string }>> = {
-    conflict: { tr: 'var(--flux-conflict-row-bg)', sticky: 'var(--flux-conflict-sticky-bg)' },
-    late:     { tr: 'var(--flux-late-row-bg)',     sticky: 'var(--flux-late-sticky-bg)' },
-  };
-  const tint = ROW_TINT[jobStatus] ?? null;
+  // Row background — 8-state grammar (locked 2026-05-06, see project_flux_row_colors.md):
+  //   shipped (any status) → green solid
+  //   ready (transition)   → hachured crossfade toward green, hue per status
+  //   late                 → red solid
+  //   conflict             → yellow solid
+  //   planned / unplanned  → flat (dot alone conveys status)
+  const tint: { tr: string; sticky: string } | null =
+    isShipped
+      ? { tr: 'var(--flux-shipped-row-bg)', sticky: 'var(--flux-shipped-sticky-bg)' }
+    : isReady
+      ? jobStatus === 'late'
+        ? { tr: 'var(--flux-late-ready-row-bg)',     sticky: 'var(--flux-late-ready-sticky-bg)' }
+        : jobStatus === 'conflict'
+        ? { tr: 'var(--flux-conflict-ready-row-bg)', sticky: 'var(--flux-conflict-ready-sticky-bg)' }
+        : { tr: 'var(--flux-planned-ready-row-bg)',  sticky: 'var(--flux-planned-ready-sticky-bg)' }
+    : jobStatus === 'late'
+      ? { tr: 'var(--flux-late-row-bg)',     sticky: 'var(--flux-late-sticky-bg)' }
+    : jobStatus === 'conflict'
+      ? { tr: 'var(--flux-conflict-row-bg)', sticky: 'var(--flux-conflict-sticky-bg)' }
+    : null;
 
   const cellBase = `${stickyCell} px-4 py-0 text-sm text-flux-text-secondary`;
-  const stickyBg = tint ? { backgroundColor: tint.sticky } : undefined;
+  // background shorthand (not backgroundColor) — required because ready-state tints are gradients.
+  const stickyBg = tint ? { background: tint.sticky } : undefined;
 
   // Left border style reflects expanded state
   const expandCellStyle = isMulti
@@ -382,12 +406,14 @@ const FluxTableRow = memo(function FluxTableRow({
       className={`border-b border-flux-border group transition-colors cursor-pointer hover:bg-flux-hover ${isMulti ? 'row-multi' : ''} ${isFocused ? 'ring-1 ring-inset ring-indigo-500/40' : ''}`}
       style={{
         height: '2.25rem',
-        backgroundColor: rowBg,
+        background: rowBg,
       }}
       data-testid="flux-table-row"
       data-job-id={job.id}
       data-flux-focused={isFocused ? 'true' : undefined}
       data-late-row={jobStatus === 'late' ? 'true' : undefined}
+      data-shipped-row={isShipped ? 'true' : undefined}
+      data-ready-row={isReady ? 'true' : undefined}
       onClick={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest('button, select, [role="listbox"], [role="option"], a')) return;
@@ -437,7 +463,7 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Designation — frozen left + right shadow */}
       <td
         className={`${cellBase} left-[18.5rem]`}
-        style={tint ? { ...LEFT_SHADOW, backgroundColor: tint.sticky } : LEFT_SHADOW}
+        style={tint ? { ...LEFT_SHADOW, background: tint.sticky } : LEFT_SHADOW}
         data-testid="flux-designation"
       >
         <TruncatedCell fullText={job.designation}>
@@ -618,7 +644,7 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Actions — frozen right */}
       <td
         className={`${stickyCell} right-0 px-4 py-0`}
-        style={tint ? { ...RIGHT_SHADOW, backgroundColor: tint.sticky } : RIGHT_SHADOW}
+        style={tint ? { ...RIGHT_SHADOW, background: tint.sticky } : RIGHT_SHADOW}
       >
         <div className="flex items-center gap-2">
           <button
@@ -629,14 +655,16 @@ const FluxTableRow = memo(function FluxTableRow({
           >
             <Trash2 className="w-4 h-4" strokeWidth={2} />
           </button>
-          <button
-            className="text-blue-400 hover:text-blue-300 transition-colors"
-            onClick={() => ctx.onEditJob(job.id)}
-            title="Éditer"
-            data-testid="flux-action-edit"
-          >
-            <FolderOpen className="w-4 h-4" strokeWidth={2} />
-          </button>
+          {ctx.canEditJobShape && (
+            <button
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+              onClick={() => ctx.onEditJob(job.id)}
+              title="Modifier"
+              data-testid="flux-action-edit"
+            >
+              <FolderOpen className="w-4 h-4" strokeWidth={2} />
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -788,6 +816,7 @@ export const FluxTable = memo(function FluxTable({
   onToggleExpand = () => {},
   onDeleteJob = () => {},
   onEditJob = () => {},
+  canEditJobShape = true,
   onUpdateShipper,
   shippers = [],
   onToggleShipped,
@@ -808,6 +837,7 @@ export const FluxTable = memo(function FluxTable({
     onToggleExpand,
     onDeleteJob,
     onEditJob,
+    canEditJobShape,
     onUpdateShipper,
     shippers,
     onToggleShipped,

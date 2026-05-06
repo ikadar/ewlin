@@ -8,6 +8,7 @@ import { FluxTable } from '@/components/FluxTable';
 import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
+import { JobModificationContainer } from '@/components/JcfModificationModal/JobModificationContainer';
 import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
@@ -66,7 +67,13 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   // + JobController inline guard) ; the UI short-circuits with a hint so
   // users don't see optimistic flickers and silent failures.
   const { mode } = useScenarioMode();
+  // Wall writes (gate states + ST/Parti/Facturé) are Prod-only ;
+  // job-shape edits (sequence, deadline, priority, gate `needsX`) live
+  // in Préprod where they're tentative until publish. The toggles
+  // mirror the asymmetry described in
+  // docs/architecture/preprod-prod-photo-model.md (Pillar A + B).
   const canEditFluxReality = mode === 'prod';
+  const canEditJobShape = mode === 'preprod';
   const { showToast } = useToast();
 
   // Late job IDs from schedule snapshot
@@ -94,6 +101,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   // ── Local UI state (not tied to server data) ──────────────────────────────
   const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
   const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<string | null>(null);
+  const [editingJobInternalId, setEditingJobInternalId] = useState<string | null>(null);
 
   // ── Search / keyboard state ──────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -282,13 +290,24 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     navigate(`/?task=${encodeURIComponent(taskId)}`);
   }, [navigate]);
 
-  /** Open JCF in edit mode for a job, then return to Flux on close (qa.md K6.2). */
+  /**
+   * Open the Pillar B JCF modification modal for a job. Préprod-only :
+   * the surface is hidden in Prod via `canEditJobShape`. The legacy
+   * "open JCF creation form in edit mode" navigation is gone — the
+   * dedicated modification modal now handles deadline/sequence/gates
+   * with continuous progress preserved (see Pillar B in
+   * docs/architecture/preprod-prod-photo-model.md).
+   */
   const handleEditJob = useCallback((jobId: string) => {
-    // FluxJob.internalId is the scheduler Job UUID; FluxJob.id is the display reference.
+    if (!canEditJobShape) {
+      showToast('Bascule en Préprod pour modifier un job.', 'info');
+      return;
+    }
     const fluxJob = jobs.find(j => j.id === jobId);
-    const editId = fluxJob?.internalId ?? jobId;
-    navigate('/stations/job/new', { state: { editJobId: editId, from: location.pathname } });
-  }, [navigate, location.pathname, jobs]);
+    const editId = fluxJob?.internalId;
+    if (!editId) return;
+    setEditingJobInternalId(editId);
+  }, [jobs, canEditJobShape, showToast]);
 
   // ── Keyboard shortcuts (spec 3.4) ────────────────────────────────────────
   useEffect(() => {
@@ -309,6 +328,10 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
       }
       if (isAltLetter(e, 'n')) {
         e.preventDefault();
+        if (!canEditJobShape) {
+          showToast('Bascule en Préprod pour créer un job.', 'info');
+          return;
+        }
         navigate('/stations/job/new', { state: { from: location.pathname } });
         return;
       }
@@ -334,7 +357,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
 
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [activeTab, navigate, location.pathname, backdrop]);
+  }, [activeTab, navigate, location.pathname, backdrop, canEditJobShape, showToast]);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading) {
@@ -373,6 +396,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               searchValue={search}
               onSearchChange={handleSearchChange}
               onNewJob={handleNewJob}
+              canCreateJob={canEditJobShape}
               searchInputRef={searchInputRef}
               jobs={jobs}
               filters={filters}
@@ -401,6 +425,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               onToggleExpand={handleToggleExpand}
               onDeleteJob={handleDeleteJob}
               onEditJob={handleEditJob}
+              canEditJobShape={canEditJobShape}
               onUpdateShipper={handleUpdateShipper}
               shippers={shippers}
               onToggleShipped={handleToggleShipped}
@@ -419,6 +444,14 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
         <FluxDeleteConfirmDialog
           onCancel={() => setDeleteConfirmJobId(null)}
           onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {/* Pillar B JCF modification modal — Préprod-only entry point. */}
+      {editingJobInternalId && (
+        <JobModificationContainer
+          jobInternalId={editingJobInternalId}
+          onClose={() => setEditingJobInternalId(null)}
         />
       )}
 

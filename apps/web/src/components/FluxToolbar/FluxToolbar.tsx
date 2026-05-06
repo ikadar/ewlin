@@ -8,6 +8,12 @@ interface FluxToolbarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   onNewJob: () => void;
+  /**
+   * When false, hide the "Nouveau job" CTA. Préprod → true (the chef
+   * drafts a new JCF), Prod → false (jobs always start in Préprod
+   * before being published, so a Prod-side "+" would be misleading).
+   */
+  canCreateJob?: boolean;
   /** Ref forwarded from parent so Alt+F can focus this input. */
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
   /** All jobs from the API — used to derive dynamic filter options. */
@@ -25,6 +31,7 @@ export const FluxToolbar = memo(function FluxToolbar({
   searchValue,
   onSearchChange,
   onNewJob,
+  canCreateJob = true,
   searchInputRef,
   jobs,
   filters,
@@ -43,15 +50,17 @@ export const FluxToolbar = memo(function FluxToolbar({
         <h1 className="text-xl font-semibold text-flux-text-primary">
           Flux de production
         </h1>
-        <button
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white text-base font-medium rounded-[0.25rem] transition-colors"
-          onClick={onNewJob}
-          data-testid="flux-new-job-button"
-          title="Nouveau job (Alt+N)"
-        >
-          <Plus className="w-4 h-4" strokeWidth={2} />
-          Nouveau job
-        </button>
+        {canCreateJob && (
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white text-base font-medium rounded-[0.25rem] transition-colors"
+            onClick={onNewJob}
+            data-testid="flux-new-job-button"
+            title="Nouveau job (Alt+N)"
+          >
+            <Plus className="w-4 h-4" strokeWidth={2} />
+            Nouveau job
+          </button>
+        )}
       </div>
 
       {/* Search bar */}

@@ -22,6 +22,12 @@ export interface FluxTableContextValue {
   onToggleExpand: (jobId: string) => void;
   onDeleteJob: (jobId: string) => void;
   onEditJob: (jobId: string) => void;
+  /**
+   * Hide the row "Modifier" button when false. Préprod → true, Prod →
+   * false. The asymmetry mirrors the wall vs. scenario-scoped frontier
+   * decided in docs/architecture/preprod-prod-photo-model.md.
+   */
+  canEditJobShape: boolean;
   expandedJobIds: Set<string>;
   /** Active sort column (v0.5.21). */
   sortColumn: SortColumn;

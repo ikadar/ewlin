@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Flux split — badge de mode</title>
+<style>
+  /* CSS variables driven by the controls */
+  :root {
+    --mode: 'preprod';
+    --variant: 'A';
+  }
+  body {
+    margin: 0;
+    background: #09090b;
+    color: #e4e4e7;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* Halo overlay — preprod = emerald, prod = amber */
+  body[data-mode='preprod']::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow:
+      inset 0 0 0 2px rgba(16, 185, 129, 0.4),
+      inset 0 0 40px rgba(16, 185, 129, 0.12);
+  }
+  body[data-mode='prod']::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow:
+      inset 0 0 0 2px rgba(245, 158, 11, 0.4),
+      inset 0 0 40px rgba(245, 158, 11, 0.12);
+  }
+
+  /* Controls panel */
+  .controls {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(24, 24, 27, 0.95);
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+    padding: 14px 16px;
+    width: 280px;
+  }
+  .controls h2 { font-size: 12px; margin: 0 0 4px 0; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; }
+  .control-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .control-row label {
+    font-size: 11px;
+    color: #a1a1aa;
+    width: 60px;
+  }
+  .seg {
+    display: flex;
+    background: #18181b;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+    flex: 1;
+  }
+  .seg button {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: #a1a1aa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .seg button.active {
+    background: #27272a;
+    color: #fafafa;
+  }
+  .legend {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid #27272a;
+    font-size: 10px;
+    line-height: 1.5;
+    color: #71717a;
+  }
+  .legend strong { color: #d4d4d8; }
+
+  /* Page layout */
+  .page {
+    margin-left: 320px;
+    margin-right: 24px;
+    padding: 24px 0;
+  }
+  .page-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: #fafafa;
+  }
+  .page-subtitle {
+    color: #71717a;
+    margin: 0 0 18px 0;
+    font-size: 12px;
+  }
+
+  /* Card containing the mock table — mirrors flux-elevated */
+  .card {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  /* Variant A — minimal inline badge in toolbar (shares row with search) */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #27272a;
+  }
+  .toolbar-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #fafafa;
+    margin-right: auto;
+  }
+  .badge-A {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid;
+  }
+  body[data-mode='preprod'] .badge-A {
+    background: rgba(16, 185, 129, 0.10);
+    border-color: rgba(16, 185, 129, 0.40);
+    color: #6ee7b7;
+  }
+  body[data-mode='prod'] .badge-A {
+    background: rgba(245, 158, 11, 0.10);
+    border-color: rgba(245, 158, 11, 0.40);
+    color: #fcd34d;
+  }
+  .search-mock {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: #71717a;
+    width: 200px;
+  }
+
+  /* Variant B — full-width sticky banner above tabs */
+  .banner-B {
+    padding: 8px 16px;
+    border-bottom: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11.5px;
+  }
+  body[data-mode='preprod'] .banner-B {
+    background: rgba(16, 185, 129, 0.06);
+    border-bottom-color: rgba(16, 185, 129, 0.25);
+    color: #a7f3d0;
+  }
+  body[data-mode='prod'] .banner-B {
+    background: rgba(245, 158, 11, 0.06);
+    border-bottom-color: rgba(245, 158, 11, 0.25);
+    color: #fde68a;
+  }
+  .banner-B strong { font-weight: 600; }
+  .banner-B span.muted { color: rgba(255,255,255,0.4); }
+
+  /* Variant C — corner ribbon top-left of the card */
+  .ribbon-C {
+    position: relative;
+  }
+  .ribbon-C::before {
+    content: attr(data-mode-label);
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 4px 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    border-bottom-right-radius: 6px;
+    z-index: 5;
+  }
+  body[data-mode='preprod'] .ribbon-C::before {
+    background: rgb(16, 185, 129);
+    color: #052e1f;
+  }
+  body[data-mode='prod'] .ribbon-C::before {
+    background: rgb(245, 158, 11);
+    color: #3d2806;
+  }
+
+  /* Variant D — title-line badge (Flux • [PROD]) */
+  .badge-D {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    vertical-align: middle;
+  }
+  body[data-mode='preprod'] .badge-D {
+    background: rgba(16, 185, 129, 0.18);
+    color: #6ee7b7;
+  }
+  body[data-mode='prod'] .badge-D {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fcd34d;
+  }
+
+  /* Common — hide variant blocks not selected */
+  body[data-variant='A'] .variant-B,
+  body[data-variant='A'] .variant-C-cap,
+  body[data-variant='A'] .variant-D-on-title { display: none; }
+  body[data-variant='B'] .variant-A,
+  body[data-variant='B'] .variant-C-cap,
+  body[data-variant='B'] .variant-D-on-title { display: none; }
+  body[data-variant='C'] .variant-A,
+  body[data-variant='C'] .variant-B,
+  body[data-variant='C'] .variant-D-on-title { display: none; }
+  body[data-variant='D'] .variant-A,
+  body[data-variant='D'] .variant-B,
+  body[data-variant='D'] .variant-C-cap { display: none; }
+
+  /* Body of card / table mock */
+  .tab-bar {
+    display: flex;
+    gap: 8px;
+    padding: 6px 16px;
+    border-bottom: 1px solid #27272a;
+    background: #18181b;
+  }
+  .tab {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #a1a1aa;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .tab.active {
+    background: #27272a;
+    color: #fafafa;
+  }
+  .table-mock {
+    padding: 10px 16px 16px 16px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 80px 140px 200px 1fr 80px 80px 80px 100px;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #27272a;
+    font-size: 12px;
+    align-items: center;
+  }
+  .row.header {
+    color: #71717a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #3f3f46;
+  }
+  .gate {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    display: inline-block;
+    cursor: pointer;
+  }
+  .gate.ok { background: #047857; border-color: #10b981; }
+  .gate.pending { background: #92400e; border-color: #f59e0b; }
+  /* Affordance hint: gate is disabled in préprod (read-only wall) */
+  body[data-mode='preprod'] .gate { cursor: not-allowed; opacity: 0.5; }
+  body[data-mode='preprod'] .gate { cursor: not-allowed; }
+
+  .modify-btn {
+    background: transparent;
+    border: 1px solid #3f3f46;
+    color: #d4d4d8;
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  body[data-mode='prod'] .modify-btn {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .new-job-btn {
+    background: rgb(16, 185, 129);
+    border: 0;
+    color: #052e1f;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  body[data-mode='prod'] .new-job-btn { display: none; }
+
+  /* Inline notes that appear under each variant header */
+  .variant-note {
+    background: rgba(99, 102, 241, 0.08);
+    border-left: 2px solid rgba(99, 102, 241, 0.5);
+    padding: 8px 12px;
+    margin: 12px 0 16px 0;
+    font-size: 11px;
+    color: #a5b4fc;
+  }
+</style>
+</head>
+<body data-mode="preprod" data-variant="A">
+  <div class="controls">
+    <h2>Flux mode badge</h2>
+
+    <div class="control-row">
+      <label>Mode</label>
+      <div class="seg" id="mode-seg">
+        <button data-mode="preprod" class="active">Préprod</button>
+        <button data-mode="prod">Prod</button>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <label>Variant</label>
+      <div class="seg" id="variant-seg">
+        <button data-variant="A" class="active">A</button>
+        <button data-variant="B">B</button>
+        <button data-variant="C">C</button>
+        <button data-variant="D">D</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <strong>A</strong> — Pill in toolbar row (sober).<br>
+      <strong>B</strong> — Sticky banner above tabs (loud, copy-rich).<br>
+      <strong>C</strong> — Corner ribbon on the card.<br>
+      <strong>D</strong> — Badge inline on the page title (smallest footprint).<br>
+      <br>
+      Halo on viewport edges = always there. Affordances (gate clicks, "Modifier" btn, "+" btn) react to mode regardless of which badge variant.
+    </div>
+  </div>
+
+  <main class="page">
+    <h1 class="page-title">
+      Flux
+      <span class="badge-D variant-D-on-title" id="badge-D-text">Préprod</span>
+    </h1>
+    <p class="page-subtitle">Tableau de pilotage du mur asymétrique. Préprod = édition tentative ; Prod = écriture du mur.</p>
+
+    <div class="card">
+      <!-- Variant C — corner ribbon, sits on the card itself -->
+      <div class="ribbon-C variant-C-cap" data-mode-label="Préprod" id="ribbon-C-cap"></div>
+
+      <!-- Variant A — pill in toolbar -->
+      <div class="toolbar">
+        <span class="toolbar-title">Tableau de flux</span>
+        <span class="badge-A variant-A" id="badge-A-text">Préprod — édition tentative</span>
+        <div class="search-mock">Rechercher…</div>
+        <button class="new-job-btn" title="Nouveau job (Préprod uniquement)">+ Nouveau job</button>
+      </div>
+
+      <!-- Variant B — full-width sticky banner -->
+      <div class="banner-B variant-B" id="banner-B-text">
+        <strong>Préprod</strong>
+        <span>—</span>
+        <span>tu peux éditer deadline, séquence, priorité.</span>
+        <span class="muted">Les gates (BAT, papier, plaque, forme) restent en lecture — bascule en Prod pour les saisir.</span>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab active">Tous les jobs</div>
+        <div class="tab">Prépresse</div>
+        <div class="tab">Impression</div>
+        <div class="tab">Façonnage</div>
+      </div>
+
+      <div class="table-mock">
+        <div class="row header">
+          <span>ID</span><span>Client</span><span>Désignation</span><span>BAT</span><span>Papier</span><span>Plaque</span><span>Forme</span><span>Action</span>
+        </div>
+        <div class="row">
+          <span>00042</span><span>Acme Corp.</span><span>Brochure A4 32p</span>
+          <span><span class="gate ok"></span></span>
+          <span><span class="gate pending"></span></span>
+          <span><span class="gate"></span></span>
+          <span><span class="gate"></span></span>
+          <span><button class="modify-btn">Modifier</button></span>
+        </div>
+        <div class="row">
+          <span>00043</span><span>Bistrot 12</span><span>Carte menu été</span>
+          <span><span class="gate ok"></span></span>
+          <span><span class="gate ok"></span></span>
+          <span><span class="gate pending"></span></span>
+          <span><span class="gate"></span></span>
+          <span><button class="modify-btn">Modifier</button></span>
+        </div>
+        <div class="row">
+          <span>00044</span><span>Cab Studio</span><span>Affiche 60×80</span>
+          <span><span class="gate pending"></span></span>
+          <span><span class="gate"></span></span>
+          <span><span class="gate"></span></span>
+          <span><span class="gate"></span></span>
+          <span><button class="modify-btn">Modifier</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="variant-note">
+      <strong>Affordances visibles dans cette maquette :</strong>
+      <ul style="margin: 6px 0 0 16px; padding: 0;">
+        <li><em>Préprod</em> — bouton <code>+ Nouveau job</code> visible, <code>Modifier</code> cliquable, gates en lecture seule (curseur not-allowed, opacité réduite).</li>
+        <li><em>Prod</em> — bouton <code>+</code> caché, <code>Modifier</code> grisé, gates cliquables (curseur normal, contraste plein).</li>
+      </ul>
+    </div>
+  </main>
+
+<script>
+  const body = document.body;
+  document.querySelectorAll('#mode-seg button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#mode-seg button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const m = b.dataset.mode;
+      body.dataset.mode = m;
+      // Update text labels on each variant
+      const isProd = m === 'prod';
+      document.getElementById('badge-A-text').textContent = isProd ? 'Prod — écriture du mur' : 'Préprod — édition tentative';
+      document.getElementById('badge-D-text').textContent = isProd ? 'Prod' : 'Préprod';
+      document.getElementById('ribbon-C-cap').dataset.modeLabel = isProd ? 'Prod' : 'Préprod';
+      const banner = document.getElementById('banner-B-text');
+      banner.innerHTML = isProd
+        ? '<strong>Prod</strong> <span>—</span> <span>tu saisis la réalité (BAT, papier, plaque, forme, statut ST, parti, facturé).</span> <span class="muted">Édition du plan désactivée — bascule en Préprod pour modifier deadline ou séquence.</span>'
+        : '<strong>Préprod</strong> <span>—</span> <span>tu peux éditer deadline, séquence, priorité.</span> <span class="muted">Les gates (BAT, papier, plaque, forme) restent en lecture — bascule en Prod pour les saisir.</span>';
+    });
+  });
+  document.querySelectorAll('#variant-seg button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#variant-seg button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      body.dataset.variant = b.dataset.variant;
+    });
+  });
+</script>
+</body>
+</html>

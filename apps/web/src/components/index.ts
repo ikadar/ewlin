@@ -51,12 +51,14 @@ export type { JcfDonePanelProps } from './JcfDonePanel/JcfDonePanel';
 export type { TaskForRemainingDsl, RemainingDslResult } from './JcfDonePanel/computeRemainingDsl';
 
 export { JcfModificationModal } from './JcfModificationModal/JcfModificationModal';
+export { JobModificationContainer } from './JcfModificationModal/JobModificationContainer';
 export type {
   JcfModificationModalProps,
   JobModificationData,
   ElementModificationData,
   ModificationChanges,
 } from './JcfModificationModal/JcfModificationModal';
+export type { JobModificationContainerProps } from './JcfModificationModal/JobModificationContainer';
 
 export { JcfJobHeader, parseFrenchDate, formatToFrench, generateJobId } from './JcfJobHeader';
 export type { JcfJobHeaderProps } from './JcfJobHeader';
