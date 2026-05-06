@@ -161,9 +161,39 @@ Always-allowed (regardless of cut points):
 2. FE — confirm that entity reads through the active scenario context return the right row.
 3. Playwright smoke test: modify a deadline in Préprod, confirm Prod view is unaffected; push, confirm Prod view updates.
 
-### Phase B — JCF de modification (subsequent chantier)
+### Phase B — JCF de modification (livré 2026-05-06)
 
-Out of scope here. Will be planned and executed after Phase A is merged.
+Pillar B delivered as a follow-on chantier on the same branch (`multi-person-stations-encarteuse-travail-table`). The decisions, validated visually with the user via `playground-jcf-sequence-cell.html`, were:
+
+- Strict visual continuity with the existing JCF (same modal, same table layout — disabled fields, never hidden).
+- Single edit verb in the UI: the chef edits the DSL textarea ; the backend computes the diff between the old and new sequence and emits `Keep` / `Create` / `Cancel` ops. No special "replace" UX.
+- A "Déjà fait" panel sits above the Sequence textarea (read-only). The textarea is pre-filled with the **remaining** DSL — completed tasks excluded, in-progress task with `runMinutes` reduced by `recordedProgressPct`, setup preserved. The engine is the authority on whether a partial setup carries over (`lastSetupAt` + `lastSetupStationId`), so the JCF doesn't try to bake that decision into the DSL.
+- Element add/delete via column header actions ; element delete is `Element.status = Cancelled` (no hard-delete) so the wall preserves history.
+- Gate switches (`needsBat / needsPaper / needsForme / needsPlates`) editable on a dedicated Gates row alongside their current status.
+- No transmission notes, no blocking warnings — the chef is trusted.
+
+**What ships :**
+
+| Layer | Artefact |
+|---|---|
+| Backend entity | `Element.status: ElementStatus` (Active / Cancelled), `Element::cancel()`, `Element::isActive()`, `Job::getActiveElements()` |
+| Backend audit | `JcfModification` entity + repository + table `jcf_modifications` |
+| Backend service | `ElementSequenceDiffService` (matches by station/provider signature, falls back to position) ; `ElementModificationService` (orchestrates parse → diff → apply → audit) |
+| Backend API | `PUT /api/v1/elements/{id}/sequence` (DSL + commentaires + needsX), `DELETE /api/v1/elements/{id}` (returns 410 on subsequent edits to a cancelled element) |
+| Backend filter | `SnapshotBuilder` and `ScheduleComputeController::buildJobs` use `getActiveElements()` so Cancelled elements never reach the engine |
+| Frontend | `JcfModificationModal` (reuses `JcfModal` / `JcfJobHeader` / `JcfElementsTable` with `disabledFields` / `disabledRows` props), `JcfDonePanel` + `computeRemainingDsl` helper |
+| Migration | `Version20260509000000` — ALTER `elements` ADD `status` + CREATE `jcf_modifications` |
+
+**Tests :**
+- Backend: 10 unit tests on the entity layer + 7 unit tests on the diff service. PHPStan level 8 clean.
+- Frontend: 8 vitest tests on `computeRemainingDsl` (orderings, in-progress reduction, cancelled drop, outsourced rendering).
+- E2E: `apps/web/playwright/jcf-modification-api.spec.ts` smoke-tests the new endpoints over REST. The two round-trip cases (DELETE idempotency, 410 on cancelled element) skip gracefully when the Préprod fixture lacks a job with ≥2 elements — the no-fixtures-ever rule means the test must tolerate the real DB shape.
+
+**Left for V2 (deliberate cuts) :**
+- `POST /jobs/{jobId}/elements` (add element) — UI scaffolding present, endpoint not wired. Use case is rare and the diff service can already represent it.
+- 409 conflict resolution when an operator records progress mid-edit. Today the modal will simply 200 over the stale state ; an explicit refresh-and-warn flow is a V2 polish.
+- Mercure live-refresh of the "Déjà fait" panel while the modal is open.
+- Wiring a "Modifier" button into `JobDetailsPanel` — the modal is exported from the components index but not yet invoked from any UI affordance, pending the chef's preferred entry point.
 
 ## 6. Risk register
 
