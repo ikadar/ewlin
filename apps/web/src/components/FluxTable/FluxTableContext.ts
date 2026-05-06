@@ -28,6 +28,19 @@ export interface FluxTableContextValue {
    * decided in docs/architecture/preprod-prod-photo-model.md.
    */
   canEditJobShape: boolean;
+  /**
+   * Disable gate listbox interactions (BAT / Papier / Plaque / Forme)
+   * when false. Prod → true (the chef saisies reality events on the
+   * wall), Préprod → false (the wall is read-only there). The backend
+   * FluxProdOnlyGuardSubscriber already rejects these mutations in
+   * Préprod ; this flag is the user-facing mirror that removes the
+   * false affordance (cursor, hover, dropdown opening, caret).
+   *
+   * Other Flux wall affordances (ST cell, Parti, Facturé) are out of
+   * V1 scope here — ST is already read-only by prior decision, Parti
+   * and Facturé remain Prod-only via their handler-level guards.
+   */
+  canEditWall: boolean;
   expandedJobIds: Set<string>;
   /** Active sort column (v0.5.21). */
   sortColumn: SortColumn;

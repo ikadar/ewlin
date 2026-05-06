@@ -418,6 +418,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               onDeleteJob={handleDeleteJob}
               onEditJob={handleEditJob}
               canEditJobShape={canEditJobShape}
+              canEditWall={canEditFluxReality}
               onUpdateShipper={handleUpdateShipper}
               shippers={shippers}
               onToggleShipped={handleToggleShipped}

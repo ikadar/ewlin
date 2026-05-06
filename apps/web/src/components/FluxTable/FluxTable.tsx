@@ -120,6 +120,14 @@ interface FluxTableProps {
    * UI manages to fire one ; this prop is the user-facing mirror.
    */
   canEditJobShape?: boolean;
+  /**
+   * When false, gate listboxes (BAT / Papier / Plaque / Forme) become
+   * inert : disabled buttons, no hover state, no dropdown, no caret.
+   * Préprod sets this false because the wall is observed-only there ;
+   * the same guard exists on the backend (FluxProdOnlyGuardSubscriber)
+   * but the FE removes the false affordance.
+   */
+  canEditWall?: boolean;
   /** Update a job's shipper (transporteur). */
   onUpdateShipper?: (jobInternalId: string, shipperId: string | null) => void;
   /** Available shippers for the inline dropdown. */
@@ -822,6 +830,7 @@ export const FluxTable = memo(function FluxTable({
   onDeleteJob = () => {},
   onEditJob = () => {},
   canEditJobShape = true,
+  canEditWall = true,
   onUpdateShipper,
   shippers = [],
   onToggleShipped,
@@ -843,6 +852,7 @@ export const FluxTable = memo(function FluxTable({
     onDeleteJob,
     onEditJob,
     canEditJobShape,
+    canEditWall,
     onUpdateShipper,
     shippers,
     onToggleShipped,

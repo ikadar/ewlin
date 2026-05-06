@@ -7,13 +7,22 @@ import type { FluxTableContextValue } from './FluxTableContext';
 /** Build a minimal FluxTableContextValue for testing. */
 function makeCtx(overrides?: Partial<FluxTableContextValue>): FluxTableContextValue {
   return {
+    categories: [],
     openListboxId: null,
     setOpenListboxId: vi.fn(),
     onUpdatePrerequisite: vi.fn(),
+    onUpdateSTStatus: vi.fn(),
     onToggleExpand: vi.fn(),
     onDeleteJob: vi.fn(),
     onEditJob: vi.fn(),
+    canEditJobShape: true,
+    canEditWall: true,
     expandedJobIds: new Set(),
+    sortColumn: 'id',
+    sortDirection: 'asc',
+    onSortChange: vi.fn(),
+    lateJobIds: new Set(),
+    conflictJobIds: new Set(),
     ...overrides,
   };
 }
@@ -207,5 +216,37 @@ describe('FluxPrerequisiteListbox', () => {
     );
     fireEvent.click(screen.getByTestId('flux-prereq-listbox-trigger'));
     expect(ctx.setOpenListboxId).toHaveBeenCalledWith(null);
+  });
+
+  // ── Wall read-only mode (Préprod) ───────────────────────────────────────
+
+  it('renders the trigger as disabled when canEditWall is false', () => {
+    renderListbox({}, { canEditWall: false });
+    const trigger = screen.getByTestId('flux-prereq-listbox-trigger');
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveAttribute('data-readonly', 'true');
+  });
+
+  it('clicking the trigger does not open the dropdown when canEditWall is false', () => {
+    const ctx = renderListbox({}, { canEditWall: false });
+    fireEvent.click(screen.getByTestId('flux-prereq-listbox-trigger'));
+    expect(ctx.setOpenListboxId).not.toHaveBeenCalled();
+  });
+
+  it('shows the caret only when canEditWall is true', () => {
+    const { unmount } = render(
+      <FluxTableContext.Provider value={makeCtx({ canEditWall: true })}>
+        <FluxPrerequisiteListbox jobId="j1" elementId="e1" column="bat" status="bat_approved" />
+      </FluxTableContext.Provider>,
+    );
+    expect(screen.getByTestId('flux-prereq-listbox-trigger').querySelector('svg')).not.toBeNull();
+    unmount();
+
+    render(
+      <FluxTableContext.Provider value={makeCtx({ canEditWall: false })}>
+        <FluxPrerequisiteListbox jobId="j2" elementId="e2" column="bat" status="bat_approved" />
+      </FluxTableContext.Provider>,
+    );
+    expect(screen.getByTestId('flux-prereq-listbox-trigger').querySelector('svg')).toBeNull();
   });
 });

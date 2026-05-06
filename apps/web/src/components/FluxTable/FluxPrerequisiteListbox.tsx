@@ -43,6 +43,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
   const ctx = useFluxTableContext();
   const myId = `${jobId}-${elementId}-${column}`;
   const isOpen = ctx.openListboxId === myId;
+  const isReadOnly = !ctx.canEditWall;
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -56,6 +57,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
   // ── Open / Close ────────────────────────────────────────────────────────
 
   const handleOpen = useCallback(() => {
+    if (isReadOnly) return;
     if (isOpen) {
       ctx.setOpenListboxId(null);
       return;
@@ -71,7 +73,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
     const currentIdx = options.findIndex(o => o.value === status);
     setFocusedIndex(currentIdx >= 0 ? currentIdx : 0);
     ctx.setOpenListboxId(myId);
-  }, [isOpen, ctx, myId, options, status]);
+  }, [isOpen, ctx, myId, options, status, isReadOnly]);
 
   // ── Click-outside detection ──────────────────────────────────────────────
 
@@ -171,6 +173,7 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
     <div style={{ display: 'block', width: '100%' }}>
       <button
         ref={triggerRef}
+        disabled={isReadOnly}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -180,42 +183,46 @@ export const FluxPrerequisiteListbox = memo(function FluxPrerequisiteListbox({
           height: '100%',
           padding: '0 5px',
           minHeight: compact ? '2rem' : '2.25rem',
-          background: isHovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+          background: !isReadOnly && isHovered ? 'rgba(255,255,255,0.04)' : 'transparent',
           border: 'none',
-          cursor: 'pointer',
+          cursor: isReadOnly ? 'not-allowed' : 'pointer',
           fontFamily: 'inherit',
           transition: 'background 0.15s',
           borderRadius: '2px',
           outline: isOpen ? '1.5px solid rgba(99,102,241,0.5)' : 'none',
           outlineOffset: '-1.5px',
         }}
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => !isReadOnly && setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleOpen}
         onKeyDown={handleTriggerKeyDown}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
+        aria-haspopup={isReadOnly ? undefined : 'listbox'}
+        aria-expanded={isReadOnly ? undefined : isOpen}
+        title={isReadOnly ? 'Saisie réservée à Prod (mur). Bascule pour modifier.' : undefined}
         data-testid="flux-prereq-listbox-trigger"
+        data-readonly={isReadOnly ? 'true' : undefined}
       >
         <FluxPrerequisiteBadge status={status} date={date} />
-        {/* Caret icon */}
-        <svg
-          style={{
-            width: '10px',
-            height: '10px',
-            flexShrink: 0,
-            opacity: isOpen ? 0.6 : 0.35,
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.15s, opacity 0.15s',
-            color: 'currentColor',
-          }}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        {/* Caret icon — hidden in read-only mode (no dropdown to open) */}
+        {!isReadOnly && (
+          <svg
+            style={{
+              width: '10px',
+              height: '10px',
+              flexShrink: 0,
+              opacity: isOpen ? 0.6 : 0.35,
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.15s, opacity 0.15s',
+              color: 'currentColor',
+            }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
       </button>
 
       {isOpen && createPortal(
