@@ -7,6 +7,8 @@ import { useLinkPropagation, isLinkableField } from '../../hooks/useLinkPropagat
 import { useSessionLearning } from '../../hooks/useSessionLearning';
 import { JcfErrorTooltip } from '../JcfErrorTooltip';
 import { CellContent } from './CellContent';
+import { JcfDonePanel } from '../JcfDonePanel/JcfDonePanel';
+import type { TaskForRemainingDsl } from '../JcfDonePanel/computeRemainingDsl';
 import type { PostePresetLike } from '../JcfSequenceAutocomplete/JcfSequenceAutocomplete';
 import { validateAllElements, validateAllForSubmit, getCellError } from './validation';
 import {
@@ -19,6 +21,18 @@ import {
   getTabNavigationTarget,
   getArrowNavigationTarget,
 } from './navigationUtils';
+
+/**
+ * Per-element "Déjà fait" data — passed by the JCF modification flow
+ * (Pillar B) so the Sequence cell can show completed/in-progress tasks
+ * above the editable remaining-DSL textarea. Keyed by element *name*
+ * because that's the stable identifier inside JcfElementsTable (the
+ * table doesn't know DB ids — those live in the wrapper).
+ */
+export interface SequenceDonePanelData {
+  completedTasks: TaskForRemainingDsl[];
+  inProgressTask: TaskForRemainingDsl | null;
+}
 
 // ── Row definitions ──
 
@@ -78,6 +92,47 @@ export interface JcfElementsTableProps {
   /** Mode: 'job' shows required indicators, 'template' does not */
   mode?: JcfMode;
   /**
+   * Per-element "Déjà fait" data — when defined for a given element name,
+   * the Sequence cell renders a `JcfDonePanel` above the textarea.
+   * Used by the Pillar B JCF modification flow ; create-mode callers
+   * leave this undefined.
+   */
+  donePanelByElementName?: Record<string, SequenceDonePanelData>;
+  /**
+   * Hide the per-column "+" affordance. Set in JCF modification mode
+   * where adding a brand-new element requires its own POST /elements
+   * flow (out of scope for Pillar B V1). The "−" remove button stays
+   * available since DELETE /elements/{id} is wired.
+   */
+  disableAddElement?: boolean;
+  /**
+   * Lock the per-column element name : no click-to-edit, name renders
+   * as a static span. Required in JCF modification mode where the
+   * element name acts as the stable key bridging the on-screen row to
+   * its DB id ; renaming would silently break the save-time mapping.
+   * Scoped to `lockedElementNames` if defined ; applies globally otherwise.
+   */
+  disableElementRename?: boolean;
+  /**
+   * Row keys whose cells render as static read-only values (no input,
+   * no autocomplete). Mirrors the canonical JCF modification playground
+   * where production specs (Format, Papier, Imposition…) are displayed
+   * but cannot be edited post-creation. The value is taken verbatim
+   * from `elements[i][rowKey]`. Empty / "−" cells fall through to a
+   * dimmed em-dash. Scoped to `lockedElementNames` if defined ; applies
+   * to all columns otherwise.
+   */
+  disabledRowKeys?: ReadonlyArray<JcfFieldKey>;
+  /**
+   * Element names that are subject to `disabledRowKeys` and
+   * `disableElementRename`. When defined, columns whose `element.name`
+   * is **not** in this list behave as in pure creation mode (every
+   * field editable, name renamable). Used by JCF modification mode :
+   * pre-existing DB rows get the locks, freshly-added in-session rows
+   * stay fully editable. When undefined, the locks apply globally.
+   */
+  lockedElementNames?: ReadonlyArray<string>;
+  /**
    * Ref to expose the save validation handler to parent.
    * Parent sets this ref, and we populate it with a function that returns true if valid.
    * @see v0.4.30 Submit Validation
@@ -97,9 +152,32 @@ export function JcfElementsTable({
   sequenceWorkflows,
   jobQuantity = '',
   mode = 'job',
+  donePanelByElementName,
+  disableAddElement = false,
+  disableElementRename = false,
+  disabledRowKeys,
+  lockedElementNames,
   onSaveAttemptRef,
   onSave,
 }: JcfElementsTableProps) {
+  const disabledRowKeysSet = useMemo(
+    () => new Set(disabledRowKeys ?? []),
+    [disabledRowKeys],
+  );
+  const lockedElementNamesSet = useMemo(
+    () => (lockedElementNames ? new Set(lockedElementNames) : null),
+    [lockedElementNames],
+  );
+  /**
+   * True when the locks (`disabledRowKeys`, `disableElementRename`)
+   * apply to a given column. If `lockedElementNames` is undefined the
+   * locks are global ; otherwise only listed columns get them.
+   */
+  const isElementLocked = useCallback(
+    (name: string) =>
+      lockedElementNamesSet === null || lockedElementNamesSet.has(name),
+    [lockedElementNamesSet],
+  );
   const [editingElementIndex, setEditingElementIndex] = useState<number | null>(
     null,
   );
@@ -518,7 +596,15 @@ export function JcfElementsTable({
             className={`px-[10px] py-[7px] ${index < elements.length - 1 ? 'border-r border-zinc-800' : ''}`}
           >
             <div className="flex items-center justify-between gap-[7px]">
-              {editingElementIndex === index ? (
+              {disableElementRename && isElementLocked(element.name) ? (
+                <span
+                  className="flex-1 text-base text-zinc-400 font-medium px-[3px] mx-[-3px] py-[2px] my-[-2px]"
+                  data-testid={`jcf-element-name-${index}`}
+                  title="Le nom d'un élément existant ne peut pas être modifié pendant l'édition d'un job."
+                >
+                  {element.name}
+                </span>
+              ) : editingElementIndex === index ? (
                 <input
                   type="text"
                   value={editingName}
@@ -558,15 +644,17 @@ export function JcfElementsTable({
                 >
                   <Minus className="w-[11px] h-[11px]" />
                 </button>
-                <button
-                  type="button"
-                  className="text-zinc-600 hover:text-zinc-400 transition-colors"
-                  onClick={() => handleAddElement(index)}
-                  aria-label="Ajouter un élément"
-                  data-testid={`jcf-element-add-${index}`}
-                >
-                  <Plus className="w-[11px] h-[11px]" />
-                </button>
+                {!disableAddElement && (
+                  <button
+                    type="button"
+                    className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                    onClick={() => handleAddElement(index)}
+                    aria-label="Ajouter un élément"
+                    data-testid={`jcf-element-add-${index}`}
+                  >
+                    <Plus className="w-[11px] h-[11px]" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -622,12 +710,31 @@ export function JcfElementsTable({
               const canLinkThisCell = isLinkable && linkPropagation.canLink(elementIndex);
               const isLinked = isLinkable && linkPropagation.isLinked(elementIndex, row.key as JcfLinkableField);
 
+              const donePanelData =
+                row.key === 'sequence'
+                  ? donePanelByElementName?.[element.name]
+                  : undefined;
+              const isRowDisabled =
+                disabledRowKeysSet.has(row.key) && isElementLocked(element.name);
+
               return (
                 <div
                   key={`${elementIndex}-${row.key}`}
-                  className={`px-[5px] py-[3px] relative ${!isLastElement ? 'border-r border-zinc-800/50' : ''} ${hasError ? 'bg-red-900/20 transition-colors duration-500' : ''} ${isLinked ? 'bg-blue-900/30' : ''}`}
+                  className={`px-[5px] py-[3px] relative ${!isLastElement ? 'border-r border-zinc-800/50' : ''} ${hasError ? 'bg-red-900/20 transition-colors duration-500' : ''} ${isLinked ? 'bg-blue-900/30' : ''} ${isRowDisabled ? 'bg-zinc-900/40' : ''}`}
                   data-testid={`jcf-cell-${elementIndex}-${row.key}`}
                 >
+                  {isRowDisabled ? (
+                    <div
+                      className={`px-[5px] py-[2px] font-mono text-[13px] cursor-not-allowed select-none ${
+                        isEmpty ? 'text-zinc-700' : 'text-zinc-500'
+                      }`}
+                      title="Modifiable uniquement à la création du job"
+                      data-testid={`jcf-cell-readonly-${elementIndex}-${row.key}`}
+                    >
+                      {isEmpty ? '—' : value}
+                    </div>
+                  ) : (
+                  <>
                   {/* Error tooltip */}
                   {cellError && (
                     <JcfErrorTooltip
@@ -642,6 +749,12 @@ export function JcfElementsTable({
                     title="Champ requis"
                     data-testid={`required-indicator-${elementIndex}-${row.key}`}
                   />
+                  {donePanelData && (
+                    <JcfDonePanel
+                      completedTasks={donePanelData.completedTasks}
+                      inProgressTask={donePanelData.inProgressTask}
+                    />
+                  )}
                   <CellContent
                     rowKey={row.key}
                     value={value}
@@ -675,6 +788,8 @@ export function JcfElementsTable({
                     handleToggleAutoCalculated={handleToggleAutoCalculated}
                     markFieldTouched={markFieldTouched}
                   />
+                  </>
+                  )}
                 </div>
               );
             })}

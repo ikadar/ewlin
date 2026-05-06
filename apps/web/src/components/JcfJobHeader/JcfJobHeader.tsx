@@ -58,7 +58,20 @@ export interface JcfJobHeaderProps {
   onRequiredJobsChange?: (value: string) => void;
   /** Available job suggestions for the required jobs autocomplete */
   jobSuggestions?: Array<{ reference: string; client: string }>;
+  /**
+   * Header fields locked in read-only display. Used by JCF modification
+   * mode to mirror the canonical playground (Client, Template, Intitulé,
+   * Quantité non-modifiables post-création). The ID Job field continues
+   * to use `onJobIdChange={undefined}` for legacy reasons.
+   */
+  disabledFields?: ReadonlyArray<JcfHeaderDisabledField>;
 }
+
+export type JcfHeaderDisabledField =
+  | 'client'
+  | 'template'
+  | 'intitule'
+  | 'quantity';
 
 /**
  * JCF Job Header — horizontal form row with all job fields.
@@ -96,7 +109,14 @@ export function JcfJobHeader({
   requiredJobs,
   onRequiredJobsChange,
   jobSuggestions,
+  disabledFields,
 }: JcfJobHeaderProps) {
+  const disabledFieldsSet = useMemo(
+    () => new Set(disabledFields ?? []),
+    [disabledFields],
+  );
+  const disabledInputClass =
+    'w-full border border-zinc-700 rounded-[3px] px-[7px] py-[5px] font-mono bg-zinc-800 text-zinc-400 cursor-not-allowed';
   const deadlineInputRef = useRef<HTMLInputElement>(null);
   const nativeDateRef = useRef<HTMLInputElement>(null);
   const batDeadlineInputRef = useRef<HTMLInputElement>(null);
@@ -352,22 +372,35 @@ export function JcfJobHeader({
           </div>
         </div>
 
-        {/* Client — autocomplete */}
+        {/* Client — autocomplete (or read-only in modification mode) */}
         <div className="w-[234px]">
           <label htmlFor="jcf-client" className={labelClass}>
             Client
           </label>
           <div className="relative">
-            <JcfAutocomplete
-              id="jcf-client"
-              value={client}
-              onChange={onClientChange}
-              suggestions={clientSuggestions}
-              inputClassName={inputBaseClass}
-              onSelect={handleClientSelect}
-              onBlur={handleClientBlur}
-            />
-            <RequiredDot show={!client.trim()} />
+            {disabledFieldsSet.has('client') ? (
+              <input
+                id="jcf-client"
+                type="text"
+                value={client}
+                disabled
+                tabIndex={-1}
+                className={disabledInputClass}
+                title="Modifiable uniquement à la création du job"
+                data-testid="jcf-field-client-disabled"
+              />
+            ) : (
+              <JcfAutocomplete
+                id="jcf-client"
+                value={client}
+                onChange={onClientChange}
+                suggestions={clientSuggestions}
+                inputClassName={inputBaseClass}
+                onSelect={handleClientSelect}
+                onBlur={handleClientBlur}
+              />
+            )}
+            <RequiredDot show={!client.trim() && !disabledFieldsSet.has('client')} />
           </div>
         </div>
 
@@ -387,20 +420,33 @@ export function JcfJobHeader({
           />
         </div>
 
-        {/* Template — autocomplete */}
+        {/* Template — autocomplete (or read-only in modification mode) */}
         <div className="w-[234px]">
           <label htmlFor="jcf-template" className={labelClass}>
             Template
           </label>
-          <JcfAutocomplete
-            id="jcf-template"
-            value={template}
-            onChange={handleTemplateChange}
-            suggestions={templateSuggestions}
-            inputClassName={inputBaseClass}
-            placeholder="Aucun"
-            onSelect={handleTemplateSelectInternal}
-          />
+          {disabledFieldsSet.has('template') ? (
+            <input
+              id="jcf-template"
+              type="text"
+              value="—"
+              disabled
+              tabIndex={-1}
+              className={disabledInputClass}
+              title="Modifiable uniquement à la création du job"
+              data-testid="jcf-field-template-disabled"
+            />
+          ) : (
+            <JcfAutocomplete
+              id="jcf-template"
+              value={template}
+              onChange={handleTemplateChange}
+              suggestions={templateSuggestions}
+              inputClassName={inputBaseClass}
+              placeholder="Aucun"
+              onSelect={handleTemplateSelectInternal}
+            />
+          )}
         </div>
 
         {/* Intitulé */}
@@ -414,11 +460,14 @@ export function JcfJobHeader({
               type="text"
               value={intitule}
               onChange={(e) => onIntituleChange(e.target.value)}
-              className={inputBaseClass}
+              disabled={disabledFieldsSet.has('intitule')}
+              tabIndex={disabledFieldsSet.has('intitule') ? -1 : 0}
+              title={disabledFieldsSet.has('intitule') ? 'Modifiable uniquement à la création du job' : undefined}
+              className={disabledFieldsSet.has('intitule') ? disabledInputClass : inputBaseClass}
               autoComplete="off"
               data-testid="jcf-field-intitule"
             />
-            <RequiredDot show={!intitule.trim()} />
+            <RequiredDot show={!intitule.trim() && !disabledFieldsSet.has('intitule')} />
           </div>
         </div>
 
@@ -433,11 +482,18 @@ export function JcfJobHeader({
               type="text"
               value={quantity}
               onChange={(e) => onQuantityChange(e.target.value)}
-              className={`${inputBaseClass} text-right font-mono`}
+              disabled={disabledFieldsSet.has('quantity')}
+              tabIndex={disabledFieldsSet.has('quantity') ? -1 : 0}
+              title={disabledFieldsSet.has('quantity') ? 'Modifiable uniquement à la création du job' : undefined}
+              className={
+                disabledFieldsSet.has('quantity')
+                  ? `${disabledInputClass} text-right`
+                  : `${inputBaseClass} text-right font-mono`
+              }
               autoComplete="off"
               data-testid="jcf-field-quantite"
             />
-            <RequiredDot show={!quantity.trim()} />
+            <RequiredDot show={!quantity.trim() && !disabledFieldsSet.has('quantity')} />
           </div>
         </div>
 

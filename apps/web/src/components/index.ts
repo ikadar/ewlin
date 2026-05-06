@@ -55,7 +55,6 @@ export { JobModificationContainer } from './JcfModificationModal/JobModification
 export type {
   JcfModificationModalProps,
   JobModificationData,
-  ElementModificationData,
   ModificationChanges,
 } from './JcfModificationModal/JcfModificationModal';
 export type { JobModificationContainerProps } from './JcfModificationModal/JobModificationContainer';
