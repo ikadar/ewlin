@@ -5,6 +5,24 @@
  * the end) that exercises the four structural invariants documented in
  * `docs/architecture/preprod-prod-photo-tests.md`.
  *
+ * Self-bootstrapping :
+ *   - beforeAll cancels any stale `[E2E-AUDIT-...]` jobs from prior
+ *     runs (best-effort cleanup), creates a fresh test_job in Préprod
+ *     with 2 active elements, then publishes Préprod → Prod so both
+ *     scenarios share the same starting state.
+ *   - afterAll cancels the test_job in Préprod so future runs ignore
+ *     it (the row stays for audit-log purposes).
+ *
+ * Caveat (read carefully) :
+ *   The bootstrap publish materialises the *entire* Préprod into Prod,
+ *   not just the test_job. Run the audit only when Préprod has no
+ *   unrelated in-flight work, or accept that those mutations will hit
+ *   Prod. The audit is a diagnostic protocol, not a production-safe
+ *   continuous test. The cleaner option (Simulation fork sandbox) is
+ *   marked HORS SCOPE UX in `feedback_preprod_vs_scenarios.md` ; using
+ *   it for tests would re-introduce a path the user has explicitly
+ *   suppressed.
+ *
  * Invariants checked :
  *   1. Scenario isolation — Préprod writes don't leak into Prod until
  *      `POST /promotion`. Tested at job level (deadline) AND element
@@ -14,8 +32,7 @@
  *   3. Publish reversibility — `POST /promotion/undo` restores Prod
  *      to its previous state.
  *   4. Logical identity — Préprod and Prod rows for the same logical
- *      element share the same wall view (= the wall lookup keyed by
- *      logical_element_id resolves identically).
+ *      element share the same wall view.
  *
  * Runs against the real backend (php-api on :8080) and the real DB.
  * Reuses the existing `claude-test@flux.local` test user.
@@ -23,6 +40,7 @@
  * Run modes :
  *   pnpm playwright test preprod-prod-architecture-audit
  *   pnpm playwright test preprod-prod-architecture-audit --headed --workers=1
+ *   pnpm playwright test preprod-prod-architecture-audit --ui
  */
 
 import { expect, request as pwRequest, test, type APIRequestContext } from '@playwright/test';
@@ -50,6 +68,8 @@ interface FluxJob {
 
 let api: APIRequestContext;
 let token: string;
+let bootstrappedTestJobRef: string | null = null;
+let bootstrappedTestJobInternalId: string | null = null;
 const report: { invariant: string; result: 'PASS' | 'BUG' | 'SKIP'; detail: string }[] = [];
 
 function log(invariant: string, result: 'PASS' | 'BUG' | 'SKIP', detail: string) {
@@ -90,9 +110,66 @@ test.describe('Préprod/Prod architecture audit', () => {
     });
     expect(r.ok(), `login failed: ${r.status()}`).toBeTruthy();
     token = (await r.json()).token;
+
+    // Best-effort cleanup of leftover audit artefacts in Préprod.
+    // Stale jobs from prior runs share the `E2E-AUDIT-` reference
+    // prefix ; cancel them so they no longer interfere with target
+    // selection (and so the active-flux read stays clean).
+    const preprodJobs = await fluxJobs('preprod');
+    const stale = preprodJobs.filter((j) => j.id?.startsWith('E2E-AUDIT-'));
+    for (const j of stale) {
+      const cancelResp = await call('POST', `/jobs/${j.internalId}/cancel`, 'preprod');
+      if (cancelResp.ok()) {
+        console.log(`[bootstrap] cancelled stale audit job ${j.id} (${j.internalId})`);
+      } else {
+        console.log(`[bootstrap] could not cancel stale ${j.id}: ${cancelResp.status()}`);
+      }
+    }
+
+    // Create a fresh test_job in Préprod with 2 active elements named
+    // ELT-A and ELT-B. Empty sequence is intentionally minimal — the
+    // audit doesn't exercise scheduling, only scenario semantics.
+    const testRef = `E2E-AUDIT-${Date.now()}`;
+    const createResp = await call('POST', '/jobs', 'preprod', {
+      reference: testRef,
+      client: 'E2E Audit',
+      description: 'Architecture audit fixture (auto-created by spec)',
+      workshopExitDate: '2027-01-15T16:00',
+      quantity: 100,
+      deadlinePriority: 2,
+      status: 'planned',
+      elements: [
+        { name: 'ELT-A', label: 'Audit element A', sequence: '' },
+        { name: 'ELT-B', label: 'Audit element B', sequence: '' },
+      ],
+    });
+    expect(createResp.ok(), `bootstrap POST /jobs failed: ${createResp.status()} ${await createResp.text()}`).toBeTruthy();
+    const created = await createResp.json();
+    bootstrappedTestJobRef = testRef;
+    bootstrappedTestJobInternalId = created.id;
+    console.log(`[bootstrap] created test job ${testRef} (internalId=${created.id})`);
+
+    // Publish Préprod → Prod to materialize the test_job into Prod so
+    // scenario isolation can be observed. Caveat documented in the
+    // file header.
+    const promoteResp = await call('POST', '/promotion', undefined, { engineVersion: 'audit-bootstrap' });
+    expect(promoteResp.ok(), `bootstrap publish failed: ${promoteResp.status()} ${await promoteResp.text()}`).toBeTruthy();
+    console.log(`[bootstrap] published Préprod → Prod`);
   });
 
   test.afterAll(async () => {
+    // Cancel the test_job in Préprod so subsequent runs don't pick
+    // it up. Best-effort — log but don't fail the audit if cleanup
+    // fails.
+    if (bootstrappedTestJobInternalId !== null) {
+      const cancelResp = await call('POST', `/jobs/${bootstrappedTestJobInternalId}/cancel`, 'preprod');
+      if (cancelResp.ok()) {
+        console.log(`[teardown] cancelled audit job ${bootstrappedTestJobRef} (${bootstrappedTestJobInternalId})`);
+      } else {
+        console.log(`[teardown] could not cancel ${bootstrappedTestJobRef}: ${cancelResp.status()} — manual cleanup recommended`);
+      }
+    }
+
     console.log('\n' + '='.repeat(60));
     console.log('PRÉPROD/PROD ARCHITECTURE AUDIT — REPORT');
     console.log('='.repeat(60));
@@ -121,31 +198,32 @@ test.describe('Préprod/Prod architecture audit', () => {
     testInfo.setTimeout(300_000);
 
     // -------------------------------------------------------------
-    // Setup — pick a Prod-existing job that has ≥1 element. We'll
-    // mutate its Préprod twin and confirm isolation, then publish.
+    // Setup — locate the test_job that beforeAll bootstrapped.
+    //   It must exist in BOTH Préprod and Prod (the bootstrap publish
+    //   materialised it). All subsequent invariants run against this
+    //   isolated, audit-owned target.
     // -------------------------------------------------------------
+    expect(bootstrappedTestJobRef, 'beforeAll did not record a test_job ref').not.toBeNull();
     const prodInitial = await fluxJobs('prod');
     const preprodInitial = await fluxJobs('preprod');
-    if (prodInitial.length === 0 || preprodInitial.length === 0) {
-      log('setup', 'SKIP', `Prod=${prodInitial.length} Préprod=${preprodInitial.length} — DB empty, audit cannot run.`);
-      return;
-    }
-    log('setup', 'PASS', `Prod=${prodInitial.length} jobs · Préprod=${preprodInitial.length} jobs`);
 
-    // Find a job with at least 1 element present in BOTH scenarios.
-    let target: { ref: string; prod: FluxJob; preprod: FluxJob } | null = null;
-    for (const p of prodInitial) {
-      const pp = preprodInitial.find((x) => x.id === p.id);
-      if (pp && (pp.elements?.length ?? 0) >= 1) {
-        target = { ref: p.id, prod: p, preprod: pp };
-        break;
-      }
-    }
-    if (!target) {
-      log('setup', 'SKIP', 'No job with elements present in both Prod and Préprod — pre-existing data shape required.');
+    const prodTarget = prodInitial.find((j) => j.id === bootstrappedTestJobRef);
+    const preprodTarget = preprodInitial.find((j) => j.id === bootstrappedTestJobRef);
+    if (!prodTarget || !preprodTarget) {
+      log('setup', 'BUG', `Bootstrapped test_job ${bootstrappedTestJobRef} missing from one scenario. Prod=${!!prodTarget}, Préprod=${!!preprodTarget}.`);
       return;
     }
-    log('setup', 'PASS', `target=${target.ref} (Prod.internalId=${target.prod.internalId}, Préprod.internalId=${target.preprod.internalId}, ${target.preprod.elements?.length} elements)`);
+    if ((preprodTarget.elements?.length ?? 0) < 2) {
+      log('setup', 'BUG', `Bootstrapped test_job has fewer than 2 elements in Préprod: ${preprodTarget.elements?.length}. Bootstrap may have failed silently.`);
+      return;
+    }
+    log('setup', 'PASS', `Bootstrapped test_job ref=${bootstrappedTestJobRef}, Prod.internalId=${prodTarget.internalId}, Préprod.internalId=${preprodTarget.internalId}, ${preprodTarget.elements?.length} active elements in Préprod`);
+
+    const target: { ref: string; prod: FluxJob; preprod: FluxJob } = {
+      ref: bootstrappedTestJobRef!,
+      prod: prodTarget,
+      preprod: preprodTarget,
+    };
 
     const prodSortieBefore = target.prod.sortieIso ?? null;
     const prodElementCountBefore = target.prod.elements?.length ?? 0;

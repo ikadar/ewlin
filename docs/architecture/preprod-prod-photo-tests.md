@@ -135,37 +135,38 @@ transitively).
   is a separate suite.
 - **Auth boundary** — assumes the test user has all permissions.
 
-## State management — the one tricky part
+## State management — self-bootstrapping
 
-The audit is **destructive to Préprod** : it leaves a deadline change
-and a cancelled element behind on the target job. After two
-consecutive runs without re-seeding, Préprod is drained of elements
-and the audit will SKIP for lack of a viable target.
+The audit owns its test data end-to-end :
 
-**Re-seeding procedure** :
+- **`beforeAll`** cancels any stale `E2E-AUDIT-*` jobs from prior runs
+  (best-effort), creates a fresh `E2E-AUDIT-{timestamp}` job in
+  Préprod with 2 active elements (`ELT-A`, `ELT-B`), and publishes
+  Préprod → Prod so both scenarios see it from the same starting
+  state.
+- **`afterAll`** cancels the test_job in Préprod via
+  `POST /jobs/{id}/cancel`. The row stays for audit-log purposes but
+  is filtered out of active reads (`/flux/jobs` only returns jobs
+  with status ≠ cancelled). Future runs can list and cancel any
+  leftover with the same prefix as a defensive belt-and-suspenders.
 
-```bash
-# Bootstrap the Préprod and Prod scenario rows (idempotent).
-docker exec flux-php-scheduler php bin/console flux:scenarios:bootstrap
+**Idempotency verified 2026-05-06** : three consecutive runs without
+re-seeding all returned 14 PASS / 0 BUG / 0 SKIP. No stale state
+accumulates in active reads.
 
-# Generate fresh test jobs into Préprod.
-docker exec flux-php-scheduler php bin/console app:jobs:generate \
-  --count=3 --from=2026-05-15 --to=2026-06-30 \
-  --ref-start=9001 --ref-prefix='AUDIT-'
+### Caveat — the bootstrap publish
 
-# Publish them to Prod so they appear in both scenarios.
-TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"claude-test@flux.local","password":"ClaudeAuditPwd!"}' \
-  | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")
-curl -X POST http://localhost:8080/api/v1/promotion \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"engineVersion":"audit-bootstrap"}'
-```
+The bootstrap step calls `POST /promotion`, which materialises **the
+entire Préprod state into Prod**, not just the test_job. Run the
+audit only when Préprod has no unrelated in-flight work, or accept
+that those mutations will hit Prod.
 
-After re-seeding the audit is repeatable until Préprod runs out of
-audit-targets (typically ~3 runs per generated batch).
+The cleaner option (Simulation fork as test sandbox) is marked
+HORS SCOPE UX in `feedback_preprod_vs_scenarios.md` ; using it for
+tests would re-introduce a path the user has explicitly suppressed.
+Selective publish (per-job `materialize`) is the V2 escape hatch — it
+would let the audit publish only the test_job and leave the rest of
+Préprod untouched.
 
 ## Running
 
