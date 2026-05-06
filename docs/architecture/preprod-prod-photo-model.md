@@ -193,7 +193,38 @@ Pillar B delivered as a follow-on chantier on the same branch (`multi-person-sta
 - `POST /jobs/{jobId}/elements` (add element) — UI scaffolding present, endpoint not wired. Use case is rare and the diff service can already represent it.
 - 409 conflict resolution when an operator records progress mid-edit. Today the modal will simply 200 over the stale state ; an explicit refresh-and-warn flow is a V2 polish.
 - Mercure live-refresh of the "Déjà fait" panel while the modal is open.
-- Wiring a "Modifier" button into `JobDetailsPanel` — the modal is exported from the components index but not yet invoked from any UI affordance, pending the chef's preferred entry point.
+
+## 5. Flux split V1 (livré 2026-05-06)
+
+Pillar A and Pillar B together set the data model and the form. The Flux pilot page (`/flux`) sits on top — it's the surface where the chef negotiates the asymmetry day to day. V1 makes that asymmetry visible through write affordances ; V2 (out of scope here) will add a per-job/per-changeset publish to handle parallel hypotheses cleanly.
+
+### 5.1 Decision
+
+`FluxPage` is asymmetric depending on the active scenario (toggle = `?env=prod` URL param resolved into the `X-Flux-Scenario` header by `realBaseQuery`).
+
+| Scenario | Reads | Writes |
+|---|---|---|
+| Prod   | Prod + wall | Wall only — gates (paperStatus/batStatus/plateStatus/formeStatus), ST status, Parti, Facturé. Reality-event saisie. |
+| Préprod | Préprod + wall | Pillar B JCF modification surface (deadline / batDeadline / priority / sequence DSL / gate `needsX` / element cancel) + new-job creation. Tentative until publish. |
+
+The frontier is wall = non-negotiable observation, scenario-scoped = negotiable hypothesis. Deadlines belong in Préprod because the chef negotiates them with clients ; gates belong in Prod because they reflect material events that already happened.
+
+### 5.2 What ships
+
+| Layer | Artefact |
+|---|---|
+| Backend | (no new endpoints — Pillar A wall handlers + Pillar B `/elements/{id}/sequence` and `/elements/{id}` already cover the writes ; `JobController::update` continues to gate Parti/Facturé to Prod via the existing `X-Flux-Scenario` header check.) |
+| Frontend RTK Query | `getJob` query (`GET /api/v1/jobs/{id}`), `updateElementSequence` mutation (`PUT /elements/{id}/sequence`), `deleteElement` mutation (`DELETE /elements/{id}`) — added in `apps/web/src/store/api/scheduleApi.ts`. |
+| Frontend container | `JobModificationContainer` — fetches the job, builds `JobModificationData` (re-grouping flat task list per element via `taskIds`), orchestrates save (sequences → deletions → job-level fields), invalidates Flux + Snapshot caches so auto-replan picks up the new shape. |
+| Frontend gating | `canEditJobShape` prop on `FluxTable` (hides row "Modifier" button) and `canCreateJob` on `FluxToolbar` (hides "+ Nouveau job" CTA). Both wired from `FluxPage` based on `mode === 'preprod'`. Alt+N keyboard shortcut also gated with a toast. |
+| Tests | Vitest coverage on the Préprod-only show/hide of "Modifier" + "Nouveau job" affordances. The Pillar B endpoints retain their own Playwright API smoke (`jcf-modification-api.spec.ts`). |
+
+### 5.3 What was deliberately cut from V1
+
+- **Per-job / per-changeset publish.** Today `ProdPhotoService::materialize()` is all-or-nothing — when the chef wants to publish a single hypothesis among several open ones, the V1 surface cannot help. Recorded as the only structural blocker in the design verdict ; concrete design deferred until the scenario starts pulling in practice.
+- **A "Sync Préprod from Prod" rebase.** Same reason — not yet pulling in practice.
+- **Diff visualization.** Auto-replan absorbs each saisie immediately, so any "before / after" overlay would lie (cf. `feedback_auto_replan_no_preview.md`).
+- **A header badge for the active mode.** A playground (`playground-flux-mode-badge.html`) explores four variants (toolbar pill / sticky banner / corner ribbon / title-line tag) ; React implementation is held until the chef picks. The viewport-edge halo (`.preprod-shell-glow` / `.prod-shell-glow`) and the bottom-right `EnvFloatingControls` dock card cover identification in the meantime.
 
 ## 6. Risk register
 
@@ -209,3 +240,5 @@ Pillar B delivered as a follow-on chantier on the same branch (`multi-person-sta
 - `reference_sur_le_mur_terminology.md` — "Sur le mur" = données canoniques de la réalité.
 - `project_gates_on_wall.md` — gates extraits d'Element vers couche partagée.
 - `project_progress_seeds_not_pins.md` — avancement = seed, pas pin auto.
+- `project_flux_split_design.md` — Flux split decision, V1 livré 2026-05-06.
+- `feedback_auto_replan_no_preview.md` — pas de diff/preview UX, le replan absorbe.

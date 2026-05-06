@@ -144,7 +144,32 @@ describe('FluxTable', () => {
   it('shows delete and edit action buttons', () => {
     render(<FluxTable categories={dummyCategories} jobs={[singleJob]} />);
     expect(screen.getByTitle('Supprimer')).toBeInTheDocument();
-    expect(screen.getByTitle('Éditer')).toBeInTheDocument();
+    expect(screen.getByTitle('Modifier')).toBeInTheDocument();
+  });
+
+  it('hides the Modifier button when canEditJobShape is false (Prod)', () => {
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[singleJob]}
+        canEditJobShape={false}
+      />,
+    );
+    expect(screen.queryByTitle('Modifier')).toBeNull();
+    expect(screen.queryByTestId('flux-action-edit')).toBeNull();
+    expect(screen.getByTitle('Supprimer')).toBeInTheDocument();
+  });
+
+  it('shows the Modifier button when canEditJobShape is true (Préprod)', () => {
+    render(
+      <FluxTable
+        categories={dummyCategories}
+        jobs={[singleJob]}
+        canEditJobShape={true}
+      />,
+    );
+    expect(screen.getByTitle('Modifier')).toBeInTheDocument();
+    expect(screen.getByTestId('flux-action-edit')).toBeInTheDocument();
   });
 
   it('renders worst-value prerequisites for multi-element job', () => {

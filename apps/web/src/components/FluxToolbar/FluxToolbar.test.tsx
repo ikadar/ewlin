@@ -35,6 +35,16 @@ describe('FluxToolbar', () => {
     expect(onNewJob).toHaveBeenCalledOnce();
   });
 
+  it('hides the Nouveau job button when canCreateJob is false (Prod scenario)', () => {
+    renderToolbar({ canCreateJob: false });
+    expect(screen.queryByTestId('flux-new-job-button')).toBeNull();
+  });
+
+  it('shows the Nouveau job button when canCreateJob is true (Préprod, default)', () => {
+    renderToolbar({ canCreateJob: true });
+    expect(screen.getByTestId('flux-new-job-button')).toBeInTheDocument();
+  });
+
   it('renders the search input with placeholder', () => {
     renderToolbar();
     const input = screen.getByTestId('flux-search');
