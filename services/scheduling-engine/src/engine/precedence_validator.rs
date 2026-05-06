@@ -333,6 +333,7 @@ mod tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup: None,
         }
     }
 
@@ -372,6 +373,8 @@ mod tests {
             is_masked_time: false,
             recalages: vec![],
             active_windows: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 
@@ -673,6 +676,7 @@ mod tests {
                 task_elapsed_ticks: 0,
                 forced_start_tick: None,
                 already_eaten_ticks: 0,
+                inherited_setup: None,
             }
         }
 
@@ -696,6 +700,7 @@ mod tests {
                 task_elapsed_ticks: 0,
                 forced_start_tick: None,
                 already_eaten_ticks: 0,
+                inherited_setup: None,
             }
         }
 
@@ -786,6 +791,7 @@ mod tests {
                 }),
                 station_groups: vec![],
                 occupied_slots: vec![],
+                setup_completion_log: vec![],
             };
 
             let result = compute(&req);
@@ -897,6 +903,7 @@ mod tests {
                 }),
                 station_groups: vec![],
                 occupied_slots: vec![],
+                setup_completion_log: vec![],
             };
 
             let result = compute(&req);

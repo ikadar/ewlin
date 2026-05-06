@@ -314,6 +314,41 @@ export const TaskTile = memo(function TaskTile({
                 </span>
               </>
             )}
+            {/* Setup-inheritance signals on a re-placed partially-progressed
+                task. The "déjà fait" chip surfaces the saisie anchor that
+                explains the shorter run-only duration ; the "recalage" chip
+                appears when the engine offered to inherit but rejected it
+                (peremption, intercalation, mismatch) so the operator
+                understands a fresh setup is included. */}
+            {task.type === 'Internal' && ((task as InternalTask).recordedProgressPct ?? 0) > 0 && (
+              <span
+                className="text-[10.5px] tabular-nums text-emerald-300 bg-emerald-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
+                title="Avancement déjà enregistré sur cette tâche — la durée affichée correspond au reste à produire."
+              >
+                {Math.round((task as InternalTask).recordedProgressPct ?? 0)}% déjà fait
+              </span>
+            )}
+            {task.type === 'Internal'
+              && ((task as InternalTask).recordedProgressPct ?? 0) > 0
+              && assignment?.setupInherited === false && (
+              <span
+                className="text-[10.5px] text-amber-300 bg-amber-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
+                title={(() => {
+                  switch (assignment?.setupLostReason) {
+                    case 'peremption':
+                      return 'Calage périmé : le délai depuis le dernier calage dépasse la péremption de la station — un nouveau calage est inclus dans la planification.';
+                    case 'intercalated_setup':
+                      return 'Calage perdu : une autre tâche a été calée sur la station entre-temps — un nouveau calage est inclus.';
+                    case 'station_mismatch':
+                      return 'Calage indisponible : la tâche a changé de station — un calage complet est inclus.';
+                    default:
+                      return 'Recalage requis sur cette replanification.';
+                  }
+                })()}
+              >
+                recalage
+              </span>
+            )}
           </div>
           <span className="text-[11px] shrink-0 font-mono">
             {hasEffDelta ? (

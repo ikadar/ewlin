@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 
 use crate::model::schedule::{
-    ComputedAssignment, ScheduleStats, StationGroupInput, Warning,
+    ComputedAssignment, ScheduleStats, SetupCompletion, StationGroupInput, Warning,
 };
 use crate::model::station::StationInput;
 use crate::model::operator::OperatorInput;
@@ -12,11 +12,38 @@ use crate::model::job::JobInput;
 use super::backward_pass::{compute_last_values, BackwardOrdering};
 use super::forward_pass::{
     build_prepared_groups, run_forward_pass, Action, OperatorAvailability, OperatorScheduleData,
-    PreparedConcurrentGroup, SkillEntry, StationAttrs,
+    PreparedConcurrentGroup, SetupCompletionEntry, SkillEntry, StationAttrs,
 };
 use super::grid::ScheduleGrid;
 use super::pre_split::pre_split;
 use super::{build_actions, compute_stats, remap_assignments};
+
+/// Project the wire-format `setup_completion_log` (a flat list of
+/// {task, station, tick} tuples) into a per-station-idx vec of entries
+/// sorted ascending by tick. Entries pointing at unknown station ids are
+/// silently dropped — they can't influence any decision because no
+/// action will ever look them up.
+fn index_setup_log_by_station(
+    log: &[SetupCompletion],
+    station_id_to_idx: &HashMap<String, usize>,
+    num_stations: usize,
+) -> Vec<Vec<SetupCompletionEntry>> {
+    let mut out: Vec<Vec<SetupCompletionEntry>> = vec![Vec::new(); num_stations];
+    for entry in log {
+        if let Some(&idx) = station_id_to_idx.get(&entry.station_id) {
+            if idx < num_stations {
+                out[idx].push(SetupCompletionEntry {
+                    task_id: entry.task_id.clone(),
+                    at_tick: entry.at_tick,
+                });
+            }
+        }
+    }
+    for entries in out.iter_mut() {
+        entries.sort_by_key(|e| e.at_tick);
+    }
+    out
+}
 
 /// Run the scheduling pipeline with FBI (Feedback-Based Iteration).
 ///
@@ -38,6 +65,7 @@ pub fn run_with_fbi(
     ordering: BackwardOrdering,
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    setup_completion_log: &[SetupCompletion],
     progress: &super::ProgressSender,
     now_tick: usize,
     score_weights: &[f64; 7],
@@ -53,9 +81,16 @@ pub fn run_with_fbi(
     let num_stations = stations.len();
     let num_operators = operators.len();
 
+    // Project the historical setup completion log onto our station index so
+    // each StationAttrs carries its own slice — avoids a separate context
+    // struct + reference threading through the entire engine pipeline.
+    let mut setup_completions_per_station =
+        index_setup_log_by_station(setup_completion_log, &station_id_to_idx, num_stations);
+
     let station_attrs: Vec<StationAttrs> = stations
         .iter()
-        .map(|s| StationAttrs {
+        .enumerate()
+        .map(|(idx, s)| StationAttrs {
             attention_setup: s.effective_attention_setup(),
             attention_run: s.effective_attention_run(),
             max_run_attention: s.effective_max_run_attention(),
@@ -65,6 +100,7 @@ pub fn run_with_fbi(
             } else {
                 0
             },
+            setup_completions: std::mem::take(&mut setup_completions_per_station[idx]),
             min_setup_operators: s.effective_min_setup_operators(),
             max_setup_operators: s.effective_max_setup_operators(),
             min_run_operators: s.effective_min_run_operators(),
@@ -376,13 +412,14 @@ pub fn run_with_fbi_ordering(
     _station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    setup_completion_log: &[SetupCompletion],
     progress: &super::ProgressSender,
     now_tick: usize,
     score_weights: &[f64; 7],
     precedence_min_gap_ticks: u32,
     warnings: &mut Vec<Warning>,
 ) -> (Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32) {
-    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, progress, now_tick, score_weights, precedence_min_gap_ticks, warnings)
+    run_with_fbi(jobs, stations, operators, tick_minutes, horizon_days, max_iterations, start_date, ordering, station_blocked_ranges, occupied_slots, setup_completion_log, progress, now_tick, score_weights, precedence_min_gap_ticks, warnings)
 }
 
 /// Multi-start FBI with perturbed scoring weights.
@@ -411,6 +448,7 @@ pub fn run_with_multi_start_fbi(
     station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    setup_completion_log: &[SetupCompletion],
     progress: &super::ProgressSender,
     now_tick: usize,
     precedence_min_gap_ticks: u32,
@@ -431,7 +469,7 @@ pub fn run_with_multi_start_fbi(
     let (mut best_a, mut best_act, mut best_s, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
+        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
         now_tick, &default_weights,
         precedence_min_gap_ticks,
         &mut warnings_p1,
@@ -454,7 +492,7 @@ pub fn run_with_multi_start_fbi(
         let (a2, act2, s2, i2) = run_with_fbi_ordering(
             jobs, stations, operators,
             tick_minutes, horizon_days, max_iterations, start_date,
-            BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, progress,
+            BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
             &mut warnings_p2,
@@ -484,7 +522,7 @@ pub fn run_with_multi_start_fbi(
         let (a3, act3, s3, i3) = run_with_fbi_ordering(
             jobs, stations, operators,
             tick_minutes, horizon_days, max_iterations, start_date,
-            BackwardOrdering::SlackFirst, station_groups, station_blocked_ranges, occupied_slots, progress,
+            BackwardOrdering::SlackFirst, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
             &mut warnings_p3,
@@ -528,7 +566,7 @@ pub fn run_with_multi_start_fbi(
             let (ap, actp, sp, ip) = run_with_fbi_ordering(
                 jobs, stations, operators,
                 tick_minutes, horizon_days, max_iterations, start_date,
-                ordering, station_groups, station_blocked_ranges, occupied_slots, progress,
+                ordering, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
                 now_tick, &weights,
                 precedence_min_gap_ticks,
                 &mut warnings_pp,

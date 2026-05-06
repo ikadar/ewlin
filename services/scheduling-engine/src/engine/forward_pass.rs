@@ -22,6 +22,15 @@ pub struct OperatorScheduleData {
     pub overtimes: Vec<Overtime>,
 }
 
+/// One entry of the setup-completion historical log, indexed by station.
+/// The vec on `StationAttrs.setup_completions` is sorted ascending by
+/// `at_tick` so the inheritance check can binary-search a tick range.
+#[derive(Debug, Clone)]
+pub struct SetupCompletionEntry {
+    pub task_id: String,
+    pub at_tick: i64,
+}
+
 /// Station attributes needed during forward pass
 pub struct StationAttrs {
     pub attention_setup: f64,
@@ -31,6 +40,14 @@ pub struct StationAttrs {
     /// Setup peremption threshold in ticks. If operator is absent this many consecutive
     /// ticks during setup, setup expires and must be redone.
     pub peremption_ticks: u32,
+    /// Setup completions observed in the workshop on this station, sorted
+    /// ascending by `at_tick`. Drives the past-side intercalation check
+    /// in `evaluate_setup_inheritance` — given an inherited anchor tick
+    /// `t_a` and a candidate placement tick `t_c`, the inheritance is
+    /// rejected if any entry has `t_a < at_tick < min(t_c, now_tick)`
+    /// for a different `task_id`.
+    /// Populated by `fbi.rs::run_with_fbi` from `ComputeRequest.setup_completion_log`.
+    pub setup_completions: Vec<SetupCompletionEntry>,
     /// Hard floor on bodies for the setup phase (gate). Default 1.
     pub min_setup_operators: u32,
     /// Hard cap on bodies for the setup phase (top-N filter). Default 1.
@@ -430,6 +447,28 @@ pub struct Action {
     /// a tile with most of its work already done isn't blocked by the
     /// fragmentation rule on its remaining sliver.
     pub already_eaten_ticks: u32,
+    /// Setup-inheritance anchor — tick at which the previous calage was
+    /// completed. Resolved from `TaskInput.inherited_setup.at_tick` at
+    /// action build time. `None` = no calage anchor (forces full setup).
+    pub inherited_setup_at_tick: Option<i64>,
+    /// Setup-inheritance anchor — station_idx where the calage was
+    /// completed. Resolved from the inherited.station_id via the
+    /// build-time station_id_to_idx map. `None` when inheritance was
+    /// offered but the station_id is unknown (mismatch in payload, deleted
+    /// station) — pre-place treats this as `station_mismatch` and forces
+    /// a full setup.
+    pub inherited_setup_station_idx: Option<usize>,
+    /// Setup-inheritance outcome (output). Set to `true` by
+    /// `pre_place_pinned_actions` when the three inheritance conditions
+    /// hold and the action's effective `setup_ticks` is collapsed to 0.
+    /// Surfaced verbatim in `ComputedAssignment.setup_inherited` so the
+    /// UI can drop the "recalage" badge when the calage was honoured.
+    pub setup_inherited: bool,
+    /// Reason why an available inheritance was rejected at placement time
+    /// (`peremption`, `intercalated_setup`, `station_mismatch`). `None`
+    /// when the inheritance was honoured or no inheritance was offered.
+    /// Surfaced in `ComputedAssignment.setup_lost_reason` for the UI badge.
+    pub setup_lost_reason: Option<String>,
 }
 
 /// Cap on how many times an action can re-setup due to peremption before
@@ -1015,6 +1054,26 @@ pub fn run_forward_pass(
         operator_groups,
         now_tick,
         warnings,
+    );
+
+    // Limitation-1 fix : the pre-place pass above only evaluates inheritance
+    // for pinned actions because they expose a known placement tick. Non-
+    // pinned actions go through the scoring loop and don't have a tick at
+    // build time. We pre-evaluate them at the *earliest* tick the scoring
+    // loop could ever pick (`max(now_tick, earliest_start_tick)`), which
+    // bounds the past-side window from below — peremption is monotonic
+    // forward, so a calage that's still valid at the earliest tick is at
+    // worst overshadowed by intercalations in the future portion (which
+    // the post-scoring revalidation catches). When the pre-evaluation
+    // succeeds we collapse setup_ticks to 0 so the scoring loop plans
+    // the run-only duration ; if a future intercalation appears the
+    // revalidation pass flips the flag without reshuffling the schedule
+    // (the user gets a "recalage" badge and the operator recales by hand).
+    pre_evaluate_setup_inheritance_for_non_pinned(
+        actions,
+        station_attrs,
+        grid,
+        now_tick,
     );
 
     // Start scheduling from now (rounded up to tick boundary), not midnight.
@@ -2024,6 +2083,21 @@ pub fn run_forward_pass(
         }
     }
 
+    // Limitation-2 future-side : revalidate inheritance against the now-
+    // filled grid. Pre-evaluation only saw earlier-iterated pins ; the
+    // scoring loop's commits may have intercalated foreign actions. If
+    // any did, flip the flag and emit a warning for the UI badge — the
+    // schedule is committed by this point and re-running it would risk
+    // cascade failures, so we surface the fact and let the operator
+    // recale physically.
+    revalidate_setup_inheritance_after_scoring(
+        actions,
+        station_attrs,
+        grid,
+        now_tick,
+        warnings,
+    );
+
     assignments
 }
 
@@ -2724,6 +2798,513 @@ fn is_window_station_free(
     true
 }
 
+/// Evaluate whether a setup-inheritance offer can be honoured for a pinned
+/// action placed at `candidate_tick` on `candidate_station_idx`. Returns
+/// `Ok(())` when the three conditions hold (same station, within peremption,
+/// no foreign action observed on the station between the anchor tick and
+/// the candidate tick), or `Err(reason_tag)` matching the user-facing
+/// `setup_lost_reason` taxonomy:
+///   - `"station_mismatch"`: anchor station differs from current placement
+///     (or the anchor's station_id failed to resolve at action build time).
+///   - `"peremption"`: gap between anchor and candidate exceeds the
+///     station's peremption threshold.
+///   - `"intercalated_setup"`: the grid shows another action present on
+///     the same station between the anchor and the candidate, meaning the
+///     calage was changed for someone else's job.
+///
+/// V1 LIMITATION: at the time this is called from `pre_place_pinned_actions`,
+/// the grid only contains placements made by *previous* iterations of the
+/// pre-place loop (other pinned actions). Scoring-loop placements that fall
+/// inside the [anchor, candidate] window are not yet visible and cannot be
+/// detected here. Practical replan flows tend to leave the operator in
+/// charge of competing pins, so this is acceptable for V1 ; a post-pass
+/// re-validation can be added later if the gap surfaces in production.
+fn evaluate_setup_inheritance(
+    inherited_at_tick: i64,
+    inherited_station_idx: Option<usize>,
+    inherited_task_id: &str,
+    candidate_tick: usize,
+    candidate_station_idx: usize,
+    self_action_idx: usize,
+    peremption_ticks: u32,
+    grid: &ScheduleGrid,
+    setup_completions: &[SetupCompletionEntry],
+    now_tick: usize,
+) -> Result<(), &'static str> {
+    let inherited_idx = match inherited_station_idx {
+        Some(idx) => idx,
+        None => return Err("station_mismatch"),
+    };
+    if inherited_idx != candidate_station_idx {
+        return Err("station_mismatch");
+    }
+    // Defensive: anchor in the future relative to the placement makes no
+    // physical sense. Reject as station_mismatch (the anchor is unusable).
+    let candidate_signed = candidate_tick as i64;
+    if inherited_at_tick > candidate_signed {
+        return Err("station_mismatch");
+    }
+    let gap = (candidate_signed - inherited_at_tick) as u32;
+    if peremption_ticks > 0 && gap > peremption_ticks {
+        return Err("peremption");
+    }
+    // Past-side intercalation : the historical log records every calage
+    // ever achieved on this station. If a foreign task achieved one
+    // strictly between the inherited anchor and `min(candidate, now)`
+    // (the "past observable" window), the calage was changed for that
+    // foreign task — ours is dead. Self-completions (same task_id, e.g.
+    // an earlier saisie of the same task that re-anchored) are NOT
+    // intercalations. The log is sorted, so we early-terminate once we
+    // walk past `past_end`.
+    let past_end_signed = (candidate_tick.min(now_tick)) as i64;
+    for entry in setup_completions {
+        if entry.at_tick <= inherited_at_tick {
+            continue;
+        }
+        if entry.at_tick >= past_end_signed {
+            break;
+        }
+        if entry.task_id != inherited_task_id {
+            return Err("intercalated_setup");
+        }
+    }
+    // Future-side intercalation : the segment [now_tick, candidate_tick]
+    // is forecast, not observable. The grid (which by this point holds
+    // earlier-iterated pins, and after the scoring loop, every
+    // committed action) is the only source. Any foreign action_idx in
+    // that range means a different task is planned to occupy the
+    // station before we get there — its setup will displace ours.
+    if candidate_tick > now_tick {
+        let from = now_tick;
+        let to = candidate_tick.min(grid.num_ticks);
+        for t in from..to {
+            if let Some(other_idx) = grid.station_action_at(candidate_station_idx, t) {
+                if other_idx != self_action_idx {
+                    return Err("intercalated_setup");
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod inheritance_tests {
+    //! Unit tests for `evaluate_setup_inheritance` covering the QA matrix
+    //! locked at 2026-05-05 :
+    //!   1. Calage préservé (same station, gap < péremption, no foreign action)
+    //!   2. Calage périmé (gap > péremption)
+    //!   3. Calage volé (foreign action present in the [anchor, candidate] window)
+    //!   4. Calage volé puis libéré (foreign action removed before evaluation —
+    //!      decided based on planning state at evaluation time)
+    //!   5. Pre-saisie (no anchor offered — caller code skips evaluation)
+    //!   6. Defensive : station mismatch / unresolved station_idx
+    use super::*;
+    use crate::engine::grid::ScheduleGrid;
+
+    fn fresh_grid() -> ScheduleGrid {
+        ScheduleGrid::new(2, 1, 64, 15)
+    }
+
+    #[test]
+    fn case_1_calage_preserved_same_station_under_peremption() {
+        let grid = fresh_grid();
+        let result = evaluate_setup_inheritance(
+            10,                  // anchor at_tick
+            Some(0),             // anchor station_idx (matches candidate)
+            "self-task",
+            18,                  // candidate tick (gap = 8 ticks, < peremption 16)
+            0,                   // candidate station_idx
+            42,                  // self action_idx (irrelevant, grid is empty)
+            16,                  // peremption_ticks
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Ok(()), "calage on same station within peremption + empty range must be honoured");
+    }
+
+    #[test]
+    fn case_2_calage_expired_by_peremption() {
+        let grid = fresh_grid();
+        let result = evaluate_setup_inheritance(
+            10,
+            Some(0),
+            "self-task",
+            50,                  // gap = 40 > peremption = 16
+            0,
+            42,
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Err("peremption"));
+    }
+
+    #[test]
+    fn case_3_calage_stolen_by_intercalated_action() {
+        let mut grid = fresh_grid();
+        // Place a foreign action on station 0 between ticks 12 and 14
+        // (inside the [anchor=10, candidate=18) window).
+        grid.assign_station(0, 12, 99);
+        grid.assign_station(0, 13, 99);
+        let result = evaluate_setup_inheritance(
+            10,
+            Some(0),
+            "self-task",
+            18,
+            0,
+            42,                  // self_action_idx ; foreign action is 99
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Err("intercalated_setup"));
+    }
+
+    #[test]
+    fn case_4_self_continuation_does_not_count_as_intercalation() {
+        let mut grid = fresh_grid();
+        // The same task already occupies the station between anchor and
+        // candidate (e.g. an earlier chunk of the same task already placed).
+        // This should NOT count as intercalation since the calage is ours.
+        grid.assign_station(0, 12, 42);
+        grid.assign_station(0, 13, 42);
+        let result = evaluate_setup_inheritance(
+            10,
+            Some(0),
+            "self-task",
+            18,
+            0,
+            42,                  // self matches the grid action_idx
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Ok(()), "self-continuation (same action_idx) must not trigger intercalation");
+    }
+
+    #[test]
+    fn case_6a_station_mismatch_when_anchor_on_different_station() {
+        let grid = fresh_grid();
+        let result = evaluate_setup_inheritance(
+            10,
+            Some(1),             // anchor on station 1
+            "self-task",
+            18,
+            0,                   // candidate on station 0
+            42,
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Err("station_mismatch"));
+    }
+
+    #[test]
+    fn case_6b_unresolved_anchor_station_treated_as_mismatch() {
+        let grid = fresh_grid();
+        let result = evaluate_setup_inheritance(
+            10,
+            None,                // anchor station_id failed to resolve at build
+            "self-task",
+            18,
+            0,
+            42,
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Err("station_mismatch"));
+    }
+
+    #[test]
+    fn anchor_in_future_relative_to_candidate_is_rejected() {
+        let grid = fresh_grid();
+        // Defensive : a payload bug or stale clock could produce
+        // `anchor > candidate`. We must reject rather than treat as gap=0.
+        let result = evaluate_setup_inheritance(
+            20,
+            Some(0),
+            "self-task",
+            10,                  // candidate before anchor — nonsensical
+            0,
+            42,
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Err("station_mismatch"));
+    }
+
+    #[test]
+    fn negative_anchor_within_peremption_is_honoured() {
+        let grid = fresh_grid();
+        // Anchor predates today_midnight (negative tick) — common when a
+        // saisie was recorded yesterday and the task is replanned today.
+        let result = evaluate_setup_inheritance(
+            -5,
+            Some(0),
+            "self-task",
+            10,                  // gap = 15 ticks, within peremption 16
+            0,
+            42,
+            16,
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn zero_peremption_disables_peremption_check_only() {
+        let grid = fresh_grid();
+        // peremption_ticks = 0 means "no peremption rule" (the existing
+        // station semantics). Inheritance must still pass on station +
+        // intercalation rules even on infinite-window stations.
+        let result = evaluate_setup_inheritance(
+            10,
+            Some(0),
+            "self-task",
+            10_000,              // huge gap
+            0,
+            42,
+            0,                   // peremption disabled
+            &grid,
+            &[],
+            0,
+        );
+        assert_eq!(result, Ok(()));
+    }
+
+    // ============================================================
+    // V2 — log-driven past intercalation tests. With the historical
+    // log feeding `evaluate_setup_inheritance`, the past portion of
+    // the gap [anchor, now_tick] is decided from immutable history
+    // instead of the volatile grid. The grid is still consulted for
+    // the future portion [now_tick, candidate].
+    // ============================================================
+
+    fn entry(task_id: &str, at_tick: i64) -> SetupCompletionEntry {
+        SetupCompletionEntry { task_id: task_id.to_string(), at_tick }
+    }
+
+    #[test]
+    fn log_past_intercalation_rejects_inheritance() {
+        // Anchor at t=10, now=20, candidate=18 (entirely in the past
+        // observable). Log records a foreign-task completion at t=14
+        // — the calage was changed to that foreign task, ours is dead.
+        let grid = fresh_grid();
+        let log = vec![entry("foreign-task", 14)];
+        let result = evaluate_setup_inheritance(
+            10, Some(0), "self-task",
+            18, 0, 42, 16,
+            &grid, &log,
+            /*now_tick=*/ 20,
+        );
+        assert_eq!(result, Err("intercalated_setup"));
+    }
+
+    #[test]
+    fn log_self_continuation_does_not_count_as_intercalation() {
+        // Same scenario but the log entry is for the same task (an
+        // earlier saisie that re-anchored). The calage is still ours.
+        let grid = fresh_grid();
+        let log = vec![entry("self-task", 14)];
+        let result = evaluate_setup_inheritance(
+            10, Some(0), "self-task",
+            18, 0, 42, 16,
+            &grid, &log,
+            /*now_tick=*/ 20,
+        );
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn log_intercalation_outside_window_ignored() {
+        // Log has entries at t=2 (before anchor) and t=30 (after
+        // candidate's past_end of min(18,20)=18). Both fall outside
+        // [anchor=10, past_end=18] and must be ignored.
+        let grid = fresh_grid();
+        let log = vec![entry("foreign-task", 2), entry("foreign-task", 30)];
+        let result = evaluate_setup_inheritance(
+            10, Some(0), "self-task",
+            18, 0, 42, 16,
+            &grid, &log,
+            /*now_tick=*/ 20,
+        );
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn log_handles_now_in_middle_of_gap() {
+        // Anchor=10, now=15, candidate=20. Past portion [10,15] checked
+        // via log ; future portion [15,20] checked via grid. A log
+        // entry at t=13 (past) intercalates ; ditto a grid action at t=17.
+        let mut grid = fresh_grid();
+        grid.assign_station(0, 17, 99);
+        let log = vec![entry("other", 13)];
+        // Either source detects intercalation — this test asserts the
+        // past path fires first (log walked before grid).
+        let result = evaluate_setup_inheritance(
+            10, Some(0), "self-task",
+            20, 0, 42, 16,
+            &grid, &log,
+            /*now_tick=*/ 15,
+        );
+        assert_eq!(result, Err("intercalated_setup"));
+    }
+
+    #[test]
+    fn future_grid_intercalation_detected_when_log_clean() {
+        // Past is clean (empty log) ; future grid has a foreign action
+        // between now_tick and candidate.
+        let mut grid = fresh_grid();
+        grid.assign_station(0, 17, 99);
+        let result = evaluate_setup_inheritance(
+            10, Some(0), "self-task",
+            20, 0, 42, 16,
+            &grid, &[],
+            /*now_tick=*/ 15,
+        );
+        assert_eq!(result, Err("intercalated_setup"));
+    }
+}
+
+/// Limitation-1 fix : evaluate setup inheritance for non-pinned actions
+/// at the earliest tick the scoring loop could place them, *before* the
+/// scoring loop runs. Because peremption is monotonic forward (a calage
+/// that's expired at `t` is also expired at `t' > t`), a successful
+/// evaluation at the earliest tick stays valid at any later tick on the
+/// peremption axis. Future intercalations introduced by the scoring loop
+/// itself are caught by `revalidate_setup_inheritance_after_scoring`
+/// running at the end of the forward pass.
+///
+/// Pinned actions are skipped here — they were handled by
+/// `pre_place_pinned_actions` at their pinned tick.
+fn pre_evaluate_setup_inheritance_for_non_pinned(
+    actions: &mut [Action],
+    station_attrs: &[StationAttrs],
+    grid: &ScheduleGrid,
+    now_tick: usize,
+) {
+    for i in 0..actions.len() {
+        if actions[i].is_pinned {
+            continue;
+        }
+        let at_tick = match actions[i].inherited_setup_at_tick {
+            Some(t) => t,
+            None => continue,
+        };
+        // Earliest tick the scoring loop could pick. The peremption check
+        // uses this tick — if it fails, the calage is gone for any later
+        // placement too. The grid intercalation check uses [now_tick,
+        // earliest_tick] which is empty when earliest_tick == now_tick ;
+        // if earliest_tick > now_tick (e.g. BAT-deadline floor) we walk
+        // that thin window for foreign actions already on the grid.
+        let earliest_tick = (actions[i].earliest_start_tick.unwrap_or(0)).max(now_tick);
+        let candidate_station = actions[i].station_idx;
+        let attrs = station_attrs.get(candidate_station);
+        let peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
+        let setup_completions: &[SetupCompletionEntry] =
+            attrs.map(|s| s.setup_completions.as_slice()).unwrap_or(&[]);
+        let self_task_id = actions[i].task_id.clone();
+        match evaluate_setup_inheritance(
+            at_tick,
+            actions[i].inherited_setup_station_idx,
+            &self_task_id,
+            earliest_tick,
+            candidate_station,
+            i,
+            peremption_ticks,
+            grid,
+            setup_completions,
+            now_tick,
+        ) {
+            Ok(()) => {
+                let saved_setup = actions[i].setup_ticks;
+                actions[i].setup_ticks = 0;
+                // Decrease total work the scoring loop will need to fit
+                // (art = setup + run; we just zeroed setup).
+                actions[i].art = actions[i].art.saturating_sub(saved_setup);
+                actions[i].original_art = actions[i].original_art.saturating_sub(saved_setup);
+                actions[i].task_total_ticks =
+                    actions[i].task_total_ticks.saturating_sub(saved_setup);
+                actions[i].setup_inherited = true;
+                actions[i].setup_lost_reason = None;
+            }
+            Err(reason) => {
+                actions[i].setup_inherited = false;
+                actions[i].setup_lost_reason = Some(reason.to_string());
+            }
+        }
+    }
+}
+
+/// Limitation-2 fix (future-side) : after the scoring loop has filled
+/// the grid with every committed placement, re-evaluate inheritance for
+/// actions whose calage was honoured (pinned or non-pinned). If the
+/// final placement crosses a foreign action that wasn't visible at
+/// pre-evaluation time, flip the flag and emit a warning. The schedule
+/// itself is not reshuffled — the user sees the "recalage" badge and
+/// the operator handles the physical recale at the press.
+fn revalidate_setup_inheritance_after_scoring(
+    actions: &mut [Action],
+    station_attrs: &[StationAttrs],
+    grid: &ScheduleGrid,
+    now_tick: usize,
+    warnings: &mut Vec<Warning>,
+) {
+    for i in 0..actions.len() {
+        if !actions[i].setup_inherited {
+            continue;
+        }
+        let at_tick = match actions[i].inherited_setup_at_tick {
+            Some(t) => t,
+            None => continue, // defensive
+        };
+        let final_tick = match actions[i].start_tick.or(actions[i].pinned_start_tick) {
+            Some(t) => t,
+            None => continue, // never placed (unplaced action) ; nothing to re-check
+        };
+        let station = actions[i].station_idx;
+        let attrs = station_attrs.get(station);
+        let peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
+        let setup_completions: &[SetupCompletionEntry] =
+            attrs.map(|s| s.setup_completions.as_slice()).unwrap_or(&[]);
+        let self_task_id = actions[i].task_id.clone();
+        if let Err(reason) = evaluate_setup_inheritance(
+            at_tick,
+            actions[i].inherited_setup_station_idx,
+            &self_task_id,
+            final_tick,
+            station,
+            i,
+            peremption_ticks,
+            grid,
+            setup_completions,
+            now_tick,
+        ) {
+            actions[i].setup_inherited = false;
+            actions[i].setup_lost_reason = Some(reason.to_string());
+            warnings.push(Warning {
+                task_id: Some(actions[i].task_id.clone()),
+                message: format!(
+                    "Calage hérité finalement perdu (raison : {reason}) — \
+                     l'opérateur devra recaler la machine au démarrage."
+                ),
+            });
+        }
+    }
+}
+
 fn pre_place_pinned_actions(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
@@ -2808,6 +3389,55 @@ fn pre_place_pinned_actions(
             continue;
         }
         // ============================================================
+
+        // Setup-inheritance evaluation. When PHP has anchored a previous
+        // calage on this task, the engine may collapse the setup phase to
+        // zero at this placement iff (same station, within peremption, no
+        // intercalated foreign action). On success, the action's effective
+        // setup_ticks drops to 0 and the run phase starts at the pin tick ;
+        // pinned_end_tick (carried from PHP via the operator-stint span)
+        // is recomputed by trimming the original setup window so the
+        // station reservation matches the new shorter duration.
+        if let Some(at_tick) = actions[i].inherited_setup_at_tick {
+            let candidate_station = actions[i].station_idx;
+            let attrs = station_attrs.get(candidate_station);
+            let peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
+            let setup_completions: &[SetupCompletionEntry] =
+                attrs.map(|s| s.setup_completions.as_slice()).unwrap_or(&[]);
+            let self_task_id = actions[i].task_id.clone();
+            match evaluate_setup_inheritance(
+                at_tick,
+                actions[i].inherited_setup_station_idx,
+                &self_task_id,
+                start_t,
+                candidate_station,
+                i,
+                peremption_ticks,
+                grid,
+                setup_completions,
+                now_tick,
+            ) {
+                Ok(()) => {
+                    let saved_setup = actions[i].setup_ticks;
+                    actions[i].setup_ticks = 0;
+                    actions[i].setup_inherited = true;
+                    actions[i].setup_lost_reason = None;
+                    // If PHP gave us an absolute end tick that included a
+                    // setup phase, trim the front by `saved_setup` so the
+                    // station reservation lines up with the now shorter
+                    // run-only window. Falls back to the config-derived
+                    // end below when pinned_end_tick is None.
+                    if let Some(end) = actions[i].pinned_end_tick {
+                        let trimmed = end.saturating_sub(saved_setup as usize).max(start_t);
+                        actions[i].pinned_end_tick = Some(trimmed);
+                    }
+                }
+                Err(reason) => {
+                    actions[i].setup_inherited = false;
+                    actions[i].setup_lost_reason = Some(reason.to_string());
+                }
+            }
+        }
 
         let total_ticks = (actions[i].setup_ticks + actions[i].run_ticks) as usize;
         // Honour PHP's explicit pinned_end_tick (derived from
@@ -3323,6 +3953,13 @@ fn build_assignment_for(
         is_masked_time: false, // Set in post-processing by compute()
         recalages,
         active_windows,
+        // Setup-inheritance outcome — surfaces directly to PHP / FE so
+        // the JDP can drop the "recalage" badge when the calage was
+        // honoured (`setup_inherited` true, `setup_lost_reason` None) or
+        // surface it with the rejection tag when the engine forced a
+        // re-setup despite the offer.
+        setup_inherited: action.setup_inherited,
+        setup_lost_reason: action.setup_lost_reason.clone(),
     }
 }
 
@@ -3886,6 +4523,10 @@ mod peremption_tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 
@@ -4023,6 +4664,7 @@ mod peremption_tests {
             min_run_operators: 1,
             max_run_operators: 1,
             max_chunk_ticks: 24,
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 2.0,
             chunk_mini_task_percentage: 0.5,
             similarity_criteria: Vec::new(),
@@ -4136,6 +4778,7 @@ mod peremption_tests {
             min_run_operators: 1,
             max_run_operators: 1,
             max_chunk_ticks: 72,
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 2.0,
             chunk_mini_task_percentage: 0.5,
             similarity_criteria: Vec::new(),
@@ -4246,6 +4889,7 @@ mod attention_capacity_tests {
             min_run_operators: 1,
             max_run_operators: 2,
             max_chunk_ticks: 96,
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
             similarity_criteria: Vec::new(),
@@ -4308,6 +4952,10 @@ mod attention_capacity_tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 
@@ -4440,6 +5088,7 @@ mod attention_capacity_tests {
             min_run_operators: 1,
             max_run_operators: 1,
             max_chunk_ticks: 96,
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
             similarity_criteria: Vec::new(),
@@ -4489,6 +5138,7 @@ mod attention_capacity_tests {
             min_run_operators: 1,
             max_run_operators: 5,
             max_chunk_ticks: 200,
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
             similarity_criteria: Vec::new(),
@@ -4563,6 +5213,7 @@ mod attention_capacity_tests {
             min_run_operators: 1,
             max_run_operators: 5,
             max_chunk_ticks: 200,
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
             similarity_criteria: Vec::new(),
@@ -4869,6 +5520,7 @@ mod safety_zone_chunk_mini_tests {
             // 5 ticks max chunk = 75 min at 15 min/tick.
             max_chunk_ticks: 5,
             // Defaults: 2.0 × setup, 0.5 × total.
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 2.0,
             chunk_mini_task_percentage: 0.5,
             similarity_criteria: Vec::new(),
@@ -4935,6 +5587,10 @@ mod safety_zone_chunk_mini_tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 
@@ -5180,6 +5836,270 @@ mod safety_zone_chunk_mini_tests {
             "credit covers most of the chunk-mini floor"
         );
         assert!(actions[0].pinned_end_tick.is_none(), "future end is mutable");
+    }
+
+    // ============================================================
+    // Setup-inheritance integration tests — exercise the full
+    // `pre_place_pinned_actions` → `evaluate_setup_inheritance` →
+    // mutate Action chain so the persisted output (Action.setup_inherited /
+    // setup_lost_reason / setup_ticks) reflects the engine's decision.
+    // ============================================================
+
+    #[test]
+    fn pinned_action_with_recent_anchor_inherits_calage() {
+        // setup=4 ticks (60min), run=4 ticks. Anchor placed 2 ticks ago
+        // on the SAME station, no foreign action in [anchor, pin]. With
+        // default peremption=8 ticks (120min), gap=2 < 8 → inherit.
+        let mut action = make_action(0, 0, 4, 4, 70, /*is_frozen_by_safety_zone=*/ false);
+        action.inherited_setup_at_tick = Some(68);
+        action.inherited_setup_station_idx = Some(0);
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 60,
+        );
+
+        assert!(actions[0].setup_inherited, "engine should honour the calage");
+        assert!(actions[0].setup_lost_reason.is_none(), "no rejection reason");
+        assert_eq!(actions[0].setup_ticks, 0, "setup phase collapsed to zero");
+    }
+
+    #[test]
+    fn pinned_action_past_peremption_loses_calage() {
+        // Same setup as above but anchor is 50 ticks ago — far past the
+        // 8-tick peremption window. Engine must reject and force a full
+        // setup, surfacing `peremption` to the assignment output.
+        let mut action = make_action(0, 0, 4, 4, 70, /*is_frozen_by_safety_zone=*/ false);
+        action.inherited_setup_at_tick = Some(20);
+        action.inherited_setup_station_idx = Some(0);
+        let availability = restricted_availability(200, &[(0, 200)]);
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = 8; // 8 ticks = 120 min, the production default
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            attrs,
+            200,
+            /*now_tick=*/ 60,
+        );
+
+        assert!(!actions[0].setup_inherited, "calage must be rejected past peremption");
+        assert_eq!(
+            actions[0].setup_lost_reason.as_deref(),
+            Some("peremption"),
+            "rejection tag surfaces to ComputedAssignment.setupLostReason",
+        );
+        assert_eq!(
+            actions[0].setup_ticks, 4,
+            "full setup re-introduced when inheritance fails",
+        );
+    }
+
+    #[test]
+    fn pinned_action_anchor_on_other_station_loses_calage() {
+        // Anchor station differs from the placement station ⇒ calage is
+        // physically incompatible (each press has its own state). Engine
+        // rejects with `station_mismatch`.
+        let mut action = make_action(0, 0, 4, 4, 70, /*is_frozen_by_safety_zone=*/ false);
+        action.inherited_setup_at_tick = Some(68);
+        action.inherited_setup_station_idx = Some(99); // arbitrary other station
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 60,
+        );
+
+        assert!(!actions[0].setup_inherited);
+        assert_eq!(
+            actions[0].setup_lost_reason.as_deref(),
+            Some("station_mismatch"),
+        );
+    }
+
+    #[test]
+    fn pinned_action_without_anchor_skips_inheritance_evaluation() {
+        // No anchor offered ⇒ pre_place leaves setup_inherited=false +
+        // setup_lost_reason=None. The FE turns the (false, None) pair
+        // into "no badge" — distinct from the rejected case where the
+        // ambre "recalage" badge fires.
+        let action = make_action(0, 0, 4, 4, 70, /*is_frozen_by_safety_zone=*/ false);
+        let availability = restricted_availability(200, &[(0, 200)]);
+
+        let (actions, _warnings) = run_pre_place(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 60,
+        );
+
+        assert!(!actions[0].setup_inherited);
+        assert!(actions[0].setup_lost_reason.is_none());
+        assert_eq!(actions[0].setup_ticks, 4, "setup unchanged when no inheritance offered");
+    }
+
+    // ============================================================
+    // V2 — non-pinned inheritance + post-scoring revalidation tests
+    // (limitation 1 fix). Exercise the new helper functions that pre-
+    // evaluate inheritance at the earliest tick a non-pinned action
+    // could be placed at, and the revalidation pass that flips the flag
+    // when the scoring loop introduced an intercalation.
+    // ============================================================
+
+    fn make_non_pinned_action(
+        setup_ticks: u32,
+        run_ticks: u32,
+        anchor_at_tick: i64,
+        anchor_station_idx: Option<usize>,
+    ) -> Action {
+        let mut a = make_action(0, 0, setup_ticks, run_ticks, 0, false);
+        a.is_pinned = false;
+        a.is_frozen_by_safety_zone = false;
+        a.pinned_start_tick = None;
+        a.pinned_end_tick = None;
+        a.inherited_setup_at_tick = Some(anchor_at_tick);
+        a.inherited_setup_station_idx = anchor_station_idx;
+        a
+    }
+
+    fn station_attrs_with_peremption(peremption_ticks: u32) -> StationAttrs {
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = peremption_ticks;
+        attrs
+    }
+
+    #[test]
+    fn non_pinned_action_inherits_calage_when_anchor_recent() {
+        // Anchor 2 ticks ago (well within 8-tick peremption), no
+        // intercalation. The non-pinned helper must collapse setup_ticks
+        // to 0 and flag setup_inherited = true *before* the scoring loop
+        // sees the action.
+        let mut actions = vec![make_non_pinned_action(4, 8, 18, Some(0))];
+        let attrs = vec![station_attrs_with_peremption(8)];
+        let grid = ScheduleGrid::new(1, 1, 64, 15);
+
+        pre_evaluate_setup_inheritance_for_non_pinned(
+            &mut actions,
+            &attrs,
+            &grid,
+            /*now_tick=*/ 20,
+        );
+
+        assert!(actions[0].setup_inherited);
+        assert!(actions[0].setup_lost_reason.is_none());
+        assert_eq!(actions[0].setup_ticks, 0, "setup phase collapsed for non-pinned action too");
+        assert_eq!(actions[0].art, 8, "art shrunk by saved_setup so scoring loop plans run-only duration");
+    }
+
+    #[test]
+    fn non_pinned_action_loses_calage_past_peremption() {
+        // Anchor 50 ticks ago, peremption 8 ticks. Rejected with
+        // peremption tag. setup_ticks stays full so the scoring loop
+        // plans the recale.
+        let mut actions = vec![make_non_pinned_action(4, 8, -30, Some(0))];
+        let attrs = vec![station_attrs_with_peremption(8)];
+        let grid = ScheduleGrid::new(1, 1, 64, 15);
+
+        pre_evaluate_setup_inheritance_for_non_pinned(
+            &mut actions,
+            &attrs,
+            &grid,
+            /*now_tick=*/ 20,
+        );
+
+        assert!(!actions[0].setup_inherited);
+        assert_eq!(actions[0].setup_lost_reason.as_deref(), Some("peremption"));
+        assert_eq!(actions[0].setup_ticks, 4, "setup re-introduced");
+    }
+
+    #[test]
+    fn non_pinned_action_log_intercalation_rejects_inheritance() {
+        // Anchor recent, but the historical log records a foreign-task
+        // calage on the same station between anchor and now_tick. The
+        // peremption check passes ; the past-side log check fires.
+        let mut actions = vec![make_non_pinned_action(4, 8, 10, Some(0))];
+        let mut attrs = vec![station_attrs_with_peremption(16)];
+        attrs[0].setup_completions = vec![SetupCompletionEntry {
+            task_id: "foreign-task".to_string(),
+            at_tick: 14,
+        }];
+        let grid = ScheduleGrid::new(1, 1, 64, 15);
+
+        pre_evaluate_setup_inheritance_for_non_pinned(
+            &mut actions,
+            &attrs,
+            &grid,
+            /*now_tick=*/ 20,
+        );
+
+        assert!(!actions[0].setup_inherited);
+        assert_eq!(actions[0].setup_lost_reason.as_deref(), Some("intercalated_setup"));
+    }
+
+    #[test]
+    fn revalidation_flips_flag_when_scoring_introduces_intercalation() {
+        // Pre-eval succeeded at earliest_tick=20 (no intercalation visible).
+        // The scoring loop placed our action at start_tick=30, but a
+        // foreign action was committed on the same station at tick 25
+        // between [now_tick=20, start_tick=30]. The revalidation pass
+        // catches it via the now-filled grid.
+        let mut grid = ScheduleGrid::new(1, 1, 64, 15);
+        grid.assign_station(0, 25, 99);
+        let mut actions = vec![make_non_pinned_action(4, 8, 18, Some(0))];
+        actions[0].setup_inherited = true;
+        actions[0].setup_lost_reason = None;
+        actions[0].start_tick = Some(30);
+        let attrs = vec![station_attrs_with_peremption(16)];
+        let mut warnings: Vec<Warning> = Vec::new();
+
+        revalidate_setup_inheritance_after_scoring(
+            &mut actions,
+            &attrs,
+            &grid,
+            /*now_tick=*/ 20,
+            &mut warnings,
+        );
+
+        assert!(!actions[0].setup_inherited);
+        assert_eq!(actions[0].setup_lost_reason.as_deref(), Some("intercalated_setup"));
+        assert!(
+            warnings.iter().any(|w| w.message.contains("Calage hérité finalement perdu")),
+            "expected a recalage warning, got {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn revalidation_keeps_flag_when_no_intercalation_appeared() {
+        // Pre-eval succeeded, scoring loop placed without intercalation,
+        // grid stays clean → flag survives.
+        let grid = ScheduleGrid::new(1, 1, 64, 15);
+        let mut actions = vec![make_non_pinned_action(4, 8, 18, Some(0))];
+        actions[0].setup_inherited = true;
+        actions[0].setup_lost_reason = None;
+        actions[0].start_tick = Some(30);
+        let attrs = vec![station_attrs_with_peremption(16)];
+        let mut warnings: Vec<Warning> = Vec::new();
+
+        revalidate_setup_inheritance_after_scoring(
+            &mut actions,
+            &attrs,
+            &grid,
+            /*now_tick=*/ 20,
+            &mut warnings,
+        );
+
+        assert!(actions[0].setup_inherited, "honoured calage stays honoured when grid is clean");
+        assert!(actions[0].setup_lost_reason.is_none());
+        assert!(warnings.is_empty(), "no warning when nothing changes");
     }
 
     // ============================================================
@@ -5439,6 +6359,7 @@ mod borrow_tests {
             // chunk_mini set to 0% so the borrow path's chunk-mini floor doesn't
             // block tests where the donor has barely started its run. The
             // chunk-mini-floor test below opts back into a real value.
+            setup_completions: Vec::new(),
             chunk_mini_setup_multiplier: 0.0,
             chunk_mini_task_percentage: 0.0,
             similarity_criteria: Vec::new(),
@@ -5504,6 +6425,10 @@ mod borrow_tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 

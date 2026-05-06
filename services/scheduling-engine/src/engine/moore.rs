@@ -37,6 +37,7 @@ pub fn moore_escape(
     start_date: NaiveDate,
     max_attempts: u32,
     station_groups: &[StationGroupInput],
+    setup_completion_log: &[crate::model::schedule::SetupCompletion],
     now_tick: usize,
     precedence_min_gap_ticks: u32,
 ) -> Option<(Vec<ComputedAssignment>, Vec<Action>, ScheduleStats, u32)> {
@@ -195,7 +196,15 @@ pub fn moore_escape(
         let (new_assignments, new_actions, new_stats, new_iters) = run_with_fbi_ordering(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, fbi_max_iterations, start_date,
-            BackwardOrdering::TierFirst, station_groups, &[], &[], &None,
+            BackwardOrdering::TierFirst, station_groups, &[], &[],
+            // Moore inherits the same historical log as the main pass —
+            // recovery passes that ignore inheritance plan stale setups
+            // and produce systematically pessimistic recovery schedules,
+            // making Moore look unhelpful on partially-progressed late
+            // jobs. Threading the original log through keeps the recovery
+            // attempts on equal footing with the main FBI passes.
+            setup_completion_log,
+            &None,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
             &mut _moore_warnings,

@@ -40,6 +40,7 @@ pub fn lns_improve(
     station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
+    setup_completion_log: &[crate::model::schedule::SetupCompletion],
     now_tick: usize,
     time_budget_ms: u64,
     progress: &super::ProgressSender,
@@ -236,6 +237,7 @@ pub fn lns_improve(
             tick_minutes, horizon_days, 1, // single FBI iteration
             start_date, BackwardOrdering::TierFirst,
             station_groups, station_blocked_ranges, occupied_slots,
+            setup_completion_log,
             &None, now_tick, &default_weights,
             precedence_min_gap_ticks,
             &mut _lns_warnings,
@@ -487,6 +489,8 @@ mod tests {
             is_masked_time: false,
             recalages: Vec::new(),
             active_windows: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 

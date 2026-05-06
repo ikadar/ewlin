@@ -177,6 +177,7 @@ fn compute_inner(
         &request.station_groups,
         &station_blocked_ranges,
         &occupied_slots_parsed,
+        &request.setup_completion_log,
         progress,
         now_tick,
         options.precedence_min_gap_ticks,
@@ -201,6 +202,7 @@ fn compute_inner(
             start_date,
             2, // max_attempts (reduced to leave budget for SA)
             &request.station_groups,
+            &request.setup_completion_log,
             now_tick,
             options.precedence_min_gap_ticks,
         ) {
@@ -235,6 +237,7 @@ fn compute_inner(
             &request.station_groups,
             &station_blocked_ranges,
             &occupied_slots_parsed,
+            &request.setup_completion_log,
             now_tick,
             lns_budget,
             progress,
@@ -742,6 +745,13 @@ fn merge_chunk_assignments(assignments: Vec<ComputedAssignment>) -> Vec<Computed
             is_masked_time,
             recalages: merged_recalages,
             active_windows,
+            // Inheritance is decided at pre-place for the WHOLE pinned
+            // task ; chunks of a single non-pinned task can't inherit, so
+            // when merging chunk assignments we propagate the inheritance
+            // status from the first chunk verbatim. setup_lost_reason
+            // mirrors the same logic.
+            setup_inherited: first.setup_inherited,
+            setup_lost_reason: first.setup_lost_reason.clone(),
         });
     }
 
@@ -955,6 +965,18 @@ pub fn build_actions(
                     task_elapsed_ticks: task.task_elapsed_ticks,
                     forced_start_tick: task.forced_start_tick,
                     already_eaten_ticks: task.already_eaten_ticks,
+                    // Setup-inheritance: resolve station_id → station_idx
+                    // here so pre_place_pinned_actions can compare directly
+                    // against `action.station_idx` without re-threading the
+                    // string→idx map. Unknown stations land at `None` and
+                    // are rejected as `station_mismatch` at evaluation.
+                    inherited_setup_at_tick: task.inherited_setup.as_ref().map(|i| i.at_tick),
+                    inherited_setup_station_idx: task
+                        .inherited_setup
+                        .as_ref()
+                        .and_then(|i| station_id_to_idx.get(&i.station_id).copied()),
+                    setup_inherited: false,
+                    setup_lost_reason: None,
                 });
 
                 task_id_to_action_idx.insert(task.id.clone(), idx);
@@ -1651,6 +1673,7 @@ mod integration_tests {
                     task_elapsed_ticks: 0,
                     forced_start_tick: None,
                     already_eaten_ticks: 0,
+                    inherited_setup: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -1716,7 +1739,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1751,7 +1774,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1811,14 +1834,14 @@ mod integration_tests {
             operators: vec![paired_op],
             jobs: jobs.clone(),
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         });
         let unpaired_result = compute(&ComputeRequest {
             stations,
             operators: vec![unpaired_op],
             jobs,
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         });
 
         let paired_makespan = paired_result
@@ -1878,7 +1901,7 @@ mod integration_tests {
             operators: vec![op],
             jobs: vec![make_job("job-a", "sbg", 60)],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1918,7 +1941,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -1986,6 +2009,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                     TaskInput {
                         id: "task-finish".into(),
@@ -2006,6 +2030,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                 ],
                 spec: None,
@@ -2018,7 +2043,7 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![job],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2213,6 +2238,7 @@ mod integration_tests {
                     task_elapsed_ticks: 0,
                     forced_start_tick: None,
                     already_eaten_ticks: 0,
+                    inherited_setup: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2233,6 +2259,7 @@ mod integration_tests {
             options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
+        setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2296,8 +2323,8 @@ mod integration_tests {
                 id: format!("{id}-elem"),
                 name: None,
                 tasks: vec![
-                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None, is_in_progress: false, task_elapsed_ticks: 0, forced_start_tick: None, already_eaten_ticks: 0 },
-                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None, is_in_progress: false, task_elapsed_ticks: 0, forced_start_tick: None, already_eaten_ticks: 0 },
+                    TaskInput { id: format!("{id}-s1"), station_id: "s1".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 0, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None, is_in_progress: false, task_elapsed_ticks: 0, forced_start_tick: None, already_eaten_ticks: 0, inherited_setup: None },
+                    TaskInput { id: format!("{id}-s2"), station_id: "s2".into(), setup_minutes: 0, run_minutes: 120, sequence_order: 1, is_pinned: false, is_frozen_by_safety_zone: false, pinned_start_tick: None, pinned_end_tick: None, outsourced: None, earliest_start_tick: None, realistic_run_minutes: None, cumulative_position_pct: None, slot_volume_pct: None, is_in_progress: false, task_elapsed_ticks: 0, forced_start_tick: None, already_eaten_ticks: 0, inherited_setup: None },
                 ],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2318,6 +2345,7 @@ mod integration_tests {
             options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
+        setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2384,6 +2412,7 @@ mod integration_tests {
                     task_elapsed_ticks: 0,
                     forced_start_tick: None,
                     already_eaten_ticks: 0,
+                    inherited_setup: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2396,7 +2425,7 @@ mod integration_tests {
             jobs: vec![make_pinned_job("J1", 5), make_pinned_job("J2", 5)],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2490,6 +2519,7 @@ mod integration_tests {
                     task_elapsed_ticks: 0,
                     forced_start_tick: None,
                     already_eaten_ticks: 0,
+                    inherited_setup: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2505,7 +2535,7 @@ mod integration_tests {
             ],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2620,6 +2650,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                     TaskInput {
                         id: "task-ST".into(),
@@ -2640,6 +2671,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                     TaskInput {
                         id: "task-B".into(),
@@ -2660,6 +2692,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                 ],
                 spec: None,
@@ -2683,6 +2716,7 @@ mod integration_tests {
             }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
+        setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2785,6 +2819,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                     TaskInput {
                         id: "ST".into(),
@@ -2805,6 +2840,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                     TaskInput {
                         id: "B".into(),
@@ -2825,6 +2861,7 @@ mod integration_tests {
                         task_elapsed_ticks: 0,
                         forced_start_tick: None,
                         already_eaten_ticks: 0,
+                        inherited_setup: None,
                     },
                 ],
                 spec: None,
@@ -2848,6 +2885,7 @@ mod integration_tests {
             }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
+        setup_completion_log: Vec::new(),
         };
 
         let result = compute(&request);
@@ -2909,6 +2947,7 @@ mod integration_tests {
                     task_elapsed_ticks: 0,
                     forced_start_tick: None,
                     already_eaten_ticks: 0,
+                    inherited_setup: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -2928,7 +2967,7 @@ mod integration_tests {
             jobs: vec![make_single_task_job("j", "s1", 60, None)],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
         let baseline_result = compute(&baseline);
         assert_eq!(baseline_result.assignments.len(), 1, "baseline must place");
@@ -2944,7 +2983,7 @@ mod integration_tests {
             jobs: vec![make_single_task_job("j", "s1", 60, Some(120))],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
         };
         let ratio_result = compute(&with_ratio);
         assert_eq!(ratio_result.assignments.len(), 1, "ratio'd job must place");
@@ -3008,6 +3047,7 @@ mod integration_tests {
                             task_elapsed_ticks: 0,
                             forced_start_tick: None,
                             already_eaten_ticks: 0,
+                            inherited_setup: None,
                         },
                         TaskInput {
                             id: "j-t2".into(),
@@ -3028,6 +3068,7 @@ mod integration_tests {
                             task_elapsed_ticks: 0,
                             forced_start_tick: None,
                             already_eaten_ticks: 0,
+                            inherited_setup: None,
                         },
                     ],
                     spec: None,
@@ -3040,7 +3081,7 @@ mod integration_tests {
                 jobs: vec![job],
                 options: options(),
                 station_groups: Vec::new(),
-                occupied_slots: Vec::new(),
+                occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
             }
         };
 
@@ -3203,6 +3244,7 @@ mod setup_run_split_e2e_tests {
                     task_elapsed_ticks: 0,
                     forced_start_tick: None,
                     already_eaten_ticks: 0,
+                    inherited_setup: None,
                 }],
                 spec: None,
                 prerequisite_element_ids: Vec::new(),
@@ -3220,7 +3262,7 @@ mod setup_run_split_e2e_tests {
             jobs,
             operators,
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
             options: Some(ComputeOptions {
                 horizon_days: 2,
                 tick_minutes: 60,

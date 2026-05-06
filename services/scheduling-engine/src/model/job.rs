@@ -124,11 +124,41 @@ pub struct TaskInput {
     /// `Some` when a saisie has produced a productivity ratio for this fragment ;
     /// the engine plans with this value instead of `run_minutes` via
     /// `effective_run_minutes()`. `None` = pre-saisie, fall back to JCF planned
-    /// run. PHP computes `round(run_minutes × productivity_ratio)` upstream
-    /// (ScheduleComputeController). Setup is unchanged either way (calage
-    /// neutral — bounded by machine + material, not operator pace).
+    /// run. PHP computes `round(run_minutes × productivity_ratio × (1 −
+    /// recordedProgressPct/100))` upstream (ScheduleComputeController) — the
+    /// already-done portion is subtracted so the engine plans the remaining
+    /// work on a replan. Setup is forwarded as-is in the payload ; the engine
+    /// decides whether to honour an inherited calage via `inherited_setup`
+    /// below (calage is per-machine, peremption-bound, and stolen by any
+    /// intercalated foreign setup).
     #[serde(default)]
     pub realistic_run_minutes: Option<u32>,
+    /// Setup-inheritance anchor — when a partially-progressed task is
+    /// replanned, the engine may skip the setup phase iff three conditions
+    /// align at the candidate placement tick `t` :
+    ///   1. `inherited_setup.station_id == station_id` (calage is
+    ///      machine-bound — reusing it on a different station is physically
+    ///      impossible).
+    ///   2. `t − inherited_setup.at_tick ≤ station.peremption_ticks`
+    ///      (calage drifts ; ink dries, rollers move, paper tension changes).
+    ///   3. No other task's setup phase has been placed on `station_id`
+    ///      between `inherited_setup.at_tick` and `t` (a foreign setup
+    ///      "steals" the calage — the machine is now configured for someone
+    ///      else's job).
+    /// When all three hold, the action's effective setup phase collapses to
+    /// 0 ticks and the resulting `ComputedAssignment.setup_inherited` is
+    /// `true`. When inheritance is rejected, the engine plans the full
+    /// `setup_minutes` and reports the reason via `setup_lost_reason` on
+    /// the assignment so the UI can surface a "recalage" badge.
+    ///
+    /// PHP sources the pair from `tasks.last_setup_at` +
+    /// `tasks.last_setup_station_id`, written on the first transition of
+    /// `recorded_progress_pct` from null/0 to >0 (the run cannot have
+    /// started unless the calage was completed). `at_tick` is signed
+    /// because the anchor frequently predates `today_midnight` on
+    /// overnight replans.
+    #[serde(default)]
+    pub inherited_setup: Option<InheritedSetup>,
     /// V2 progress capture — % of the parent job's volume already delivered by
     /// fragments before this one. Carried through so the FE's VolumeGauge can
     /// position the active slot on the 100% job scale without re-deriving it.
@@ -173,6 +203,17 @@ pub struct TaskInput {
     /// pins, zero otherwise.
     #[serde(default)]
     pub already_eaten_ticks: u32,
+}
+
+/// Setup-inheritance anchor — see `TaskInput.inherited_setup` for the full
+/// rationale. `at_tick` is signed (i64) because the anchor often predates
+/// `today_midnight` ; the engine treats it as a wall-clock offset and only
+/// the difference `placement_tick − at_tick` is meaningful.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InheritedSetup {
+    pub at_tick: i64,
+    pub station_id: String,
 }
 
 /// Provider parameters needed to compute departure & return ticks of a
@@ -264,6 +305,7 @@ mod task_input_v2_helpers_tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup: None,
         }
     }
 

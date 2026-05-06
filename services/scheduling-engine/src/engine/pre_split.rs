@@ -177,6 +177,14 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
                 task_elapsed_ticks: 0,
                 forced_start_tick: None,
                 already_eaten_ticks: 0,
+                // Setup-inheritance is evaluated by `pre_place_pinned_actions`
+                // for user pins ; chunked actions are never pinned, so we
+                // start without an inherited anchor (each chunk plans its
+                // own setup if the engine schedules one).
+                inherited_setup_at_tick: None,
+                inherited_setup_station_idx: None,
+                setup_inherited: false,
+                setup_lost_reason: None,
             });
 
             prev_chunk_idx = Some(idx);
@@ -272,6 +280,10 @@ mod tests {
             task_elapsed_ticks: 0,
             forced_start_tick: None,
             already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
         }
     }
 
@@ -436,5 +448,9 @@ pub fn clone_action(a: &Action) -> Action {
         task_elapsed_ticks: a.task_elapsed_ticks,
         forced_start_tick: a.forced_start_tick,
         already_eaten_ticks: a.already_eaten_ticks,
+        inherited_setup_at_tick: a.inherited_setup_at_tick,
+        inherited_setup_station_idx: a.inherited_setup_station_idx,
+        setup_inherited: a.setup_inherited,
+        setup_lost_reason: a.setup_lost_reason.clone(),
     }
 }

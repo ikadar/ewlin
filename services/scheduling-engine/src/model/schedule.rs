@@ -33,6 +33,30 @@ pub struct ComputeRequest {
     /// tasks are placed in the remaining gaps only.
     #[serde(default)]
     pub occupied_slots: Vec<OccupiedSlot>,
+    /// Historical record of every setup completion observed in the
+    /// workshop on the stations relevant to this compute. Sourced from
+    /// PHP's append-only `setup_completion_log` table, filtered by
+    /// station and clipped to a finite lookback (PHP default: 30 days).
+    /// Drives the past-side intercalation check inside
+    /// `evaluate_setup_inheritance` — given an inherited anchor, the
+    /// engine asks "did another task complete a setup on the same
+    /// station between the anchor and now?". The grid (which only
+    /// represents the current in-flight plan) cannot answer past-side
+    /// questions reliably, hence this companion input.
+    #[serde(default)]
+    pub setup_completion_log: Vec<SetupCompletion>,
+}
+
+/// One row from the setup-completion historical log. `at_tick` is signed
+/// because completions older than `today_midnight` resolve to negative
+/// ticks ; the engine only does subtraction on this value, so signedness
+/// is purely a wire-format concern.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupCompletion {
+    pub task_id: String,
+    pub station_id: String,
+    pub at_tick: i64,
 }
 
 /// A pre-occupied station+operator slot from an existing assignment.
@@ -217,6 +241,23 @@ pub struct ComputedAssignment {
     /// hides those bands and a continuous envelope renders correctly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_windows: Option<Vec<PhaseSegment>>,
+    /// True when the engine honoured a setup-inheritance offer from PHP:
+    /// the previous calage was reused and the setup phase was collapsed to
+    /// zero ticks for this placement. Surfaced to the UI so the operator
+    /// understands why a partially-progressed re-placement is shorter than
+    /// the theoretical setup + run.
+    #[serde(default)]
+    pub setup_inherited: bool,
+    /// Set when PHP offered an inheritance but the engine rejected it.
+    /// Tag values: `"peremption"` (calage too old), `"intercalated_setup"`
+    /// (another task's setup ran on the station between the anchor and
+    /// the candidate placement), `"station_mismatch"` (anchor station
+    /// differs from current placement, or anchor's station id is unknown).
+    /// `None` when the inheritance was honoured or no inheritance was
+    /// offered. The UI renders an ambre "recalage" badge when this is
+    /// set together with `recordedProgressPct > 0` on the linked task.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup_lost_reason: Option<String>,
 }
 
 /// A generic phase window within an assignment, used today for re-calage
