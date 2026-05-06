@@ -352,13 +352,16 @@ const FluxTableRow = memo(function FluxTableRow({
   const ctx = useFluxTableContext();
   const isMulti = job.elements.length > 1;
   const isExpanded = isMulti && ctx.expandedJobIds.has(job.id);
-  const el0 = job.elements[0] as FluxElement;
+  // el0 may be undefined when a Pillar B element-cancel leaves the
+  // job with zero active elements ; the prerequisite columns then
+  // display 'none' (the canonical default of every gate enum).
+  const el0 = job.elements[0] as FluxElement | undefined;
 
   // Prerequisite values — aggregated for multi-element, direct for single
-  const bat    = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.bat))    : el0.bat;
-  const papier = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.papier)) : el0.papier;
-  const formes = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.formes)) : el0.formes;
-  const plaques= isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.plaques)): el0.plaques;
+  const bat    = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.bat))    : el0?.bat    ?? 'none';
+  const papier = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.papier)) : el0?.papier ?? 'none';
+  const formes = isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.formes)) : el0?.formes ?? 'none';
+  const plaques= isMulti ? worstPrerequisiteStatus(job.elements.map(e => e.plaques)): el0?.plaques ?? 'none';
 
   // +N count only when collapsed (sub-rows show individual elements when expanded)
   const plusCount = isMulti && !isExpanded ? job.elements.length - 1 : undefined;
@@ -508,14 +511,14 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Prerequisite badge/listbox cells */}
       {(['bat', 'papier', 'formes', 'plaques'] as PrerequisiteColumn[]).map((col, i) => {
         const status = [bat, papier, formes, plaques][i]!;
-        const date = !isMulti ? getPrerequisiteDate(el0, col) : null;
+        const date = !isMulti && el0 ? getPrerequisiteDate(el0, col) : null;
         const cell = isMulti && isExpanded ? (
           <td key={col} className="px-1 py-0" />
         ) : isMulti ? (
           <td key={col} className="px-1 py-0">
             <FluxPrerequisiteBadge status={status} plusCount={plusCount} />
           </td>
-        ) : (
+        ) : el0 ? (
           <td key={col} className="p-0">
             <FluxPrerequisiteListbox
               jobId={job.id}
@@ -525,6 +528,8 @@ const FluxTableRow = memo(function FluxTableRow({
               date={date}
             />
           </td>
+        ) : (
+          <td key={col} className="px-1 py-0" />
         );
         // Insert DL BAT cell right after BAT column
         if (col === 'bat') {
@@ -546,7 +551,7 @@ const FluxTableRow = memo(function FluxTableRow({
 
       {/* Station cells — dynamic from API */}
       {ctx.categories.map(cat => {
-        const singleTaskId = !isMulti ? el0.stations[cat.id]?.taskId : undefined;
+        const singleTaskId = !isMulti && el0 ? el0.stations[cat.id]?.taskId : undefined;
         const clickable = singleTaskId && ctx.onStationClick;
         return (
           <td
@@ -563,7 +568,7 @@ const FluxTableRow = memo(function FluxTableRow({
                 )}
                 stationName={cat.name}
               />
-            ) : !isMulti ? (
+            ) : !isMulti && el0 ? (
               <FluxStationIndicator
                 data={el0.stations[cat.id]}
                 stationName={cat.name}
@@ -579,7 +584,7 @@ const FluxTableRow = memo(function FluxTableRow({
           <STCell
             tasks={isMulti
               ? job.elements.flatMap(e => e.outsourcing)
-              : el0.outsourcing}
+              : el0?.outsourcing ?? []}
             onUpdateSTStatus={ctx.onUpdateSTStatus}
           />
         )}

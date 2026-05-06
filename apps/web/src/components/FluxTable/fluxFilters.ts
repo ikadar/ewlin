@@ -244,16 +244,16 @@ export function filterByTab(job: FluxJob, tab: TabId): boolean {
 
   const bat    = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.bat))
-    : job.elements[0]!.bat;
+    : job.elements[0]?.bat ?? 'none';
   const papier = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.papier))
-    : job.elements[0]!.papier;
+    : job.elements[0]?.papier ?? 'none';
   const formes = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.formes))
-    : job.elements[0]!.formes;
+    : job.elements[0]?.formes ?? 'none';
   const plaques = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
-    : job.elements[0]!.plaques;
+    : job.elements[0]?.plaques ?? 'none';
 
   switch (tab) {
     case 'bat':       return bat !== 'bat_approved' && bat !== 'none';
@@ -286,16 +286,16 @@ export function filterBySearch(job: FluxJob, search: string): boolean {
   // Prerequisite badge labels (displayed values on parent row — worst for multi-element)
   const bat    = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.bat))
-    : job.elements[0]!.bat;
+    : job.elements[0]?.bat ?? 'none';
   const papier = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.papier))
-    : job.elements[0]!.papier;
+    : job.elements[0]?.papier ?? 'none';
   const formes = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.formes))
-    : job.elements[0]!.formes;
+    : job.elements[0]?.formes ?? 'none';
   const plaques = job.elements.length > 1
     ? worstPrerequisiteStatus(job.elements.map(e => e.plaques))
-    : job.elements[0]!.plaques;
+    : job.elements[0]?.plaques ?? 'none';
 
   const badgeLabels = [bat, papier, formes, plaques].map(s => PREREQUISITE_BADGE_LABEL[s] ?? s);
   const allFields = [...textFields, ...badgeLabels].map(f => f.toLowerCase());
