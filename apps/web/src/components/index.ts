@@ -45,6 +45,19 @@ export { ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from '../utils/zoom';
 export { JcfModal } from './JcfModal';
 export type { JcfModalProps } from './JcfModal';
 
+export { JcfDonePanel } from './JcfDonePanel/JcfDonePanel';
+export { computeRemainingDsl } from './JcfDonePanel/computeRemainingDsl';
+export type { JcfDonePanelProps } from './JcfDonePanel/JcfDonePanel';
+export type { TaskForRemainingDsl, RemainingDslResult } from './JcfDonePanel/computeRemainingDsl';
+
+export { JcfModificationModal } from './JcfModificationModal/JcfModificationModal';
+export type {
+  JcfModificationModalProps,
+  JobModificationData,
+  ElementModificationData,
+  ModificationChanges,
+} from './JcfModificationModal/JcfModificationModal';
+
 export { JcfJobHeader, parseFrenchDate, formatToFrench, generateJobId } from './JcfJobHeader';
 export type { JcfJobHeaderProps } from './JcfJobHeader';
 
