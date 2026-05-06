@@ -18,6 +18,7 @@ import { SquareSlash } from 'lucide-react';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AutoRecomputeProvider } from '../../contexts/AutoRecomputeContext';
 import { ScenarioProvider } from '../../contexts/ScenarioContext';
+import { useScenarioCacheReset } from '../../hooks/useScenarioCacheReset';
 import { CommandCenterProvider, useCommandCenter } from '../CommandPalette/CommandCenterContext';
 import { CommandPalette } from '../CommandPalette/CommandPalette';
 import { useCommands } from '../CommandPalette/useCommands';
@@ -40,6 +41,10 @@ function ScenarioShellInner() {
   const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
+
+  // Drop scenario-scoped caches whenever the env flips inside the
+  // fork shell — same rationale as in RootLayout.
+  useScenarioCacheReset();
 
   // Bail if URL is malformed — back to the list.
   useEffect(() => {

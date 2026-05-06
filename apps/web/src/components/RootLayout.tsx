@@ -11,6 +11,7 @@ import { ScenarioProvider, useScenarioMode, useEnvAwareNavigate } from '../conte
 import { SaisieModalProvider } from '../contexts/SaisieModalContext';
 import { EnvFloatingControls } from './EnvFloatingControls/EnvFloatingControls';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
+import { useScenarioCacheReset } from '../hooks/useScenarioCacheReset';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
 import type { CompactHorizon } from '../utils';
 
@@ -23,6 +24,11 @@ function RootLayoutInner() {
   // The .env-readonly class on the shell drives the global CSS that
   // hides planning-only affordances (pin, snowflake) when in prod mode.
   const { mode: scenarioMode } = useScenarioMode();
+
+  // Drop scenario-scoped caches whenever the env flips so RTK Query
+  // refetches under the new X-Flux-Scenario header instead of serving
+  // the previously-cached scenario's data.
+  useScenarioCacheReset();
 
   // Pipe Mercure real-time updates into the unified compute toaster
   // (top-right). Reset Mercure local state immediately so the next
