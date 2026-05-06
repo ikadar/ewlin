@@ -84,9 +84,9 @@ test.describe('Phase A2 — Préprod / Prod row isolation', () => {
     baseDate.setDate(baseDate.getDate() + 5);
     const newWorkshopExitDate = baseDate.toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
 
-    // Mutate Préprod via the JCF update endpoint.
+    // Mutate Préprod via the JCF update endpoint (PUT /jobs/{id}).
     const apiContext = await request.newContext();
-    const updateResp = await apiContext.patch(`${API_BASE_URL}/jobs/${preprodTarget!.internalId}`, {
+    const updateResp = await apiContext.put(`${API_BASE_URL}/jobs/${preprodTarget!.internalId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'X-Flux-Scenario': 'preprod',
@@ -94,7 +94,7 @@ test.describe('Phase A2 — Préprod / Prod row isolation', () => {
       },
       data: { workshopExitDate: newWorkshopExitDate },
     });
-    expect(updateResp.ok()).toBe(true);
+    expect(updateResp.ok(), `PUT /jobs/${preprodTarget!.internalId} failed with ${updateResp.status()}: ${await updateResp.text()}`).toBe(true);
 
     // Préprod sees the new deadline immediately.
     const preprodAfter = await fetchFluxJobs(token, 'preprod');
@@ -109,16 +109,16 @@ test.describe('Phase A2 — Préprod / Prod row isolation', () => {
     expect(prodTargetAfter).toBeDefined();
     expect(prodTargetAfter?.sortieIso ?? null).toBe(prodSortieBefore);
 
-    // Push Préprod → Prod via promotion. After this, Prod reflects
-    // the Préprod modification.
-    const promoteResp = await apiContext.post(`${API_BASE_URL}/promotion/promote`, {
+    // Push Préprod → Prod via promotion (POST /api/v1/promotion).
+    // After this, Prod reflects the Préprod modification.
+    const promoteResp = await apiContext.post(`${API_BASE_URL}/promotion`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       data: { engineVersion: 'phase-a2-test' },
     });
-    expect(promoteResp.ok()).toBe(true);
+    expect(promoteResp.ok(), `POST /promotion failed with ${promoteResp.status()}: ${await promoteResp.text()}`).toBe(true);
 
     const prodAfterPush = await fetchFluxJobs(token, 'prod');
     const prodTargetPushed = prodAfterPush.find((j) => j.id === targetReference);
