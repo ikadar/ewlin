@@ -80,4 +80,25 @@ describe('FluxToolbar', () => {
     renderToolbar();
     expect(screen.getByTestId('flux-filter-bar')).toBeInTheDocument();
   });
+
+  it('renders the Préprod mode badge when scenarioMode is preprod', () => {
+    renderToolbar({ scenarioMode: 'preprod' });
+    const badge = screen.getByTestId('flux-mode-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('data-mode', 'preprod');
+    expect(badge).toHaveTextContent('Préprod');
+  });
+
+  it('renders the Prod mode badge when scenarioMode is prod', () => {
+    renderToolbar({ scenarioMode: 'prod' });
+    const badge = screen.getByTestId('flux-mode-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('data-mode', 'prod');
+    expect(badge).toHaveTextContent('Prod');
+  });
+
+  it('does not render the mode badge when scenarioMode is omitted', () => {
+    renderToolbar({});
+    expect(screen.queryByTestId('flux-mode-badge')).toBeNull();
+  });
 });

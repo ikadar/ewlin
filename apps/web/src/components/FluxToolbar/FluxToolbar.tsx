@@ -14,6 +14,15 @@ interface FluxToolbarProps {
    * before being published, so a Prod-side "+" would be misleading).
    */
   canCreateJob?: boolean;
+  /**
+   * Active scenario mode — drives the title-line badge ("Préprod" /
+   * "Prod") so the asymmetry of the page (which side writes the wall,
+   * which side writes the job shape) is unambiguous at all times.
+   * Halo + dock card cover identification too, but the badge sits in
+   * the primary scan path (the page H1) and earns its weight by
+   * removing any need to look at the corners of the viewport.
+   */
+  scenarioMode?: 'preprod' | 'prod';
   /** Ref forwarded from parent so Alt+F can focus this input. */
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
   /** All jobs from the API — used to derive dynamic filter options. */
@@ -32,6 +41,7 @@ export const FluxToolbar = memo(function FluxToolbar({
   onSearchChange,
   onNewJob,
   canCreateJob = true,
+  scenarioMode,
   searchInputRef,
   jobs,
   filters,
@@ -47,8 +57,9 @@ export const FluxToolbar = memo(function FluxToolbar({
     >
       {/* Title row */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-flux-text-primary">
+        <h1 className="text-xl font-semibold text-flux-text-primary flex items-center">
           Flux de production
+          {scenarioMode && <FluxModeBadge mode={scenarioMode} />}
         </h1>
         {canCreateJob && (
           <button
@@ -86,3 +97,33 @@ export const FluxToolbar = memo(function FluxToolbar({
     </div>
   );
 });
+
+/**
+ * Title-line scenario badge — sits inline with the page H1.
+ *
+ * Préprod = emerald (matches `.preprod-shell-glow` halo + the dock
+ * card's emerald variant, semantics "ouvert, tu peux tripoter").
+ * Prod = amber (matches `.prod-shell-glow` halo + amber dock card,
+ * semantics "engagé en atelier").
+ *
+ * Kept text-only — no icon — so it doesn't drift from the H1's
+ * vertical baseline ; the dock card carries the lock/unlock symbol
+ * for users who want a non-text cue.
+ */
+function FluxModeBadge({ mode }: { mode: 'preprod' | 'prod' }) {
+  const isProd = mode === 'prod';
+  const label = isProd ? 'Prod' : 'Préprod';
+  const className = isProd
+    ? 'ml-3 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-[0.08em] bg-amber-500/20 text-amber-300'
+    : 'ml-3 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-[0.08em] bg-emerald-500/20 text-emerald-300';
+  return (
+    <span
+      className={className}
+      data-testid="flux-mode-badge"
+      data-mode={mode}
+      aria-label={`Mode ${label}`}
+    >
+      {label}
+    </span>
+  );
+}

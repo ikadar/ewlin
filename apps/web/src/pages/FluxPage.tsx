@@ -382,21 +382,13 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
       <div className="flex-1 overflow-hidden">
         <div className="p-4 h-full">
           <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden flex flex-col">
-            {!canEditFluxReality && (
-              <div
-                className="px-4 py-1.5 bg-amber-950/30 border-b border-amber-700/30 text-amber-200/80 text-[11px] flex items-center gap-2"
-                data-testid="flux-readonly-banner"
-              >
-                <span className="font-medium">Lecture seule en Préprod</span>
-                <span className="text-amber-300/60">— bascule en Prod pour valider BAT/papier/formes/plaques, statut ST, Parti et Facturé.</span>
-              </div>
-            )}
             {/* Toolbar: title + search bar + filter bar */}
             <FluxToolbar
               searchValue={search}
               onSearchChange={handleSearchChange}
               onNewJob={handleNewJob}
               canCreateJob={canEditJobShape}
+              scenarioMode={mode}
               searchInputRef={searchInputRef}
               jobs={jobs}
               filters={filters}
