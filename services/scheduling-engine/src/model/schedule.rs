@@ -45,6 +45,15 @@ pub struct ComputeRequest {
     /// questions reliably, hence this companion input.
     #[serde(default)]
     pub setup_completion_log: Vec<SetupCompletion>,
+    /// Optional virtual-clock reference (ISO 8601 with timezone). When
+    /// set, the engine treats this as "now" instead of reading
+    /// `Local::now()`. PHP forwards its `ClockService::now()` in this
+    /// field so a global now-override toggled in the admin UI flows
+    /// through to the engine without the engine having to know about
+    /// the override mechanism. Absent or unparseable values fall back
+    /// to wall-clock time, preserving prod behaviour.
+    #[serde(default)]
+    pub reference_time: Option<String>,
 }
 
 /// One row from the setup-completion historical log. `at_tick` is signed

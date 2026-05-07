@@ -791,7 +791,7 @@ mod tests {
                 }),
                 station_groups: vec![],
                 occupied_slots: vec![],
-                setup_completion_log: vec![],
+                setup_completion_log: vec![], reference_time: None,
             };
 
             let result = compute(&req);
@@ -903,7 +903,7 @@ mod tests {
                 }),
                 station_groups: vec![],
                 occupied_slots: vec![],
-                setup_completion_log: vec![],
+                setup_completion_log: vec![], reference_time: None,
             };
 
             let result = compute(&req);

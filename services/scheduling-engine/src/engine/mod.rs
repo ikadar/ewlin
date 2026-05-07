@@ -26,7 +26,7 @@ fn emit(tx: &ProgressSender, event: ProgressEvent) {
     }
 }
 
-use chrono::Local;
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 
 use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
@@ -37,6 +37,31 @@ use crate::model::schedule::{
 use crate::model::station::StationInput;
 
 use self::forward_pass::Action;
+
+/// Resolve the engine's notion of "now" from the request.
+///
+/// When `reference_time` is provided (PHP forwards its `ClockService::now()`),
+/// parse it and convert to local timezone — the rest of the engine derives
+/// `start_date` and tick offsets from this value, so a global now-override
+/// configured in PHP propagates here without further plumbing. Falls back
+/// to wall clock if the field is absent or unparseable, preserving prod
+/// behaviour when nothing is set.
+fn resolve_now(reference_time: &Option<String>) -> chrono::DateTime<Local> {
+    if let Some(s) = reference_time.as_deref() {
+        if !s.is_empty() {
+            if let Ok(parsed) = DateTime::parse_from_rfc3339(s) {
+                return parsed.with_timezone(&Local);
+            }
+            // Fallback: accept naive ISO ("2026-05-07T10:00:00") as local-time.
+            if let Ok(naive) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+                if let chrono::LocalResult::Single(dt) = Local.from_local_datetime(&naive) {
+                    return dt;
+                }
+            }
+        }
+    }
+    Local::now()
+}
 
 /// Format a tick count into an ISO datetime string relative to start_date.
 pub fn format_minutes(minutes: u64, start_date: chrono::NaiveDate) -> String {
@@ -73,7 +98,7 @@ fn compute_inner(
     cancel: Option<Arc<AtomicBool>>,
 ) -> ScheduleResult {
     let start_time = Instant::now();
-    let now = Local::now();
+    let now = resolve_now(&request.reference_time);
     let start_date = now.date_naive();
 
     let options = request.options.clone().unwrap_or_default();
@@ -1739,7 +1764,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -1774,7 +1799,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -1834,14 +1859,14 @@ mod integration_tests {
             operators: vec![paired_op],
             jobs: jobs.clone(),
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         });
         let unpaired_result = compute(&ComputeRequest {
             stations,
             operators: vec![unpaired_op],
             jobs,
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         });
 
         let paired_makespan = paired_result
@@ -1901,7 +1926,7 @@ mod integration_tests {
             operators: vec![op],
             jobs: vec![make_job("job-a", "sbg", 60)],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -1941,7 +1966,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2043,7 +2068,7 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![job],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2259,7 +2284,7 @@ mod integration_tests {
             options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
-        setup_completion_log: Vec::new(),
+        setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2345,7 +2370,7 @@ mod integration_tests {
             options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
-        setup_completion_log: Vec::new(),
+        setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2425,7 +2450,7 @@ mod integration_tests {
             jobs: vec![make_pinned_job("J1", 5), make_pinned_job("J2", 5)],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2535,7 +2560,7 @@ mod integration_tests {
             ],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2716,7 +2741,7 @@ mod integration_tests {
             }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
-        setup_completion_log: Vec::new(),
+        setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2885,7 +2910,7 @@ mod integration_tests {
             }),
             station_groups: Vec::new(),
             occupied_slots: Vec::new(),
-        setup_completion_log: Vec::new(),
+        setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2967,7 +2992,7 @@ mod integration_tests {
             jobs: vec![make_single_task_job("j", "s1", 60, None)],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
         let baseline_result = compute(&baseline);
         assert_eq!(baseline_result.assignments.len(), 1, "baseline must place");
@@ -2983,7 +3008,7 @@ mod integration_tests {
             jobs: vec![make_single_task_job("j", "s1", 60, Some(120))],
             options: options(),
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
         let ratio_result = compute(&with_ratio);
         assert_eq!(ratio_result.assignments.len(), 1, "ratio'd job must place");
@@ -3081,7 +3106,7 @@ mod integration_tests {
                 jobs: vec![job],
                 options: options(),
                 station_groups: Vec::new(),
-                occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+                occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
             }
         };
 
@@ -3112,6 +3137,84 @@ mod integration_tests {
              saisie-driven retard propagates to successors instead of being \
              swallowed silently",
         );
+    }
+}
+
+#[cfg(test)]
+mod resolve_now_tests {
+    //! Tests for `resolve_now` — the entry point of the now-override
+    //! flow on the engine side. PHP forwards its `ClockService::now()`
+    //! as `reference_time`, and `resolve_now` parses it into a
+    //! `DateTime<Local>` that drives `start_date` and tick conversions.
+    //! Anything unparseable must transparently fall back to wall clock
+    //! so a malformed payload never breaks prod compute.
+
+    use super::resolve_now;
+    use chrono::{Datelike, Local, TimeZone, Timelike};
+
+    #[test]
+    fn returns_wall_clock_when_field_absent() {
+        let before = Local::now();
+        let now = resolve_now(&None);
+        let after = Local::now();
+        assert!(now >= before);
+        assert!(now <= after + chrono::Duration::seconds(1));
+    }
+
+    #[test]
+    fn returns_wall_clock_when_field_empty() {
+        let now = resolve_now(&Some(String::new()));
+        let wall = Local::now();
+        let diff = (now - wall).num_seconds().abs();
+        assert!(diff <= 1, "diff {} s exceeds 1 s tolerance", diff);
+    }
+
+    #[test]
+    fn parses_rfc3339_with_timezone() {
+        // 2026-05-07T10:00:00+02:00 → 2026-05-07 08:00:00 UTC.
+        let s = "2026-05-07T10:00:00+02:00".to_string();
+        let parsed = resolve_now(&Some(s));
+        let utc = parsed.with_timezone(&chrono::Utc);
+        assert_eq!(utc.year(), 2026);
+        assert_eq!(utc.month(), 5);
+        assert_eq!(utc.day(), 7);
+        assert_eq!(utc.hour(), 8);
+        assert_eq!(utc.minute(), 0);
+    }
+
+    #[test]
+    fn parses_rfc3339_with_z_zulu() {
+        let s = "2026-05-07T10:00:00Z".to_string();
+        let parsed = resolve_now(&Some(s));
+        let utc = parsed.with_timezone(&chrono::Utc);
+        assert_eq!(utc.hour(), 10);
+    }
+
+    #[test]
+    fn falls_back_to_wall_when_unparseable() {
+        let s = "not-a-date".to_string();
+        let now = resolve_now(&Some(s));
+        let wall = Local::now();
+        let diff = (now - wall).num_seconds().abs();
+        assert!(diff <= 1);
+    }
+
+    #[test]
+    fn parses_naive_iso_as_local_time() {
+        // Naive ISO: no timezone marker → interpreted as local wall time.
+        let s = "2026-05-07T15:30:00".to_string();
+        let parsed = resolve_now(&Some(s));
+        // Sanity: the wall-time fields should match what we wrote.
+        assert_eq!(parsed.year(), 2026);
+        assert_eq!(parsed.month(), 5);
+        assert_eq!(parsed.day(), 7);
+        // Confirm it's the local-time interpretation (not UTC) by
+        // round-tripping through Local.
+        let expected = Local
+            .with_ymd_and_hms(2026, 5, 7, 15, 30, 0)
+            .single()
+            .expect("local time should be unambiguous on May 7");
+        assert_eq!(parsed.timestamp(), expected.timestamp());
     }
 }
 
@@ -3262,7 +3365,7 @@ mod setup_run_split_e2e_tests {
             jobs,
             operators,
             station_groups: Vec::new(),
-            occupied_slots: Vec::new(), setup_completion_log: Vec::new(),
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
             options: Some(ComputeOptions {
                 horizon_days: 2,
                 tick_minutes: 60,
