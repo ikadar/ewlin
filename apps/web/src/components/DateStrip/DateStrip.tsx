@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { DateCell } from './DateCell';
 import { useVirtualScroll, getVisibleDates } from '../../hooks';
+import { useNow } from '../../contexts/NowContext';
 import type { TaskMarker } from './TaskMarkers';
 
 /** Task marker data for a specific day */
@@ -82,7 +83,10 @@ export function DateStrip({
   taskMarkersPerDay,
   earliestTaskDate,
 }: DateStripProps) {
-  const today = new Date();
+  // Source "today" from NowContext so the highlighted day in the strip
+  // tracks the now-override (test environments) instead of the wall
+  // clock — keeps the day-strip and the in-grid red line consistent.
+  const today = useNow();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // v0.3.46: Track scroll position and viewport for virtual scrolling
