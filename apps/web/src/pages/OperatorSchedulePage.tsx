@@ -41,6 +41,8 @@ import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTim
 import { TileContextMenu } from '../components/Tile';
 import { isAltLetter, isCtrlAltLetter } from '../utils/keyboardLayout';
 import { useScenarioMode } from '../contexts/ScenarioContext';
+import { useNow } from '../contexts/NowContext';
+import { getNow } from '../utils/getNow';
 import { getTasksForJob } from '../utils';
 import { getProduitLabel } from '../utils/tileLabelResolver';
 import { getErrorMessage } from '../store/api/errorNormalization';
@@ -199,7 +201,7 @@ export default function OperatorSchedulePage() {
   const operators = snapshot.operators ?? [];
 
   const gridStartDate = useMemo(() => {
-    const d = new Date();
+    const d = getNow();
     d.setHours(START_HOUR, 0, 0, 0);
     return d;
   }, []);
@@ -820,11 +822,9 @@ export default function OperatorSchedulePage() {
   ]);
 
   // ---- Now line ----
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // Sourced from NowContext: a single 60 s ticker shared across the
+  // whole app, instantly updated when the now-override toggles.
+  const now = useNow();
   const nowPosition = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
   // Precompute tile slices for all operators (must be before early returns — hooks rule)
@@ -1521,25 +1521,44 @@ export default function OperatorSchedulePage() {
       {/* ---- Shortcut footer ---- */}
       <ShortcutFooter mode={selectedJobId ? 'operatorJobSelected' : 'operatorDefault'} />
 
-      {/* Right-click context menu — operator subset (Épingler / Voir
-          détails / Saisir l'avancement / Définir heure de début…). Saisie
-          and "Définir heure de début" follow the same gates as the icon :
-          past-start ⇒ saisie, future-start ⇒ Définir heure de début. */}
+      {/* Right-click context menu — mode-gated full set. Prod = Voir / Saisir
+          (past) / Marquer terminé. Préprod = Voir / Pin / Définir (future) /
+          Rappeler / Diviser / Fusionner. */}
       {contextMenuState && (() => {
         const startMs = new Date(contextMenuState.currentScheduledStart).getTime();
         const hasStarted = startMs <= now.getTime();
+        const ctxTask = snapshot.tasks.find((t) => t.id === contextMenuState.taskId);
+        const isSplit = ctxTask?.type === 'Internal' && !!(ctxTask as InternalTask).splitGroupId;
         return (
           <TileContextMenu
             x={contextMenuState.x}
             y={contextMenuState.y}
             isPinned={contextMenuState.isPinned}
             isCompleted={contextMenuState.isCompleted}
+            scenarioMode={scenarioMode}
+            isSplit={isSplit}
             onTogglePin={() => {
               void handleTogglePin(contextMenuState.assignmentId);
               setContextMenuState(null);
             }}
             onViewDetails={() => {
               setSelectedJobId(contextMenuState.jobId);
+              setContextMenuState(null);
+            }}
+            onToggleComplete={() => {
+              void handleToggleComplete(contextMenuState.assignmentId);
+              setContextMenuState(null);
+            }}
+            onRecall={() => {
+              void handleRecallAssignment(contextMenuState.taskId);
+              setContextMenuState(null);
+            }}
+            onSplit={() => {
+              void handleSplitTask(contextMenuState.taskId);
+              setContextMenuState(null);
+            }}
+            onFuse={() => {
+              void handleFuseTask(contextMenuState.taskId);
               setContextMenuState(null);
             }}
             onSaisirAvancement={hasStarted && contextMenuState.openSaisie
