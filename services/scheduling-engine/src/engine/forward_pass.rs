@@ -3305,6 +3305,131 @@ fn revalidate_setup_inheritance_after_scoring(
     }
 }
 
+/// Emit a `ComputedAssignment` for an in-progress action whose start has
+/// already happened. The past pre-NOW portion is committed (the operator
+/// was physically working) ; the post-NOW portion uses the LATEST plan
+/// (`setup_ticks + run_ticks`) so a JCF run cut shortens the tile.
+///
+/// Called from the split-at-NOW branch in `pre_place_pinned_actions`. Without
+/// this emission the assignment is dropped by PHP's
+/// `bulkReplaceComputedAssignments` on the next compute, killing the tile
+/// the operator is currently working on.
+///
+/// Behaviour mirrors the non-in-progress pinned path : reserve usable grid
+/// cells (skipping closure/operator-off ticks the same way), pick a roster
+/// per tick via `find_operators_for_station`, and write `tick_operator_log`
+/// so `build_assignment_for` populates the operators field. Differs in two
+/// places : (1) skips the BAT / chunk-mini / shift guards because the past
+/// is verbatim, (2) on a station-cell conflict with a previously-placed
+/// pin, the conflict tick is left unmarked (instead of rejecting the whole
+/// pin) so the in-progress assignment still emits.
+#[allow(clippy::too_many_arguments)]
+fn emit_in_progress_assignment(
+    grid: &mut ScheduleGrid,
+    actions: &mut Vec<Action>,
+    i: usize,
+    grow_ticks: usize,
+    start_t: usize,
+    end_t: usize,
+    tick_minutes: u32,
+    start_date: NaiveDate,
+    station_attrs: &[StationAttrs],
+    operator_skills: &[Vec<SkillEntry>],
+    operator_availability: &OperatorAvailability,
+    operator_groups: &[Vec<PreparedConcurrentGroup>],
+    assignments: &mut Vec<ComputedAssignment>,
+) {
+    let station_idx = actions[i].station_idx;
+
+    if end_t <= start_t {
+        actions[i].start_tick = Some(start_t);
+        actions[i].end_tick = Some(start_t);
+        actions[i].art = 0;
+        actions[i].eat = 0;
+        let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
+        assignments.push(assignment);
+        return;
+    }
+
+    while end_t > grid.num_ticks {
+        grid.grow(grow_ticks);
+    }
+
+    let tick_is_usable = |t: usize| -> bool {
+        (0..operator_skills.len()).any(|op| {
+            operator_availability.is_available(op, t)
+                && operator_skills[op]
+                    .iter()
+                    .any(|s| s.station_idx == station_idx && s.is_qualified_either_phase())
+        })
+    };
+
+    for t in start_t..end_t {
+        if !tick_is_usable(t) {
+            continue;
+        }
+        match grid.station_action_at(station_idx, t) {
+            None => grid.assign_station(station_idx, t, i),
+            Some(occupant) if occupant == i => {}
+            // Foreign occupant: leave the cell as-is. The past is verbatim
+            // — we don't displace someone else's pre-placed pin, but the
+            // in-progress assignment still emits with its envelope intact.
+            Some(_) => {}
+        }
+    }
+
+    let (min_setup_ops, max_setup_ops, min_run_ops, max_run_ops) =
+        if station_idx < station_attrs.len() {
+            let a = &station_attrs[station_idx];
+            (
+                a.min_setup_operators,
+                a.max_setup_operators,
+                a.min_run_operators,
+                a.max_run_operators,
+            )
+        } else {
+            (1, 1, 1, 1)
+        };
+    let setup_ticks = actions[i].setup_ticks as usize;
+    for t in start_t..end_t {
+        let in_run_phase = setup_ticks == 0 || (t - start_t) >= setup_ticks;
+        let (phase_min, phase_max) = if in_run_phase {
+            (min_run_ops, max_run_ops)
+        } else {
+            (min_setup_ops, max_setup_ops)
+        };
+        let ops = find_operators_for_station(
+            grid,
+            t,
+            station_idx,
+            operator_skills,
+            operator_availability,
+            operator_groups,
+            &actions[i].assigned_operators,
+            phase_min,
+            phase_max,
+            !in_run_phase,
+        );
+        for &op_idx in &ops {
+            grid.assign_operator(op_idx, t, station_idx, 0.0);
+            if !actions[i].assigned_operators.contains(&op_idx) {
+                actions[i].assigned_operators.push(op_idx);
+            }
+        }
+        if !ops.is_empty() {
+            actions[i].tick_operator_log.push((t, ops));
+        }
+    }
+
+    actions[i].start_tick = Some(start_t);
+    actions[i].end_tick = Some(end_t);
+    actions[i].art = 0;
+    actions[i].eat = (end_t - start_t) as u32;
+
+    let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
+    assignments.push(assignment);
+}
+
 fn pre_place_pinned_actions(
     grid: &mut ScheduleGrid,
     actions: &mut Vec<Action>,
@@ -3339,36 +3464,37 @@ fn pre_place_pinned_actions(
         //
         // When PHP flags this pin as in-progress (the assignment had
         // scheduledStart < now < scheduledEnd && !isCompleted), the
-        // past portion is committed (cannot be undone) and the future
-        // portion must remain mutable so the engine can interrupt /
-        // re-station / peremption-replan around it.
+        // past portion is committed (cannot be undone). The replan
+        // emits an assignment anchored at the original `pinned_start_tick`
+        // (verbatim past) but extending only over the LATEST plan
+        // duration (`setup_ticks + run_ticks` after any JCF modif). The
+        // earlier `pinned_end_tick` from PHP reflects the *operator*
+        // span which may include trailing time from a now-stale plan ;
+        // we replace it with the post-modif envelope so a JCF run cut
+        // (e.g. 4h → 2h) actually shortens the tile.
         //
-        // Strategy:
-        //   - Free the pin entirely (clear `is_pinned` + `pinned_end_tick`)
-        //   - Record `forced_start_tick = pinned_start_tick` so the
-        //     scoring loop only attempts placement at the original tick
-        //     (the past stays verbatim)
-        //   - Record `already_eaten_ticks = task_elapsed_ticks` so the
-        //     chunk-mini guard credits the past committed work and
-        //     doesn't reject a small post-NOW remainder
+        // Why emit here instead of "leave unplaced and let PHP keep
+        // the DB row verbatim" : PHP's `bulkReplaceComputedAssignments`
+        // drops any row that's neither pinned (user-pin) nor completed
+        // and not in the engine output. An unplaced in-progress action
+        // therefore *vanishes* from the schedule on the next compute,
+        // which silently kills the tile the operator is currently
+        // working on. Emitting the assignment from pre_place keeps the
+        // row alive and reflects the new envelope in one shot.
+        //
+        // Diagnostic fields (`forced_start_tick`, `already_eaten_ticks`,
+        // `is_in_progress`) are preserved so downstream passes
+        // (peremption / inheritance revalidation, chunk-mini credit on
+        // any future resume) see the past as committed work rather
+        // than fresh scheduling.
         //
         // Triggered by PHP's explicit `is_in_progress` flag, OR by the
-        // legacy heuristic "start in the past AND (end is None OR end is
-        // in the future)". The end-side condition is the upgrade over
-        // the original heuristic : without it, every pin that finished
-        // in the past (the typical integration-test case where a pin
-        // covers ticks 5..6 and now_tick is 14+) was mis-classified as
-        // in-progress, freeing its pinned_end_tick and breaking the
-        // tests. End-in-future correctly distinguishes "the work is
-        // happening now" from "the work was done earlier".
+        // legacy heuristic "start in the past AND end is in the future".
+        // The end-side condition distinguishes "the work is happening
+        // now" from "the work was done earlier".
         //
         // Cf. docs/operator-sandbox/engine-split-at-now-plan.md and
         // memory `feedback_in_progress_committed.md` (Q1 2026-05-04).
-        // Supersedes 2026-04-28 "tile crossing now stays verbatim
-        // end-to-end" which is encoded in the (now-flipped) tests
-        // `in_progress_safety_zone_pin_skips_chunk_mini_guard`,
-        // `in_progress_pin_with_short_remaining_window_still_kept`,
-        // `in_progress_pin_below_earliest_start_is_kept`.
         let derived_end = actions[i].pinned_end_tick.unwrap_or_else(|| {
             start_t + (actions[i].setup_ticks + actions[i].run_ticks) as usize
         });
@@ -3379,6 +3505,21 @@ fn pre_place_pinned_actions(
             } else {
                 now_tick.saturating_sub(start_t) as u32
             };
+
+            // New envelope = past start + LATEST plan duration. Falls
+            // back to derived_end (= setup+run if pinned_end was None)
+            // when the latest plan would collapse to zero ticks (defensive
+            // — the engine has nothing to schedule otherwise).
+            let new_total_ticks =
+                (actions[i].setup_ticks + actions[i].run_ticks) as usize;
+            let new_end_t = if new_total_ticks == 0 {
+                derived_end
+            } else {
+                start_t + new_total_ticks
+            };
+
+            // Update diagnostic fields BEFORE clearing pin flags so the
+            // emitted assignment carries the post-split state.
             actions[i].is_pinned = false;
             actions[i].is_frozen_by_safety_zone = false;
             actions[i].pinned_end_tick = None;
@@ -3386,6 +3527,22 @@ fn pre_place_pinned_actions(
             actions[i].already_eaten_ticks = elapsed;
             actions[i].is_in_progress = true;
             actions[i].task_elapsed_ticks = elapsed;
+
+            emit_in_progress_assignment(
+                grid,
+                actions,
+                i,
+                grow_ticks,
+                start_t,
+                new_end_t,
+                tick_minutes,
+                start_date,
+                station_attrs,
+                operator_skills,
+                operator_availability,
+                operator_groups,
+                assignments,
+            );
             continue;
         }
         // ============================================================
@@ -5632,6 +5789,21 @@ mod safety_zone_chunk_mini_tests {
         num_ticks: usize,
         now_tick: usize,
     ) -> (Vec<Action>, Vec<Warning>) {
+        let (actions, _, warnings) =
+            run_pre_place_full(action, availability, station_attrs, num_ticks, now_tick);
+        (actions, warnings)
+    }
+
+    /// Variant that also returns the emitted ComputedAssignments — used by
+    /// in-progress emission tests where the new contract is "pre_place
+    /// always produces an assignment for in-progress actions".
+    fn run_pre_place_full(
+        action: Action,
+        availability: OperatorAvailability,
+        station_attrs: StationAttrs,
+        num_ticks: usize,
+        now_tick: usize,
+    ) -> (Vec<Action>, Vec<ComputedAssignment>, Vec<Warning>) {
         let mut grid = ScheduleGrid::new(1, 1, num_ticks, 15);
         let mut actions = vec![action];
         let mut assignments = Vec::new();
@@ -5652,7 +5824,7 @@ mod safety_zone_chunk_mini_tests {
             now_tick,
             &mut warnings,
         );
-        (actions, warnings)
+        (actions, assignments, warnings)
     }
 
     #[test]
@@ -5739,13 +5911,13 @@ mod safety_zone_chunk_mini_tests {
         // "tile crossing now stays verbatim end-to-end").
         //
         // In-progress pin: pinned_start_tick (60) is in the past
-        // relative to now_tick (66). Operator started at tick 60 and is
-        // theoretically about to finish at tick 68. Under the new rule
-        // the past portion stays verbatim (forced_start_tick = 60) but
-        // the future portion (post-NOW) is freed: the engine clears the
-        // pin entirely and records `already_eaten_ticks = 6` so the
-        // scoring loop can replan the remaining run with the chunk-mini
-        // credit.
+        // relative to now_tick (66). Operator started at tick 60 and
+        // is theoretically about to finish at tick 68. Under the
+        // current rule the past portion stays verbatim
+        // (forced_start_tick = 60) and pre_place emits the assignment
+        // for the post-modif envelope (start + setup + run = 60 + 8 = 68)
+        // so PHP's bulkReplaceComputedAssignments doesn't drop the row
+        // on the next compute.
         //
         // Detected via the legacy `start_t < now_tick` heuristic since
         // the explicit `is_in_progress` flag isn't set on the action.
@@ -5784,19 +5956,25 @@ mod safety_zone_chunk_mini_tests {
         );
         assert!(
             actions[0].pinned_end_tick.is_none(),
-            "pinned_end_tick freed so the engine can replan"
+            "pinned_end_tick cleared — pre_place owns the new envelope"
         );
         assert!(
             actions[0].pinned_start_tick.is_some(),
             "pinned_start_tick kept for diagnostic"
         );
-        assert!(
-            actions[0].start_tick.is_none(),
-            "start_tick stays None — scoring loop will place at forced_start_tick"
+        assert_eq!(
+            actions[0].start_tick,
+            Some(60),
+            "start_tick anchors at forced_start_tick (verbatim past)"
         );
-        assert!(
-            actions[0].end_tick.is_none(),
-            "end_tick stays None — engine picks the new end"
+        assert_eq!(
+            actions[0].end_tick,
+            Some(68),
+            "end_tick = forced_start_tick + setup + run (post-modif envelope)"
+        );
+        assert_eq!(
+            actions[0].art, 0,
+            "art zeroed — assignment was emitted in pre_place, scoring loop must not re-place"
         );
         assert!(
             !warnings.iter().any(|w| w.message.contains("retiré")),
@@ -5836,6 +6014,76 @@ mod safety_zone_chunk_mini_tests {
             "credit covers most of the chunk-mini floor"
         );
         assert!(actions[0].pinned_end_tick.is_none(), "future end is mutable");
+    }
+
+    /// Regression for the bug where an in-progress task lost its assignment
+    /// after a Préprod replan with a JCF run cut. Repro:
+    ///   - Prod tile starts at 01h30 with 15 min setup + 4h run
+    ///   - At 01h40 (10 min in) the operator switches to Préprod, opens
+    ///     JCF modif and shortens the run from 4h to 2h
+    ///   - The replan compute calls pre_place_pinned_actions
+    /// Expected: ONE ComputedAssignment is emitted, anchored at the past
+    /// start (01h30) and ending at the post-modif envelope (01h30 + 15 +
+    /// 120 = 03h45). Without this, the assignment is dropped by PHP's
+    /// `bulkReplaceComputedAssignments` and the tile vanishes.
+    ///
+    /// Tick units throughout : 15 min/tick. So 01h30 = tick 6 if the
+    /// schedule starts at 00h00, but the test uses arbitrary anchor
+    /// values — the invariant is `end == start + setup + run`.
+    #[test]
+    fn in_progress_pin_emits_assignment_with_post_modif_envelope() {
+        // Setup the action with the LATEST plan: setup 1 tick (15 min) +
+        // run 8 ticks (120 min = 2h after JCF modif). pinned_end_tick
+        // reflects the OLD operator span (e.g. 17 ticks from 4h run,
+        // i.e. 60..77), to simulate PHP shipping the pre-modif end —
+        // we expect the engine to override it with the new envelope.
+        let mut action = make_action(0, 0, 1, 8, 60, /*is_frozen_by_safety_zone=*/ true);
+        action.pinned_end_tick = Some(77); // pre-modif operator span end
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 2; // 10 min into the setup at NOW
+
+        let availability = restricted_availability(200, &[(60, 200)]);
+
+        let (actions, assignments, warnings) = run_pre_place_full(
+            action,
+            availability,
+            station_attrs_default(),
+            200,
+            /*now_tick=*/ 62, // 10 min after the start
+        );
+
+        assert_eq!(
+            assignments.len(),
+            1,
+            "exactly one assignment must be emitted for the in-progress task — \
+             without it PHP's bulkReplaceComputedAssignments drops the row"
+        );
+        assert_eq!(
+            actions[0].start_tick,
+            Some(60),
+            "start anchored at forced_start_tick (the past start, verbatim)"
+        );
+        assert_eq!(
+            actions[0].end_tick,
+            Some(69),
+            "end = start + setup_ticks + run_ticks (post-modif: 60 + 1 + 8 = 69), \
+             NOT the stale pinned_end_tick=77 from the pre-modif operator span"
+        );
+        assert_eq!(actions[0].art, 0, "art zeroed: scoring loop must not re-place");
+        assert!(actions[0].is_in_progress, "diagnostic flag preserved");
+        assert_eq!(
+            actions[0].forced_start_tick,
+            Some(60),
+            "forced_start_tick kept for downstream passes (chunk-mini credit, etc.)"
+        );
+        assert_eq!(
+            actions[0].already_eaten_ticks, 2,
+            "already_eaten = task_elapsed_ticks supplied by PHP"
+        );
+        assert!(
+            warnings.is_empty(),
+            "no warnings on a clean in-progress emission: {warnings:?}"
+        );
     }
 
     // ============================================================
