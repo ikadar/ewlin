@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } f
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter } from './components';
 import { useTheme } from './contexts/ThemeContext';
+import { useNow } from './contexts/NowContext';
+import { getNow } from './utils/getNow';
 import { ZOOM_LEVELS } from './utils/zoom';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
@@ -48,6 +50,8 @@ import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
 import { detectKeyboardLayout, isAltLetter, isCtrlAltLetter } from './utils/keyboardLayout';
 import { useScenarioMode } from './contexts/ScenarioContext';
+import { useSaisieModal } from './contexts/SaisieModalContext';
+import { SetStartTimeDialog } from './components/SetStartTimeDialog/SetStartTimeDialog';
 import { FluxPage } from './pages/FluxPage';
 import { SplitTaskPopover } from './components/SplitTaskPopover';
 import { Minimap } from './components/Minimap';
@@ -152,7 +156,7 @@ function handleJumpToToday(e: KeyboardEvent, ctx: KeyboardContext): boolean {
   if (e.key === 'Home' && !e.altKey && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (ctx.gridRef.current) {
-      const now = new Date();
+      const now = getNow();
       const y = timeToYPosition(now, START_HOUR, ctx.pixelsPerHour, ctx.gridStartDate, ctx.collapses);
       const viewportHeight = ctx.gridRef.current.getViewportHeight();
       const scrollTarget = Math.max(0, y - viewportHeight / 2);
@@ -381,6 +385,15 @@ function AppContent() {
     isPinned: boolean;
   } | null>(null);
 
+  // V2 progress capture — Définir heure de début dialog state
+  const [pinDialogState, setPinDialogState] = useState<{
+    taskId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+  } | null>(null);
+
+  const saisieModal = useSaisieModal();
+
   // Split task popover state
   const [splitPopover, setSplitPopover] = useState<{
     x: number;
@@ -454,6 +467,13 @@ function AppContent() {
   // v0.4.33: Save job via API (v0.5.4: migrated to RTK Query mutation)
   // v0.5.13b: Supports both create and update modes
   const handleJcfSave = useCallback(async () => {
+    // Defense in depth: if the user opened JCF in Préprod and toggled
+    // to Prod before saving, the backend would 403 the PUT. Surface the
+    // reason without flushing the form state.
+    if (isEditMode && scenarioMode === 'prod') {
+      showToast('Bascule en Préprod pour enregistrer les modifications.', 'info');
+      return;
+    }
     // In edit mode, skip JCF validation (elements table not editable)
     if (!isEditMode) {
       if (!jcfSaveAttemptRef.current) return;
@@ -562,7 +582,7 @@ function AppContent() {
       setJcfSaveError(errorMessage);
       showToast(errorMessage);
     }
-  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlineRelativeDays, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch, autoRecompute]);
+  }, [jcfJobId, jcfClient, jcfReferent, jcfIntitule, jcfDeadline, jcfBatDeadline, jcfDeadlineRelativeDays, jcfDeadlinePriority, jcfElements, jcfQuantity, jcfShipperId, jcfRequiredJobs, navigate, createJob, updateJob, showToast, isEditMode, editingJobId, location.state, dispatch, autoRecompute, scenarioMode]);
 
   // v0.4.38: Navigate to /job/new to open modal
   const handleOpenJcf = useCallback(() => {
@@ -816,12 +836,19 @@ function AppContent() {
   }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, snapshot.jobs]);
 
   // v0.5.13b: Handler for "Modifier" button in Job Details Panel (scheduler view)
+  // Prod is read-only for planning data — JobController::update would 403 the
+  // PUT anyway, so we short-circuit here to skip the modal flicker and surface
+  // the reason. Mirrors FluxPage's per-handler Préprod gates.
   const handleEditJob = useCallback(() => {
     if (!selectedJob) return;
+    if (scenarioMode === 'prod') {
+      showToast('Bascule en Préprod pour modifier un job.', 'info');
+      return;
+    }
     populateJcfFromJob(selectedJob);
     preJcfSelectedJobIdRef.current = selectedJobId;
     navigate('/stations/job/new');
-  }, [selectedJob, selectedJobId, populateJcfFromJob, navigate]);
+  }, [selectedJob, selectedJobId, populateJcfFromJob, navigate, scenarioMode, showToast]);
 
   // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
   useEffect(() => {
@@ -849,7 +876,7 @@ function AppContent() {
   // REQ-14: Calculate grid/DateStrip start date (lookbackDays before today)
   const lookbackDays = snapshotData?.lookbackDays ?? 6;
   const gridStartDate = useMemo(() => {
-    const today = new Date();
+    const today = getNow();
     today.setDate(today.getDate() - lookbackDays);
     today.setHours(START_HOUR, 0, 0, 0);
     return today;
@@ -878,7 +905,7 @@ function AppContent() {
     if (hasScrolledToToday.current || !gridRef.current) return;
 
     // Calculate Y position for today at current time
-    const now = new Date();
+    const now = getNow();
     const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
     // Scroll to center today in the viewport
@@ -919,7 +946,7 @@ function AppContent() {
     };
     if (!selectedJobId) return emptyResult;
 
-    const now = new Date();
+    const now = getNow();
     const jobTaskIds = new Set(
       getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
@@ -967,7 +994,7 @@ function AppContent() {
   }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // REQ-09.2: Focused date for DateStrip sync
-  const [focusedDate, setFocusedDate] = useState<Date | null>(new Date());
+  const [focusedDate, setFocusedDate] = useState<Date | null>(() => getNow());
   const scrollTimeoutRef = useRef<number | null>(null);
 
   // v0.3.47: Viewport hours for DateStrip indicator
@@ -1023,12 +1050,10 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pixelsPerHour]); // handleGridScroll is stable, pixelsPerHour triggers recalc
 
-  // Real-time clock for NOW-surpassed overdue detection (updated every 60 s)
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // Real-time clock for NOW-surpassed overdue detection. Sourced from
+  // NowContext so the now-override (test environments) and the wall
+  // clock both flow through a single ticker.
+  const now = useNow();
 
   // Late job IDs: deadline violations (snapshot) + real-time NOW-surpassed tasks
   const lateJobIds = useMemo(() => {
@@ -1653,7 +1678,7 @@ function AppContent() {
   useEffect(() => {
     // Small delay to ensure grid is mounted and rendered
     const timer = setTimeout(() => {
-      handleDateClick(new Date());
+      handleDateClick(getNow());
     }, 100);
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1807,6 +1832,44 @@ function AppContent() {
     });
   }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.stations]);
 
+  // V2 progress capture — open the saisie modal for the menu's tile.
+  const handleContextMenuSaisirAvancement = useCallback(() => {
+    if (!contextMenu) return;
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+    if (!task || task.type !== 'Internal') return;
+    const internalTask = task as InternalTask;
+    const jobId = getJobIdForTask(task, snapshot.elements);
+    const job = jobId ? snapshot.jobs.find((j) => j.id === jobId) : undefined;
+    if (!job) return;
+    const station = snapshot.stations.find((s) => s.id === internalTask.stationId);
+    saisieModal.open({
+      assignment,
+      taskDuration: internalTask.duration,
+      job: { reference: job.reference, client: job.client },
+      machineName: station?.name ?? internalTask.stationId,
+      now,
+    });
+  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.elements, snapshot.jobs, snapshot.stations, saisieModal, now]);
+
+  // V2 progress capture — open the SetStartTimeDialog for the menu's tile.
+  const handleContextMenuDefinirDebut = useCallback(() => {
+    if (!contextMenu) return;
+    const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    const task = snapshot.tasks.find((t) => t.id === assignment.taskId);
+    if (!task) return;
+    const jobId = getJobIdForTask(task, snapshot.elements);
+    const job = jobId ? snapshot.jobs.find((j) => j.id === jobId) : undefined;
+    if (!job) return;
+    setPinDialogState({
+      taskId: task.id,
+      job: { reference: job.reference, client: job.client },
+      currentScheduledStart: assignment.scheduledStart,
+    });
+  }, [contextMenu, snapshot.assignments, snapshot.tasks, snapshot.elements, snapshot.jobs]);
+
   // Handle context menu "Fuse" action
   const handleContextMenuFuse = useCallback(async () => {
     if (!contextMenu) return;
@@ -1878,7 +1941,7 @@ function AppContent() {
         // Route through `timeToYPosition` so the scroll is collapse-aware.
         // Previous impl used a raw `diffHours * pixelsPerHour` formula that
         // ignored collapses entirely — silently misaligned with the grid.
-        const y = timeToYPosition(new Date(), START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
+        const y = timeToYPosition(getNow(), START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
         gridRef.current.scrollToY(y - 200, 'smooth');
       }
     }, [gridStartDate, pixelsPerHour, effectiveCollapses]),
@@ -1901,7 +1964,9 @@ function AppContent() {
     }, [selectedJobId, orderedJobIds, setSelectedJobId]),
     onNavigateScheduler: useCallback(() => navigate('/'), [navigate]),
     onNavigateFlux: useCallback(() => navigate('/flux'), [navigate]),
-    onEditJob: handleEditJob,
+    // useCommands skips the "Modifier le job" entry when onEditJob is
+    // undefined — that's how we hide it from the palette in Prod.
+    onEditJob: scenarioMode === 'prod' ? undefined : handleEditJob,
     onNewJob: useCallback(() => {
       navigate('/stations/job/new');
     }, [navigate]),
@@ -2117,21 +2182,44 @@ function AppContent() {
 
       <ShortcutFooter mode={footerMode} />
 
-      {/* v0.3.58: Context menu for tiles */}
-      {contextMenu && (
-        <TileContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          isCompleted={contextMenu.isCompleted}
-          isPinned={contextMenu.isPinned}
-          onTogglePin={handleContextMenuTogglePin}
-          onViewDetails={handleContextMenuViewDetails}
-          onToggleComplete={handleContextMenuToggleComplete}
-          onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
-          onSplit={handleContextMenuSplit}
-          onFuse={handleContextMenuFuse}
-          isSplit={isContextMenuTaskSplit}
-          onClose={handleContextMenuClose}
+      {/* v0.3.58: Context menu for tiles. Mode-gated: prod = saisie/terminer/voir,
+          préprod = pin/définir/recall/diviser/fusionner. Past/future gating comes
+          from the assignment's scheduled start (saisie ⇒ past-started, définir ⇒
+          future-start). */}
+      {contextMenu && (() => {
+        const assignment = snapshot.assignments.find((a) => a.id === contextMenu.assignmentId);
+        const startMs = assignment ? new Date(assignment.scheduledStart).getTime() : 0;
+        const hasStarted = !!assignment && startMs <= now.getTime();
+        return (
+          <TileContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            isCompleted={contextMenu.isCompleted}
+            isPinned={contextMenu.isPinned}
+            scenarioMode={scenarioMode}
+            onTogglePin={handleContextMenuTogglePin}
+            onViewDetails={handleContextMenuViewDetails}
+            onToggleComplete={handleContextMenuToggleComplete}
+            onRecall={() => handleRecallAssignment(contextMenu.assignmentId)}
+            onSplit={handleContextMenuSplit}
+            onFuse={handleContextMenuFuse}
+            isSplit={isContextMenuTaskSplit}
+            onSaisirAvancement={hasStarted ? handleContextMenuSaisirAvancement : undefined}
+            onDefinirDebut={!hasStarted ? handleContextMenuDefinirDebut : undefined}
+            onClose={handleContextMenuClose}
+          />
+        );
+      })()}
+
+      {/* V2 set-start-time dialog — opened from the context menu's "Définir
+          heure de début…" item. */}
+      {pinDialogState && (
+        <SetStartTimeDialog
+          isOpen={true}
+          onClose={() => setPinDialogState(null)}
+          taskId={pinDialogState.taskId}
+          job={pinDialogState.job}
+          currentScheduledStart={pinDialogState.currentScheduledStart}
         />
       )}
 

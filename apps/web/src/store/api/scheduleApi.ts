@@ -81,6 +81,28 @@ export interface LoadScheduleResponse {
 }
 
 /**
+ * Global "now() override" config — test-environment virtual clock.
+ *
+ * The server returns a live `effectiveNow` so the FE doesn't need to
+ * recompute it from the offset; just anchor it to local Date.now() to
+ * keep the virtual clock ticking at wall speed.
+ */
+export interface NowOverrideConfig {
+  offsetSeconds: number;
+  enabled: boolean;
+  setAt: string;
+  setVirtualNow: string;
+  effectiveNow: string;
+  wallNow: string;
+  updatedAt: string;
+}
+
+export interface UpdateNowOverrideRequest {
+  virtualNow: string;
+  enabled: boolean;
+}
+
+/**
  * Response from createJob mutation.
  * Simplified response with essential job info.
  */
@@ -279,7 +301,7 @@ function calculateOptimisticEndTime(
 export const scheduleApi = createApi({
   reducerPath: 'scheduleApi',
   baseQuery: baseQueryWithFixtureSupport,
-  tagTypes: ['Snapshot', 'ClientSuggestions', 'ReferentSuggestions', 'SavedSchedules'],
+  tagTypes: ['Snapshot', 'ClientSuggestions', 'ReferentSuggestions', 'SavedSchedules', 'NowOverride'],
 
   endpoints: (builder) => ({
     // ========================================================================
@@ -1072,6 +1094,27 @@ export const scheduleApi = createApi({
     }),
 
     /**
+     * Get the global "now() override" — the virtual clock used in test
+     * environments. Returns offset + computed `effectiveNow` so the FE
+     * can anchor its wall-clock loop directly to it.
+     */
+    getNowOverride: builder.query<NowOverrideConfig, void>({
+      query: () => '/now-override',
+      providesTags: ['NowOverride'],
+    }),
+
+    /**
+     * Set or toggle the now-override (admin / test). Invalidates the
+     * NowOverride tag (so NowProvider re-fetches) and Snapshot (because
+     * the next compute will see a different "now" and produce different
+     * floors / lateness).
+     */
+    updateNowOverride: builder.mutation<NowOverrideConfig, UpdateNowOverrideRequest>({
+      query: (body) => ({ url: '/now-override', method: 'PUT', body }),
+      invalidatesTags: ['NowOverride', 'Snapshot'],
+    }),
+
+    /**
      * Set (or clear) a safety override on a (jobId, sequenceIndex, stationId) tuple.
      * Optimistically mirrors the override into the snapshot so the tile
      * reflects the cyan-off state immediately.
@@ -1262,4 +1305,6 @@ export const {
   useUpdatePaperLeadTimeMutation,
   useGetFormeLeadTimeQuery,
   useUpdateFormeLeadTimeMutation,
+  useGetNowOverrideQuery,
+  useUpdateNowOverrideMutation,
 } = scheduleApi;

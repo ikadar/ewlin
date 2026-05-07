@@ -21,6 +21,7 @@ import { CollapseBand } from './CollapseBand';
 import { yPositionToTime } from '../DragPreview/snapUtils';
 import { SafetyBand } from '../SafetyBand';
 import { makeSafetyKey, isInSafetyZone } from '../../utils/safetyZone';
+import { useNow } from '../../contexts/NowContext';
 
 /** Handle for programmatic grid scrolling */
 export interface SchedulingGridHandle {
@@ -156,7 +157,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     },
     ref
   ) {
-    const [now, setNow] = useState(() => new Date());
+    const now = useNow();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // v0.3.46: Track scroll position and viewport for virtual scrolling
@@ -220,13 +221,8 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       getScrollHeight: () => scrollContainerRef.current?.scrollHeight ?? 0,
     }));
 
-  // Update current time every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // Current time is sourced from NowContext (60 s ticker shared across
+  // the whole app + automatic re-render on now-override toggle).
 
   // v0.3.46: Track scroll position and viewport size for virtual scrolling.
   // Also REQ-09.2: Notify parent of scroll position for DateStrip sync.

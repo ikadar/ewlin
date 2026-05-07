@@ -6,6 +6,7 @@ import { TaskTile } from './TaskTile';
 import { DryTimeLabel } from './DryTimeLabel';
 import { ElementSection } from './ElementSection';
 import { isCompletedEffective } from '../Tile/colorUtils';
+import { useNow } from '../../contexts/NowContext';
 
 export interface TaskListProps {
   /** Tasks to display */
@@ -84,6 +85,7 @@ export function TaskList({
   paperLeadTime,
   formeLeadTime,
 }: TaskListProps) {
+  const now = useNow();
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
   const { assignmentByTaskId, stationById, taskById, providerById } = useMemo(() => ({
     assignmentByTaskId: new Map(assignments.map((a) => [a.taskId, a])),
@@ -190,15 +192,15 @@ export function TaskList({
       const isCompleted = task.type === 'Outsourced'
         ? task.status === 'Completed'
         : isScheduled
-          && isCompletedEffective(assignment!.isCompleted, assignment!.scheduledEnd, Date.now());
+          && isCompletedEffective(assignment!.isCompleted, assignment!.scheduledEnd, now.getTime());
       const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
-      const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < new Date();
+      const isTaskOverdue = isScheduled && !isCompleted && new Date(assignment!.scheduledEnd) < now;
       // Outsourced tasks with manual dates but no assignment: check manual return/departure
       const isOutsourcedOverdue = !isScheduled && task.type === 'Outsourced' && (() => {
         // One-way tasks (last task of job) use departure; others use return
         const dateToCheck = isLastTask ? task.manualDeparture : (task.manualReturn ?? undefined);
-        return !!dateToCheck && new Date(dateToCheck) < new Date();
+        return !!dateToCheck && new Date(dateToCheck) < now;
       })();
       const isLate = isJobLate || isTaskOverdue || isOutsourcedOverdue;
       const hasConflictFlag = conflictTaskIds?.has(task.id) ?? false;

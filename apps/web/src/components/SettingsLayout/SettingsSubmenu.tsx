@@ -23,6 +23,7 @@ const SETTINGS_ITEMS = [
   { label: 'Écart de précédence',         path: '/settings/precedence-gap' },
   { label: 'Délai papier',                path: '/settings/paper-lead-time' },
   { label: 'Délai forme',                 path: '/settings/forme-lead-time' },
+  { label: "Now (override)",              path: '/settings/now-override' },
 ];
 
 /**

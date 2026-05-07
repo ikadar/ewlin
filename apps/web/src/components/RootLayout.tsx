@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { SquareSlash } from 'lucide-react';
 import { Sidebar } from './Sidebar/Sidebar';
+import { NowOverrideBanner } from './NowOverrideBanner/NowOverrideBanner';
 import { CommandPalette } from './CommandPalette/CommandPalette';
 import { CommandCenterProvider, useCommandCenter } from './CommandPalette/CommandCenterContext';
 import { useCommands } from './CommandPalette/useCommands';
@@ -150,6 +151,7 @@ function RootLayoutInner() {
     >
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
+        <NowOverrideBanner />
         <Outlet />
       </div>
 

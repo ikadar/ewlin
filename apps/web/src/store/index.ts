@@ -191,9 +191,11 @@ export {
   useUpdatePaperLeadTimeMutation,
   useGetFormeLeadTimeQuery,
   useUpdateFormeLeadTimeMutation,
+  useGetNowOverrideQuery,
+  useUpdateNowOverrideMutation,
   scheduleApi,
 } from './api/scheduleApi';
-export type { SavedScheduleItem, ComputeScheduleResult, JobDetailsResponse, JobDetailsElement, JobDetailsTask, UpdateElementSequenceArg } from './api/scheduleApi';
+export type { SavedScheduleItem, ComputeScheduleResult, JobDetailsResponse, JobDetailsElement, JobDetailsTask, UpdateElementSequenceArg, NowOverrideConfig, UpdateNowOverrideRequest } from './api/scheduleApi';
 
 export { useGetTemplatesQuery, useCreateTemplateMutation, useUpdateTemplateMutation, useDeleteTemplateMutation, templateApi } from './api/templateApi';
 

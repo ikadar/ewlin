@@ -5,6 +5,9 @@ import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
 import { getTasksForJob } from '../../utils/taskHelpers';
 import { useScenarioMode } from '../../contexts/ScenarioContext';
+import { useNow } from '../../contexts/NowContext';
+import { useSaisieModal } from '../../contexts/SaisieModalContext';
+import { SetStartTimeDialog } from '../SetStartTimeDialog/SetStartTimeDialog';
 
 export interface JobDetailsPanelProps {
   /** Selected job to display (null if none selected) */
@@ -131,6 +134,7 @@ export function JobDetailsPanel({
   paperLeadTime,
   formeLeadTime,
 }: JobDetailsPanelProps) {
+  const now = useNow();
   // Memoize data filtering for this job
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
   const { jobTasks, jobElements, jobAssignments } = useMemo(() => {
@@ -153,6 +157,15 @@ export function JobDetailsPanel({
     taskId?: string;
     isUnassigned?: boolean;
   } | null>(null);
+
+  // V2 progress capture — Définir heure de début dialog state
+  const [pinDialogState, setPinDialogState] = useState<{
+    taskId: string;
+    job: { reference: string; client: string };
+    currentScheduledStart: string;
+  } | null>(null);
+
+  const saisieModal = useSaisieModal();
 
   const handleTileContextMenu = useCallback(
     (x: number, y: number, assignmentId: string, isCompleted: boolean, isPinned: boolean) => {
@@ -208,6 +221,34 @@ export function JobDetailsPanel({
       onFuseTask(contextMenu.taskId);
     }
   }, [contextMenu, onFuseTask]);
+
+  const handleContextMenuSaisirAvancement = useCallback(() => {
+    if (!contextMenu || !job) return;
+    const assignment = jobAssignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    const task = jobTasks.find((t) => t.id === assignment.taskId);
+    if (!task || task.type !== 'Internal') return;
+    const internalTask = task as InternalTask;
+    const station = stations.find((s) => s.id === internalTask.stationId);
+    saisieModal.open({
+      assignment,
+      taskDuration: internalTask.duration,
+      job: { reference: job.reference, client: job.client },
+      machineName: station?.name ?? internalTask.stationId,
+      now,
+    });
+  }, [contextMenu, job, jobAssignments, jobTasks, stations, saisieModal, now]);
+
+  const handleContextMenuDefinirDebut = useCallback(() => {
+    if (!contextMenu || !job) return;
+    const assignment = jobAssignments.find((a) => a.id === contextMenu.assignmentId);
+    if (!assignment) return;
+    setPinDialogState({
+      taskId: assignment.taskId,
+      job: { reference: job.reference, client: job.client },
+      currentScheduledStart: assignment.scheduledStart,
+    });
+  }, [contextMenu, job, jobAssignments]);
 
   // Dependencies: required jobs and dependent jobs
   const requiredJobs = useMemo(() => {
@@ -334,7 +375,7 @@ export function JobDetailsPanel({
           </div>
         )}
 
-        {onEditJob && (
+        {onEditJob && scenarioMode !== 'prod' && (
           <div className="flex gap-1.5">
             <button
               onClick={onEditJob}
@@ -374,21 +415,38 @@ export function JobDetailsPanel({
         onJumpToOperatorSlice={onJumpToOperatorSlice}
       />
 
-      {contextMenu && (
-        <JobDetailContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          isCompleted={contextMenu.isCompleted}
-          isPinned={contextMenu.isPinned}
-          onTogglePin={handleContextMenuTogglePin}
-          onToggleComplete={handleContextMenuToggleComplete}
-          onRecall={handleContextMenuRecall}
-          onSplit={onSplitTask ? handleContextMenuSplit : undefined}
-          onFuse={onFuseTask ? handleContextMenuFuse : undefined}
-          isSplit={isContextMenuSplit}
-          isUnassigned={contextMenu.isUnassigned}
-          hideCompletionToggle={scenarioMode !== 'prod'}
-          onClose={handleContextMenuClose}
+      {contextMenu && (() => {
+        const assignment = jobAssignments.find((a) => a.id === contextMenu.assignmentId);
+        const startMs = assignment ? new Date(assignment.scheduledStart).getTime() : 0;
+        const hasStarted = !!assignment && startMs <= now.getTime();
+        return (
+          <JobDetailContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            isCompleted={contextMenu.isCompleted}
+            isPinned={contextMenu.isPinned}
+            scenarioMode={scenarioMode}
+            onTogglePin={handleContextMenuTogglePin}
+            onToggleComplete={handleContextMenuToggleComplete}
+            onRecall={handleContextMenuRecall}
+            onSplit={onSplitTask ? handleContextMenuSplit : undefined}
+            onFuse={onFuseTask ? handleContextMenuFuse : undefined}
+            isSplit={isContextMenuSplit}
+            isUnassigned={contextMenu.isUnassigned}
+            onSaisirAvancement={hasStarted ? handleContextMenuSaisirAvancement : undefined}
+            onDefinirDebut={!hasStarted && !contextMenu.isUnassigned ? handleContextMenuDefinirDebut : undefined}
+            onClose={handleContextMenuClose}
+          />
+        );
+      })()}
+
+      {pinDialogState && (
+        <SetStartTimeDialog
+          isOpen={true}
+          onClose={() => setPinDialogState(null)}
+          taskId={pinDialogState.taskId}
+          job={pinDialogState.job}
+          currentScheduledStart={pinDialogState.currentScheduledStart}
         />
       )}
     </div>

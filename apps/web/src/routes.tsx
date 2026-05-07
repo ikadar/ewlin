@@ -46,6 +46,7 @@ import { SafetyZonePage } from './pages/SafetyZonePage';
 import { PrecedenceGapPage } from './pages/PrecedenceGapPage';
 import { PaperLeadTimePage } from './pages/PaperLeadTimePage';
 import { FormeLeadTimePage } from './pages/FormeLeadTimePage';
+import { NowOverridePage } from './pages/NowOverridePage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { LogistiquePage } from './pages/LogistiquePage';
@@ -146,6 +147,7 @@ export function AppRoutes() {
           <Route path="precedence-gap" element={<PrecedenceGapPage />} />
           <Route path="paper-lead-time" element={<PaperLeadTimePage />} />
           <Route path="forme-lead-time" element={<FormeLeadTimePage />} />
+          <Route path="now-override" element={<NowOverridePage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
           <Route path="shippers" element={<ShippersPage />} />
           <Route path="users" element={<RequirePermission permission="admin.users"><UsersPage /></RequirePermission>} />

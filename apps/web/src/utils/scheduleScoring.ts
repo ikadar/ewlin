@@ -2,6 +2,7 @@ import type { ScheduleSnapshot, TaskAssignment } from '@flux/types';
 import { COMPACT_HORIZONS } from '../constants';
 import type { CompactHorizon } from '../constants';
 import { compareSimilarity } from '../components/Tile/similarityUtils';
+import { getNow } from '../utils/getNow';
 
 export interface SimilarityScore {
   printing: number;
@@ -72,10 +73,12 @@ export function computeScheduleScore(snapshot: ScheduleSnapshot): ScheduleScore 
     .filter((a) => !a.isOutsourced)
     .map((a) => ({ ...a, _startMs: new Date(a.scheduledStart).getTime() }));
 
-  // Anchor horizon at earliest assignment, not wall-clock time
+  // Anchor horizon at earliest assignment; fall back to virtual now for
+  // empty schedules so a now-override (test environments) shifts the
+  // similarity windows consistently with the rest of the UI.
   const firstStart = internalAssignments.length > 0
     ? Math.min(...internalAssignments.map((a) => a._startMs))
-    : Date.now();
+    : getNow().getTime();
 
   // Compute similarity for each horizon
   const similarityByHorizon = {} as Record<CompactHorizon, SimilarityScore>;

@@ -1,45 +1,79 @@
 /**
- * getNow() — returns the current time, or a simulated time if `?now=` is set in the URL.
+ * getNow() — single source of truth for "current time" on the FE.
  *
- * Usage:  `getNow()`  instead of  `new Date()`  everywhere scheduling logic needs "current time".
+ * Resolution priority:
+ *   1. URL `?now=<iso>` — useful for shareable reproducible links
+ *   2. API override (set via `setApiOverride`) populated by NowProvider
+ *      from /api/v1/now-override
+ *   3. Wall clock
  *
- * Override via URL:  ?now=2026-03-10T14:00
+ * Both override sources behave the same way: the offset is captured once
+ * and the clock continues to tick at wall speed (we add the elapsed
+ * real-time since capture). This is a *time-warp*, not a *freeze*.
  *
- * The parsed value is cached so repeated calls don't re-parse the URL.
+ * Components must consume `useNow()` from NowContext rather than calling
+ * getNow() directly: the hook ties re-renders to the 60 s ticker and the
+ * RTK-driven API override updates. getNow() is the underlying pure
+ * function used by the hook and by non-component code paths.
  */
 
-let cachedOverride: Date | null | undefined; // undefined = not yet checked
+interface OverrideState {
+  /** The captured "virtual now" reference. */
+  reference: Date;
+  /** Wall-clock time when the reference was captured. */
+  capturedAt: number;
+}
 
-function parseOverride(): Date | null {
+let urlOverride: OverrideState | null | undefined; // undefined = not yet checked
+let apiOverride: OverrideState | null = null;
+
+function parseUrlOverride(): OverrideState | null {
   if (typeof window === 'undefined') return null;
   const param = new URLSearchParams(window.location.search).get('now');
   if (!param) return null;
   const d = new Date(param);
-  return isNaN(d.getTime()) ? null : d;
+  if (isNaN(d.getTime())) return null;
+  return { reference: d, capturedAt: Date.now() };
+}
+
+function ensureUrlOverride(): OverrideState | null {
+  if (urlOverride === undefined) {
+    urlOverride = parseUrlOverride();
+  }
+  return urlOverride;
+}
+
+/**
+ * Set or clear the API-driven override. Called by NowProvider whenever
+ * the result of useGetNowOverrideQuery changes.
+ *
+ * Pass `null` to clear the override (when `enabled: false` server-side).
+ * Pass `{ effectiveNow }` — the API computes effectiveNow = wall + offset
+ * server-side, so the FE only needs to anchor it to local Date.now().
+ */
+export function setApiOverride(effectiveNow: Date | null): void {
+  apiOverride = effectiveNow === null
+    ? null
+    : { reference: effectiveNow, capturedAt: Date.now() };
+}
+
+/** Returns the active override (URL wins over API). */
+function activeOverride(): OverrideState | null {
+  return ensureUrlOverride() ?? apiOverride;
 }
 
 export function getNow(): Date {
-  if (cachedOverride === undefined) {
-    cachedOverride = parseOverride();
-  }
-  if (cachedOverride) {
-    // Advance by the elapsed real-time since the page loaded so the clock still ticks
-    return new Date(cachedOverride.getTime() + (Date.now() - pageLoadTime));
-  }
-  return new Date();
+  const ov = activeOverride();
+  if (ov === null) return new Date();
+  return new Date(ov.reference.getTime() + (Date.now() - ov.capturedAt));
 }
 
-/** Returns true when a time override is active. */
+/** Returns true when a time override is active (URL or API). */
 export function isTimeOverridden(): boolean {
-  if (cachedOverride === undefined) {
-    cachedOverride = parseOverride();
-  }
-  return cachedOverride !== null;
+  return activeOverride() !== null;
 }
 
-/** Reset cache (useful if URL changes via pushState). */
+/** Reset the URL cache (used by tests / pushState handlers). */
 export function resetNowCache(): void {
-  cachedOverride = undefined;
+  urlOverride = undefined;
 }
-
-const pageLoadTime = Date.now();
