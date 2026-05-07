@@ -3307,22 +3307,28 @@ fn revalidate_setup_inheritance_after_scoring(
 
 /// Emit a `ComputedAssignment` for an in-progress action whose start has
 /// already happened. The past pre-NOW portion is committed (the operator
-/// was physically working) ; the post-NOW portion uses the LATEST plan
-/// (`setup_ticks + run_ticks`) so a JCF run cut shortens the tile.
+/// was physically working) ; the post-NOW portion is replanned around any
+/// station/operator gap that intersects the post-NOW window.
 ///
-/// Called from the split-at-NOW branch in `pre_place_pinned_actions`. Without
-/// this emission the assignment is dropped by PHP's
-/// `bulkReplaceComputedAssignments` on the next compute, killing the tile
-/// the operator is currently working on.
+/// Walks productively from `start_t` and counts placeable ticks until the
+/// LATEST plan budget (`setup_ticks + run_ticks`) is exhausted. Closure
+/// ticks (station blocked by `station_blocked_ranges`, operator off shift,
+/// or a foreign pin) are *skipped* — they don't burn the budget, but they
+/// extend the wall-clock envelope. The mid-walk peremption check fires
+/// when consecutive idle ticks reach `peremption_ticks` : the partial
+/// calage is physically lost (ink dries during the gap), so we abandon
+/// the in-progress state and let the scoring loop replan from scratch.
 ///
-/// Behaviour mirrors the non-in-progress pinned path : reserve usable grid
-/// cells (skipping closure/operator-off ticks the same way), pick a roster
-/// per tick via `find_operators_for_station`, and write `tick_operator_log`
-/// so `build_assignment_for` populates the operators field. Differs in two
-/// places : (1) skips the BAT / chunk-mini / shift guards because the past
-/// is verbatim, (2) on a station-cell conflict with a previously-placed
-/// pin, the conflict tick is left unmarked (instead of rejecting the whole
-/// pin) so the in-progress assignment still emits.
+/// Without this walk the closure would be silently *absorbed* into the
+/// envelope (`scheduledEnd = start + setup + run` regardless of gaps),
+/// reporting more productive work than the operator could physically have
+/// done. Worse, the operator-tick log would assign operators to the
+/// closed station for the closure ticks — a ghost-assignment pattern.
+///
+/// Returns `true` when the assignment was emitted, `false` when the walk
+/// hit peremption and the action's in-progress markers were cleared so
+/// the scoring loop replans it as a fresh non-pinned task. On `false` a
+/// warning is appended so the user sees the displacement.
 #[allow(clippy::too_many_arguments)]
 fn emit_in_progress_assignment(
     grid: &mut ScheduleGrid,
@@ -3330,7 +3336,6 @@ fn emit_in_progress_assignment(
     i: usize,
     grow_ticks: usize,
     start_t: usize,
-    end_t: usize,
     tick_minutes: u32,
     start_date: NaiveDate,
     station_attrs: &[StationAttrs],
@@ -3338,22 +3343,25 @@ fn emit_in_progress_assignment(
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     assignments: &mut Vec<ComputedAssignment>,
-) {
+    warnings: &mut Vec<Warning>,
+) -> bool {
     let station_idx = actions[i].station_idx;
+    let setup_ticks = actions[i].setup_ticks as usize;
+    let run_ticks = actions[i].run_ticks as usize;
+    let total_productive_needed = setup_ticks + run_ticks;
 
-    if end_t <= start_t {
+    if total_productive_needed == 0 {
         actions[i].start_tick = Some(start_t);
         actions[i].end_tick = Some(start_t);
         actions[i].art = 0;
         actions[i].eat = 0;
         let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
         assignments.push(assignment);
-        return;
+        return true;
     }
 
-    while end_t > grid.num_ticks {
-        grid.grow(grow_ticks);
-    }
+    let attrs = station_attrs.get(station_idx);
+    let peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
 
     let tick_is_usable = |t: usize| -> bool {
         (0..operator_skills.len()).any(|op| {
@@ -3364,18 +3372,73 @@ fn emit_in_progress_assignment(
         })
     };
 
-    for t in start_t..end_t {
-        if !tick_is_usable(t) {
-            continue;
+    // Pass 1 — dry walk: count productive ticks (operator available AND
+    // station free for us) without mutating the grid. Detect peremption
+    // mid-walk : consecutive idle_run ≥ peremption_ticks means the
+    // calage physically died during the post-NOW gap.
+    let scan_cap = start_t.saturating_add(total_productive_needed.saturating_mul(10).max(48));
+    let mut productive_count = 0usize;
+    let mut idle_run: u32 = 0;
+    let mut last_productive_tick = start_t;
+    let mut t = start_t;
+    let mut peremption_violated = false;
+
+    while productive_count < total_productive_needed && t < scan_cap {
+        if t >= grid.num_ticks {
+            grid.grow(grow_ticks);
         }
-        match grid.station_action_at(station_idx, t) {
-            None => grid.assign_station(station_idx, t, i),
-            Some(occupant) if occupant == i => {}
-            // Foreign occupant: leave the cell as-is. The past is verbatim
-            // — we don't displace someone else's pre-placed pin, but the
-            // in-progress assignment still emits with its envelope intact.
-            Some(_) => {}
+        let station_free = match grid.station_action_at(station_idx, t) {
+            None => true,
+            Some(occupant) => occupant == i,
+        };
+        let is_productive = tick_is_usable(t) && station_free;
+        if is_productive {
+            productive_count += 1;
+            last_productive_tick = t;
+            idle_run = 0;
+        } else {
+            idle_run = idle_run.saturating_add(1);
+            if peremption_ticks > 0 && idle_run >= peremption_ticks {
+                peremption_violated = true;
+                break;
+            }
         }
+        t += 1;
+    }
+
+    if peremption_violated || productive_count < total_productive_needed {
+        // Calage perdu en cours d'exécution post-NOW : abandon. The action
+        // becomes a regular non-pinned task ; the scoring loop will replan
+        // it with a complete fresh setup at NOW or later.
+        let reason = if peremption_violated {
+            "peremption"
+        } else {
+            "horizon_too_short"
+        };
+        warnings.push(Warning {
+            task_id: Some(actions[i].task_id.clone()),
+            message: format!(
+                "Calage partiel perdu en cours ({reason}) — replanification \
+                 complète avec calage neuf depuis NOW."
+            ),
+        });
+        actions[i].forced_start_tick = None;
+        actions[i].already_eaten_ticks = 0;
+        actions[i].is_in_progress = false;
+        actions[i].task_elapsed_ticks = 0;
+        actions[i].setup_inherited = false;
+        actions[i].setup_lost_reason = Some(reason.to_string());
+        return false;
+    }
+
+    let new_end_t = last_productive_tick + 1;
+
+    // Pass 2 — commit : mark the grid and pick a per-tick operator roster
+    // for productive ticks only. Closure / off-shift / foreign-pin ticks
+    // are left untouched, so the active_windows decomposition surfaces
+    // them as visible gaps in the tile.
+    while new_end_t > grid.num_ticks {
+        grid.grow(grow_ticks);
     }
 
     let (min_setup_ops, max_setup_ops, min_run_ops, max_run_ops) =
@@ -3390,14 +3453,33 @@ fn emit_in_progress_assignment(
         } else {
             (1, 1, 1, 1)
         };
-    let setup_ticks = actions[i].setup_ticks as usize;
-    for t in start_t..end_t {
-        let in_run_phase = setup_ticks == 0 || (t - start_t) >= setup_ticks;
+
+    let mut productive_phase_count = 0usize;
+    let mut setup_completion_tick: Option<usize> = None;
+    for t in start_t..new_end_t {
+        let station_free = match grid.station_action_at(station_idx, t) {
+            None => true,
+            Some(occupant) => occupant == i,
+        };
+        if !tick_is_usable(t) || !station_free {
+            continue;
+        }
+        if matches!(grid.station_action_at(station_idx, t), None) {
+            grid.assign_station(station_idx, t, i);
+        }
+
+        let in_run_phase = setup_ticks == 0 || productive_phase_count >= setup_ticks;
         let (phase_min, phase_max) = if in_run_phase {
             (min_run_ops, max_run_ops)
         } else {
             (min_setup_ops, max_setup_ops)
         };
+        productive_phase_count += 1;
+        if setup_ticks > 0 && productive_phase_count == setup_ticks && setup_completion_tick.is_none() {
+            // Setup ends at the tick *after* the last productive setup tick.
+            setup_completion_tick = Some(t + 1);
+        }
+
         let ops = find_operators_for_station(
             grid,
             t,
@@ -3422,12 +3504,16 @@ fn emit_in_progress_assignment(
     }
 
     actions[i].start_tick = Some(start_t);
-    actions[i].end_tick = Some(end_t);
+    actions[i].end_tick = Some(new_end_t);
     actions[i].art = 0;
-    actions[i].eat = (end_t - start_t) as u32;
+    actions[i].eat = (new_end_t - start_t) as u32;
+    if setup_ticks > 0 {
+        actions[i].setup_end_tick = setup_completion_tick.map(|t| t as u32);
+    }
 
     let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
     assignments.push(assignment);
+    true
 }
 
 fn pre_place_pinned_actions(
@@ -3575,18 +3661,12 @@ fn pre_place_pinned_actions(
                 continue;
             }
 
-            // Calage partiel toujours valable → preserve the in-progress
-            // state and emit an assignment with the post-modif envelope.
-            let new_total_ticks =
-                (actions[i].setup_ticks + actions[i].run_ticks) as usize;
-            let new_end_t = if new_total_ticks == 0 {
-                derived_end
-            } else {
-                start_t + new_total_ticks
-            };
-
-            // Update diagnostic fields BEFORE clearing pin flags so the
-            // emitted assignment carries the post-split state.
+            // Calage partiel toujours valable au moment du compute → emit
+            // an assignment whose envelope is determined by walking
+            // productive ticks from `start_t`. The emit function walks
+            // around station closures and operator off-ticks, extending
+            // the envelope post-NOW so the visible scheduledEnd reflects
+            // the wall-clock end (not just `start + setup + run`).
             actions[i].is_pinned = false;
             actions[i].is_frozen_by_safety_zone = false;
             actions[i].pinned_end_tick = None;
@@ -3601,7 +3681,6 @@ fn pre_place_pinned_actions(
                 i,
                 grow_ticks,
                 start_t,
-                new_end_t,
                 tick_minutes,
                 start_date,
                 station_attrs,
@@ -3609,6 +3688,7 @@ fn pre_place_pinned_actions(
                 operator_availability,
                 operator_groups,
                 assignments,
+                warnings,
             );
             continue;
         }
@@ -6252,6 +6332,165 @@ mod safety_zone_chunk_mini_tests {
         assert!(
             warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
             "warning emitted: {warnings:?}"
+        );
+    }
+
+    /// Station closure inside the post-NOW envelope, brief enough to fit
+    /// inside the peremption window — the calage SURVIVES across the
+    /// closure and the tile envelope STRETCHES past the closure to give
+    /// back the lost productive ticks.
+    ///
+    /// Repro for the user's scenario : setup started at 08h20 in prod,
+    /// machine unavailability declared at 08h27 for [08h30, 09h00] in
+    /// preprod, station peremption = 2h. With 5-min ticks :
+    ///   - setup_ticks = 3 (15 min), run_ticks = 24 (120 min)
+    ///   - pinned_start_tick = 100 (08h20)
+    ///   - now_tick = 101 (08h25, post-rounding)
+    ///   - closure marks ticks 102-107 (08h30-09h00) with `usize::MAX`
+    ///   - peremption_ticks = 24 (2h), gap = 6 ticks ≪ 24 → calage holds
+    ///
+    /// Expected : assignment emitted with start=100, end=133 (extended
+    /// past the 6-tick closure), so the operator's lost work after the
+    /// closure ends up on the wall correctly. WITHOUT the productive walk
+    /// the function emitted end=127 and silently absorbed 30 min of work
+    /// — a regression specifically prevented by this test.
+    #[test]
+    fn closure_inside_post_now_extends_envelope_within_peremption() {
+        let mut action = make_action(0, 0, 3, 24, 100, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 1;
+        let availability = restricted_availability(300, &[(0, 300)]);
+
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = 24; // 2h, > closure of 6 ticks (30 min)
+
+        // Pre-mark the closure on the grid before pre_place runs — mirrors
+        // what `fbi.rs::run_with_fbi` does from `Station.scheduleExceptions`.
+        let mut grid = ScheduleGrid::new(1, 1, 300, 15);
+        for t in 102..108 {
+            grid.assign_station(0, t, usize::MAX);
+        }
+
+        let mut actions = vec![action];
+        let mut assignments = Vec::new();
+        let mut warnings = Vec::new();
+        let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]);
+        let groups = vec![vec![]];
+        pre_place_pinned_actions(
+            &mut grid,
+            &mut actions,
+            96,
+            &mut assignments,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 28).unwrap(),
+            &[attrs],
+            &skills,
+            &availability,
+            &groups,
+            /*now_tick=*/ 101,
+            &mut warnings,
+        );
+
+        assert_eq!(
+            assignments.len(),
+            1,
+            "calage holds across the brief closure → assignment emitted"
+        );
+        assert_eq!(actions[0].start_tick, Some(100), "start anchored at past");
+        assert_eq!(
+            actions[0].end_tick,
+            Some(133),
+            "end stretched : start (100) + 27 productive ticks + 6 closure ticks = 133. \
+             Without the walk we'd see Some(127) and 30 min of work would vanish."
+        );
+        assert_eq!(
+            actions[0].setup_end_tick,
+            Some(109),
+            "setup completes at the 3rd productive tick (108) + 1 ; \
+             tick 109 = 09h05, after the closure ends at 09h00"
+        );
+        assert!(
+            actions[0].is_in_progress,
+            "calage preserved — peremption did NOT fire"
+        );
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "no abandon warning : {warnings:?}"
+        );
+        // Verify the operator log skips closure ticks (no ghost-assignment
+        // to the closed station) — derive_active_windows would otherwise
+        // claim the operator worked through the closure.
+        let logged_ticks: Vec<usize> = actions[0]
+            .tick_operator_log
+            .iter()
+            .map(|&(t, _)| t)
+            .collect();
+        for closure_t in 102..108 {
+            assert!(
+                !logged_ticks.contains(&closure_t),
+                "tick {closure_t} (closure) must not appear in tick_operator_log"
+            );
+        }
+        assert_eq!(
+            logged_ticks.len(),
+            27,
+            "exactly setup + run productive ticks logged (3 + 24)"
+        );
+    }
+
+    /// Station closure that lasts longer than peremption — the partial
+    /// calage CANNOT survive the gap. The walk-time peremption check
+    /// fires, the in-progress markers are cleared, no assignment is
+    /// emitted, and the action falls through to the scoring loop for a
+    /// fresh complete-setup replan.
+    #[test]
+    fn closure_inside_post_now_exceeds_peremption_abandons() {
+        let mut action = make_action(0, 0, 3, 24, 100, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 1;
+        let availability = restricted_availability(400, &[(0, 400)]);
+
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = 4; // very tight (20 min) so the 30-tick closure exceeds it
+
+        // 30-tick closure starting just after the 2 productive ticks.
+        let mut grid = ScheduleGrid::new(1, 1, 400, 15);
+        for t in 102..132 {
+            grid.assign_station(0, t, usize::MAX);
+        }
+
+        let mut actions = vec![action];
+        let mut assignments = Vec::new();
+        let mut warnings = Vec::new();
+        let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]);
+        let groups = vec![vec![]];
+        pre_place_pinned_actions(
+            &mut grid,
+            &mut actions,
+            96,
+            &mut assignments,
+            15,
+            NaiveDate::from_ymd_opt(2026, 4, 28).unwrap(),
+            &[attrs],
+            &skills,
+            &availability,
+            &groups,
+            /*now_tick=*/ 101,
+            &mut warnings,
+        );
+
+        assert_eq!(assignments.len(), 0, "no assignment — calage perdu mid-walk");
+        assert!(!actions[0].is_in_progress, "is_in_progress cleared");
+        assert!(actions[0].forced_start_tick.is_none(), "forced_start_tick cleared");
+        assert_eq!(actions[0].already_eaten_ticks, 0, "no chunk-mini credit retained");
+        assert_eq!(
+            actions[0].setup_lost_reason.as_deref(),
+            Some("peremption"),
+            "diagnostic tag distinguishes mid-walk peremption from horizon limits"
+        );
+        assert!(
+            warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "user-facing warning : {warnings:?}"
         );
     }
 
