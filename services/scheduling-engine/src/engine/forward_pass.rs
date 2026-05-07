@@ -3506,10 +3506,77 @@ fn pre_place_pinned_actions(
                 now_tick.saturating_sub(start_t) as u32
             };
 
-            // New envelope = past start + LATEST plan duration. Falls
-            // back to derived_end (= setup+run if pinned_end was None)
-            // when the latest plan would collapse to zero ticks (defensive
-            // — the engine has nothing to schedule otherwise).
+            // Partial-calage validity check : same physics as
+            // `evaluate_setup_inheritance` for completed calages, applied
+            // to the partial setup's *implicit* anchor (`pinned_start_tick`,
+            // i.e. the moment the operator started the calage). If the
+            // gap to NOW exceeds peremption_ticks, or a foreign setup
+            // intercalated on the station between start and NOW, the
+            // partial work is physically lost — abandon the in-progress
+            // state and let the scoring loop replan a full setup at a
+            // fresh placement.
+            //
+            // Why use `pinned_start_tick` instead of `lastSetupAt` : the
+            // latter is only stamped when the run starts (post-setup-
+            // completion), so it's null for partial calages. The former
+            // is the only timestamp we have for the start of the calage
+            // activity. Conservative — it assumes the calage *started*
+            // at start_t, regardless of how much progress the operator
+            // actually made — but symmetric with how peremption applies
+            // to completed calages (anchored at last activity).
+            //
+            // Self-task entries in `setup_completions` aren't flagged as
+            // intercalation (cf. `evaluate_setup_inheritance` line ~2867),
+            // so a saisie that re-anchored mid-setup is correctly ignored.
+            let candidate_station = actions[i].station_idx;
+            let attrs = station_attrs.get(candidate_station);
+            let peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
+            let setup_completions: &[SetupCompletionEntry] =
+                attrs.map(|s| s.setup_completions.as_slice()).unwrap_or(&[]);
+            let self_task_id = actions[i].task_id.clone();
+            let calage_outcome = evaluate_setup_inheritance(
+                start_t as i64,
+                Some(candidate_station),
+                &self_task_id,
+                now_tick,
+                candidate_station,
+                i,
+                peremption_ticks,
+                grid,
+                setup_completions,
+                now_tick,
+            );
+
+            if let Err(reason) = calage_outcome {
+                // Partial calage perdu : drop every in-progress / pin
+                // marker so the action enters the scoring loop as a
+                // regular non-pinned task. The scoring loop replans it
+                // fresh from NOW with the full `setup_ticks + run_ticks`,
+                // which is the physically correct outcome (the operator
+                // must recale from scratch). The warning surfaces in the
+                // compute modal so the user sees why the tile shifted.
+                warnings.push(Warning {
+                    task_id: Some(actions[i].task_id.clone()),
+                    message: format!(
+                        "Calage partiel perdu ({reason}) — replanification \
+                         complète avec calage neuf depuis NOW."
+                    ),
+                });
+                actions[i].is_pinned = false;
+                actions[i].is_frozen_by_safety_zone = false;
+                actions[i].pinned_start_tick = None;
+                actions[i].pinned_end_tick = None;
+                actions[i].forced_start_tick = None;
+                actions[i].already_eaten_ticks = 0;
+                actions[i].is_in_progress = false;
+                actions[i].task_elapsed_ticks = 0;
+                actions[i].setup_inherited = false;
+                actions[i].setup_lost_reason = Some(reason.to_string());
+                continue;
+            }
+
+            // Calage partiel toujours valable → preserve the in-progress
+            // state and emit an assignment with the post-modif envelope.
             let new_total_ticks =
                 (actions[i].setup_ticks + actions[i].run_ticks) as usize;
             let new_end_t = if new_total_ticks == 0 {
@@ -6083,6 +6150,141 @@ mod safety_zone_chunk_mini_tests {
         assert!(
             warnings.is_empty(),
             "no warnings on a clean in-progress emission: {warnings:?}"
+        );
+    }
+
+    /// Calage partiel périmé : the operator started a setup at tick 60 but
+    /// abandoned it (no saisie, no productivity log). Replan happens at
+    /// now_tick=200, gap = 140 ticks. Station's peremption_ticks=24
+    /// (= 6h at 15 min/tick) — gap > peremption, so the partial calage
+    /// is physically lost (ink dried, registers shifted).
+    ///
+    /// Expected behaviour : no in-progress assignment is emitted from
+    /// pre_place ; the action's pin/in-progress markers are cleared so
+    /// the scoring loop replans it as a fresh action with a complete
+    /// setup at NOW. A warning surfaces in the compute output so the
+    /// user understands why the tile shifted.
+    #[test]
+    fn partial_calage_peremption_abandons_in_progress() {
+        let mut action = make_action(0, 0, 1, 8, 60, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 2;
+        let availability = restricted_availability(300, &[(0, 300)]);
+
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = 24; // 6h — gap of 140 will exceed this
+
+        let (actions, assignments, warnings) = run_pre_place_full(
+            action,
+            availability,
+            attrs,
+            300,
+            /*now_tick=*/ 200,
+        );
+
+        assert_eq!(
+            assignments.len(),
+            0,
+            "no assignment emitted from pre_place — the action falls through \
+             to the scoring loop for a complete fresh replan"
+        );
+        assert!(!actions[0].is_pinned, "pin cleared after peremption abandon");
+        assert!(
+            !actions[0].is_in_progress,
+            "is_in_progress cleared so downstream passes treat it as a fresh task"
+        );
+        assert!(actions[0].forced_start_tick.is_none(), "forced_start_tick cleared");
+        assert_eq!(
+            actions[0].already_eaten_ticks, 0,
+            "no chunk-mini credit — the partial work is lost"
+        );
+        assert_eq!(
+            actions[0].setup_lost_reason.as_deref(),
+            Some("peremption"),
+            "diagnostic tag surfaces the cause for the UI badge"
+        );
+        assert!(
+            warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "user-facing warning explains the displacement: {warnings:?}"
+        );
+    }
+
+    /// Calage partiel volé : the operator started a setup at tick 60, then
+    /// a foreign task's setup completed on the same station at tick 70
+    /// (recorded in `setup_completions`). The original operator's partial
+    /// work is now overwritten — the machine is configured for someone
+    /// else's job. Even with peremption_ticks=0 (no time-based decay),
+    /// the intercalation alone is enough to invalidate the partial calage.
+    ///
+    /// Expected behaviour : same as peremption — abandon the in-progress
+    /// state, no assignment emitted, scoring loop replans fresh.
+    #[test]
+    fn partial_calage_intercalation_abandons_in_progress() {
+        let mut action = make_action(0, 0, 1, 8, 60, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 2;
+        let availability = restricted_availability(300, &[(0, 300)]);
+
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = 0; // ignore peremption — we want to isolate the intercalation
+        attrs.setup_completions = vec![SetupCompletionEntry {
+            task_id: "foreign-task".to_string(),
+            at_tick: 70, // strictly between our start (60) and now (100)
+        }];
+
+        let (actions, assignments, warnings) = run_pre_place_full(
+            action,
+            availability,
+            attrs,
+            300,
+            /*now_tick=*/ 100,
+        );
+
+        assert_eq!(assignments.len(), 0, "no assignment emitted");
+        assert!(!actions[0].is_in_progress, "in-progress markers cleared");
+        assert!(actions[0].forced_start_tick.is_none());
+        assert_eq!(actions[0].already_eaten_ticks, 0);
+        assert_eq!(
+            actions[0].setup_lost_reason.as_deref(),
+            Some("intercalated_setup"),
+            "diagnostic tag distinguishes vol from peremption"
+        );
+        assert!(
+            warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "warning emitted: {warnings:?}"
+        );
+    }
+
+    /// Negative control : when the partial calage is still within
+    /// peremption AND no foreign action has intercalated, the in-progress
+    /// state is preserved and the assignment is emitted exactly as the
+    /// JCF-modif test above. Guards against an over-eager peremption
+    /// check that abandons valid partial calages.
+    #[test]
+    fn partial_calage_within_peremption_preserves_in_progress() {
+        let mut action = make_action(0, 0, 1, 8, 60, /*is_frozen_by_safety_zone=*/ true);
+        action.is_in_progress = true;
+        action.task_elapsed_ticks = 2;
+        let availability = restricted_availability(300, &[(0, 300)]);
+
+        let mut attrs = station_attrs_default();
+        attrs.peremption_ticks = 24; // 6h, gap = 5 ticks ≪ 24
+
+        let (actions, assignments, warnings) = run_pre_place_full(
+            action,
+            availability,
+            attrs,
+            300,
+            /*now_tick=*/ 65, // 5 ticks after start, well within peremption
+        );
+
+        assert_eq!(assignments.len(), 1, "in-progress assignment preserved");
+        assert!(actions[0].is_in_progress, "is_in_progress kept");
+        assert_eq!(actions[0].forced_start_tick, Some(60));
+        assert_eq!(actions[0].already_eaten_ticks, 2);
+        assert!(
+            !warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "no abandon warning on valid partial calage: {warnings:?}"
         );
     }
 
