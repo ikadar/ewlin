@@ -32,7 +32,9 @@ import {
   type JobTestScenarioResponse,
   type JobTestWipeResponse,
 } from '../store/api/jobTestApi';
-import { useGetSnapshotQuery } from '../store';
+import { useGetSnapshotQuery, useAppDispatch, scheduleApi } from '../store';
+import { prodSnapshotApi } from '../store/api/prodSnapshotApi';
+import { fluxApi } from '../store/api/fluxApi';
 import { JobTestRecipeEditor } from '../components/JobTestRecipeEditor/JobTestRecipeEditor';
 import { JobTestScenarioEditor } from '../components/JobTestScenarioEditor/JobTestScenarioEditor';
 
@@ -62,6 +64,21 @@ export function JobsDeTestPage() {
   const [duplicateScenario] = useDuplicateScenarioMutation();
   const [generateOneOfEach, { isLoading: genEachLoading }] = useGenerateOneOfEachMutation();
   const [wipe, { isLoading: wipeLoading }] = useWipeMutation();
+  const dispatch = useAppDispatch();
+
+  /**
+   * Reality-driven mutations (wipe, generate, execute) bypass the normal
+   * Mercure-driven invalidation paths : TRUNCATE doesn't fire ORM events,
+   * and the freshly created jobs sit behind three separate RTK Query
+   * caches (Préprod Snapshot, Prod ProdSnapshot, Flux dashboard FluxJobs).
+   * After any such mutation, we invalidate all three explicitly — see
+   * memory `feedback_dual_snapshot_invalidation`.
+   */
+  const invalidatePlanningCaches = () => {
+    dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+    dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+    dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+  };
 
   const [creatingRecipe, setCreatingRecipe] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<JobTestRecipeResponse | null>(null);
@@ -97,6 +114,7 @@ export function JobsDeTestPage() {
   const handleGenerateRecipe = async (id: string) => {
     try {
       const res = await generateRecipe(id).unwrap();
+      invalidatePlanningCaches();
       showToast('ok', `${res.totalJobs} job créé : ${res.createdJobs[0]?.description ?? ''}`);
     } catch (err) {
       showToast('err', errorMessage(err, 'Erreur de génération.'));
@@ -106,6 +124,7 @@ export function JobsDeTestPage() {
   const handleExecuteScenario = async (id: string, name: string) => {
     try {
       const res = await executeScenario(id).unwrap();
+      invalidatePlanningCaches();
       showToast('ok', `Scénario « ${name} » exécuté · ${res.totalJobs} jobs créés.`);
     } catch (err) {
       showToast('err', errorMessage(err, "Erreur d'exécution."));
@@ -124,6 +143,7 @@ export function JobsDeTestPage() {
   const handleGenerateEach = async () => {
     try {
       const res = await generateOneOfEach().unwrap();
+      invalidatePlanningCaches();
       showToast('ok', `${res.totalJobs} jobs créés depuis ${recipes.length} recette${recipes.length > 1 ? 's' : ''}.`);
     } catch (err) {
       showToast('err', errorMessage(err, 'Erreur de génération.'));
@@ -150,6 +170,7 @@ export function JobsDeTestPage() {
   const handleConfirmWipe = async () => {
     try {
       const res: JobTestWipeResponse = await wipe().unwrap();
+      invalidatePlanningCaches();
       setShowRaz(false);
       showToast('ok', `Base vidée · ${res.totalRowsWiped} lignes supprimées sur ${Object.keys(res.countsBefore).length} tables.`);
     } catch (err) {
