@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Jobs de test (settings)</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  :root {
+    --bg:           rgb(9 9 11);
+    --bg-elev-1:    rgb(24 24 27);
+    --bg-elev-2:    rgb(39 39 42);
+    --bg-elev-3:    rgb(63 63 70);
+    --border:       rgb(39 39 42);
+    --border-soft:  rgb(63 63 70);
+    --text-1:       rgb(244 244 245);
+    --text-2:       rgb(212 212 216);
+    --text-3:       rgb(161 161 170);
+    --text-4:       rgb(113 113 122);
+    --text-5:       rgb(82 82 91);
+
+    --accent-blue:    rgb(37 99 235);
+    --accent-blue-h:  rgb(59 130 246);
+    --accent-amber:   rgb(245 158 11);
+    --accent-emerald: rgb(16 185 129);
+    --accent-red:     rgb(239 68 68);
+    --accent-violet:  rgb(139 92 246);
+
+    --prio-imperatif: rgb(248 113 113);
+    --prio-important: rgb(251 146 60);
+    --prio-standard:  rgb(244 244 245);
+    --prio-flexible:  rgb(96 165 250);
+
+    --radius-sm: 3px;
+    --radius-md: 5px;
+    --radius-lg: 7px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 13px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-2);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.4;
+    min-height: 100vh;
+  }
+
+  /* Lucide normalization */
+  [data-lucide], svg.lucide {
+    width: 14px; height: 14px;
+    stroke-width: 2;
+    flex-shrink: 0;
+  }
+  .icon-sm { width: 12px !important; height: 12px !important; }
+  .icon-md { width: 14px !important; height: 14px !important; }
+  .icon-lg { width: 16px !important; height: 16px !important; }
+  .icon-xl { width: 20px !important; height: 20px !important; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ───── Sidebar ───── */
+  aside.sidebar {
+    background: var(--bg-elev-1);
+    border-right: 1px solid var(--border);
+    padding: 14px 12px;
+    overflow-y: auto;
+  }
+  .sidebar-section-label {
+    font-size: 11px; font-weight: 600; color: var(--text-4);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 0 8px; margin: 8px 0 6px;
+  }
+  .sidebar-link {
+    display: block; padding: 7px 10px; border-radius: var(--radius-md);
+    color: var(--text-3); font-size: 13px; text-decoration: none;
+    cursor: pointer; user-select: none;
+  }
+  .sidebar-link:hover { background: var(--bg-elev-2); color: var(--text-1); }
+  .sidebar-link.active {
+    background: rgba(37, 99, 235, 0.15); color: var(--text-1);
+    font-weight: 500; border: 1px solid rgba(37, 99, 235, 0.35);
+  }
+  .sidebar-link.new-badge::after {
+    content: 'NEW';
+    background: rgba(16, 185, 129, 0.15); color: rgb(110 231 183);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    font-size: 9px; padding: 1px 5px; border-radius: 3px;
+    margin-left: 8px; vertical-align: middle; letter-spacing: 0.05em;
+  }
+  .sidebar-divider { height: 1px; background: var(--border); margin: 10px 4px; }
+
+  /* ───── Main ───── */
+  main { padding: 24px 28px; overflow-y: auto; }
+
+  .page-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; margin-bottom: 20px; padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-title { color: var(--text-1); font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .page-subtitle { color: var(--text-4); font-size: 12px; max-width: 600px; }
+
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft); background: var(--bg-elev-2);
+    color: var(--text-2); font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-elev-3); color: var(--text-1); }
+  .btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: white; }
+  .btn-primary:hover { background: var(--accent-blue-h); border-color: var(--accent-blue-h); }
+  .btn-success {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: rgba(16, 185, 129, 0.5); color: rgb(110 231 183);
+  }
+  .btn-success:hover { background: rgba(16, 185, 129, 0.3); color: white; }
+  .btn-danger {
+    background: transparent; border-color: rgba(239, 68, 68, 0.4); color: rgb(252 165 165);
+  }
+  .btn-danger:hover { background: rgba(239, 68, 68, 0.15); color: white; }
+  .btn-destructive {
+    background: var(--accent-red); border-color: var(--accent-red); color: white;
+  }
+  .btn-destructive:hover { background: rgb(220 38 38); border-color: rgb(220 38 38); }
+  .btn-ghost { background: transparent; }
+  .btn-sm { padding: 4px 8px; font-size: 11px; }
+  .btn-icon { padding: 4px 6px; }
+  .btn-icon-only {
+    padding: 4px; width: 26px; height: 26px;
+    justify-content: center;
+  }
+
+  /* ───── Banner ───── */
+  .banner {
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: var(--accent-amber);
+    padding: 8px 12px; border-radius: var(--radius-md);
+    font-size: 11px; margin-bottom: 18px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .banner b { color: rgb(252 211 77); }
+  .banner [data-lucide], .banner svg.lucide { margin-top: 2px; }
+
+  /* ───── Section ───── */
+  .section { margin-bottom: 24px; }
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; gap: 12px;
+  }
+  .section-title {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--text-1); font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .section-title .icon-section {
+    color: var(--text-3);
+  }
+  .section-title.scenarios .icon-section { color: var(--accent-violet); }
+  .section-title.recipes .icon-section { color: var(--accent-blue-h); }
+  .section-count {
+    color: var(--text-4); font-size: 11px; font-weight: 500;
+    text-transform: none; letter-spacing: 0;
+  }
+
+  /* ───── Table ───── */
+  .table-wrap {
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  table.recipes {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  table.recipes thead th {
+    text-align: left; padding: 10px 12px;
+    color: var(--text-4); font-weight: 500; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    background: var(--bg-elev-2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.recipes thead th.right { text-align: right; }
+  table.recipes thead th.center { text-align: center; }
+  table.recipes tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    color: var(--text-2);
+  }
+  table.recipes tbody tr:hover td { background: var(--bg-elev-2); }
+  table.recipes tbody tr:last-child td { border-bottom: none; }
+  table.recipes td.right { text-align: right; }
+  table.recipes td.center { text-align: center; }
+  table.recipes td.actions { text-align: right; white-space: nowrap; }
+  table.recipes td.actions .btn { margin-left: 4px; }
+
+  .cell-base-title { color: var(--text-1); font-weight: 500; }
+  .cell-base-ref { color: var(--text-4); font-family: ui-monospace, monospace; font-size: 10.5px; margin-top: 1px; }
+  .cell-mono { font-family: ui-monospace, monospace; }
+  .cell-muted { color: var(--text-4); }
+
+  .ratio-chip {
+    display: inline-block; padding: 2px 7px; border-radius: 100px;
+    font-family: ui-monospace, monospace; font-size: 11px;
+    background: var(--bg-elev-2); border: 1px solid var(--border-soft);
+    color: var(--text-3);
+  }
+  .ratio-chip.scaled { color: var(--accent-blue-h); border-color: rgba(37, 99, 235, 0.4); }
+
+  .imp-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 100px;
+    font-size: 11px; border: 1px solid var(--border-soft); background: var(--bg-elev-2);
+  }
+  .imp-chip.prio-0 { color: var(--prio-imperatif); border-color: rgba(248,113,113,0.4); }
+  .imp-chip.prio-1 { color: var(--prio-important); border-color: rgba(251,146,60,0.4); }
+  .imp-chip.prio-2 { color: var(--prio-standard); }
+  .imp-chip.prio-3 { color: var(--prio-flexible); border-color: rgba(96,165,250,0.4); }
+
+  .gen-count {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-3); font-size: 11.5px; cursor: help;
+    border-bottom: 1px dashed var(--border-soft);
+  }
+  .gen-count .num { color: var(--text-1); font-weight: 600; font-family: ui-monospace, monospace; }
+  .gen-count.empty { color: var(--text-5); border-bottom: none; cursor: default; }
+
+  .gen-tooltip {
+    position: absolute; z-index: 50;
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    font-size: 11px; min-width: 280px;
+    pointer-events: none;
+  }
+  .gen-tooltip[hidden] { display: none; }
+  .gen-tooltip-title { color: var(--text-4); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .gen-tooltip-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-family: ui-monospace, monospace; padding: 1px 0; color: var(--text-3);
+  }
+  .gen-tooltip-row .gid { color: var(--text-2); }
+
+  .empty-row td {
+    text-align: center; padding: 50px 20px !important;
+    color: var(--text-4); font-style: italic;
+  }
+
+  /* ───── Recipe chip (in scenario rows) ───── */
+  .recipe-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 100px;
+    background: rgba(37, 99, 235, 0.10);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    color: var(--text-2); font-size: 11px;
+    margin: 2px 4px 2px 0;
+  }
+  .recipe-chip-count {
+    color: var(--accent-blue-h); font-weight: 600;
+    font-family: ui-monospace, monospace;
+  }
+
+  .scenario-name { color: var(--text-1); font-weight: 600; }
+  .scenario-desc { color: var(--text-4); font-size: 10.5px; margin-top: 1px; max-width: 320px; }
+
+  /* ───── Modal ───── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop[hidden] { display: none; }
+
+  .modal {
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    width: min(760px, 92vw); max-height: 90vh;
+    overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+  .modal-head {
+    padding: 12px 16px; background: var(--bg-elev-1);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title {
+    color: var(--text-1); font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .modal-body {
+    padding: 16px; overflow-y: auto;
+    display: grid; grid-template-columns: 1fr 290px; gap: 18px;
+  }
+  .modal-foot {
+    padding: 10px 16px; background: var(--bg-elev-1);
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+
+  /* ───── Form fields ───── */
+  .form-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    align-content: start;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  .field-label {
+    display: block; color: var(--text-4); font-size: 11px;
+    font-weight: 500; margin-bottom: 4px; letter-spacing: 0.02em;
+  }
+  .field-input, .field-textarea {
+    width: 100%; padding: 7px 10px; border-radius: var(--radius-md);
+    background: var(--bg-elev-1); border: 1px solid var(--border);
+    color: var(--text-1); font-size: 12px; font-family: inherit;
+    color-scheme: dark;
+  }
+  .field-input:focus, .field-textarea:focus {
+    outline: none; border-color: var(--accent-blue); background: var(--bg-elev-2);
+  }
+  .field-input.mono { font-family: ui-monospace, monospace; }
+  .field-textarea { resize: vertical; min-height: 56px; line-height: 1.5; }
+  .field-help {
+    color: var(--text-5); font-size: 10.5px;
+    margin-top: 3px; line-height: 1.4;
+  }
+  .field-row-pair {
+    display: grid; grid-template-columns: 1fr 110px; gap: 10px;
+  }
+  .or-required {
+    grid-column: 1 / -1;
+    font-size: 10.5px; margin-top: -4px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .or-required.unsatisfied { color: var(--accent-amber); }
+  .or-required.satisfied { color: var(--accent-emerald); }
+
+  /* ───── Custom select / autocomplete ───── */
+  .cs-trigger {
+    width: 100%; padding: 7px 10px; border-radius: var(--radius-md);
+    background: var(--bg-elev-1); border: 1px solid var(--border);
+    color: var(--text-1); font-size: 12px; font-family: inherit;
+    cursor: pointer; text-align: left;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .cs-trigger:hover { background: var(--bg-elev-2); }
+  .cs-trigger.open { border-color: var(--accent-blue); background: var(--bg-elev-2); }
+  .cs-trigger .cs-value {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .cs-trigger .cs-chev {
+    color: var(--text-4); transition: transform 0.15s;
+  }
+  .cs-trigger.open .cs-chev { transform: rotate(180deg); }
+
+  .cs-popover {
+    position: fixed; z-index: 200;
+    background: var(--bg-elev-2); border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    padding: 4px 0; max-height: 280px; overflow-y: auto;
+    min-width: 220px;
+  }
+  .cs-popover[hidden] { display: none; }
+  .cs-search { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .cs-search input {
+    width: 100%; padding: 5px 8px; border-radius: var(--radius-sm);
+    background: var(--bg-elev-1); border: 1px solid var(--border);
+    color: var(--text-1); font-size: 12px; font-family: inherit;
+    outline: none;
+  }
+  .cs-option {
+    padding: 6px 12px; font-size: 12px; cursor: pointer;
+    color: var(--text-1); display: flex; flex-direction: column; gap: 1px;
+  }
+  .cs-option:hover, .cs-option.active { background: var(--bg-elev-3); }
+  .cs-option.selected { color: var(--accent-blue-h); font-weight: 500; }
+  .cs-option .cs-opt-sub {
+    color: var(--text-4); font-size: 10.5px; font-family: ui-monospace, monospace;
+  }
+  .cs-option.prio-0.selected { color: var(--prio-imperatif); }
+  .cs-option.prio-1.selected { color: var(--prio-important); }
+  .cs-option.prio-2.selected { color: var(--prio-standard); }
+  .cs-option.prio-3.selected { color: var(--prio-flexible); }
+  .cs-empty {
+    padding: 10px 12px; color: var(--text-4);
+    font-size: 11px; font-style: italic;
+  }
+
+  .cs-trigger.prio-0 .cs-value { color: var(--prio-imperatif); }
+  .cs-trigger.prio-1 .cs-value { color: var(--prio-important); }
+  .cs-trigger.prio-2 .cs-value { color: var(--prio-standard); }
+  .cs-trigger.prio-3 .cs-value { color: var(--prio-flexible); }
+
+  /* ───── Preview panel ───── */
+  .preview {
+    background: var(--bg-elev-1); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 12px;
+    font-size: 11px; color: var(--text-3);
+    align-self: start; position: sticky; top: 0;
+  }
+  .preview-title {
+    color: var(--text-4); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 8px; font-weight: 600;
+  }
+  .preview-section { margin-bottom: 10px; }
+  .preview-section:last-child { margin-bottom: 0; }
+  .preview-section-head { color: var(--text-4); font-size: 10px; margin-bottom: 3px; }
+  .preview-key { color: var(--text-2); font-family: ui-monospace, monospace; font-size: 11px; }
+  .preview-val { color: var(--text-1); }
+  .preview-strong { color: var(--accent-blue-h); font-weight: 600; }
+  .preview-warn {
+    color: var(--accent-amber); font-size: 10.5px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .preview-divider { height: 1px; background: var(--border); margin: 10px 0; }
+  .preview-total {
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-md);
+    padding: 8px 10px; margin-bottom: 10px;
+    text-align: center;
+  }
+  .preview-total .big {
+    color: var(--accent-violet); font-size: 22px; font-weight: 700;
+    font-family: ui-monospace, monospace;
+  }
+  .preview-total .lbl {
+    color: var(--text-3); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  /* ───── Scenario items list (in editor) ───── */
+  .items-list {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 8px; background: var(--bg-elev-1);
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+  }
+  .item-row {
+    display: grid;
+    grid-template-columns: 1fr 80px auto;
+    gap: 8px; align-items: center;
+  }
+  .item-row .field-input { padding: 6px 8px; }
+  .items-empty {
+    padding: 14px; text-align: center;
+    color: var(--text-4); font-size: 11px; font-style: italic;
+  }
+  .item-add-btn {
+    margin-top: 4px; align-self: flex-start;
+  }
+
+  /* ───── RAZ modal contents ───── */
+  .raz-warning {
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: rgb(252 165 165);
+    padding: 9px 12px; border-radius: var(--radius-md);
+    font-size: 11.5px; margin-bottom: 14px;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .raz-warning b { color: rgb(248 113 113); }
+  .raz-stats {
+    background: var(--bg-elev-1); border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 9px 12px; margin-bottom: 14px;
+    font-family: ui-monospace, monospace; font-size: 12px;
+    color: var(--text-2);
+    display: flex; gap: 22px; justify-content: center;
+  }
+  .raz-stats .stat-num { color: var(--text-1); font-weight: 600; }
+  .raz-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .raz-col-title {
+    color: var(--text-4); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 6px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .raz-col-title.wipe { color: var(--accent-red); }
+  .raz-col-title.keep { color: var(--accent-emerald); }
+  .raz-list {
+    list-style: none; padding-left: 0;
+    font-size: 11px; color: var(--text-2); line-height: 1.7;
+  }
+  .raz-list li {
+    padding: 1px 0; padding-left: 18px; position: relative;
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .raz-list li > [data-lucide], .raz-list li > svg.lucide {
+    margin-top: 3px;
+  }
+  .raz-list-wipe li > [data-lucide], .raz-list-wipe li > svg.lucide { color: var(--accent-red); }
+  .raz-list-keep li > [data-lucide], .raz-list-keep li > svg.lucide { color: var(--accent-emerald); }
+
+  /* ───── Toast ───── */
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: rgb(110 231 183);
+    padding: 10px 14px; border-radius: var(--radius-md);
+    font-size: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    z-index: 200; animation: toast-in 0.2s ease-out;
+    display: inline-flex; align-items: center; gap: 8px;
+    max-width: 480px;
+  }
+  .toast[hidden] { display: none; }
+  .toast strong { color: white; font-weight: 600; }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-section-label">Settings</div>
+    <a class="sidebar-link">Stations</a>
+    <a class="sidebar-link">Opérateurs</a>
+    <a class="sidebar-link">Catégories de stations</a>
+    <a class="sidebar-link">Sous-traitants</a>
+    <a class="sidebar-link">Transporteurs</a>
+    <a class="sidebar-link">Clients</a>
+    <a class="sidebar-link">Référents</a>
+    <a class="sidebar-link">Formats</a>
+    <a class="sidebar-link">Templates</a>
+    <a class="sidebar-link">Safety Zone</a>
+    <a class="sidebar-link">Délai papier</a>
+    <a class="sidebar-link">Délai forme</a>
+    <a class="sidebar-link">Now (override)</a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-link active new-badge">Jobs de test</a>
+  </aside>
+
+  <main>
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Jobs de test</h1>
+        <p class="page-subtitle">
+          Recettes (clones paramétrés d'un job de base) et scénarios (ensembles de recettes) pour mettre la base
+          dans un état déterministe en deux clics.
+        </p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-success" onclick="generateOneOfEachRecipe()" title="Génère un job pour chaque recette">
+          <i data-lucide="zap"></i> 1 de chaque recette
+        </button>
+        <button class="btn btn-destructive" onclick="openRazModal()" title="Vide les données liées aux jobs">
+          <i data-lucide="trash-2"></i> RAZ jobs
+        </button>
+      </div>
+    </div>
+
+    <div class="banner">
+      <i data-lucide="info" class="icon-md"></i>
+      <span>
+        <b>Playground.</b> Données fictives en mémoire. Tu peux créer/éditer/supprimer des recettes et des scénarios,
+        cliquer "Exécuter" sur un scénario ou "Générer" sur une recette. Aucun appel API.
+      </span>
+    </div>
+
+    <!-- ───── SCENARIOS ───── -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-title scenarios">
+          <i data-lucide="layers" class="icon-section icon-lg"></i>
+          Scénarios
+          <span class="section-count" id="scenarios-count"></span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openScenarioEditor(null)">
+          <i data-lucide="plus"></i> Nouveau scénario
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table class="recipes">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Recettes</th>
+              <th class="center">Jobs / exécution</th>
+              <th class="center">Exécutions</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody id="scenarios-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ───── RECIPES ───── -->
+    <section class="section">
+      <div class="section-head">
+        <div class="section-title recipes">
+          <i data-lucide="book-open" class="icon-section icon-lg"></i>
+          Recettes
+          <span class="section-count" id="recipes-count"></span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openRecipeEditor(null)">
+          <i data-lucide="plus"></i> Nouvelle recette
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table class="recipes">
+          <thead>
+            <tr>
+              <th>Job de base</th>
+              <th class="right">Quantité</th>
+              <th>Délai départ</th>
+              <th>BAT</th>
+              <th>Importance</th>
+              <th class="center">Roule</th>
+              <th class="center">Générés</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody id="recipes-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+</div>
+
+<div class="gen-tooltip" id="gen-tooltip" hidden></div>
+
+<!-- ───── Recipe editor modal ───── -->
+<div class="modal-backdrop" id="recipe-modal" hidden onclick="if(event.target.id==='recipe-modal') closeRecipeEditor()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div class="modal-title">
+        <i data-lucide="book-open"></i>
+        <span id="recipe-modal-title">Nouvelle recette</span>
+      </div>
+      <button class="btn btn-ghost btn-icon-only" onclick="closeRecipeEditor()" aria-label="Fermer">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <form class="form-grid" id="recipe-form" onsubmit="event.preventDefault(); saveRecipe();">
+        <div class="full">
+          <label class="field-label">Job de base *</label>
+          <button type="button" class="cs-trigger" id="trg-base">
+            <span class="cs-value">—</span>
+            <i data-lucide="chevron-down" class="cs-chev"></i>
+          </button>
+          <div class="field-help">Le job dont la séquence et le calage seront clonés. Quantité du gabarit&nbsp;: <span id="f-base-qty" class="cell-mono">—</span>.</div>
+        </div>
+
+        <div class="full">
+          <label class="field-label" for="f-qty">Quantité (override)</label>
+          <input class="field-input mono" type="text" inputmode="numeric" id="f-qty" oninput="updateRecipePreview()">
+          <div class="field-help">Vide = on garde la quantité du job de base. La <b>durée de roule</b> sera proportionnelle à ce nombre, le <b>calage</b> reste fixe.</div>
+        </div>
+
+        <div class="full">
+          <div class="field-row-pair">
+            <div>
+              <label class="field-label" for="f-deadline">Départ atelier</label>
+              <input class="field-input mono" type="datetime-local" id="f-deadline" oninput="updateRecipePreview()">
+            </div>
+            <div>
+              <label class="field-label" for="f-deadline-rel">Délai (J+)</label>
+              <input class="field-input mono" type="text" inputmode="numeric" pattern="\d*" id="f-deadline-rel" oninput="onRelativeInput(event)" placeholder="ex: 5" style="text-align:right;">
+            </div>
+            <div class="or-required" id="or-req"></div>
+          </div>
+          <div class="field-help">Mêmes règles que le JCF : si tu remplis "Délai", chaque génération calcule la date à partir du <b>NOW</b> du moment.</div>
+        </div>
+
+        <div>
+          <label class="field-label" for="f-bat">Date limite BAT</label>
+          <input class="field-input mono" type="datetime-local" id="f-bat" oninput="updateRecipePreview()">
+        </div>
+
+        <div>
+          <label class="field-label">Importance deadline</label>
+          <button type="button" class="cs-trigger" id="trg-priority">
+            <span class="cs-value">Standard</span>
+            <i data-lucide="chevron-down" class="cs-chev"></i>
+          </button>
+        </div>
+      </form>
+
+      <aside class="preview" id="recipe-preview"></aside>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeRecipeEditor()">Annuler</button>
+      <button class="btn btn-primary" id="recipe-save-btn" onclick="saveRecipe()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ───── Scenario editor modal ───── -->
+<div class="modal-backdrop" id="scenario-modal" hidden onclick="if(event.target.id==='scenario-modal') closeScenarioEditor()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div class="modal-title">
+        <i data-lucide="layers"></i>
+        <span id="scenario-modal-title">Nouveau scénario</span>
+      </div>
+      <button class="btn btn-ghost btn-icon-only" onclick="closeScenarioEditor()" aria-label="Fermer">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <form class="form-grid" id="scenario-form" onsubmit="event.preventDefault(); saveScenario();">
+        <div class="full">
+          <label class="field-label" for="s-name">Nom *</label>
+          <input class="field-input" type="text" id="s-name" oninput="updateScenarioPreview()" placeholder="ex: Fin de mois — gros volume">
+        </div>
+
+        <div class="full">
+          <label class="field-label" for="s-desc">Description</label>
+          <textarea class="field-textarea" id="s-desc" oninput="updateScenarioPreview()" placeholder="ex: Stress test : forte charge sur ImpA + ED, BAT serrés"></textarea>
+        </div>
+
+        <div class="full">
+          <label class="field-label">Recettes du scénario</label>
+          <div class="items-list" id="items-list"></div>
+          <button type="button" class="btn btn-sm item-add-btn" onclick="addScenarioItem()">
+            <i data-lucide="plus"></i> Ajouter une recette
+          </button>
+        </div>
+      </form>
+
+      <aside class="preview" id="scenario-preview"></aside>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeScenarioEditor()">Annuler</button>
+      <button class="btn btn-primary" id="scenario-save-btn" onclick="saveScenario()">Enregistrer</button>
+      <button class="btn btn-success" id="scenario-save-run-btn" onclick="saveScenarioAndRun()">
+        <i data-lucide="play"></i> Enregistrer & exécuter
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ───── RAZ modal ───── -->
+<div class="modal-backdrop" id="raz-modal" hidden onclick="if(event.target.id==='raz-modal') closeRazModal()">
+  <div class="modal" role="dialog" aria-modal="true" style="width: min(640px, 92vw);">
+    <div class="modal-head">
+      <div class="modal-title">
+        <i data-lucide="trash-2"></i>
+        Vider les données de test
+      </div>
+      <button class="btn btn-ghost btn-icon-only" onclick="closeRazModal()" aria-label="Fermer">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="modal-body" style="display:block;">
+
+      <div class="raz-warning">
+        <i data-lucide="alert-triangle" class="icon-md"></i>
+        <span>
+          <b>Action irréversible.</b> Tous les jobs et leur historique (avancements, calages, BAT, modifications…)
+          seront supprimés. Recettes et scénarios sont préservés (compteurs remis à zéro).
+        </span>
+      </div>
+
+      <div class="raz-stats" id="raz-stats"></div>
+
+      <div class="raz-cols">
+        <div>
+          <div class="raz-col-title wipe">
+            <i data-lucide="x-circle" class="icon-sm"></i>
+            Sera supprimé
+          </div>
+          <ul class="raz-list raz-list-wipe">
+            <li><i data-lucide="x" class="icon-sm"></i><span>Jobs (et commentaires)</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Éléments + element_walls</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Tâches + assignations + completions</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Saisies (productivity_ratio, last_saisie_at, recordedProgressPct…)</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Setup completions (calages historiques)</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Modifications JCF</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Statuts BAT / papier / forme / plaque / provider</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Notes & audits logistiques</span></li>
+            <li><i data-lucide="x" class="icon-sm"></i><span>Overrides safety zone</span></li>
+          </ul>
+        </div>
+        <div>
+          <div class="raz-col-title keep">
+            <i data-lucide="check-circle" class="icon-sm"></i>
+            Sera préservé
+          </div>
+          <ul class="raz-list raz-list-keep">
+            <li><i data-lucide="check" class="icon-sm"></i><span>Stations, opérateurs, catégories, groupes</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>Clients, référents, transporteurs</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>Formats, presets, délais papier/forme</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>Schedules (version+1 pour caches)</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>Scénarios (forks technique)</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>JCF templates</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>Recettes & scénarios de test</span></li>
+            <li><i data-lucide="check" class="icon-sm"></i><span>Users, settings, configs</span></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeRazModal()">Annuler</button>
+      <button class="btn btn-destructive" onclick="executeRaz()">
+        <i data-lucide="trash-2"></i> Vider la base
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+  // ───────── Mock state ─────────
+  const baseJobs = [
+    {
+      id: 'JOB-A41', reference: 'A41', designation: 'Carte Visite Acme', quantity: 1000,
+      sequence: [
+        { name: 'Impression offset', setupMin: 30, runMin: 60 },
+        { name: 'Découpe massicot', setupMin: 15, runMin: 20 },
+      ],
+    },
+    {
+      id: 'JOB-B12', reference: 'B12', designation: 'Brochure Mairie de Lyon 32p', quantity: 500,
+      sequence: [
+        { name: 'Impression offset', setupMin: 45, runMin: 120 },
+        { name: 'Pliage', setupMin: 20, runMin: 30 },
+        { name: 'Encartage piqué cheval', setupMin: 25, runMin: 40 },
+        { name: 'Massicot finition', setupMin: 10, runMin: 15 },
+      ],
+    },
+    {
+      id: 'JOB-C07', reference: 'C07', designation: 'Affiche 60×80 Festival', quantity: 2000,
+      sequence: [
+        { name: 'Impression numérique', setupMin: 15, runMin: 90 },
+        { name: 'Vernis sélectif', setupMin: 30, runMin: 45 },
+      ],
+    },
+    {
+      id: 'JOB-D23', reference: 'D23', designation: 'Étiquettes adhésives Saveurs', quantity: 5000,
+      sequence: [
+        { name: 'Impression flexo', setupMin: 60, runMin: 180 },
+        { name: 'Découpe forme', setupMin: 40, runMin: 60 },
+        { name: 'Bobinage', setupMin: 10, runMin: 25 },
+      ],
+    },
+  ];
+
+  const globalGenCounter = { 'JOB-A41': 2 };
+
+  let recipes = [
+    {
+      id: 'r1', baseJobId: 'JOB-A41',
+      qty: 2000, deadline: '', deadlineRelDays: '5', batDeadline: '', priority: 1,
+      log: [
+        { jobId: 'JOB-G42', designation: 'Carte Visite Acme 1', qty: 2000, ratio: 2.0, generatedAt: '2026-05-07 09:14' },
+        { jobId: 'JOB-G45', designation: 'Carte Visite Acme 2', qty: 2000, ratio: 2.0, generatedAt: '2026-05-08 10:02' },
+      ],
+    },
+    {
+      id: 'r2', baseJobId: 'JOB-B12',
+      qty: '', deadline: '', deadlineRelDays: '2', batDeadline: '2026-05-12T14:00', priority: 0,
+      log: [],
+    },
+    {
+      id: 'r3', baseJobId: 'JOB-C07',
+      qty: 1000, deadline: '', deadlineRelDays: '7', batDeadline: '', priority: 2,
+      log: [],
+    },
+    {
+      id: 'r4', baseJobId: 'JOB-D23',
+      qty: '', deadline: '', deadlineRelDays: '10', batDeadline: '', priority: 3,
+      log: [],
+    },
+  ];
+
+  let scenarios = [
+    {
+      id: 's1',
+      name: 'Fin de mois — gros volume',
+      description: 'Stress test : 3 cartes de visite + 1 brochure + 2 étiquettes en charge serrée.',
+      items: [
+        { recipeId: 'r1', count: 3 },
+        { recipeId: 'r2', count: 1 },
+        { recipeId: 'r4', count: 2 },
+      ],
+      log: [],
+    },
+    {
+      id: 's2',
+      name: 'BAT en retard',
+      description: 'Tester le comportement quand un BAT serré bloque la chaîne.',
+      items: [
+        { recipeId: 'r2', count: 2 },
+      ],
+      log: [],
+    },
+  ];
+
+  let editingRecipeId = null;
+  let editingScenarioId = null;
+  let modalBaseId = null;
+  let modalPriority = 2;
+  let modalScenarioItems = [];
+  let nextSyntheticId = 100;
+
+  const PRIORITY_OPTIONS = [
+    { value: 0, label: 'Impératif' },
+    { value: 1, label: 'Important' },
+    { value: 2, label: 'Standard' },
+    { value: 3, label: 'Flexible' },
+  ];
+
+  // ───────── Helpers ─────────
+  function findBase(id) { return baseJobs.find(j => j.id === id); }
+  function findRecipe(id) { return recipes.find(r => r.id === id); }
+  function fmtMin(m) { return Number.isInteger(m) ? `${m} min` : `${m.toFixed(1)} min`; }
+  function fmtQty(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+
+  function recipeLabel(r) {
+    const base = findBase(r.baseJobId);
+    if (!base) return '— recette orpheline —';
+    const qty = (r.qty !== '' && r.qty != null) ? r.qty : base.quantity;
+    const parts = [
+      `qty ${fmtQty(qty)}`,
+      r.deadlineRelDays ? `J+${r.deadlineRelDays}` : (r.deadline ? r.deadline.slice(0,10) : '?'),
+      PRIORITY_OPTIONS[r.priority].label,
+    ];
+    return { main: base.designation, sub: parts.join(' · ') + ` · ${r.id}` };
+  }
+
+  function computeGenerated(recipe) {
+    const base = findBase(recipe.baseJobId);
+    if (!base) return null;
+    const newQty = (recipe.qty === '' || recipe.qty == null) ? base.quantity : Number(recipe.qty);
+    const ratio = newQty / base.quantity;
+    const sequence = base.sequence.map(s => ({
+      name: s.name, setupMin: s.setupMin,
+      oldRunMin: s.runMin, newRunMin: s.runMin * ratio,
+    }));
+    const totalSetup = sequence.reduce((acc, s) => acc + s.setupMin, 0);
+    const totalRun = sequence.reduce((acc, s) => acc + s.newRunMin, 0);
+    const totalRunOld = sequence.reduce((acc, s) => acc + s.oldRunMin, 0);
+    const nextIndex = (globalGenCounter[base.id] ?? 0) + 1;
+    return {
+      base, newQty, ratio, sequence,
+      totalSetup, totalRun, totalRunOld,
+      nextDesignation: `${base.designation} ${nextIndex}`,
+      nextIndex,
+    };
+  }
+
+  function resolveRelativeDate(daysStr) {
+    const d = parseInt(daysStr, 10);
+    if (!Number.isFinite(d)) return null;
+    const r = new Date();
+    r.setDate(r.getDate() + d);
+    return r.toISOString().slice(0, 10);
+  }
+
+  function refreshIcons() {
+    if (window.lucide && lucide.createIcons) lucide.createIcons();
+  }
+
+  // ───────── Custom select / autocomplete ─────────
+  let openPopover = null;
+
+  function closeAllPopovers() {
+    if (openPopover) {
+      if (openPopover.popover._cleanup) openPopover.popover._cleanup();
+      openPopover.popover.remove();
+      openPopover.trigger.classList.remove('open');
+      openPopover = null;
+    }
+  }
+
+  document.addEventListener('mousedown', (e) => {
+    if (!openPopover) return;
+    if (openPopover.trigger.contains(e.target) || openPopover.popover.contains(e.target)) return;
+    closeAllPopovers();
+  });
+
+  function mountCustomSelect(triggerEl, {
+    options, initialValue, onSelect, renderTrigger,
+    searchable = false, placeholder = 'Rechercher…',
+  }) {
+    let value = initialValue;
+    const selected = options.find(o => o.value === value) ?? options[0];
+    if (renderTrigger) renderTrigger(selected);
+
+    triggerEl.onclick = (e) => {
+      e.stopPropagation();
+      if (openPopover && openPopover.trigger === triggerEl) {
+        closeAllPopovers();
+        return;
+      }
+      closeAllPopovers();
+
+      const rect = triggerEl.getBoundingClientRect();
+      const popover = document.createElement('div');
+      popover.className = 'cs-popover';
+      popover.style.top = `${rect.bottom + 2}px`;
+      popover.style.left = `${rect.left}px`;
+      popover.style.minWidth = `${rect.width}px`;
+
+      let filterText = '';
+      let activeIdx = options.findIndex(o => o.value === value);
+
+      function renderOptions() {
+        const filtered = filterText
+          ? options.filter(o => (o.label + ' ' + (o.sublabel ?? '')).toLowerCase().includes(filterText.toLowerCase()))
+          : options;
+
+        let html = '';
+        if (searchable) {
+          html += `<div class="cs-search"><input type="text" autocomplete="off" placeholder="${placeholder}" value="${filterText.replace(/"/g, '&quot;')}"></div>`;
+        }
+        if (filtered.length === 0) {
+          html += `<div class="cs-empty">Aucun résultat</div>`;
+        } else {
+          html += filtered.map((o) => {
+            const isSelected = o.value === value;
+            const isActive = options.indexOf(o) === activeIdx;
+            const prioClass = (typeof o.value === 'number' && o.value >= 0 && o.value <= 3) ? `prio-${o.value}` : '';
+            return `
+              <div class="cs-option ${prioClass} ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''}" data-value="${o.value}">
+                <span>${o.label}</span>
+                ${o.sublabel ? `<span class="cs-opt-sub">${o.sublabel}</span>` : ''}
+              </div>`;
+          }).join('');
+        }
+        popover.innerHTML = html;
+
+        if (searchable) {
+          const searchInput = popover.querySelector('.cs-search input');
+          searchInput.addEventListener('input', (e) => {
+            filterText = e.target.value;
+            renderOptions();
+            const newSearch = popover.querySelector('.cs-search input');
+            newSearch.focus();
+            newSearch.setSelectionRange(filterText.length, filterText.length);
+          });
+          setTimeout(() => searchInput.focus(), 0);
+        }
+
+        popover.querySelectorAll('.cs-option').forEach(el => {
+          el.addEventListener('mousedown', (ev) => {
+            ev.preventDefault();
+            const v = el.getAttribute('data-value');
+            const opt = options.find(o => String(o.value) === v);
+            if (opt) {
+              value = opt.value;
+              if (renderTrigger) renderTrigger(opt);
+              onSelect(opt.value);
+              closeAllPopovers();
+            }
+          });
+          el.addEventListener('mouseenter', () => {
+            const v = el.getAttribute('data-value');
+            activeIdx = options.indexOf(options.find(o => String(o.value) === v));
+          });
+        });
+      }
+
+      renderOptions();
+      document.body.appendChild(popover);
+      triggerEl.classList.add('open');
+      openPopover = { popover, trigger: triggerEl };
+
+      const keyHandler = (e) => {
+        if (!openPopover) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeAllPopovers();
+          triggerEl.focus();
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeIdx = Math.min(activeIdx + 1, options.length - 1);
+          renderOptions();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeIdx = Math.max(activeIdx - 1, 0);
+          renderOptions();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const opt = options[activeIdx];
+          if (opt) {
+            value = opt.value;
+            if (renderTrigger) renderTrigger(opt);
+            onSelect(opt.value);
+            closeAllPopovers();
+          }
+        }
+      };
+      document.addEventListener('keydown', keyHandler);
+      popover._cleanup = () => document.removeEventListener('keydown', keyHandler);
+    };
+  }
+
+  // ───────── Render scenarios table ─────────
+  function renderScenarios() {
+    document.getElementById('scenarios-count').textContent = `(${scenarios.length})`;
+    const tbody = document.getElementById('scenarios-tbody');
+    if (!scenarios.length) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Aucun scénario. Crée-en un pour orchestrer un ensemble de recettes en un clic.</td></tr>`;
+      refreshIcons();
+      return;
+    }
+    tbody.innerHTML = scenarios.map(s => scenarioRowHTML(s)).join('');
+    refreshIcons();
+  }
+
+  function scenarioRowHTML(s) {
+    const items = s.items.filter(it => findRecipe(it.recipeId));
+    const totalJobs = items.reduce((acc, it) => acc + it.count, 0);
+    const chips = items.map(it => {
+      const r = findRecipe(it.recipeId);
+      const base = findBase(r.baseJobId);
+      return `<span class="recipe-chip"><span class="recipe-chip-count">${it.count}×</span> ${base.designation}</span>`;
+    }).join('');
+    return `
+      <tr>
+        <td>
+          <div class="scenario-name">${s.name}</div>
+          ${s.description ? `<div class="scenario-desc">${s.description}</div>` : ''}
+        </td>
+        <td>${chips || '<span class="cell-muted">— vide —</span>'}</td>
+        <td class="center"><span class="cell-mono" style="color: var(--text-1); font-weight: 600;">${totalJobs}</span></td>
+        <td class="center"><span class="cell-mono">${s.log.length}</span></td>
+        <td class="actions">
+          <button class="btn btn-sm btn-success" onclick="executeScenario('${s.id}')" title="Exécuter le scénario">
+            <i data-lucide="play"></i> Exécuter
+          </button>
+          <button class="btn btn-sm btn-icon-only" onclick="openScenarioEditor('${s.id}')" title="Éditer">
+            <i data-lucide="pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-icon-only" onclick="duplicateScenario('${s.id}')" title="Dupliquer">
+            <i data-lucide="copy"></i>
+          </button>
+          <button class="btn btn-sm btn-icon-only btn-danger" onclick="deleteScenario('${s.id}')" title="Supprimer">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </td>
+      </tr>`;
+  }
+
+  // ───────── Render recipes table ─────────
+  function renderRecipes() {
+    document.getElementById('recipes-count').textContent = `(${recipes.length})`;
+    const tbody = document.getElementById('recipes-tbody');
+    if (!recipes.length) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Aucune recette. Crée-en une pour générer des jobs de test.</td></tr>`;
+      refreshIcons();
+      return;
+    }
+    tbody.innerHTML = recipes.map(r => recipeRowHTML(r)).join('');
+    tbody.querySelectorAll('.gen-count').forEach(el => {
+      const rid = el.getAttribute('data-recipe-id');
+      el.addEventListener('mouseenter', (e) => showGenTooltip(rid, e.currentTarget));
+      el.addEventListener('mouseleave', hideGenTooltip);
+    });
+    refreshIcons();
+  }
+
+  function recipeRowHTML(r) {
+    const g = computeGenerated(r);
+    if (!g) return '';
+
+    const qtyCell = (r.qty !== '' && r.qty != null)
+      ? `<span class="cell-mono">${fmtQty(Number(r.qty))}</span>`
+      : `<span class="cell-mono cell-muted">${fmtQty(g.base.quantity)} <span style="font-size:10px">(base)</span></span>`;
+
+    let delaiCell = '';
+    if (r.deadline) {
+      delaiCell = `<span class="cell-mono">${r.deadline.replace('T', ' ')}</span>`;
+    } else if (r.deadlineRelDays) {
+      delaiCell = `<span class="cell-mono">J+${r.deadlineRelDays}</span> <span class="cell-muted" style="font-size:10.5px">→ ${resolveRelativeDate(r.deadlineRelDays) ?? ''}</span>`;
+    } else {
+      delaiCell = `<span class="cell-muted">—</span>`;
+    }
+
+    const batCell = r.batDeadline
+      ? `<span class="cell-mono">${r.batDeadline.replace('T', ' ')}</span>`
+      : `<span class="cell-muted">—</span>`;
+
+    const impCell = `<span class="imp-chip prio-${r.priority}">${PRIORITY_OPTIONS[r.priority].label}</span>`;
+    const ratioCell = Math.abs(g.ratio - 1) < 0.001
+      ? `<span class="ratio-chip">×1.00</span>`
+      : `<span class="ratio-chip scaled">×${g.ratio.toFixed(2)}</span>`;
+
+    const genCell = r.log.length === 0
+      ? `<span class="gen-count empty" data-recipe-id="${r.id}"><span class="num">0</span></span>`
+      : `<span class="gen-count" data-recipe-id="${r.id}"><span class="num">${r.log.length}</span> jobs</span>`;
+
+    return `
+      <tr>
+        <td>
+          <div class="cell-base-title">${g.base.designation}</div>
+          <div class="cell-base-ref">${g.base.id} · ${g.base.sequence.length} étapes</div>
+        </td>
+        <td class="right">${qtyCell}</td>
+        <td>${delaiCell}</td>
+        <td>${batCell}</td>
+        <td>${impCell}</td>
+        <td class="center">${ratioCell}</td>
+        <td class="center">${genCell}</td>
+        <td class="actions">
+          <button class="btn btn-sm btn-success" onclick="generateOne('${r.id}')" title="Générer un job">
+            <i data-lucide="play"></i> Générer
+          </button>
+          <button class="btn btn-sm btn-icon-only" onclick="openRecipeEditor('${r.id}')" title="Éditer">
+            <i data-lucide="pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-icon-only btn-danger" onclick="deleteRecipe('${r.id}')" title="Supprimer">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </td>
+      </tr>`;
+  }
+
+  function showGenTooltip(recipeId, anchor) {
+    const r = findRecipe(recipeId);
+    if (!r || !r.log.length) return;
+    const tip = document.getElementById('gen-tooltip');
+    const last = r.log.slice(-5).reverse();
+    tip.innerHTML = `
+      <div class="gen-tooltip-title">Derniers jobs générés (${r.log.length} total)</div>
+      ${last.map(l => `
+        <div class="gen-tooltip-row">
+          <span><span class="gid">${l.jobId}</span> ${l.designation}</span>
+          <span class="cell-muted">${l.generatedAt}</span>
+        </div>`).join('')}
+    `;
+    const rect = anchor.getBoundingClientRect();
+    tip.style.top = `${rect.bottom + 6}px`;
+    tip.style.left = `${Math.max(8, rect.left + rect.width / 2 - 140)}px`;
+    tip.hidden = false;
+  }
+  function hideGenTooltip() { document.getElementById('gen-tooltip').hidden = true; }
+
+  // ───────── Recipe editor ─────────
+  function openRecipeEditor(id) {
+    editingRecipeId = id;
+    document.getElementById('recipe-modal-title').textContent = id ? 'Éditer la recette' : 'Nouvelle recette';
+
+    let r;
+    if (id) {
+      r = findRecipe(id);
+    } else {
+      r = { baseJobId: baseJobs[0].id, qty: '', deadline: '', deadlineRelDays: '', batDeadline: '', priority: 2 };
+    }
+    modalBaseId = r.baseJobId;
+    modalPriority = r.priority ?? 2;
+    document.getElementById('f-qty').value = r.qty ?? '';
+    document.getElementById('f-deadline').value = r.deadline ?? '';
+    document.getElementById('f-deadline-rel').value = r.deadlineRelDays ?? '';
+    document.getElementById('f-bat').value = r.batDeadline ?? '';
+
+    const baseTrg = document.getElementById('trg-base');
+    mountCustomSelect(baseTrg, {
+      options: baseJobs.map(j => ({
+        value: j.id,
+        label: `${j.designation}`,
+        sublabel: `${j.id} · qty ${fmtQty(j.quantity)}`,
+      })),
+      initialValue: r.baseJobId,
+      searchable: true,
+      placeholder: 'Rechercher un job…',
+      onSelect: (v) => { modalBaseId = v; updateRecipePreview(); },
+      renderTrigger: (opt) => {
+        const j = findBase(opt.value);
+        baseTrg.querySelector('.cs-value').innerHTML = `<span>${j.designation}</span> <span class="cell-muted" style="font-family:ui-monospace,monospace; font-size:11px;">· ${j.id}</span>`;
+      },
+    });
+
+    const prioTrg = document.getElementById('trg-priority');
+    mountCustomSelect(prioTrg, {
+      options: PRIORITY_OPTIONS,
+      initialValue: r.priority ?? 2,
+      onSelect: (v) => { modalPriority = v; updateRecipePreview(); },
+      renderTrigger: (opt) => {
+        prioTrg.className = `cs-trigger prio-${opt.value}`;
+        prioTrg.querySelector('.cs-value').textContent = opt.label;
+      },
+    });
+
+    document.getElementById('recipe-modal').hidden = false;
+    document.getElementById('recipe-save-btn').textContent = id ? 'Enregistrer' : 'Créer';
+    refreshIcons();
+    updateRecipePreview();
+  }
+
+  function closeRecipeEditor() {
+    closeAllPopovers();
+    document.getElementById('recipe-modal').hidden = true;
+    editingRecipeId = null;
+  }
+
+  function onRelativeInput(e) {
+    e.target.value = e.target.value.replace(/[^\d]/g, '');
+    updateRecipePreview();
+  }
+
+  function updateRecipePreview() {
+    const base = findBase(modalBaseId);
+    if (!base) return;
+
+    document.getElementById('f-base-qty').textContent = fmtQty(base.quantity);
+    document.getElementById('f-qty').placeholder = `${fmtQty(base.quantity)} (base)`;
+
+    const draft = {
+      baseJobId: modalBaseId,
+      qty: document.getElementById('f-qty').value,
+      deadline: document.getElementById('f-deadline').value,
+      deadlineRelDays: document.getElementById('f-deadline-rel').value,
+      batDeadline: document.getElementById('f-bat').value,
+      priority: modalPriority,
+    };
+
+    const orReq = document.getElementById('or-req');
+    const satisfied = draft.deadline.trim() !== '' || draft.deadlineRelDays.trim() !== '';
+    orReq.className = `or-required ${satisfied ? 'satisfied' : 'unsatisfied'}`;
+    orReq.innerHTML = satisfied
+      ? `<i data-lucide="check" class="icon-sm"></i> Au moins un des deux est rempli`
+      : `<i data-lucide="alert-triangle" class="icon-sm"></i> Au moins un des deux requis`;
+    document.getElementById('recipe-save-btn').disabled = !satisfied;
+    document.getElementById('recipe-save-btn').style.opacity = satisfied ? '1' : '0.5';
+
+    const g = computeGenerated(draft);
+    const resolvedDate = draft.deadlineRelDays ? resolveRelativeDate(draft.deadlineRelDays) : null;
+    const ratioBadge = Math.abs(g.ratio - 1) < 0.001
+      ? `(×1.00 — durées inchangées)`
+      : `(<span class="preview-strong">×${g.ratio.toFixed(2)}</span>)`;
+
+    const seqHtml = g.sequence.map(s => `
+      <div style="display:flex; justify-content:space-between; gap:8px;">
+        <span class="preview-key">${s.name}</span>
+        <span class="preview-val">${fmtMin(s.oldRunMin)} → <span class="preview-strong">${fmtMin(s.newRunMin)}</span></span>
+      </div>`).join('');
+
+    const dualWarn = (draft.deadline && draft.deadlineRelDays)
+      ? `<div class="preview-warn"><i data-lucide="alert-triangle" class="icon-sm"></i> Départ et Délai sont tous deux remplis. Mêmes règles que le JCF.</div>` : '';
+
+    document.getElementById('recipe-preview').innerHTML = `
+      <div class="preview-title">Aperçu de la prochaine génération</div>
+      <div class="preview-section">
+        <div class="preview-section-head">Désignation</div>
+        <div class="preview-key preview-strong">${g.nextDesignation}</div>
+        <div class="field-help">Puis ${g.base.designation} ${g.nextIndex + 1}, ${g.base.designation} ${g.nextIndex + 2}…</div>
+      </div>
+      <div class="preview-divider"></div>
+      <div class="preview-section">
+        <div class="preview-section-head">Quantité</div>
+        <div class="preview-key">${fmtQty(g.newQty)} ${ratioBadge}</div>
+      </div>
+      <div class="preview-section">
+        <div class="preview-section-head">Roule (proportionnée)</div>
+        ${seqHtml}
+        <div style="margin-top:5px; padding-top:5px; border-top:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between;">
+            <span class="preview-key">Total roule</span>
+            <span class="preview-val">${fmtMin(g.totalRunOld)} → <span class="preview-strong">${fmtMin(g.totalRun)}</span></span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span class="preview-key">Total calage (inchangé)</span>
+            <span class="preview-val">${fmtMin(g.totalSetup)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="preview-divider"></div>
+      <div class="preview-section">
+        <div class="preview-section-head">Dates</div>
+        <div class="preview-key">Départ : <span class="preview-val">${draft.deadline ? draft.deadline.replace('T', ' ') : (resolvedDate ? `${resolvedDate} (J+${draft.deadlineRelDays})` : '—')}</span></div>
+        <div class="preview-key">BAT : <span class="preview-val">${draft.batDeadline ? draft.batDeadline.replace('T', ' ') : '—'}</span></div>
+        <div class="preview-key">Importance : <span class="preview-val" style="color: var(--prio-${draft.priority})">${PRIORITY_OPTIONS[draft.priority].label}</span></div>
+        ${dualWarn}
+      </div>
+    `;
+    refreshIcons();
+  }
+
+  function saveRecipe() {
+    const draft = {
+      baseJobId: modalBaseId,
+      qty: document.getElementById('f-qty').value,
+      deadline: document.getElementById('f-deadline').value,
+      deadlineRelDays: document.getElementById('f-deadline-rel').value,
+      batDeadline: document.getElementById('f-bat').value,
+      priority: modalPriority,
+    };
+    if (!draft.deadline.trim() && !draft.deadlineRelDays.trim()) {
+      toast('Renseigne Départ atelier ou Délai (J+).', 'warn');
+      return;
+    }
+    if (editingRecipeId) {
+      const idx = recipes.findIndex(r => r.id === editingRecipeId);
+      recipes[idx] = { ...recipes[idx], ...draft };
+      toast(`Recette mise à jour.`);
+    } else {
+      const newId = `r${nextSyntheticId++}`;
+      recipes.push({ id: newId, ...draft, log: [] });
+      toast(`Recette créée.`);
+    }
+    closeRecipeEditor();
+    renderRecipes();
+    renderScenarios();
+  }
+
+  function deleteRecipe(id) {
+    const r = findRecipe(id);
+    const base = findBase(r.baseJobId);
+    const usedIn = scenarios.filter(s => s.items.some(it => it.recipeId === id));
+    if (usedIn.length > 0) {
+      toast(`Impossible : recette utilisée dans ${usedIn.length} scénario(s).`, 'warn');
+      return;
+    }
+    if (!confirm(`Supprimer la recette « ${base.designation} » ? (${r.log.length} jobs déjà générés ne seront pas affectés.)`)) return;
+    recipes = recipes.filter(x => x.id !== id);
+    renderRecipes();
+    renderScenarios();
+    toast('Recette supprimée.');
+  }
+
+  // ───────── Scenario editor ─────────
+  function openScenarioEditor(id) {
+    editingScenarioId = id;
+    document.getElementById('scenario-modal-title').textContent = id ? 'Éditer le scénario' : 'Nouveau scénario';
+    let s;
+    if (id) {
+      s = scenarios.find(x => x.id === id);
+      modalScenarioItems = s.items.map(it => ({ ...it }));
+    } else {
+      s = { name: '', description: '', items: [] };
+      modalScenarioItems = [];
+    }
+    document.getElementById('s-name').value = s.name ?? '';
+    document.getElementById('s-desc').value = s.description ?? '';
+
+    document.getElementById('scenario-modal').hidden = false;
+    document.getElementById('scenario-save-btn').textContent = id ? 'Enregistrer' : 'Créer';
+    refreshIcons();
+    renderScenarioItems();
+    updateScenarioPreview();
+  }
+
+  function closeScenarioEditor() {
+    closeAllPopovers();
+    document.getElementById('scenario-modal').hidden = true;
+    editingScenarioId = null;
+    modalScenarioItems = [];
+  }
+
+  function renderScenarioItems() {
+    const list = document.getElementById('items-list');
+    if (modalScenarioItems.length === 0) {
+      list.innerHTML = `<div class="items-empty">Aucune recette. Ajoute-en au moins une ci-dessous.</div>`;
+      return;
+    }
+    list.innerHTML = modalScenarioItems.map((it, idx) => {
+      const r = findRecipe(it.recipeId);
+      const valHtml = r
+        ? `<span>${findBase(r.baseJobId)?.designation ?? '—'}</span> <span class="cell-muted" style="font-family:ui-monospace,monospace; font-size:11px;">· ${r.id}</span>`
+        : `<span class="cell-muted">— sélectionner —</span>`;
+      return `
+        <div class="item-row">
+          <button type="button" class="cs-trigger" id="trg-item-${idx}">
+            <span class="cs-value">${valHtml}</span>
+            <i data-lucide="chevron-down" class="cs-chev"></i>
+          </button>
+          <input class="field-input mono" type="number" min="1" max="99" value="${it.count}" oninput="updateScenarioItemCount(${idx}, this.value)" style="text-align:right;">
+          <button type="button" class="btn btn-icon-only btn-danger" onclick="removeScenarioItem(${idx})" title="Retirer">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>`;
+    }).join('');
+    refreshIcons();
+
+    modalScenarioItems.forEach((it, idx) => {
+      const trg = document.getElementById(`trg-item-${idx}`);
+      mountCustomSelect(trg, {
+        options: recipes.map(r => {
+          const base = findBase(r.baseJobId);
+          const lbl = recipeLabel(r);
+          return {
+            value: r.id,
+            label: lbl.main,
+            sublabel: lbl.sub,
+          };
+        }),
+        initialValue: it.recipeId,
+        searchable: true,
+        placeholder: 'Rechercher une recette…',
+        onSelect: (v) => { modalScenarioItems[idx].recipeId = v; renderScenarioItems(); updateScenarioPreview(); },
+        renderTrigger: () => { /* handled via renderScenarioItems re-render */ },
+      });
+    });
+  }
+
+  function addScenarioItem() {
+    const firstRecipe = recipes[0];
+    if (!firstRecipe) {
+      toast('Crée au moins une recette avant.', 'warn');
+      return;
+    }
+    modalScenarioItems.push({ recipeId: firstRecipe.id, count: 1 });
+    renderScenarioItems();
+    updateScenarioPreview();
+  }
+
+  function removeScenarioItem(idx) {
+    modalScenarioItems.splice(idx, 1);
+    renderScenarioItems();
+    updateScenarioPreview();
+  }
+
+  function updateScenarioItemCount(idx, val) {
+    const n = Math.max(1, Math.min(99, parseInt(val, 10) || 1));
+    modalScenarioItems[idx].count = n;
+    updateScenarioPreview();
+  }
+
+  function updateScenarioPreview() {
+    const name = document.getElementById('s-name').value.trim();
+    const totalJobs = modalScenarioItems.reduce((acc, it) => acc + it.count, 0);
+    const valid = name && modalScenarioItems.length > 0;
+    document.getElementById('scenario-save-btn').disabled = !valid;
+    document.getElementById('scenario-save-btn').style.opacity = valid ? '1' : '0.5';
+    document.getElementById('scenario-save-run-btn').disabled = !valid;
+    document.getElementById('scenario-save-run-btn').style.opacity = valid ? '1' : '0.5';
+
+    const breakdown = modalScenarioItems.map(it => {
+      const r = findRecipe(it.recipeId);
+      if (!r) return `<div class="preview-key cell-muted">— recette manquante —</div>`;
+      const base = findBase(r.baseJobId);
+      return `<div style="display:flex; justify-content:space-between; gap:8px;">
+        <span class="preview-key">${it.count}× ${base.designation}</span>
+        <span class="cell-muted" style="font-size:10.5px">${r.id}</span>
+      </div>`;
+    }).join('');
+
+    const issues = [];
+    if (!name) issues.push('Nom requis');
+    if (modalScenarioItems.length === 0) issues.push('Au moins une recette requise');
+    const issuesHtml = issues.length
+      ? `<div class="preview-warn"><i data-lucide="alert-triangle" class="icon-sm"></i> ${issues.join(' · ')}</div>`
+      : '';
+
+    document.getElementById('scenario-preview').innerHTML = `
+      <div class="preview-title">Aperçu d'exécution</div>
+      <div class="preview-total">
+        <div class="big">${totalJobs}</div>
+        <div class="lbl">jobs créés par exécution</div>
+      </div>
+      <div class="preview-section">
+        <div class="preview-section-head">Composition</div>
+        ${breakdown || '<div class="preview-key cell-muted">— vide —</div>'}
+      </div>
+      ${issuesHtml}
+    `;
+    refreshIcons();
+  }
+
+  function saveScenario(thenRun = false) {
+    const name = document.getElementById('s-name').value.trim();
+    const description = document.getElementById('s-desc').value.trim();
+    if (!name || modalScenarioItems.length === 0) {
+      toast('Donne un nom et au moins une recette.', 'warn');
+      return;
+    }
+    let savedId;
+    if (editingScenarioId) {
+      const idx = scenarios.findIndex(x => x.id === editingScenarioId);
+      scenarios[idx] = { ...scenarios[idx], name, description, items: modalScenarioItems.map(it => ({ ...it })) };
+      savedId = editingScenarioId;
+      if (!thenRun) toast(`Scénario mis à jour.`);
+    } else {
+      savedId = `s${nextSyntheticId++}`;
+      scenarios.push({ id: savedId, name, description, items: modalScenarioItems.map(it => ({ ...it })), log: [] });
+      if (!thenRun) toast(`Scénario créé.`);
+    }
+    closeScenarioEditor();
+    renderScenarios();
+    if (thenRun) executeScenario(savedId);
+  }
+
+  function saveScenarioAndRun() { saveScenario(true); }
+
+  function deleteScenario(id) {
+    const s = scenarios.find(x => x.id === id);
+    if (!confirm(`Supprimer le scénario « ${s.name} » ? (${s.log.length} exécutions consignées.)`)) return;
+    scenarios = scenarios.filter(x => x.id !== id);
+    renderScenarios();
+    toast('Scénario supprimé.');
+  }
+
+  function duplicateScenario(id) {
+    const s = scenarios.find(x => x.id === id);
+    const newId = `s${nextSyntheticId++}`;
+    scenarios.push({
+      id: newId,
+      name: `${s.name} (copie)`,
+      description: s.description,
+      items: s.items.map(it => ({ ...it })),
+      log: [],
+    });
+    renderScenarios();
+    toast(`Scénario dupliqué.`);
+  }
+
+  function executeScenario(id) {
+    const s = scenarios.find(x => x.id === id);
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const created = [];
+    // Scoped per execution: suffix counters restart fresh for each run, so
+    // a scenario rerun produces "Acme 1, Acme 2…" again (the user's call;
+    // collisions with prior gens are managed via RAZ).
+    const localCounters = {};
+    s.items.forEach(it => {
+      const r = findRecipe(it.recipeId);
+      if (!r) return;
+      const base = findBase(r.baseJobId);
+      for (let i = 0; i < it.count; i++) {
+        const newQty = (r.qty === '' || r.qty == null) ? base.quantity : Number(r.qty);
+        const ratio = newQty / base.quantity;
+        const localN = (localCounters[base.id] ?? 0) + 1;
+        localCounters[base.id] = localN;
+        const designation = `${base.designation} ${localN}`;
+        const newJobId = `JOB-G${50 + nextSyntheticId++}`;
+        r.log.push({
+          jobId: newJobId, designation, qty: newQty, ratio, generatedAt: stamp,
+        });
+        created.push(newJobId);
+      }
+    });
+    s.log.push({ executedAt: stamp, jobCount: created.length, jobIds: created });
+    renderScenarios();
+    renderRecipes();
+    toast(`Scénario <strong>« ${s.name} »</strong> exécuté : ${created.length} jobs créés.`);
+  }
+
+  // ───────── Quick actions: 1-of-each + RAZ ─────────
+  function generateOne(id) {
+    const r = findRecipe(id);
+    const g = computeGenerated(r);
+    const newJobId = `JOB-G${50 + nextSyntheticId++}`;
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    r.log.push({
+      jobId: newJobId, designation: g.nextDesignation,
+      qty: g.newQty, ratio: g.ratio, generatedAt: stamp,
+    });
+    globalGenCounter[g.base.id] = g.nextIndex;
+    renderRecipes();
+    toast(`<strong>${newJobId}</strong> créé : « ${g.nextDesignation} » · qty=${fmtQty(g.newQty)} · roule ×${g.ratio.toFixed(2)}`);
+  }
+
+  function generateOneOfEachRecipe() {
+    if (recipes.length === 0) {
+      toast('Aucune recette à exécuter.', 'warn');
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const created = [];
+    recipes.forEach(r => {
+      const g = computeGenerated(r);
+      const newJobId = `JOB-G${50 + nextSyntheticId++}`;
+      r.log.push({
+        jobId: newJobId, designation: g.nextDesignation,
+        qty: g.newQty, ratio: g.ratio, generatedAt: stamp,
+      });
+      globalGenCounter[g.base.id] = g.nextIndex;
+      created.push(newJobId);
+    });
+    renderRecipes();
+    toast(`<strong>${created.length} jobs</strong> créés depuis ${recipes.length} recette${recipes.length > 1 ? 's' : ''}.`);
+  }
+
+  function openRazModal() {
+    const totalJobs = recipes.reduce((acc, r) => acc + r.log.length, 0);
+    const totalTasks = recipes.reduce((acc, r) => {
+      const base = findBase(r.baseJobId);
+      return acc + r.log.length * (base?.sequence.length ?? 0);
+    }, 0);
+    document.getElementById('raz-stats').innerHTML = `
+      <span><span class="stat-num">${totalJobs}</span> jobs</span>
+      <span><span class="stat-num">${totalTasks}</span> tâches</span>
+      <span><span class="stat-num">${totalJobs > 0 ? '~' + totalJobs : 0}</span> saisies (mock)</span>
+    `;
+    document.getElementById('raz-modal').hidden = false;
+    refreshIcons();
+  }
+  function closeRazModal() { document.getElementById('raz-modal').hidden = true; }
+  function executeRaz() {
+    const wipedJobs = recipes.reduce((acc, r) => acc + r.log.length, 0);
+    recipes.forEach(r => { r.log = []; });
+    scenarios.forEach(s => { s.log = []; });
+    Object.keys(globalGenCounter).forEach(k => { delete globalGenCounter[k]; });
+    closeRazModal();
+    renderRecipes();
+    renderScenarios();
+    toast(`Base vidée. <strong>${wipedJobs} jobs</strong> + dépendances supprimés. Recettes & scénarios préservés.`);
+  }
+
+  // ───────── Toast ─────────
+  function toast(msgHTML, kind = 'success') {
+    const el = document.getElementById('toast');
+    const isWarn = kind === 'warn';
+    const icon = isWarn ? 'alert-triangle' : 'check-circle-2';
+    el.innerHTML = `<i data-lucide="${icon}" class="icon-md"></i><span>${msgHTML}</span>`;
+    el.style.background = isWarn ? 'rgba(245, 158, 11, 0.18)' : 'rgba(16, 185, 129, 0.18)';
+    el.style.borderColor = isWarn ? 'rgba(245, 158, 11, 0.5)' : 'rgba(16, 185, 129, 0.5)';
+    el.style.color = isWarn ? 'rgb(252 211 77)' : 'rgb(110 231 183)';
+    el.hidden = false;
+    refreshIcons();
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+
+  // ───────── Init ─────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || openPopover) return;
+    if (!document.getElementById('raz-modal').hidden) closeRazModal();
+    else if (!document.getElementById('scenario-modal').hidden) closeScenarioEditor();
+    else if (!document.getElementById('recipe-modal').hidden) closeRecipeEditor();
+  });
+
+  renderScenarios();
+  renderRecipes();
+  refreshIcons();
+</script>
+
+</body>
+</html>

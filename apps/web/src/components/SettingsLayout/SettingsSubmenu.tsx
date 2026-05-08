@@ -24,6 +24,7 @@ const SETTINGS_ITEMS = [
   { label: 'Délai papier',                path: '/settings/paper-lead-time' },
   { label: 'Délai forme',                 path: '/settings/forme-lead-time' },
   { label: "Now (override)",              path: '/settings/now-override' },
+  { label: 'Jobs de test',                 path: '/settings/jobs-de-test' },
 ];
 
 /**
