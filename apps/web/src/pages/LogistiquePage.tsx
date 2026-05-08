@@ -6,8 +6,10 @@
  *
  * Phase 1.1 features (2026-04-27):
  *   - Date filter (Hier / Aujourd'hui / Demain / Cette semaine) — based on
- *     scheduledStart / scheduledEnd from the schedule snapshot, falls back to
- *     workshopExitDate for client expeditions.
+ *     scheduledStart / scheduledEnd from the schedule snapshot. Client
+ *     expeditions track the live planning too: scheduledAt = scheduledEnd
+ *     of the job's last task. workshopExitDate is kept as the `deadline`
+ *     reference so we can still surface contractual lateness.
  *   - Reliquat — overdue movements (scheduled < today, not processed) appear
  *     at the top of their column with a red accent bar + "Reliquat · Nj" badge,
  *     still cockable. The toolbar counter shows how many are visible.
@@ -70,10 +72,17 @@ interface Movement {
   type: MovementType;
   refType: LogisticsRefType;
   refId: string;
-  /** Planned datetime — when this movement is *expected* to occur. This
-   *  value is stable across the lifecycle so the row stays in place in
-   *  the sort order even after being checked. */
+  /** Planned datetime — when this movement is *expected* to occur according
+   *  to the live planning. Comes from the engine's scheduledEnd (predecessor
+   *  for ST departures, last-task for client expeditions). Migrates when
+   *  the planning recalculates upstream; stays put when the user checks
+   *  the row (the actual moment lives in `actualAt`). */
   scheduledAt: Date | null;
+  /** Contractual deadline reference. Populated for client expeditions
+   *  (= job.workshopExitDate). When `scheduledAt > deadline`, the planning
+   *  predicts the job ships late vs. its commitment — used for visual
+   *  signalling. Undefined for movements with no contractual deadline. */
+  deadline?: Date | null;
   /** Actual datetime — when the movement was physically performed.
    *  Null until checked; populated from completedAt / shippedAt / latest
    *  audit when available. Displayed in the second time column. */
@@ -336,10 +345,22 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
 
     const exitDate = internalJob.workshopExitDate ? new Date(internalJob.workshopExitDate) : null;
 
-    // Client-expedition row: scheduledAt always = workshopExitDate so the
-    // row position is stable (doesn't migrate when the user checks). The
-    // actual shipping moment lives in actualAt (= shippedAt or, very
-    // briefly between optimistic and re-fetch, now()).
+    // Client-expedition row: scheduledAt = scheduledEnd of the job's last
+    // task (highest sequenceOrder across elements), i.e. when the planning
+    // says the product is actually ready to ship. Aligned with the ST flows,
+    // which already track the live planning. workshopExitDate is preserved
+    // as `deadline` so the row can flag "ready after the contractual
+    // deadline" without anchoring the day-grouping to it.
+    let readyAt: Date | null = null;
+    if (lastSeq !== undefined) {
+      const lastTask = (tasksByElementId.get(lastSeq.elementId) ?? [])
+        .find((t) => t.sequenceOrder === lastSeq.sequenceOrder);
+      const lastAssignment = lastTask !== undefined ? assignmentsByTaskId.get(lastTask.id) : undefined;
+      if (lastAssignment !== undefined) {
+        readyAt = new Date(lastAssignment.scheduledEnd);
+      }
+    }
+
     const shippedAt = internalJob.shipped
       ? (internalJob.shippedAt ? new Date(internalJob.shippedAt) : new Date())
       : null;
@@ -349,9 +370,10 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
       type: 'client',
       refType: 'job',
       refId: job.internalId,
-      scheduledAt: exitDate,
+      scheduledAt: readyAt,
+      deadline: exitDate,
       actualAt: shippedAt,
-      time: formatTimeOfDay(exitDate, '17:00'),
+      time: formatTimeOfDay(readyAt, '17:00'),
       title: 'Expédition client',
       subtitle: `Job #${job.id} — ${jobLabel}`,
       counterparty: job.client,
