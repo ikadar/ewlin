@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Plus, Trash2, Pencil, Copy, Play, Zap, Layers, BookOpen,
-  AlertTriangle, X, CheckCircle2, Info,
+  AlertTriangle, X, CheckCircle2, Info, Clock, Check,
 } from 'lucide-react';
 import {
   useGetRecipesQuery,
@@ -32,7 +32,13 @@ import {
   type JobTestScenarioResponse,
   type JobTestWipeResponse,
 } from '../store/api/jobTestApi';
-import { useGetSnapshotQuery, useAppDispatch, scheduleApi } from '../store';
+import {
+  useGetSnapshotQuery,
+  useAppDispatch,
+  scheduleApi,
+  useGetNowOverrideQuery,
+  useUpdateNowOverrideMutation,
+} from '../store';
 import { prodSnapshotApi } from '../store/api/prodSnapshotApi';
 import { fluxApi } from '../store/api/fluxApi';
 import { JobTestRecipeEditor } from '../components/JobTestRecipeEditor/JobTestRecipeEditor';
@@ -212,6 +218,8 @@ export function JobsDeTestPage() {
       </header>
 
       <main className="flex-1 p-6 space-y-6">
+        <NowOverrideSection />
+
         <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2.5 text-xs text-amber-300 flex items-start gap-2">
           <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" strokeWidth={2} />
           <span>
@@ -652,4 +660,181 @@ function RazModal({ onCancel, onConfirm, isWiping }: RazModalProps) {
 function errorMessage(err: unknown, fallback: string): string {
   const e = err as { data?: { message?: string; details?: string[] } };
   return e?.data?.message ?? e?.data?.details?.join(', ') ?? fallback;
+}
+
+// ============================================================================
+// Now (override) — virtual clock controls, inlined at the top of the page.
+// Logic mirrors the standalone NowOverridePage but trimmed of long-form
+// explanations (the rest of /settings/tests carries enough context).
+// ============================================================================
+
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalInput(s: string): Date {
+  return new Date(s);
+}
+
+function formatOffset(seconds: number): string {
+  if (seconds === 0) return 'aligné sur le wall clock';
+  const sign = seconds > 0 ? '+' : '−';
+  const abs = Math.abs(seconds);
+  const days = Math.floor(abs / 86_400);
+  const hours = Math.floor((abs % 86_400) / 3600);
+  const mins = Math.floor((abs % 3600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}j`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0 || parts.length === 0) parts.push(`${mins}min`);
+  return `${sign}${parts.join(' ')}`;
+}
+
+function NowOverrideSection() {
+  const { data: config, isLoading } = useGetNowOverrideQuery();
+  const [updateOverride, { isLoading: isSaving }] = useUpdateNowOverrideMutation();
+  const [draftValue, setDraftValue] = useState<string>(() => toLocalInput(new Date()));
+  const [savedAck, setSavedAck] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (config?.setVirtualNow) {
+      setDraftValue(toLocalInput(new Date(config.setVirtualNow)));
+    }
+  }, [config?.setVirtualNow]);
+
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const liveEffectiveNow = useMemo(() => {
+    void tick;
+    if (!config || !config.enabled) return new Date();
+    const captured = new Date(config.effectiveNow).getTime();
+    const wallCaptured = new Date(config.wallNow).getTime();
+    return new Date(captured + (Date.now() - wallCaptured));
+  }, [config, tick]);
+
+  const submit = async (virtualNow: Date, enabled: boolean) => {
+    setErrorMsg(null);
+    try {
+      await updateOverride({ virtualNow: virtualNow.toISOString(), enabled }).unwrap();
+      setSavedAck(true);
+      setTimeout(() => setSavedAck(false), 1800);
+    } catch (err) {
+      setErrorMsg(
+        (err as { data?: { message?: string } })?.data?.message ?? 'Failed to update now-override',
+      );
+    }
+  };
+
+  const handleEnable = () => {
+    const d = fromLocalInput(draftValue);
+    if (isNaN(d.getTime())) {
+      setErrorMsg('Date invalide.');
+      return;
+    }
+    void submit(d, true);
+  };
+
+  const handleDisable = () => {
+    if (!config) return;
+    void submit(new Date(config.setVirtualNow), false);
+  };
+
+  const handleAlignToWall = () => {
+    void submit(new Date(), false);
+  };
+
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-2 text-flux-text-primary text-sm font-semibold uppercase tracking-wider">
+        <Clock className="w-4 h-4 text-amber-400" strokeWidth={2} />
+        Now (override)
+        {config?.enabled && (
+          <span className="text-[11px] normal-case font-normal tracking-normal text-amber-300 inline-flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" strokeWidth={2.5} />
+            actif · décalage <span className="font-mono">{formatOffset(config.offsetSeconds)}</span>
+          </span>
+        )}
+      </div>
+
+      <div className="bg-flux-elevated rounded-lg border border-flux-border p-4">
+        {isLoading ? (
+          <div className="text-sm text-flux-text-muted">Chargement…</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-3 text-xs">
+              <div>
+                <div className="text-flux-text-tertiary mb-0.5">Now du système (virtuel)</div>
+                <div className="font-mono text-base text-flux-text-primary tabular-nums">
+                  {liveEffectiveNow.toLocaleString('fr-FR')}
+                </div>
+              </div>
+              <div>
+                <div className="text-flux-text-tertiary mb-0.5">Wall clock (réel)</div>
+                <div className="font-mono text-base text-flux-text-secondary tabular-nums">
+                  {new Date().toLocaleString('fr-FR')}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-flux-border">
+              <input
+                type="datetime-local"
+                value={draftValue}
+                onChange={(e) => setDraftValue(e.target.value)}
+                className="px-2 py-1.5 bg-flux-base border border-flux-border-light rounded text-sm font-mono tabular-nums text-flux-text-primary outline-none focus:border-amber-500 [color-scheme:dark]"
+              />
+              <button
+                type="button"
+                onClick={handleEnable}
+                disabled={isSaving}
+                className="px-3 py-1.5 rounded text-xs font-medium bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 disabled:opacity-40"
+              >
+                {isSaving ? 'Enregistrement…' : 'Activer / Mettre à jour'}
+              </button>
+              <button
+                type="button"
+                onClick={handleAlignToWall}
+                disabled={isSaving}
+                className="px-3 py-1.5 rounded text-xs font-medium bg-flux-base border border-flux-border-light text-flux-text-secondary hover:text-flux-text-primary hover:bg-flux-hover disabled:opacity-40"
+                title="Pose virtualNow = wall now et désactive l'override"
+              >
+                Aligner sur maintenant
+              </button>
+              {config?.enabled && (
+                <button
+                  type="button"
+                  onClick={handleDisable}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 rounded text-xs font-medium bg-flux-base border border-flux-border-light text-flux-text-secondary hover:text-flux-text-primary hover:bg-flux-hover disabled:opacity-40"
+                >
+                  Désactiver l'override
+                </button>
+              )}
+              {savedAck && (
+                <span className="text-xs text-emerald-400 inline-flex items-center gap-1">
+                  <Check className="w-3 h-3" strokeWidth={2.5} /> Enregistré
+                </span>
+              )}
+              {errorMsg && (
+                <span className="text-xs text-red-400 ml-auto">{errorMsg}</span>
+              )}
+              {!errorMsg && config?.updatedAt && (
+                <span className="ml-auto text-[11px] text-flux-text-tertiary font-mono">
+                  maj {new Date(config.updatedAt).toLocaleString('fr-FR')}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
 }
