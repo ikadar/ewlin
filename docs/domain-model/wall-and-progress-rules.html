@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Règles du mur, de l'avancement et de la replanification</title>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <style>
   :root {
     --bg: #fafaf7;
@@ -615,30 +615,36 @@ Cas où l'utilisateur **lève la tuile** d'une tâche partiellement faite, puis 
 </script>
 
 <script>
-  // Configure marked for safe rendering with anchor-friendly headings.
+  // Configure marked for safe rendering. We don't override the heading
+  // renderer (the API changes between major versions of marked) — we
+  // post-process the rendered DOM instead to attach anchor ids.
   marked.use({
     gfm: true,
     breaks: false,
   });
 
   function slugify(text) {
-    return text
+    // Lowercase + strip diacritics (NFD decomposes accented chars into
+    // base + combining marks, then we drop the U+0300–U+036F range) +
+    // collapse non-alphanumerics into hyphens.
+    return String(text)
       .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
   }
 
-  // Custom renderer to add ids to all headings.
-  const renderer = new marked.Renderer();
-  renderer.heading = (text, level) => {
-    const slug = slugify(text);
-    return `<h${level} id="${slug}">${text}</h${level}>`;
-  };
-
   const md = document.getElementById('md-source').textContent;
-  const html = marked.parse(md, { renderer });
+  const html = marked.parse(md);
   document.getElementById('content').innerHTML = html;
+
+  // Attach anchor ids to every heading after rendering.
+  document.querySelectorAll('main h1, main h2, main h3, main h4').forEach(h => {
+    if (!h.id) {
+      h.id = slugify(h.textContent);
+    }
+  });
 
   // Decorate atomic-rule paragraphs : "1.1." prefix becomes a chip.
   document.querySelectorAll('main p').forEach(p => {
