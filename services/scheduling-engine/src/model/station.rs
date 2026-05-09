@@ -361,9 +361,10 @@ impl StationInput {
     }
 
     pub fn effective_max_run_attention(&self) -> f64 {
-        self.max_run_attention
-            .unwrap_or_else(|| self.effective_attention_run())
-            .max(self.effective_attention_run()) // can't be less than attention_run
+        match self.max_run_attention {
+            Some(v) => v.max(self.effective_attention_run()),
+            None => f64::INFINITY,
+        }
     }
 
     pub fn effective_peremption(&self) -> u32 {
@@ -410,11 +411,15 @@ impl StationInput {
     /// Hard cap on bodies for the run phase. Default falls back to a value
     /// covering both attention_run and max_run_attention so the productivity
     /// formula remains live (extra operators can still contribute up to the
-    /// run-attention cap).
+    /// run-attention cap). When max_run_attention is absent (= no speed cap),
+    /// body count defaults to attention_run — "no speed cap" doesn't mean
+    /// "unlimited operators".
     pub fn effective_max_run_operators(&self) -> u32 {
         self.max_run_operators.unwrap_or_else(|| {
             let run_ops = self.effective_attention_run().ceil() as u32;
-            let max_run_ops = self.effective_max_run_attention().ceil() as u32;
+            let max_run_ops = self.max_run_attention
+                .map(|v| v.max(self.effective_attention_run()).ceil() as u32)
+                .unwrap_or(run_ops);
             run_ops.max(max_run_ops).max(1)
         })
     }
