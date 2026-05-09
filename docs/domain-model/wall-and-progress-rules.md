@@ -123,9 +123,9 @@ Chaque règle est numérotée et conçue pour être référençable individuelle
 
 8.1. La **productivité** d'un opérateur sur une tâche est un ratio adimensionnel.
 
-8.2. Ratio = `temps_wall_clock_réel / temps_planifié_JCF`. Donc :
-   - Ratio > 1 : opérateur plus lent que la référence
-   - Ratio < 1 : opérateur plus rapide
+8.2. Ratio = `temps_planifié_JCF / temps_wall_clock_réel`. Convention de la productivité au sens commun (sortie par unité de temps). Donc :
+   - Ratio > 1 : opérateur plus **rapide** que la référence (productivité supérieure)
+   - Ratio < 1 : opérateur plus lent
    - Ratio = 1 : conforme au plan
 
 8.3. Le ratio est **dérivé d'une saisie** (l'opérateur déclare une heure de fin réelle, le système calcule).
@@ -133,6 +133,14 @@ Chaque règle est numérotée et conçue pour être référençable individuelle
 8.4. Le ratio est **opérateur-only** : il n'est jamais écrit par le système automatiquement.
 
 8.5. Un ratio NULL signifie "pas de saisie de l'opérateur sur cette tâche, le système suppose 1.0".
+
+8.6. Conversion entre minutes-effort et wall-clock :
+   - `temps_wall_clock = minutes_effort / ratio` (un opérateur productif consomme moins de wall-clock pour le même effort)
+   - `minutes_effort = temps_wall_clock × ratio`
+
+8.7. Bornes de garde-fou : ratio clampé dans `[0.2, 10.0]` à la saisie. 0.2 = au plus 5× plus lent ; 10.0 = au plus 10× plus rapide. Une saisie qui produirait une valeur hors bornes est ramenée à la borne, pas rejetée.
+
+8.8. **Limitation connue** : le ratio est stocké au niveau de la tâche (sur le mur), pas par opérateur. Si un opérateur A (lent) saisit puis un opérateur B (rapide) reprend, le ratio enregistré reste celui de A jusqu'à la prochaine saisie. À surveiller dans les cas de relais en cours d'exécution.
 
 ## 9. L'override de NOW (mode test)
 
