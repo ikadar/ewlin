@@ -1,3 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Règles du mur, de l'avancement et de la replanification</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --bg-panel: #ffffff;
+    --bg-code: #f3f3ec;
+    --bg-cheat: #fff8e7;
+    --bg-tech: #f0f4f8;
+    --bg-callout: #eef7ee;
+    --fg: #1f2328;
+    --fg-muted: #5b6470;
+    --fg-strong: #0d1117;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --warning: #b91c1c;
+    --warning-bg: #fef2f2;
+    --rule-num: #6366f1;
+    --hover: #f3f4f6;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  nav.toc {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  nav.toc h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-muted);
+    margin: 0 0 12px;
+    font-weight: 600;
+  }
+
+  nav.toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: toc-counter;
+  }
+
+  nav.toc li {
+    counter-increment: toc-counter;
+    margin: 0;
+  }
+
+  nav.toc a {
+    display: block;
+    padding: 6px 8px 6px 28px;
+    color: var(--fg-muted);
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+    position: relative;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  nav.toc a::before {
+    content: counter(toc-counter) ".";
+    position: absolute;
+    left: 8px;
+    color: var(--rule-num);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  nav.toc a:hover {
+    background: var(--hover);
+    color: var(--fg-strong);
+  }
+
+  nav.toc a.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  main {
+    padding: 48px 56px;
+    max-width: 920px;
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--fg-strong);
+    margin: 0 0 16px;
+    line-height: 1.2;
+  }
+
+  h1 + p {
+    font-size: 17px;
+    color: var(--fg-muted);
+    margin: 0 0 32px;
+  }
+
+  h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--fg-strong);
+    margin: 56px 0 20px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    scroll-margin-top: 24px;
+  }
+
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg-strong);
+    margin: 32px 0 12px;
+    scroll-margin-top: 24px;
+  }
+
+  p {
+    margin: 0 0 16px;
+  }
+
+  /* Atomic rule paragraphs : "1.1." prefix gets a coloured chip. */
+  main p {
+    counter-reset: subrule;
+    position: relative;
+  }
+
+  main > section > p:first-of-type,
+  main > section > p {
+    /* nothing special by default */
+  }
+
+  /* Auto-style "X.Y." rule numbers at start of paragraph */
+  main p::first-line {
+    /* placeholder */
+  }
+
+  strong {
+    color: var(--fg-strong);
+    font-weight: 600;
+  }
+
+  code {
+    background: var(--bg-code);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-size: 0.92em;
+    color: var(--fg-strong);
+  }
+
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    border: 0;
+  }
+
+  ul, ol {
+    margin: 0 0 16px;
+    padding-left: 24px;
+  }
+
+  li {
+    margin: 6px 0;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+
+  th, td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: var(--bg-tech);
+    font-weight: 600;
+    color: var(--fg-strong);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--bg-panel);
+  }
+
+  /* Cheat sheet — coloured background */
+  h2#référence-rapide-cheat-sheet + table th,
+  h2#référence-rapide-cheat-sheet + table td {
+    background: var(--bg-cheat);
+  }
+
+  /* Section anchors — subtle hover */
+  h2:hover::after,
+  h3:hover::after {
+    content: " §";
+    color: var(--fg-muted);
+    font-weight: 400;
+  }
+
+  /* Special: the first paragraph of each numbered section becomes a "lead" */
+  h2 + p,
+  h3 + p {
+    margin-top: 8px;
+  }
+
+  /* Rule chips : style "1.1." prefix */
+  .rule-num {
+    display: inline-block;
+    background: var(--rule-num);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+
+  /* Print styles */
+  @media print {
+    nav.toc { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    main { max-width: none; padding: 24px; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: auto; }
+  }
+
+  /* Mobile */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc {
+      position: static;
+      height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    main { padding: 24px; }
+  }
+
+  /* Loading state */
+  #content:empty::before {
+    content: "Chargement…";
+    color: var(--fg-muted);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" id="toc">
+    <h2>Sommaire</h2>
+    <ol id="toc-list"></ol>
+  </nav>
+  <main>
+    <article id="content"></article>
+  </main>
+</div>
+
+<script type="text/markdown" id="md-source">
 # Règles du mur, de l'avancement et de la replanification
 
 Document de référence — règles atomiques régissant Prod, Préprod, le mur, la saisie, le calage hérité et la replanification d'une tâche partiellement exécutée.
@@ -22,27 +330,11 @@ Chaque règle est numérotée et conçue pour être référençable individuelle
 ## Formules clés
 
 ```
-pct_affiché = minutes_effort_done / runMinutes_actuel × 100
-temps_wall_clock = minutes_effort / ratio_productivité
-realisticRunMinutes = (runMinutes_JCF − minutes_effort_done) / ratio_productivité
-ratio_productivité = temps_planifié_JCF / temps_wall_clock_réel
+pct_affiché          = minutes_effort_done / runMinutes_actuel × 100
+temps_wall_clock     = minutes_effort / ratio_productivité
+realisticRunMinutes  = (runMinutes_JCF − minutes_effort_done) / ratio_productivité
+ratio_productivité   = temps_planifié_JCF / temps_wall_clock_réel
 ```
-
-## Sommaire
-
-1. [Prod et Préprod](#1-prod-et-préprod)
-2. [Le mur](#2-le-mur)
-3. [La saisie d'avancement](#3-la-saisie-davancement)
-4. [Le silence vaut consentement](#4-le-silence-vaut-consentement)
-5. [Le stockage de l'avancement (effort-minutes)](#5-le-stockage-de-lavancement-effort-minutes)
-6. [Le calage hérité](#6-le-calage-hérité)
-7. [La modification JCF (JCF modif)](#7-la-modification-jcf-jcf-modif)
-8. [La productivité opérateur](#8-la-productivité-opérateur)
-9. [L'override de NOW (mode test)](#9-loverride-de-now-mode-test)
-10. [Le partage cross-scenario du mur](#10-le-partage-cross-scenario-du-mur)
-11. [Réactivité de la planification](#11-réactivité-de-la-planification)
-12. [Replanification d'une tâche partiellement exécutée](#12-replanification-dune-tâche-partiellement-exécutée)
-13. [État technique du stockage (dette résiduelle)](#13-état-technique-du-stockage-dette-résiduelle)
 
 ## 1. Prod et Préprod
 
@@ -108,7 +400,7 @@ ratio_productivité = temps_planifié_JCF / temps_wall_clock_réel
 
 5.1. L'avancement est stocké en **minutes-effort consommées**, c'est-à-dire en minutes-référence-JCF (équivalent productivité 1).
 
-5.2. La conversion vers le wall-clock dépend du ratio de productivité de l'opérateur qui exécute :  
+5.2. La conversion vers le wall-clock dépend du ratio de productivité de l'opérateur qui exécute :
 `temps_wall_clock = minutes_effort / ratio_opérateur`.
 
 Exemple : 30 minutes-effort consommées par un opérateur de productivité 1,5 (= plus rapide) → 30 / 1,5 = 20 minutes wall-clock écoulées.
@@ -117,7 +409,7 @@ Exemple : 30 minutes-effort consommées par un opérateur de productivité 1,5 (
    - La durée JCF de la tâche change par modification (le 30 min-effort fait reste 30 min-effort fait, peu importe que runMinutes passe de 90 à 120)
    - Un autre opérateur reprend la suite avec un ratio différent (le 30 min-effort fait reste 30 min-effort fait)
 
-5.4. Le pourcentage d'avancement est **dérivé**, pas stocké :  
+5.4. Le pourcentage d'avancement est **dérivé**, pas stocké :
 `pct = minutes_effort_done / runMinutes_actuel × 100`.
 
 5.5. Le ratio de productivité d'une tâche est stocké séparément, sur le mur, et n'est jamais touché par les écritures automatiques.
@@ -320,3 +612,75 @@ Cas où l'utilisateur **lève la tuile** d'une tâche partiellement faite, puis 
 13.5. Plan d'extinction de la dette (si nécessaire) : supprimer `task_assignments.last_saisie_at` et `task_assignments.productivity_ratio` ; remplacer toutes les lectures par un accès au mur via `logical_task_id`. Estimation : 30-60 minutes de code + migration.
 
 13.6. Quatre champs (`effort_minutes_done`, `recorded_at`, `last_setup_at`, `last_setup_station_id`) sont **uniquement** sur le mur, plus aucune copie ailleurs en base. Pour ces quatre champs, le partage cross-scenario est garanti structurellement, pas par convention.
+</script>
+
+<script>
+  // Configure marked for safe rendering with anchor-friendly headings.
+  marked.use({
+    gfm: true,
+    breaks: false,
+  });
+
+  function slugify(text) {
+    return text
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  // Custom renderer to add ids to all headings.
+  const renderer = new marked.Renderer();
+  renderer.heading = (text, level) => {
+    const slug = slugify(text);
+    return `<h${level} id="${slug}">${text}</h${level}>`;
+  };
+
+  const md = document.getElementById('md-source').textContent;
+  const html = marked.parse(md, { renderer });
+  document.getElementById('content').innerHTML = html;
+
+  // Decorate atomic-rule paragraphs : "1.1." prefix becomes a chip.
+  document.querySelectorAll('main p').forEach(p => {
+    const html = p.innerHTML;
+    const m = html.match(/^(\d+\.\d+(?:\.\d+)?)\.\s+(.+)$/s);
+    if (m) {
+      p.innerHTML = `<span class="rule-num">${m[1]}</span>${m[2]}`;
+    }
+  });
+
+  // Build table of contents from h2 elements.
+  const tocList = document.getElementById('toc-list');
+  document.querySelectorAll('main h2').forEach(h2 => {
+    const id = h2.id;
+    const text = h2.textContent.replace(/^\d+\.\s*/, '');
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = `#${id}`;
+    a.textContent = text;
+    li.appendChild(a);
+    tocList.appendChild(li);
+  });
+
+  // Highlight current section in TOC on scroll.
+  const tocLinks = Array.from(tocList.querySelectorAll('a'));
+  const sections = Array.from(document.querySelectorAll('main h2'));
+
+  function updateActiveSection() {
+    const scrollPos = window.scrollY + 100;
+    let activeIdx = 0;
+    for (let i = 0; i < sections.length; i++) {
+      if (sections[i].offsetTop <= scrollPos) {
+        activeIdx = i;
+      } else {
+        break;
+      }
+    }
+    tocLinks.forEach((a, i) => a.classList.toggle('active', i === activeIdx));
+  }
+
+  window.addEventListener('scroll', updateActiveSection, { passive: true });
+  updateActiveSection();
+</script>
+</body>
+</html>
