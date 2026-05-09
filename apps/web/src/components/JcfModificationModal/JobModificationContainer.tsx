@@ -295,6 +295,8 @@ function mapTaskForRemainingDsl(
     durationOpenDays: task.durationOpenDays,
     actionType: task.actionType,
     comment: task.comment,
+    recordedProgressPct: task.recordedProgressPct,
+    lastSetupAt: task.lastSetupAt,
   };
 }
 

@@ -221,6 +221,12 @@ export interface JobDetailsTask {
   manualReturn: string | null;
   comment: string | null;
   rawDsl: string | null;
+  /** 0-100, decimal. Drives remaining-run reduction in computeRemainingDsl. */
+  recordedProgressPct: number | null;
+  /** 0-... , decimal. Live productivity multiplier sourced from saisie. */
+  productivityRatio: number | null;
+  /** ISO datetime — non-null = calage already done on this task. */
+  lastSetupAt: string | null;
 }
 
 /**
