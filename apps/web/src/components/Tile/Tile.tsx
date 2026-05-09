@@ -12,7 +12,7 @@ import { computeOptimisticProgress, computeChunkProgress } from './saisieMath';
 import { getStateInlineColors } from './colorUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
-import { useNow } from '../../hooks/useNow';
+import { useNow } from '../../contexts/NowContext';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
@@ -163,7 +163,7 @@ export const Tile = memo(function Tile({
   const { setupMinutes } = task.duration;
   const hasSetup = setupMinutes > 0;
 
-  const now = useNow(60_000);
+  const now = useNow();
 
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;

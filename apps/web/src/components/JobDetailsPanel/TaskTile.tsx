@@ -4,7 +4,7 @@ import { Scissors, Pin } from 'lucide-react';
 import { OutsourcingMiniForm } from './OutsourcingMiniForm';
 import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../FluxTable/STCell';
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
-import { useNow } from '../../hooks/useNow';
+import { useNow } from '../../contexts/NowContext';
 import { ProgressFill, computeProgressBgGradient } from '../Tile/ProgressFill';
 import { TaskBadge } from '../Tile/TaskBadge';
 import { computeChunkProgress, computeUnplacedOptimisticProgress } from '../Tile/saisieMath';
@@ -137,7 +137,7 @@ export const TaskTile = memo(function TaskTile({
 }: TaskTileProps) {
   // JDP ↔ grid hover crosslink — heartbeat pulse on the paired tile(s)
   const crosslink = useHoverCrosslink(task.id);
-  const now = useNow(60_000);
+  const now = useNow();
 
   // Per-operator-stint fond-vert is computed inside the operator-row map
   // below (see `computeChunkProgress(op.from, op.to, ...)`). Earlier
