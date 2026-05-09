@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, ShortcutFooter, useCommands, useCommandCenter } from './components';
+import { JobsList, JobDetailsPanel, DateStrip, SchedulingGrid, timeToYPosition, DEFAULT_PIXELS_PER_HOUR, TileContextMenu, JcfModal, JcfJobHeader, generateJobId, JcfElementsTable, JobModificationContainer, ShortcutFooter, useCommands, useCommandCenter } from './components';
 import { useTheme } from './contexts/ThemeContext';
 import { useNow } from './contexts/NowContext';
 import { getNow } from './utils/getNow';
@@ -430,6 +430,13 @@ function AppContent() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
 
+  // JDP "Modifier" → JcfModificationModal (Pillar B). Mirrors FluxPage's
+  // pattern : a single state holds the internalId being edited and renders
+  // <JobModificationContainer/> which fetches the full job + drives the
+  // proper modification UI (locked fields + Done panel) instead of reusing
+  // the creation modal with a half-baked isEditMode flag.
+  const [editingJobInternalId, setEditingJobInternalId] = useState<string | null>(null);
+
   // v0.4.31: Sequence workflow from selected template (per-element, template-free mode when empty)
   const [sequenceWorkflows, setSequenceWorkflows] = useState<string[][]>([]);
 
@@ -835,20 +842,20 @@ function AppContent() {
     setJcfSaveError(null);
   }, [snapshot.elements, snapshot.tasks, snapshot.stations, snapshot.providers, snapshot.jobs]);
 
-  // v0.5.13b: Handler for "Modifier" button in Job Details Panel (scheduler view)
+  // Handler for "Modifier" button in Job Details Panel (scheduler view).
   // Prod is read-only for planning data — JobController::update would 403 the
-  // PUT anyway, so we short-circuit here to skip the modal flicker and surface
-  // the reason. Mirrors FluxPage's per-handler Préprod gates.
+  // PUT anyway, so we short-circuit here to surface the reason. Préprod
+  // mounts <JobModificationContainer/> (the same component Flux uses) which
+  // drives the proper modification UX (locked client/template/quantity +
+  // JcfDonePanel) — no navigation, no creation-modal reuse.
   const handleEditJob = useCallback(() => {
     if (!selectedJob) return;
     if (scenarioMode === 'prod') {
       showToast('Bascule en Préprod pour modifier un job.', 'info');
       return;
     }
-    populateJcfFromJob(selectedJob);
-    preJcfSelectedJobIdRef.current = selectedJobId;
-    navigate('/stations/job/new');
-  }, [selectedJob, selectedJobId, populateJcfFromJob, navigate, scenarioMode, showToast]);
+    setEditingJobInternalId(selectedJob.id);
+  }, [selectedJob, scenarioMode, showToast]);
 
   // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
   useEffect(() => {
@@ -2232,6 +2239,16 @@ function AppContent() {
           stationName={splitPopover.stationName}
           onConfirm={handleSplitConfirm}
           onCancel={() => setSplitPopover(null)}
+        />
+      )}
+
+      {/* JCF Modification Modal — JDP "Modifier" + Alt+E entry point.
+          Mirrors FluxPage's mount: rendered Préprod-only, no nav, fetches
+          the full job + applies the locked-fields + Done-panel UX. */}
+      {editingJobInternalId && (
+        <JobModificationContainer
+          jobInternalId={editingJobInternalId}
+          onClose={() => setEditingJobInternalId(null)}
         />
       )}
 
