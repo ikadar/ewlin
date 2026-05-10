@@ -45,6 +45,8 @@ import type {
   UpdatePaperLeadTimeRequest,
   FormeLeadTimeConfig,
   UpdateFormeLeadTimeRequest,
+  PlateLeadTimeConfig,
+  UpdatePlateLeadTimeRequest,
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { calculateEndTime } from '@/utils/timeCalculations';
@@ -130,14 +132,6 @@ interface UpdateJobResponse {
   workshopExitDate: string;
   status: string;
   updatedAt: string;
-}
-/**
- * Request for updating element prerequisite status.
- */
-interface UpdateElementStatusRequest {
-  elementId: string;
-  field: 'paperStatus' | 'batStatus' | 'plateStatus' | 'formeStatus';
-  value: PaperStatus | BatStatus | PlateStatus | FormeStatus;
 }
 
 /**
@@ -245,18 +239,6 @@ export interface UpdateElementSequenceArg {
   needsPlates?: boolean | null;
 }
 
-/**
- * Response from updateElementStatus mutation.
- * Mirrors PHP ElementController::updatePrerequisites response.
- */
-interface UpdateElementStatusResponse {
-  elementId: string;
-  paperStatus: PaperStatus;
-  batStatus: BatStatus;
-  plateStatus: PlateStatus;
-  formeStatus: FormeStatus;
-  isBlocked: boolean;
-}
 
 import { baseQueryWithFixtureSupport } from './baseApi';
 
@@ -553,41 +535,6 @@ export const scheduleApi = createApi({
       invalidatesTags: ['Snapshot'],
     }),
 
-    /**
-     * Update element prerequisite status (paper, bat, plate, forme).
-     *
-     * Mock mode: Updates element in mock snapshot
-     * Real mode: PUT /elements/{id}/prerequisites
-     *
-     * Uses optimistic update for instant UI feedback.
-     */
-    updateElementStatus: builder.mutation<UpdateElementStatusResponse, UpdateElementStatusRequest>({
-      query: ({ elementId, field, value }) => ({
-        url: `/elements/${elementId}/prerequisites`,
-        method: 'PUT',
-        body: { [field]: value },
-      }),
-      invalidatesTags: ['Snapshot'],
-      async onQueryStarted({ elementId, field, value }, { dispatch, queryFulfilled }) {
-        // Optimistic update: immediately update element status in cache
-        const patchResult = dispatch(
-          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
-            const element = draft.elements.find((e) => e.id === elementId);
-            if (element) {
-              (element as unknown as Record<string, unknown>)[field] = value;
-              element.updatedAt = new Date().toISOString();
-            }
-          })
-        );
-
-        try {
-          await queryFulfilled;
-        } catch {
-          // Rollback on error
-          patchResult.undo();
-        }
-      },
-    }),
 
     /**
      * Assign a task to a station or provider.
@@ -1099,6 +1046,15 @@ export const scheduleApi = createApi({
       invalidatesTags: ['Snapshot'],
     }),
 
+    getPlateLeadTime: builder.query<PlateLeadTimeConfig, void>({
+      query: () => '/plate-lead-time',
+    }),
+
+    updatePlateLeadTime: builder.mutation<PlateLeadTimeConfig, UpdatePlateLeadTimeRequest>({
+      query: (body) => ({ url: '/plate-lead-time', method: 'PUT', body }),
+      invalidatesTags: ['Snapshot'],
+    }),
+
     /**
      * Get the global "now() override" — the virtual clock used in test
      * environments. Returns offset + computed `effectiveNow` so the FE
@@ -1311,6 +1267,8 @@ export const {
   useUpdatePaperLeadTimeMutation,
   useGetFormeLeadTimeQuery,
   useUpdateFormeLeadTimeMutation,
+  useGetPlateLeadTimeQuery,
+  useUpdatePlateLeadTimeMutation,
   useGetNowOverrideQuery,
   useUpdateNowOverrideMutation,
 } = scheduleApi;
