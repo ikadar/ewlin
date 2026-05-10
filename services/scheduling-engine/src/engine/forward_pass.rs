@@ -967,6 +967,34 @@ fn try_borrow_setup_op(
             if !available_full_window {
                 continue;
             }
+
+            // "Real caleur volant" guard: only borrow for setup when a
+            // DIFFERENT operator with run_proficiency > 0 on the target
+            // station will be available by the time setup finishes.
+            // Without this, borrowing is a disguised transfer — the
+            // borrowed op finishes setup, discovers they're the only one
+            // who can run the machine, stays on the target, and the donor
+            // stalls permanently. The real caleur-volant pattern is:
+            // caleur does setup → leaves → conducteur takes over the run.
+            let setup_done_tick = t + real_window as usize;
+            let has_run_successor = operator_skills.iter().enumerate().any(|(other_op, skills)| {
+                if other_op == op {
+                    return false; // must be a DIFFERENT operator
+                }
+                let run_prof = skills
+                    .iter()
+                    .find(|s| s.station_idx == target_station)
+                    .map(|s| s.run_proficiency)
+                    .unwrap_or(0.0);
+                if run_prof <= 0.0 {
+                    return false;
+                }
+                operator_availability.is_available(other_op, setup_done_tick)
+            });
+            if !has_run_successor {
+                continue;
+            }
+
             return Some((op, source_idx, real_window));
         }
     }
@@ -7179,18 +7207,27 @@ mod borrow_tests {
         avail
     }
 
-    /// Donor (Bernard) is rolling on station 0 with eat well past setup.
-    /// Target station 1 needs a setup. Bernard is qualified for setup of
-    /// station 1. Borrow should fire.
+    /// Donor (Bernard, op 0) is rolling on station 0 with eat well past
+    /// setup. Target station 1 needs a setup. Bernard is qualified for
+    /// setup of station 1. A second operator (Sandra, op 1) has
+    /// run_proficiency on station 1 and is available — the "real caleur
+    /// volant" guard is satisfied: Bernard calera, Sandra roulera.
     #[test]
     fn borrow_fires_when_donor_is_in_run_phase_and_op_is_qualified() {
         let donor = make_donor_action(0, 0, 2, 10, 6, /*op=*/ 0);
         let actions = vec![donor];
-        let skills = vec![vec![
-            SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
-            SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
-        ]];
-        let avail = always_avail(1, 100);
+        let skills = vec![
+            // Op 0 (Bernard): setup+run on station 0, setup-only on station 1
+            vec![
+                SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
+                SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
+            ],
+            // Op 1 (Sandra): run-only on station 1 (the conducteur)
+            vec![
+                SkillEntry { station_idx: 1, setup_proficiency: 0.0, run_proficiency: 1.0 },
+            ],
+        ];
+        let avail = always_avail(2, 100);
         let attrs = vec![permissive_attrs(), permissive_attrs()];
 
         let result = try_borrow_setup_op(
@@ -7206,18 +7243,53 @@ mod borrow_tests {
         );
     }
 
+    /// Same setup as above but WITHOUT a run successor on the target
+    /// station. Bernard is the only operator and has setup+run on both
+    /// stations. Borrowing him would be a disguised transfer — he'd
+    /// finish setup, stay for run, and the donor stalls permanently.
+    #[test]
+    fn borrow_refused_when_no_run_successor_on_target() {
+        let donor = make_donor_action(0, 0, 2, 10, 6, /*op=*/ 0);
+        let actions = vec![donor];
+        let skills = vec![vec![
+            SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
+            SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 1.0 },
+        ]];
+        let avail = always_avail(1, 100);
+        let attrs = vec![permissive_attrs(), permissive_attrs()];
+
+        let result = try_borrow_setup_op(
+            &actions, &skills, &avail, &attrs,
+            /*target_station=*/ 1, /*t=*/ 7, /*remaining_setup_ticks=*/ 4,
+        );
+
+        assert!(
+            result.is_none(),
+            "borrow must be refused: no other operator can run the target \
+             station after setup — borrowing would be a disguised transfer"
+        );
+    }
+
     /// Donor's chunk_mini is configured at 50% of task_total. Donor has
     /// only 1 run-phase tick out of 12 — well below the 6-tick floor —
-    /// so try_borrow must refuse, even though the op is qualified.
+    /// so try_borrow must refuse, even though the op is qualified and
+    /// a run successor exists on the target.
     #[test]
     fn borrow_refused_when_donor_chunk_mini_floor_not_met() {
         let donor = make_donor_action(0, 0, 2, 10, /*eat=*/ 3, 0);
         let actions = vec![donor];
-        let skills = vec![vec![
-            SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
-            SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
-        ]];
-        let avail = always_avail(1, 100);
+        let skills = vec![
+            // Op 0: setup+run on station 0, setup-only on station 1
+            vec![
+                SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
+                SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
+            ],
+            // Op 1: run successor on station 1 (satisfies the caleur-volant guard)
+            vec![
+                SkillEntry { station_idx: 1, setup_proficiency: 0.0, run_proficiency: 1.0 },
+            ],
+        ];
+        let avail = always_avail(2, 100);
         let mut attrs0 = permissive_attrs();
         attrs0.chunk_mini_task_percentage = 0.5; // 6-tick floor on a 12-tick task
         let attrs = vec![attrs0, permissive_attrs()];
