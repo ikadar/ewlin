@@ -6,7 +6,6 @@ import { PendingIcon, ProgressIcon, DoneIcon, taskStatusToFluxST } from '../Flux
 import { useHoverCrosslink, pulseTaskTiles } from '../../hooks';
 import { useNow } from '../../contexts/NowContext';
 import { ProgressFill, computeProgressBgGradient } from '../Tile/ProgressFill';
-import { TaskBadge } from '../Tile/TaskBadge';
 import { computeChunkProgress, computeUnplacedOptimisticProgress } from '../Tile/saisieMath';
 
 export type TileState = 'unplaced' | 'shipped' | 'default' | 'completed' | 'late' | 'conflict';
@@ -456,7 +455,11 @@ export const TaskTile = memo(function TaskTile({
                   <div className="relative w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
                   <span className={`relative text-[11.5px] truncate flex-1 ${showRowGradient ? 'text-green-200' : 'text-zinc-300'}`}>{displayName}</span>
                   <span className="relative text-[10.5px] text-zinc-500 font-mono shrink-0">{timeRange}</span>
-                  <TaskBadge pct={opBadgePct} forceShow />
+                  {Math.round(opBadgePct) < 100 && (
+                    <span className="relative shrink-0 text-[9px] font-mono tabular-nums leading-none px-1 py-0.5 rounded-[2px] bg-zinc-900/55 text-zinc-200/85 border border-zinc-700/30">
+                      {Math.round(opBadgePct)}%
+                    </span>
+                  )}
                 </div>
               );
             })}
