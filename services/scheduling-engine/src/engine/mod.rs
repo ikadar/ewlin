@@ -898,11 +898,9 @@ pub fn build_actions(
                     None => continue, // skip unknown stations
                 };
 
-                let setup_ticks = minutes_to_ticks(task.setup_minutes, tick_minutes);
-                // V2 progress capture : the operator's realistic pace replaces the
-                // JCF planned run when a saisie has produced one. Calage neutral —
-                // `setup_minutes` is read directly above without any override.
+                let raw_setup_ticks = minutes_to_ticks(task.setup_minutes, tick_minutes);
                 let run_ticks = minutes_to_ticks(task.effective_run_minutes(), tick_minutes);
+                let setup_ticks = if run_ticks == 0 { 0 } else { raw_setup_ticks };
                 let total_ticks = setup_ticks + run_ticks;
 
                 let predecessor_idx = prev_task_id
