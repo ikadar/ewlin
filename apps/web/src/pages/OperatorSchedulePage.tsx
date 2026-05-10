@@ -33,6 +33,7 @@ import {
   useBatchSetPinMutation,
   useGetPaperLeadTimeQuery,
   useGetFormeLeadTimeQuery,
+  useGetPlateLeadTimeQuery,
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
 import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
@@ -155,6 +156,7 @@ export default function OperatorSchedulePage() {
   // gate pill tooltip displays the configured delay.
   const { data: paperLeadTime } = useGetPaperLeadTimeQuery();
   const { data: formeLeadTime } = useGetFormeLeadTimeQuery();
+  const { data: plateLeadTime } = useGetPlateLeadTimeQuery();
   const refetch = scenarioModeForSnapshot === 'prod' ? prodSnapshot.refetch : preprodSnapshot.refetch;
 
   const [computeSchedule, { isLoading: isComputingSchedule }] = useComputeScheduleMutation();
@@ -976,7 +978,7 @@ export default function OperatorSchedulePage() {
       const label = getProduitLabel(job, element, elementCountByJobId.get(job.id) ?? 1);
       const setupMinutes = task.duration?.setupMinutes ?? 0;
       const taskStart = assignment ? new Date(assignment.scheduledStart) : null;
-      const setupWindow = setupMinutes > 0 && taskStart
+      const setupWindow = setupMinutes > 0 && taskStart && !assignment?.setupInherited
         ? { start: taskStart, end: new Date(taskStart.getTime() + setupMinutes * 60_000) }
         : undefined;
 
@@ -1160,7 +1162,7 @@ export default function OperatorSchedulePage() {
     // start, so the setup window is `[scheduledStart, scheduledStart + setupMinutes]`.
     const setupMinutes = task.duration?.setupMinutes ?? 0;
     const taskStart = assignment ? new Date(assignment.scheduledStart) : null;
-    const setupWindow = setupMinutes > 0 && taskStart
+    const setupWindow = setupMinutes > 0 && taskStart && !assignment?.setupInherited
       ? { start: taskStart, end: new Date(taskStart.getTime() + setupMinutes * 60_000) }
       : undefined;
 
@@ -1318,6 +1320,7 @@ export default function OperatorSchedulePage() {
             providers={snapshot.providers}
             paperLeadTime={paperLeadTime}
             formeLeadTime={formeLeadTime}
+            plateLeadTime={plateLeadTime}
             onClose={() => setSelectedJobId(null)}
             onRecallTask={handleRecallAssignment}
             onToggleComplete={handleToggleComplete}

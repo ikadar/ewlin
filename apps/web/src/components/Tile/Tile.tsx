@@ -160,7 +160,7 @@ export const Tile = memo(function Tile({
     e.stopPropagation();
     if (isSelected) crosslink.onDoubleClick?.(e);
   };
-  const { setupMinutes } = task.duration;
+  const setupMinutes = assignment?.setupInherited ? 0 : task.duration.setupMinutes;
   const hasSetup = setupMinutes > 0;
 
   const now = useNow();
@@ -375,7 +375,7 @@ export const Tile = memo(function Tile({
             the dotted/dashed border-bottom (cf. index.css) so the parent
             gradient shows through — past calage thus reads as done (vert)
             in alignment with `now()`, future calage stays on the base bg. */}
-        {calageGeometries && calageGeometries.length > 0 ? (
+        {calageGeometries && calageGeometries.length > 0 && !assignment?.setupInherited ? (
           calageGeometries.map((geom, idx) => (
             <div
               key={geom.kind === 'setup' ? 'setup' : `recalage-${idx}`}
