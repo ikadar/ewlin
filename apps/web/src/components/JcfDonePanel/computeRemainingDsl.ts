@@ -3,10 +3,9 @@
  * exclude Completed tasks (they're shown read-only in the Done panel
  * above the textarea), include in-progress + future tasks.
  *
- * For in-progress tasks, the run minutes are reduced proportionally
- * to the recorded progress percentage. Setup minutes are preserved
- * (the engine arbitrates calage carry-over at placement time via
- * lastSetupAt / lastSetupStationId).
+ * In-progress tasks show their *remaining* run (reduced by progress)
+ * so the chef sees what's left to do. The backend ignores this value
+ * for tasks with wall progress — canonical runMinutes is preserved.
  *
  * @see docs/architecture/preprod-prod-photo-model.md  (Pillar B)
  */
@@ -70,7 +69,7 @@ export function computeRemainingDsl(tasks: TaskForRemainingDsl[]): RemainingDslR
 
     if (isInProgress && inProgressTask === null) {
       inProgressTask = task;
-      remainingLines.push(taskToDslLineWithReducedRun(task));
+      remainingLines.push(taskToDslLineWithRemainingRun(task));
     } else {
       // Future task
       remainingLines.push(taskToDslLine(task));
@@ -84,11 +83,7 @@ export function computeRemainingDsl(tasks: TaskForRemainingDsl[]): RemainingDslR
   };
 }
 
-/**
- * Reduce the run minutes for an in-progress task : remaining =
- * runMinutes × (1 - progress/100). Setup unchanged. Floored at 0.
- */
-function taskToDslLineWithReducedRun(task: TaskForRemainingDsl): string {
+function taskToDslLineWithRemainingRun(task: TaskForRemainingDsl): string {
   if (task.taskType === 'internal') {
     const station = task.stationName ?? '?';
     const setup = task.setupMinutes ?? 0;
@@ -97,11 +92,9 @@ function taskToDslLineWithReducedRun(task: TaskForRemainingDsl): string {
     const remainingRun = Math.max(0, Math.round(fullRun * (1 - pct / 100)));
     return `${station}(${setup}+${remainingRun})`;
   }
-  // Outsourced — reduce open days proportionally is fuzzy ; for V1 we
-  // leave it untouched (sous-traitance is usually not "partially done"
-  // in the same way).
   return taskToDslLine(task);
 }
+
 
 function taskToDslLine(task: TaskForRemainingDsl): string {
   if (task.taskType === 'internal') {

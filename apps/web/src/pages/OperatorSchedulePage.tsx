@@ -16,8 +16,8 @@
  */
 
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { JobModificationContainer } from '@/components/JcfModificationModal/JobModificationContainer';
 import {
   useGetSnapshotQuery,
   useGetProdSnapshotQuery,
@@ -134,7 +134,6 @@ const defaultSnapshot: ScheduleSnapshot = {
 // ============================================================================
 
 export default function OperatorSchedulePage() {
-  const navigate = useNavigate();
   // V1 versioning: in prod we read the frozen plan blob (merged with the
   // live completion overlay) from /scenarios/prod/snapshot. In préprod we
   // keep the regular live /schedule/snapshot. The two queries are gated
@@ -179,6 +178,7 @@ export default function OperatorSchedulePage() {
   const [computeModalMode, setComputeModalMode] = useState<'full' | 'selective' | 'incremental' | null>(null);
   const [computeModalJobId, setComputeModalJobId] = useState<string | undefined>(undefined);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [editingJobInternalId, setEditingJobInternalId] = useState<string | null>(null);
   const massUnschedule = useMassUnschedule(snapshotData);
   const [pixelsPerHour, setPixelsPerHour] = useState(DEFAULT_PIXELS_PER_HOUR);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -567,11 +567,10 @@ export default function OperatorSchedulePage() {
     setComputeModalMode('selective');
   }, []);
 
-  // Open JCF in edit mode for the selected job, returning to operator view on close
   const handleEditJob = useCallback(() => {
     if (!selectedJobId) return;
-    navigate('/stations/job/new', { state: { editJobId: selectedJobId, from: '/' } });
-  }, [navigate, selectedJobId]);
+    setEditingJobInternalId(selectedJobId);
+  }, [selectedJobId]);
 
   // Incremental compute: place all unplaced jobs in the gaps
   const handleComputeIncremental = useCallback(() => {
@@ -1592,6 +1591,13 @@ export default function OperatorSchedulePage() {
           taskId={pinDialogState.taskId}
           job={pinDialogState.job}
           currentScheduledStart={pinDialogState.currentScheduledStart}
+        />
+      )}
+
+      {editingJobInternalId && (
+        <JobModificationContainer
+          jobInternalId={editingJobInternalId}
+          onClose={() => setEditingJobInternalId(null)}
         />
       )}
     </div>

@@ -59,7 +59,7 @@ describe('computeRemainingDsl', () => {
     expect(r.completedTasks[0].id).toBe('1');
   });
 
-  it('in-progress task has run reduced by progress percentage', () => {
+  it('in-progress task shows remaining run (reduced by progress)', () => {
     const r = computeRemainingDsl([
       task({
         id: '1', sequenceOrder: 0, status: 'assigned',
@@ -68,7 +68,7 @@ describe('computeRemainingDsl', () => {
       }),
       task({ id: '2', sequenceOrder: 1, status: 'defined', stationName: 'Pliage', setupMinutes: 0, runMinutes: 10 }),
     ]);
-    // 40min × (1 - 0.40) = 24min
+    // 40min × (1 - 0.40) = 24min remaining
     expect(r.dsl).toBe('G37(20+24)\nPliage(0+10)');
     expect(r.inProgressTask?.id).toBe('1');
     expect(r.completedTasks).toEqual([]);
