@@ -2622,21 +2622,50 @@ fn advance_action_at_tick(
     // their setup or run proficiency consistently for this tick.
     let in_setup_phase = actions[action_idx].setup_progress < setup_ticks_f;
 
+    // Filter out operators that were borrowed by caleur-volant between
+    // Phase 1A (when Assigned(ops) was recorded) and now. The borrow
+    // clears the op from this station on the grid, so checking
+    // operator_stations_at catches the mismatch. Without this filter,
+    // the tick_operator_log records the borrowed op at this tick for
+    // BOTH the source and target actions, producing overlapping
+    // operator windows in the output.
+    let actual_operators: Vec<usize> = operators_this_tick
+        .iter()
+        .copied()
+        .filter(|&op| {
+            let load = grid.operator_stations_at(op, t);
+            load[0] == Some(station_idx) || load[1] == Some(station_idx)
+        })
+        .collect();
+
     // Raw productivity = sum across operators currently on this station.
     // For solo: each operator contributes their phase-appropriate proficiency.
     // For paired: each contributes their group's productivity for this station
     // (pairing is run-only by construction).
-    let raw_productivity: f64 = operators_this_tick
+    let raw_productivity: f64 = actual_operators
         .iter()
         .map(|&op| productivity_at_tick(op, station_idx, t, grid, operator_groups, operator_skills, in_setup_phase))
         .sum();
 
-    actions[action_idx].tick_operator_log.push((t, operators_this_tick.to_vec()));
+    if !actual_operators.is_empty() {
+        actions[action_idx].tick_operator_log.push((t, actual_operators));
+    } else {
+        // All operators were borrowed — this tick is effectively a stall.
+        actions[action_idx].idle_ticks += 1;
+        apply_peremption_rule(
+            &mut actions[action_idx],
+            setup_ticks,
+            attrs.peremption_ticks,
+            t as u32,
+        );
+    }
 
     // First productive tick after a pending peremption: record the re-calage
     // window's actual start here, so the segment spans only productive
     // re-setup work, not the idle period that triggered the peremption.
-    if actions[action_idx].pending_recalage {
+    // Guard: only when operators are actually present (a borrowed-away tick
+    // has raw_productivity=0 and must not consume the pending flag).
+    if actions[action_idx].pending_recalage && raw_productivity > 0.0 {
         actions[action_idx].current_recalage_start = Some(t as u32);
         actions[action_idx].pending_recalage = false;
     }
@@ -7230,5 +7259,50 @@ mod borrow_tests {
             "borrowed op restored to magnetism after window expires"
         );
         assert!(donor.borrowed_op_to_restore.is_none(), "restore field consumed");
+    }
+
+    /// When a caleur-volant borrow steals op from a donor during Phase 1B,
+    /// advance_action_at_tick for the donor must NOT log the borrowed op
+    /// in tick_operator_log (the op is on the target station, not the
+    /// donor's). Logging it would produce overlapping operator windows in
+    /// the output.
+    #[test]
+    fn advance_does_not_log_borrowed_operator() {
+        let mut grid = ScheduleGrid::new(2, 1, 50, 15);
+        grid.init_station_capacities(&[1, 1]);
+
+        // Simulate: op 0 was assigned to station 0 in Phase 1A, then
+        // caleur-volant moved them to station 1 in Phase 1B.
+        // Grid now shows op 0 on station 1, not station 0.
+        grid.assign_operator(0, 5, 1, 0.0);
+        grid.assign_station(0, 5, 0); // donor action holds station 0
+        grid.assign_station(1, 5, 1); // target action holds station 1
+
+        let skills = vec![vec![
+            SkillEntry { station_idx: 0, setup_proficiency: 1.0, run_proficiency: 1.0 },
+            SkillEntry { station_idx: 1, setup_proficiency: 1.0, run_proficiency: 0.0 },
+        ]];
+        let groups: Vec<Vec<PreparedConcurrentGroup>> = vec![vec![]];
+        let attrs = vec![permissive_attrs(), permissive_attrs()];
+
+        let donor = make_donor_action(0, 0, 2, 10, 6, 0);
+        let mut actions = vec![donor];
+
+        // Call advance with ops=[0] as if Phase 1A recorded it before the borrow.
+        let done = advance_action_at_tick(
+            &mut actions, 0, 5, &grid, &groups, &skills, &attrs,
+            &[0], // operators_this_tick — stale, op was borrowed
+        );
+
+        assert!(!done);
+        // The tick_operator_log should NOT contain tick 5 because op 0 is
+        // on station 1 (the target), not station 0 (the donor's station).
+        assert!(
+            actions[0].tick_operator_log.is_empty(),
+            "tick_operator_log must not record a borrowed-away operator; got {:?}",
+            actions[0].tick_operator_log,
+        );
+        // idle_ticks should be incremented since the action effectively stalled
+        assert_eq!(actions[0].idle_ticks, 1, "borrowed tick counts as idle");
     }
 }
