@@ -1065,10 +1065,18 @@ function AppContent() {
   // Late job IDs: deadline violations (snapshot) + real-time NOW-surpassed tasks
   const lateJobIds = useMemo(() => {
     const ids = new Set(snapshot.lateJobs.map((lj) => lj.jobId));
-    const fromValidation = ids.size;
     const taskToJob = createTaskToJobMap(snapshot.tasks, snapshot.elements);
+    const taskById = new Map(snapshot.tasks.map(t => [t.id, t]));
+    const nowMs = now.getTime();
     for (const a of snapshot.assignments) {
-      if (!a.isCompleted && new Date(a.scheduledEnd) < now) {
+      const endMs = new Date(a.scheduledEnd).getTime();
+      if (endMs >= nowMs) continue;
+      // Silence = consent: past + no explicit saisie = presumed done.
+      // Only flag as late when a saisie explicitly says not finished.
+      const task = taskById.get(a.taskId);
+      const pct = task?.recordedProgressPct;
+      const explicitlyNotDone = pct != null && pct < 100;
+      if (explicitlyNotDone) {
         const jobId = taskToJob.get(a.taskId);
         if (jobId) ids.add(jobId);
       }
