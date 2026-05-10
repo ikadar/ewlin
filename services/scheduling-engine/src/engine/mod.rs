@@ -903,6 +903,17 @@ pub fn build_actions(
                 let setup_ticks = if run_ticks == 0 { 0 } else { raw_setup_ticks };
                 let total_ticks = setup_ticks + run_ticks;
 
+                // Fully-complete task (100% progress → 0 remaining work):
+                // mark as done at tick 0 so successors' predecessor check
+                // sees end_tick=Some(0) and proceeds. Without this, the
+                // scoring loop's `art==0 → continue` leaves end_tick=None,
+                // blocking the entire downstream chain.
+                let (zero_start, zero_end) = if total_ticks == 0 {
+                    (Some(0), Some(0))
+                } else {
+                    (None, None)
+                };
+
                 let predecessor_idx = prev_task_id
                     .as_ref()
                     .and_then(|pid| task_id_to_action_idx.get(pid).copied());
@@ -944,9 +955,9 @@ pub fn build_actions(
                     last,
                     predecessor_idx,
                     predecessor_gap_ticks,
-                    end_tick: None,
+                    end_tick: zero_end,
                     assigned_operators: Vec::new(),
-                    start_tick: None,
+                    start_tick: zero_start,
                     chunk_info: None,
                     deadline_priority: job.deadline_priority,
                     job_deadline_tick,
