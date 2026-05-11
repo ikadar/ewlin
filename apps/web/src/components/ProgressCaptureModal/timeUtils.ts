@@ -4,12 +4,16 @@
  * doesn't appear elsewhere in the app (and would clutter the shared utils).
  */
 
-/** Format minutes-from-midnight as "HhMM" (e.g., 720 → "12h00"). */
+/** Format minutes-from-midnight as "HhMM" (e.g., 720 → "12h00", 1500 → "1h00 J+1"). */
 export function fmtTimeMin(min: number): string {
   const m = Math.max(0, Math.round(min));
-  const h = Math.floor(m / 60);
-  const rest = m % 60;
-  return `${h}h${String(rest).padStart(2, '0')}`;
+  const dayOffset = Math.floor(m / 1440);
+  const inDay = m - dayOffset * 1440;
+  const h = Math.floor(inDay / 60);
+  const rest = inDay % 60;
+  const time = `${h}h${String(rest).padStart(2, '0')}`;
+  if (dayOffset === 0) return time;
+  return `${time} J+${dayOffset}`;
 }
 
 /**

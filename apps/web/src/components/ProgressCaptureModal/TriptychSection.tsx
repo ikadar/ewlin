@@ -35,7 +35,7 @@ export function TriptychSection({
           sub={fmtDuration(duration)}
         />
         {slotVolumePct != null && (
-          <Cell label="Volume" value={`${slotVolumePct}%`} sub="du total" />
+          <Cell label="Volume" value={`${Number(slotVolumePct.toFixed(1))}%`} sub="du total" />
         )}
       </div>
     </div>
