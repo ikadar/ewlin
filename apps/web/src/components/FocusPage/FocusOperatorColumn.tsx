@@ -297,7 +297,11 @@ export function FocusOperatorColumn({
                 taskDuration: task.duration,
                 job: { reference: job.reference, client: job.client },
                 machineName: station?.name ?? task.stationId,
+                operatorName: `${operator.firstName} ${operator.lastName}`.trim(),
+                operatorId: operator.id,
+                stationId: task.stationId,
                 now,
+                slotVolumePct: (assignment as Record<string, unknown>).slotVolumePct as number | undefined,
               })
           : undefined;
 

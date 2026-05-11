@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig, FormeLeadTimeConfig } from '@flux/types';
+import type { Job, Task, TaskAssignment, Station, StationCategory, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig, FormeLeadTimeConfig, PlateLeadTimeConfig } from '@flux/types';
 import { X, Calendar, CalendarCheck } from 'lucide-react';
 import { TaskList } from './TaskList';
 import { JobDetailContextMenu } from './JobDetailContextMenu';
@@ -73,6 +73,8 @@ export interface JobDetailsPanelProps {
   paperLeadTime?: PaperLeadTimeConfig;
   /** Forme (die) lead-time configuration; same role for the Forme pill. */
   formeLeadTime?: FormeLeadTimeConfig;
+  /** Plate lead-time configuration; same role for the Plaques pill. */
+  plateLeadTime?: PlateLeadTimeConfig;
 }
 
 /** Format a datetime as DD/MM/YYYY a HHhMM */
@@ -133,6 +135,7 @@ export function JobDetailsPanel({
   onJumpToOperatorSlice,
   paperLeadTime,
   formeLeadTime,
+  plateLeadTime,
 }: JobDetailsPanelProps) {
   const now = useNow();
   // Memoize data filtering for this job
@@ -230,14 +233,20 @@ export function JobDetailsPanel({
     if (!task || task.type !== 'Internal') return;
     const internalTask = task as InternalTask;
     const station = stations.find((s) => s.id === internalTask.stationId);
+    const opEntry = assignment.operators?.[0];
+    const op = opEntry ? snapshotOperators?.find((o) => o.id === opEntry.operatorId) : undefined;
     saisieModal.open({
       assignment,
       taskDuration: internalTask.duration,
       job: { reference: job.reference, client: job.client },
       machineName: station?.name ?? internalTask.stationId,
+      operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
+      operatorId: opEntry?.operatorId ?? '',
+      stationId: internalTask.stationId,
       now,
+      slotVolumePct: (assignment as Record<string, unknown>).slotVolumePct as number | undefined,
     });
-  }, [contextMenu, job, jobAssignments, jobTasks, stations, saisieModal, now]);
+  }, [contextMenu, job, jobAssignments, jobTasks, stations, snapshotOperators, saisieModal, now]);
 
   const handleContextMenuDefinirDebut = useCallback(() => {
     if (!contextMenu || !job) return;
@@ -395,6 +404,7 @@ export function JobDetailsPanel({
         job={job}
         paperLeadTime={paperLeadTime}
         formeLeadTime={formeLeadTime}
+        plateLeadTime={plateLeadTime}
         assignments={jobAssignments}
         stations={stations}
         categories={categories}

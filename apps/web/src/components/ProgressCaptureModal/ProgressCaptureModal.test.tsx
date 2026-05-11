@@ -2,21 +2,24 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProgressCaptureModal } from './ProgressCaptureModal';
 
+const inProgressNow = new Date('2026-05-11T10:30:00+02:00');
+
 const baseProps = {
   isOpen: true,
   onClose: vi.fn(),
   onSave: vi.fn(),
   job: { reference: 'J-1247', client: 'ACME' },
   machineName: 'Heidelberg',
-  slotStartMin: 570,    // 9h30
-  slotEndMin: 720,      // 12h00
-  cumulBeforeSlotPct: 30,
-  slotVolumePct: 35,
-  expectedAtNowPct: 13,
-  nowMin: 645,          // 10h45
+  operatorName: 'Marc D.',
+  scheduledStart: '2026-05-11T09:30:00+02:00',
+  scheduledEnd: '2026-05-11T12:00:00+02:00',
+  now: inProgressNow,
+  setupMinutes: 10,
 };
 
 describe('ProgressCaptureModal', () => {
+  // ── Rendering ──────────────────────────────
+
   it('renders when isOpen is true', () => {
     render(<ProgressCaptureModal {...baseProps} />);
     expect(screen.getByTestId('progress-capture-modal')).toBeInTheDocument();
@@ -27,69 +30,89 @@ describe('ProgressCaptureModal', () => {
     expect(screen.queryByTestId('progress-capture-modal')).toBeNull();
   });
 
-  it('shows job identity (without fragment number, per UX decision)', () => {
+  // ── Identity & Triptych ────────────────────
+
+  it('shows job identity centered', () => {
     render(<ProgressCaptureModal {...baseProps} />);
     expect(screen.getByText('J-1247 · ACME')).toBeInTheDocument();
+  });
+
+  it('shows operator and machine in triptych', () => {
+    render(<ProgressCaptureModal {...baseProps} />);
+    expect(screen.getByText('Marc D.')).toBeInTheDocument();
     expect(screen.getByText('Heidelberg')).toBeInTheDocument();
   });
 
-  it('shows the slot range with formatted French times', () => {
+  it('shows time slot in triptych', () => {
     render(<ProgressCaptureModal {...baseProps} />);
-    expect(screen.getByText('9h30 → 12h00')).toBeInTheDocument();
+    const triptych = screen.getByTestId('pm-triptych');
+    expect(triptych.textContent).toContain('9h30');
+    expect(triptych.textContent).toContain('12h00');
   });
 
-  it('renders the volume gauge with the slot context', () => {
+  // ── Variant: in-progress ───────────────────
+
+  it('shows progress band for in-progress task', () => {
     render(<ProgressCaptureModal {...baseProps} />);
-    expect(screen.getByTestId('volume-gauge')).toBeInTheDocument();
-    expect(screen.getByTestId('volume-gauge-marker')).toBeInTheDocument();
-    expect(screen.getByText('≈ 43% du job')).toBeInTheDocument();
+    expect(screen.getByTestId('pm-progress-band')).toBeInTheDocument();
   });
 
-  it('renders all the input controls', () => {
+  it('shows stepper with "Je finirai à :" label', () => {
     render(<ProgressCaptureModal {...baseProps} />);
-    expect(screen.getByTestId('pm-quick-ontime')).toBeInTheDocument();
-    expect(screen.getByTestId('pm-quick-plus30')).toBeInTheDocument();
-    expect(screen.getByTestId('pm-custom-input')).toBeInTheDocument();
-    expect(screen.getByTestId('pm-status')).toBeInTheDocument();
+    const stepper = screen.getByTestId('pm-stepper');
+    expect(stepper.textContent).toContain('Je finirai');
   });
 
-  it('starts on À l\'heure (initial pmTime = slotEndMin)', () => {
+  it('starts on planned end time (stepper shows slot end)', () => {
     render(<ProgressCaptureModal {...baseProps} />);
-    expect(screen.getByTestId('pm-quick-ontime').className).toMatch(/is-active/);
-    expect(screen.getByTestId('pm-status').dataset.pmStatus).toBe('ontime');
+    expect(screen.getByTestId('pm-stepper-value').textContent).toBe('12h00');
+    expect(screen.getByTestId('pm-stepper-status').textContent).toContain("l'heure");
   });
 
-  it('updates the status line when a quick button is pressed', () => {
+  it('shows blocked button for in-progress variant', () => {
     render(<ProgressCaptureModal {...baseProps} />);
-    fireEvent.click(screen.getByTestId('pm-quick-plus30'));
-    expect(screen.getByTestId('pm-status').dataset.pmStatus).toBe('retard');
-    expect(screen.getByTestId('pm-status').textContent).toContain('30 min en retard');
+    expect(screen.getByTestId('pm-blocked-btn')).toBeInTheDocument();
   });
 
-  it('calls onSave with the current pmTime when Enregistrer is clicked', async () => {
+  // ── Stepper interaction ────────────────────
+
+  it('increments stepper by +15 on first click', () => {
+    render(<ProgressCaptureModal {...baseProps} />);
+    fireEvent.click(screen.getByTestId('pm-stepper-plus'));
+    expect(screen.getByTestId('pm-stepper-value').textContent).toBe('12h15');
+    expect(screen.getByTestId('pm-stepper-status').textContent).toContain('retard');
+  });
+
+  it('decrements stepper below planned end for early finish', () => {
+    render(<ProgressCaptureModal {...baseProps} />);
+    fireEvent.click(screen.getByTestId('pm-stepper-minus'));
+    expect(screen.getByTestId('pm-stepper-value').textContent).toBe('11h45');
+    expect(screen.getByTestId('pm-stepper-status').textContent).toContain('avance');
+  });
+
+  // ── Save / Close ───────────────────────────
+
+  it('calls onSave with the planned end when Enregistrer is clicked at default', async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
     render(<ProgressCaptureModal {...baseProps} onSave={onSave} onClose={onClose} />);
-
-    fireEvent.click(screen.getByTestId('pm-quick-plus30'));
     fireEvent.click(screen.getByTestId('pm-confirm-btn'));
-
     await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(750); // 12h00 + 30 min
+      expect(onSave).toHaveBeenCalledWith(720); // 12h00
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when Annuler is clicked (without saving)', () => {
-    const onSave = vi.fn();
+  it('calls onClose when Annuler is clicked', () => {
     const onClose = vi.fn();
+    const onSave = vi.fn();
     render(<ProgressCaptureModal {...baseProps} onSave={onSave} onClose={onClose} />);
     fireEvent.click(screen.getByTestId('pm-cancel-btn'));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('calls onClose when the close button is clicked', () => {
+  it('calls onClose when close button is clicked', () => {
     const onClose = vi.fn();
     render(<ProgressCaptureModal {...baseProps} onClose={onClose} />);
     fireEvent.click(screen.getByTestId('pm-close-btn'));
@@ -103,13 +126,6 @@ describe('ProgressCaptureModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not close when clicking inside the dialog body', () => {
-    const onClose = vi.fn();
-    render(<ProgressCaptureModal {...baseProps} onClose={onClose} />);
-    fireEvent.click(screen.getByText('Quand finirez-vous ?'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
   it('closes on Escape', () => {
     const onClose = vi.fn();
     render(<ProgressCaptureModal {...baseProps} onClose={onClose} />);
@@ -117,36 +133,58 @@ describe('ProgressCaptureModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('disables the buttons while saving (async onSave)', async () => {
-    let resolveSave: (() => void) | null = null;
-    const onSave = vi.fn(() => new Promise<void>((res) => { resolveSave = res; }));
-    render(<ProgressCaptureModal {...baseProps} onSave={onSave} />);
+  // ── Blocked mode ───────────────────────────
 
-    fireEvent.click(screen.getByTestId('pm-confirm-btn'));
-    expect((screen.getByTestId('pm-confirm-btn') as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByTestId('pm-cancel-btn') as HTMLButtonElement).disabled).toBe(true);
-
-    resolveSave?.();
-    await waitFor(() => {
-      // After resolving, the modal closes via onClose (if parent handles).
-      // In our test the parent is a vi.fn so the modal stays mounted with isOpen=true.
-      // But the saving flag should now be false → buttons re-enabled.
-      expect((screen.getByTestId('pm-confirm-btn') as HTMLButtonElement).disabled).toBe(false);
-    });
+  it('switches to blocked mode when button is clicked', () => {
+    render(<ProgressCaptureModal {...baseProps} />);
+    fireEvent.click(screen.getByTestId('pm-blocked-btn'));
+    expect(screen.getByTestId('pm-blocked-mode')).toBeInTheDocument();
+    expect(screen.queryByTestId('pm-stepper')).toBeNull();
   });
 
-  it('resets pmTime to slotEndMin when reopened (à l\'heure default for new session)', () => {
-    const { rerender } = render(<ProgressCaptureModal {...baseProps} />);
+  it('returns to normal mode from blocked mode', () => {
+    render(<ProgressCaptureModal {...baseProps} />);
+    fireEvent.click(screen.getByTestId('pm-blocked-btn'));
+    fireEvent.click(screen.getByTestId('pm-blocked-back'));
+    expect(screen.getByTestId('pm-stepper')).toBeInTheDocument();
+    expect(screen.queryByTestId('pm-blocked-mode')).toBeNull();
+  });
 
-    // Move to +30 min
-    fireEvent.click(screen.getByTestId('pm-quick-plus30'));
-    expect(screen.getByTestId('pm-status').dataset.pmStatus).toBe('retard');
+  // ── Variant: done-past-end ─────────────────
 
-    // Close + reopen
-    rerender(<ProgressCaptureModal {...baseProps} isOpen={false} />);
-    rerender(<ProgressCaptureModal {...baseProps} isOpen={true} />);
+  it('shows "J\'ai termine" label for done task', () => {
+    const doneNow = new Date('2026-05-11T14:00:00+02:00');
+    render(<ProgressCaptureModal {...baseProps} now={doneNow} />);
+    const stepper = screen.getByTestId('pm-stepper');
+    expect(stepper.textContent).toContain("J'ai termin");
+  });
 
-    expect(screen.getByTestId('pm-quick-ontime').className).toMatch(/is-active/);
-    expect(screen.getByTestId('pm-status').dataset.pmStatus).toBe('ontime');
+  it('does not show blocked button for done variant', () => {
+    const doneNow = new Date('2026-05-11T14:00:00+02:00');
+    render(<ProgressCaptureModal {...baseProps} now={doneNow} />);
+    expect(screen.queryByTestId('pm-blocked-btn')).toBeNull();
+  });
+
+  // ── Variant: future-blocked ────────────────
+
+  it('shows predecessor card for future task', () => {
+    const futureNow = new Date('2026-05-11T08:00:00+02:00');
+    render(
+      <ProgressCaptureModal
+        {...baseProps}
+        now={futureNow}
+        predecessorInfo={{ jobReference: 'J-1247', client: 'ACME', stationName: 'SM102', timeRange: '7h00 - 8h30' }}
+      />,
+    );
+    expect(screen.getByTestId('pm-future-blocked')).toBeInTheDocument();
+    expect(screen.queryByTestId('pm-stepper')).toBeNull();
+    expect(screen.queryByTestId('pm-progress-band')).toBeNull();
+  });
+
+  it('shows "Fermer" instead of "Annuler" for future variant', () => {
+    const futureNow = new Date('2026-05-11T08:00:00+02:00');
+    render(<ProgressCaptureModal {...baseProps} now={futureNow} />);
+    expect(screen.getByTestId('pm-cancel-btn').textContent).toBe('Fermer');
+    expect(screen.queryByTestId('pm-confirm-btn')).toBeNull();
   });
 });

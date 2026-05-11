@@ -9,15 +9,22 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { TaskAssignment } from '@flux/types';
 import { ProgressCaptureModal } from '../components/ProgressCaptureModal/ProgressCaptureModal';
-import { applyMinToDate, computeExpectedAtNowPct, isoToMinFromMidnight } from '../components/Tile/saisieMath';
+import type { PredecessorInfo } from '../components/ProgressCaptureModal/PredecessorCard';
+import { applyMinToDate } from '../components/Tile/saisieMath';
 import { useReportSaisieMutation } from '../store';
 
-interface SaisieOpenParams {
+export interface SaisieOpenParams {
   assignment: TaskAssignment;
   taskDuration: { setupMinutes: number; runMinutes?: number };
-  job: { reference: string; client: string };
+  job: { reference: string; client: string; designation?: string };
   machineName: string;
+  operatorName: string;
+  operatorId: string;
+  stationId: string;
   now: Date;
+  slotVolumePct?: number;
+  tileColor?: string;
+  predecessorInfo?: PredecessorInfo | null;
 }
 
 interface SaisieModalApi {
@@ -44,22 +51,27 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
     [state, reportSaisie],
   );
 
-  // Modal-side derived values — recomputed from `state` while open. Cheap.
-  const slotStartMin = state ? isoToMinFromMidnight(state.assignment.scheduledStart) : 0;
-  const slotEndMin = state ? isoToMinFromMidnight(state.assignment.scheduledEnd) : 0;
-  const nowMin = state ? state.now.getHours() * 60 + state.now.getMinutes() : 0;
-  const cumulBeforeSlotPct = state?.assignment.cumulativePositionPct ?? 0;
-  const slotVolumePct = state?.assignment.slotVolumePct ?? 100;
-  const expectedAtNowPct = state
-    ? computeExpectedAtNowPct(
-        state.assignment.scheduledStart,
-        state.assignment.scheduledEnd,
-        state.taskDuration.setupMinutes,
-        state.taskDuration.runMinutes ?? 0,
-        state.now.getTime(),
-        slotVolumePct,
-      )
-    : 0;
+  // Blocking callbacks — wired to APIs when available.
+  // TODO: wire to real RTK mutations in next phase.
+  const handleBlockPrerequisite = useCallback(async () => {
+    // POST /scenarios/prod/saisie/{taskId}/defer — not yet implemented
+    // eslint-disable-next-line no-console
+    console.warn('[SaisieModal] Block prerequisite: backend endpoint not yet available');
+  }, []);
+
+  const handleBlockMachine = useCallback(async () => {
+    if (!state) return;
+    // TODO: PUT /stations/{stationId} with appended scheduleException
+    // eslint-disable-next-line no-console
+    console.warn('[SaisieModal] Block machine: will add 1h maintenance on', state.stationId);
+  }, [state]);
+
+  const handleBlockAbsence = useCallback(async () => {
+    if (!state) return;
+    // TODO: PUT /operators/{operatorId} with appended absence
+    // eslint-disable-next-line no-console
+    console.warn('[SaisieModal] Block absence: will add 1h absence for', state.operatorId);
+  }, [state]);
 
   return (
     <SaisieModalContext.Provider value={api}>
@@ -71,12 +83,17 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
           onSave={handleSave}
           job={state.job}
           machineName={state.machineName}
-          slotStartMin={slotStartMin}
-          slotEndMin={slotEndMin}
-          cumulBeforeSlotPct={cumulBeforeSlotPct}
-          slotVolumePct={slotVolumePct}
-          expectedAtNowPct={expectedAtNowPct}
-          nowMin={nowMin}
+          operatorName={state.operatorName}
+          scheduledStart={state.assignment.scheduledStart}
+          scheduledEnd={state.assignment.scheduledEnd}
+          now={state.now}
+          setupMinutes={state.taskDuration.setupMinutes}
+          slotVolumePct={state.slotVolumePct}
+          tileColor={state.tileColor}
+          onBlockPrerequisite={undefined}
+          onBlockMachine={handleBlockMachine}
+          onBlockAbsence={handleBlockAbsence}
+          predecessorInfo={state.predecessorInfo}
         />
       )}
     </SaisieModalContext.Provider>

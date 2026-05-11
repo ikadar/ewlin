@@ -1217,6 +1217,7 @@ export default function OperatorSchedulePage() {
       return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
     })();
 
+    const op = operators.find((o) => o.id === operatorId);
     const handleOpenSaisie = assignment
       ? () =>
           saisieModal.open({
@@ -1224,7 +1225,11 @@ export default function OperatorSchedulePage() {
             taskDuration: task.duration,
             job: { reference: job.reference, client: job.client },
             machineName: stationName ?? task.stationId,
+            operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
+            operatorId: operatorId,
+            stationId: task.stationId,
             now,
+            slotVolumePct: (assignment as Record<string, unknown>).slotVolumePct as number | undefined,
           })
       : undefined;
 
