@@ -94,8 +94,9 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
       taskId: state.assignment.taskId,
       jobInternalId: state.assignment.jobId,
       type: 'panne_machine',
+      operatorId: state.operatorId,
       stationId: state.stationId,
-    });
+    }).catch(() => {});
   }, [state, stations, updateStation, createProductionEvent]);
 
   const handleBlockAbsence = useCallback(async () => {
@@ -120,8 +121,9 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
       taskId: state.assignment.taskId,
       jobInternalId: state.assignment.jobId,
       type: 'absence',
+      operatorId: state.operatorId,
       stationId: state.stationId,
-    });
+    }).catch(() => {});
   }, [state, operators, updateOperator, createProductionEvent]);
 
   return (
