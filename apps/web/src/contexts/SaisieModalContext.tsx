@@ -11,7 +11,13 @@ import type { TaskAssignment } from '@flux/types';
 import { ProgressCaptureModal } from '../components/ProgressCaptureModal/ProgressCaptureModal';
 import type { PredecessorInfo } from '../components/ProgressCaptureModal/PredecessorCard';
 import { applyMinToDate } from '../components/Tile/saisieMath';
-import { useReportSaisieMutation } from '../store';
+import {
+  useReportSaisieMutation,
+  useGetOperatorsQuery,
+  useUpdateOperatorMutation,
+  useGetStationsQuery,
+  useUpdateStationMutation,
+} from '../store';
 
 export interface SaisieOpenParams {
   assignment: TaskAssignment;
@@ -33,9 +39,20 @@ interface SaisieModalApi {
 
 const SaisieModalContext = createContext<SaisieModalApi | null>(null);
 
+const BLOCK_DURATION_MS = 60 * 60 * 1000; // 1h
+
+function toNaiveLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 export function SaisieModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SaisieOpenParams | null>(null);
   const [reportSaisie] = useReportSaisieMutation();
+  const [updateOperator] = useUpdateOperatorMutation();
+  const [updateStation] = useUpdateStationMutation();
+  const { data: operators } = useGetOperatorsQuery();
+  const { data: stations } = useGetStationsQuery();
 
   const open = useCallback((params: SaisieOpenParams) => setState(params), []);
   const close = useCallback(() => setState(null), []);
@@ -51,27 +68,47 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
     [state, reportSaisie],
   );
 
-  // Blocking callbacks — wired to APIs when available.
-  // TODO: wire to real RTK mutations in next phase.
-  const handleBlockPrerequisite = useCallback(async () => {
-    // POST /scenarios/prod/saisie/{taskId}/defer — not yet implemented
-    // eslint-disable-next-line no-console
-    console.warn('[SaisieModal] Block prerequisite: backend endpoint not yet available');
-  }, []);
-
   const handleBlockMachine = useCallback(async () => {
     if (!state) return;
-    // TODO: PUT /stations/{stationId} with appended scheduleException
-    // eslint-disable-next-line no-console
-    console.warn('[SaisieModal] Block machine: will add 1h maintenance on', state.stationId);
-  }, [state]);
+    const station = stations?.find((s) => s.id === state.stationId);
+    if (!station) return;
+    const now = new Date();
+    const endAt = new Date(now.getTime() + BLOCK_DURATION_MS);
+    const existing = station.scheduleExceptions ?? [];
+    await updateStation({
+      id: state.stationId,
+      body: {
+        name: station.name,
+        status: station.status,
+        operatingSchedule: station.operatingSchedule,
+        scheduleExceptions: [
+          ...existing,
+          { startAt: toNaiveLocal(now), endAt: toNaiveLocal(endAt), reason: "Panne déclarée par opérateur" },
+        ],
+        stationGroupIds: (station as Record<string, unknown>).stationGroupIds as string[] ?? [],
+      },
+    }).unwrap();
+  }, [state, stations, updateStation]);
 
   const handleBlockAbsence = useCallback(async () => {
     if (!state) return;
-    // TODO: PUT /operators/{operatorId} with appended absence
-    // eslint-disable-next-line no-console
-    console.warn('[SaisieModal] Block absence: will add 1h absence for', state.operatorId);
-  }, [state]);
+    const operator = operators?.find((o) => o.id === state.operatorId);
+    if (!operator) return;
+    const now = new Date();
+    const endAt = new Date(now.getTime() + BLOCK_DURATION_MS);
+    const existing = operator.absences ?? [];
+    await updateOperator({
+      id: state.operatorId,
+      body: {
+        firstName: operator.firstName,
+        lastName: operator.lastName,
+        absences: [
+          ...existing,
+          { startAt: toNaiveLocal(now), endAt: toNaiveLocal(endAt), reason: "Absence déclarée par opérateur" },
+        ],
+      },
+    }).unwrap();
+  }, [state, operators, updateOperator]);
 
   return (
     <SaisieModalContext.Provider value={api}>
