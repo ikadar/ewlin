@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Promotion Modal — playground</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #09090b; color: #e4e4e7; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .modal-stage {
+      background: rgba(0,0,0,0.6);
+      border: 1px dashed rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 32px;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 400px;
+    }
+    .modal-shell {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+      width: 100%; max-width: 560px;
+    }
+    .ctrl-panel {
+      position: fixed; top: 12px; right: 12px;
+      background: #1c1c20; border: 1px solid #333; border-radius: 6px;
+      padding: 14px; display: flex; flex-direction: column; gap: 8px;
+      z-index: 100; max-width: 320px;
+    }
+    .ctrl-panel h3 { font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 0.1em; margin: 6px 0 2px; }
+    .ctrl-panel h3:first-child { margin-top: 0; }
+    .ctrl-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .ctrl-group label { font-size: 11px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; min-width: 100px; }
+    .ctrl-group input[type="range"] { width: 90px; accent-color: #8b5cf6; }
+    .ctrl-group .val { font-size: 12px; color: #d4d4d8; font-family: ui-monospace, monospace; min-width: 30px; text-align: right; }
+  </style>
+</head>
+<body class="p-6">
+
+  <div class="ctrl-panel">
+    <h3>Valeurs</h3>
+    <div class="ctrl-group">
+      <label>Total jobs</label>
+      <input type="range" min="10" max="200" value="87" id="totalJobs" />
+      <span class="val" id="totalJobsVal">87</span>
+    </div>
+    <div class="ctrl-group">
+      <label>Planifiés</label>
+      <input type="range" min="0" max="200" value="82" id="planned" />
+      <span class="val" id="plannedVal">82</span>
+    </div>
+    <div class="ctrl-group">
+      <label>En retard</label>
+      <input type="range" min="0" max="50" value="3" id="late" />
+      <span class="val" id="lateVal">3</span>
+    </div>
+    <div class="ctrl-group">
+      <label>JCF +</label>
+      <input type="range" min="0" max="20" value="4" id="jcfAdded" />
+      <span class="val" id="jcfAddedVal">4</span>
+    </div>
+    <div class="ctrl-group">
+      <label>JCF -</label>
+      <input type="range" min="0" max="10" value="1" id="jcfRemoved" />
+      <span class="val" id="jcfRemovedVal">1</span>
+    </div>
+    <div class="ctrl-group">
+      <label>JCF modif</label>
+      <input type="range" min="0" max="30" value="6" id="jcfModified" />
+      <span class="val" id="jcfModifiedVal">6</span>
+    </div>
+    <div class="ctrl-group">
+      <label>Stations</label>
+      <input type="range" min="0" max="15" value="2" id="staMod" />
+      <span class="val" id="staModVal">2</span>
+    </div>
+    <div class="ctrl-group">
+      <label>Opérateurs</label>
+      <input type="range" min="0" max="15" value="1" id="opMod" />
+      <span class="val" id="opModVal">1</span>
+    </div>
+  </div>
+
+  <div style="max-width: 960px; margin: 0 auto;">
+    <h1 class="text-lg font-semibold mb-4 text-zinc-300">Promotion préprod &rarr; prod — version finale</h1>
+    <div class="modal-stage" id="stage"></div>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const state = {
+      totalJobs: 87, planned: 82, late: 3,
+      jcfAdded: 4, jcfRemoved: 1, jcfModified: 6,
+      staMod: 2, opMod: 1,
+    };
+
+    const sliders = ['totalJobs','planned','late','jcfAdded','jcfRemoved','jcfModified','staMod','opMod'];
+    sliders.forEach(id => {
+      $(`#${id}`).addEventListener('input', (e) => {
+        state[id] = +e.target.value;
+        $(`#${id}Val`).textContent = e.target.value;
+        render();
+      });
+    });
+
+    function fmtDelta(n) { return n > 0 ? `+${n}` : n < 0 ? `${n}` : '±0'; }
+
+    function row(label, rightHtml) {
+      return `
+        <div class="flex items-center justify-between py-2">
+          <span style="font-size: 13px; color: #a1a1aa;">${label}</span>
+          <div class="flex items-baseline justify-end gap-2 font-medium" style="font-size: 14px; min-width: 100px; text-align: right; font-variant-numeric: tabular-nums;">
+            ${rightHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function render() {
+      const dPlanned = 5;
+      const dLate = -2;
+      const jcfTotal = state.jcfAdded + state.jcfRemoved + state.jcfModified;
+
+      const jcfRight = jcfTotal === 0
+        ? '<span style="color:#52525b; font-size:13px;">aucun</span>'
+        : `<span style="color:#fbbf24; font-size:13px;">${jcfTotal} modif.</span>`;
+
+      $('#stage').innerHTML = `
+        <div class="modal-shell">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-zinc-800">
+            <div class="flex items-center gap-2.5">
+              <div class="w-6 h-6 rounded flex items-center justify-center bg-emerald-500/10">
+                <i data-lucide="rocket" class="w-3.5 h-3.5 text-emerald-400"></i>
+              </div>
+              <span class="text-sm font-medium text-zinc-100">Promouvoir préprod &rarr; prod</span>
+            </div>
+            <div class="text-right">
+              <div style="font-size:10px; color:#71717a; text-transform:uppercase; letter-spacing:0.08em;">Prod actuelle</div>
+              <div style="font-size:12px; color:#a1a1aa;">11/05/2026, 08:42</div>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="px-5 py-1">
+            ${row('Jobs planifiés',
+              `<span style="color:#e4e4e7">${state.planned}</span>
+               <span class="mono" style="color:#34d399; font-size:12px;">${fmtDelta(dPlanned)}</span>`
+            )}
+            ${row('Jobs en retard',
+              `<span style="color:${state.late > 0 ? '#fca5a5' : '#e4e4e7'}">${state.late}</span>
+               <span class="mono" style="color:#34d399; font-size:12px;">${fmtDelta(dLate)}</span>`
+            )}
+
+            <!-- single separator -->
+            <div class="h-px my-1" style="background: rgba(63,63,70,0.5);"></div>
+
+            ${row('Modifications de jobs', jcfRight)}
+            ${row('Config. stations',
+              state.staMod > 0
+                ? `<span style="color:#fbbf24; font-size:13px;">${state.staMod} modif.</span>`
+                : '<span style="color:#52525b; font-size:13px;">aucun</span>'
+            )}
+            ${row('Config. opérateurs',
+              state.opMod > 0
+                ? `<span style="color:#fbbf24; font-size:13px;">${state.opMod} modif.</span>`
+                : '<span style="color:#52525b; font-size:13px;">aucun</span>'
+            )}
+          </div>
+
+          <!-- Footer -->
+          <div class="px-5 py-3 border-t border-zinc-800 flex items-center justify-between">
+            <div class="flex items-center gap-1.5" style="font-size:11px; color:#52525b;">
+              <i data-lucide="undo-2" class="w-3 h-3"></i>
+              Undo disponible 5 min
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 rounded border border-zinc-700 hover:border-zinc-600">Annuler</button>
+              <button class="px-4 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded flex items-center gap-1.5">
+                <i data-lucide="rocket" class="w-3 h-3"></i>
+                Maintenir pour promouvoir
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    render();
+  </script>
+</body>
+</html>
