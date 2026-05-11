@@ -21,6 +21,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 import { productionReportApi } from './productionReportApi';
+import { prodSnapshotApi } from './prodSnapshotApi';
 import { scheduleApi } from './scheduleApi';
 
 export interface ReportSaisieRequest {
@@ -54,28 +55,35 @@ export const saisieApi = createApi({
         body: { estimatedEndTime },
       }),
       async onQueryStarted({ taskId, estimatedEndTime }, { dispatch, queryFulfilled }) {
-        // Optimistic — flip scheduledEnd on the snapshot cache so the tile
-        // re-renders instantly. The actual replan runs server-side ; we
-        // invalidate after success so the next snapshot fetch picks up
-        // the post-replan state (which may differ from our optimistic
-        // patch if the engine had to slide things around).
-        const patch = dispatch(
+        const now = new Date().toISOString();
+        const patchPreprod = dispatch(
           scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
             const a = draft.assignments.find((x) => x.taskId === taskId);
             if (a) {
               a.scheduledEnd = estimatedEndTime;
-              a.updatedAt = new Date().toISOString();
+              a.updatedAt = now;
+            }
+          }),
+        );
+        const patchProd = dispatch(
+          prodSnapshotApi.util.updateQueryData('getProdSnapshot', undefined, (draft) => {
+            if (!draft) return;
+            const a = draft.assignments.find((x) => x.taskId === taskId);
+            if (a) {
+              a.scheduledEnd = estimatedEndTime;
+              a.updatedAt = now;
             }
           }),
         );
 
         try {
           await queryFulfilled;
-          // Force a re-fetch so we get the post-replan snapshot from the engine.
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
           dispatch(productionReportApi.util.invalidateTags(['ProductionReport']));
         } catch {
-          patch.undo();
+          patchPreprod.undo();
+          patchProd.undo();
         }
       },
     }),

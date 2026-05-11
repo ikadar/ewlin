@@ -170,6 +170,7 @@ async function runPhase1(): Promise<void> {
 
   try {
     const result = await runFast();
+    invalidateSnapshot();
     setState({
       isComputing: false,
       hasFailed: false,
