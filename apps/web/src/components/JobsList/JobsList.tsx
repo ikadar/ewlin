@@ -311,7 +311,7 @@ export function JobsList({
           {visibleJobs.length > 0 ? (
             visibleJobs.map(renderJobCard)
           ) : (
-            <div className="px-3 py-32 text-center text-zinc-500 text-sm">
+            <div className="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
               {searchQuery ? 'Aucun travail trouvé' : 'Aucun travail dans cette vue'}
             </div>
           )}

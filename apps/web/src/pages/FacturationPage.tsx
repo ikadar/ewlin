@@ -170,7 +170,7 @@ export function FacturationPage() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto flex flex-col">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-30 bg-flux-hover">
               <tr className="bg-flux-hover border-b border-flux-border">
@@ -182,17 +182,17 @@ export function FacturationPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr><td colSpan={5} className="px-4 py-32 text-center text-flux-text-muted">Chargement…</td></tr>
-              )}
-              {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-32 text-center text-flux-text-muted">Aucun dossier</td></tr>
-              )}
               {filtered.map((job) => (
                 <JobRow key={job.id} job={job} exiting={exitingIds.has(job.internalId!)} collapsing={collapsingIds.has(job.internalId!)} onToggleInvoiced={handleToggleInvoiced} />
               ))}
             </tbody>
           </table>
+          {isLoading && (
+            <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Chargement…</div>
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Aucun dossier</div>
+          )}
         </div>
       </div>
     </div>

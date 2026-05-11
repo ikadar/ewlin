@@ -222,7 +222,7 @@ export function ProductionReportPage() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto flex flex-col">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-30 bg-flux-hover">
               <tr className="bg-flux-hover border-b border-flux-border">
@@ -237,17 +237,17 @@ export function ProductionReportPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr><td colSpan={8} className="px-4 py-32 text-center text-flux-text-muted">Chargement…</td></tr>
-              )}
-              {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-32 text-center text-flux-text-muted">Aucun événement</td></tr>
-              )}
               {filtered.map((ev) => (
                 <EventRow key={ev.id} event={ev} exiting={exitingIds.has(ev.id)} collapsing={collapsingIds.has(ev.id)} onToggleSeen={handleToggleSeen} />
               ))}
             </tbody>
           </table>
+          {isLoading && (
+            <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Chargement…</div>
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Aucun événement</div>
+          )}
         </div>
       </div>
     </div>
