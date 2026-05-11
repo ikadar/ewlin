@@ -1,5 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 
+export type SidebarButtonTone = 'neutral' | 'preprod' | 'prod';
+
 export interface SidebarButtonProps {
   /** Lucide icon component */
   icon: LucideIcon;
@@ -13,7 +15,15 @@ export interface SidebarButtonProps {
   onClick?: () => void;
   /** Test ID for E2E testing */
   testId?: string;
+  /** Active-state tone — colors the highlight to match the env mode */
+  tone?: SidebarButtonTone;
 }
+
+const ACTIVE_CLASSES: Record<SidebarButtonTone, string> = {
+  neutral: 'bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white',
+  preprod: 'bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25 hover:text-emerald-50',
+  prod: 'bg-amber-500/20 text-amber-100 hover:bg-amber-500/25 hover:text-amber-50',
+};
 
 /**
  * Navigation button for the Sidebar.
@@ -26,13 +36,14 @@ export function SidebarButton({
   isDisabled = false,
   onClick,
   testId,
+  tone = 'neutral',
 }: SidebarButtonProps) {
   const baseClasses =
     'w-10 h-10 flex items-center justify-center rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-zinc-900';
 
   const getStateClasses = () => {
     if (isDisabled) return 'text-zinc-700 cursor-not-allowed';
-    if (isActive) return 'bg-white/10 text-zinc-300 hover:bg-white/15 hover:text-white';
+    if (isActive) return ACTIVE_CLASSES[tone];
     return 'text-zinc-500 hover:bg-white/10 hover:text-zinc-300';
   };
   const stateClasses = getStateClasses();

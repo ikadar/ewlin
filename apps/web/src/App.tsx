@@ -38,7 +38,7 @@ import { yPositionToTime } from './components/DragPreview/snapUtils';
 import { MassUnscheduleDialog } from './components/MassUnscheduleDialog';
 import { RazFab } from './components/RazFab/RazFab';
 import { getErrorMessage } from './store/api/errorNormalization';
-import { useAppDispatch } from './store';
+import { useAppDispatch, setFocusedDate as setFocusedDateRedux } from './store';
 import { fluxApi } from './store/api/fluxApi';
 import { formatAutoSaveName, getTasksForJob, getJobIdForTask, compareTaskOrder, createTaskToJobMap } from './utils';
 import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory } from '@flux/types';
@@ -907,16 +907,16 @@ function AppContent() {
     return map;
   }, [snapshot.categories]);
 
-  // REQ-14: Auto-scroll to today on initial load
+  // REQ-14: Auto-scroll to today on initial load — or to the date passed via
+  // navigation state (planning view toggle preserves calendar position)
+  const navFocusedDate = (location.state as { focusedDate?: string } | null)?.focusedDate;
   const hasScrolledToToday = useRef(false);
   useEffect(() => {
     if (hasScrolledToToday.current || !gridRef.current) return;
 
-    // Calculate Y position for today at current time
-    const now = getNow();
-    const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
+    const target = navFocusedDate ? new Date(navFocusedDate) : getNow();
+    const y = timeToYPosition(target, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
 
-    // Scroll to center today in the viewport
     const viewportHeight = gridRef.current.getViewportHeight();
     const scrollTarget = Math.max(0, y - viewportHeight / 2);
     gridRef.current.scrollToY(scrollTarget, 'instant');
@@ -1045,8 +1045,9 @@ function AppContent() {
       // so the focused date stays correct even when bands compress the Y range.
       const focusedTime = yPositionToTime(centerY, START_HOUR, gridStartDate, currentPixelsPerHour, effectiveCollapses);
       setFocusedDate(focusedTime);
+      dispatch(setFocusedDateRedux(focusedTime.toISOString()));
     });
-  }, [gridStartDate, effectiveCollapses]);
+  }, [gridStartDate, effectiveCollapses, dispatch]);
 
   // v0.3.47: Recalculate viewport when zoom (pixelsPerHour) changes
   // This ensures the viewport indicator stays on the correct day after zoom
@@ -1690,9 +1691,11 @@ function AppContent() {
     });
   }, [pixelsPerHour, gridStartDate, effectiveCollapses]);
 
-  // Scroll grid to today on initial load
+  // Scroll grid to today on initial load (skip when navigating from
+  // the planning view toggle — the earlier hasScrolledToToday effect
+  // already scrolled to the preserved position)
   useEffect(() => {
-    // Small delay to ensure grid is mounted and rendered
+    if (navFocusedDate) return;
     const timer = setTimeout(() => {
       handleDateClick(getNow());
     }, 100);

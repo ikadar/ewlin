@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, ListChecks, FlaskConical, History } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, ListChecks, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEnvAwareNavigate, useScenarioMode } from '../../contexts/ScenarioContext';
@@ -27,7 +27,7 @@ export function Sidebar() {
   const canSeeSettings = useHasPermission('settings.view', 'admin.users');
   const { mode } = useScenarioMode();
   const canSeeLogistique = mode === 'prod';
-  const canSeeLabo = mode === 'preprod';
+
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -80,17 +80,10 @@ export function Sidebar() {
         {/* Top navigation section */}
         <div className="flex flex-col items-center py-3 gap-2">
           <SidebarButton
-            icon={Users}
-            label="Planning opérateurs"
-            isActive={isOperatorSchedule}
-            onClick={() => navigate('/')}
-            tone={mode}
-          />
-          <SidebarButton
             icon={CalendarDays}
-            label="Planning machines"
-            isActive={isStationSchedule}
-            onClick={() => navigate('/stations')}
+            label="Planning"
+            isActive={isOperatorSchedule || isStationSchedule}
+            onClick={() => navigate('/')}
             tone={mode}
           />
           <SidebarButton
@@ -109,20 +102,7 @@ export function Sidebar() {
               tone={mode}
             />
           )}
-          <SidebarButton
-            icon={BarChart3}
-            label="Statistiques"
-            isActive={isStats}
-            onClick={() => navigate('/stats')}
-          />
-          {canSeeLabo && (
-            <SidebarButton
-              icon={FlaskConical}
-              label="Scénarios"
-              isActive={isScenarios}
-              onClick={() => navigate('/scenarios')}
-            />
-          )}
+          {/* Statistiques + Scénarios hidden — not needed for current workflow */}
         </div>
 
         {/* Spacer */}

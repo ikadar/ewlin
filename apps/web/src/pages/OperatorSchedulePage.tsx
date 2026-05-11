@@ -16,6 +16,7 @@
  */
 
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { JobModificationContainer } from '@/components/JcfModificationModal/JobModificationContainer';
 import {
@@ -36,7 +37,7 @@ import {
   useGetPlateLeadTimeQuery,
 } from '../store';
 import type { ComputeScheduleResult } from '../store';
-import { useAppDispatch, useUpdateSTStatusMutation } from '../store';
+import { useAppDispatch, useUpdateSTStatusMutation, setFocusedDate as setFocusedDateRedux } from '../store';
 import { useSaisieModal } from '../contexts/SaisieModalContext';
 import { SetStartTimeDialog } from '../components/SetStartTimeDialog/SetStartTimeDialog';
 import { TileContextMenu } from '../components/Tile';
@@ -170,6 +171,7 @@ export default function OperatorSchedulePage() {
   const [clearJobAssignments] = useClearJobAssignmentsMutation();
   const [batchSetPin] = useBatchSetPinMutation();
   const dispatch = useAppDispatch();
+  const location = useLocation();
   const invalidateSnapshot = useCallback(() => {
     dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
   }, [dispatch]);
@@ -271,6 +273,7 @@ export default function OperatorSchedulePage() {
       const centerY = newScrollTop + viewportH / 2;
       const fd = yPositionToTime(centerY, START_HOUR, gridStartDate, pixelsPerHour, effectiveCollapses);
       setFocusedDate(fd);
+      dispatch(setFocusedDateRedux(fd.toISOString()));
 
       // Viewport hour range — collapse-aware. With collapses, the visible Y span
       // covers MORE wall-clock time than `viewportH / pxPerHour` linearly suggests
@@ -313,15 +316,17 @@ export default function OperatorSchedulePage() {
     return () => resizeObserver.disconnect();
   }, [scrollContainer]);
 
-  // Scroll to current time on mount (use rAF to ensure scroll listener is attached first)
+  // Scroll to current time on mount — or to the date passed via navigation state
+  // (planning view toggle preserves calendar position when switching views)
+  const navFocusedDate = (location.state as { focusedDate?: string } | null)?.focusedDate;
   useEffect(() => {
     if (!scrollContainer) return;
     const container = scrollContainer;
     requestAnimationFrame(() => {
-      const now = new Date();
-      const y = timeToYPosition(now, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
+      const target = navFocusedDate ? new Date(navFocusedDate) : new Date();
+      const y = timeToYPosition(target, START_HOUR, pixelsPerHour, gridStartDate, effectiveCollapses);
       const vh = container.clientHeight;
-      container.scrollTop = Math.max(0, y - vh / 3);
+      container.scrollTop = Math.max(0, y - vh / 2);
     });
   }, [scrollContainer, pixelsPerHour, gridStartDate, effectiveCollapses]);
 

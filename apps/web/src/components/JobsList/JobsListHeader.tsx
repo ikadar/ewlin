@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react';
+import { PlanningViewToggle } from './PlanningViewToggle';
 
 export type JobTab = 'planified' | 'unplanified';
 export type JobChip = 'all' | 'late' | 'conflict';
@@ -26,6 +27,7 @@ export function JobsListHeader({
 }: JobsListHeaderProps) {
   return (
     <div className="shrink-0 px-3 pt-3 pb-2 flex flex-col gap-2">
+      <PlanningViewToggle />
       <div className="relative">
         <Search className="absolute left-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-zinc-500" />
         <input
