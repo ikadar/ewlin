@@ -84,7 +84,7 @@ export const FLUX_STATIC_JOBS: FluxJob[] = [
       {
         id: '00078-e2',
         label: 'Étiquette Carrée',
-        bat: 'bat_sent',
+        bat: 'bat_approved',
         papier: 'ordered',
         formes: 'none',
         plaques: 'to_make',

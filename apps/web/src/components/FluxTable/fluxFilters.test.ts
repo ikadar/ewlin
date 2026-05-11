@@ -15,8 +15,8 @@ describe('pathnameToTab', () => {
   it('maps /flux to all', () => {
     expect(pathnameToTab('/flux')).toBe('all');
   });
-  it('maps /flux/prepresse to prepresse', () => {
-    expect(pathnameToTab('/flux/prepresse')).toBe('prepresse');
+  it('maps /flux/bat to bat', () => {
+    expect(pathnameToTab('/flux/bat')).toBe('bat');
   });
   it('maps /flux/papier to papier', () => {
     expect(pathnameToTab('/flux/papier')).toBe('papier');
@@ -41,7 +41,7 @@ describe('tabToPathname', () => {
     expect(tabToPathname('all')).toBe('/flux');
   });
   it('maps other tabs to /flux/{tab}', () => {
-    expect(tabToPathname('prepresse')).toBe('/flux/prepresse');
+    expect(tabToPathname('bat')).toBe('/flux/bat');
     expect(tabToPathname('papier')).toBe('/flux/papier');
     expect(tabToPathname('formes')).toBe('/flux/formes');
     expect(tabToPathname('plaques')).toBe('/flux/plaques');
@@ -59,8 +59,8 @@ describe('filterByTab — spec 6.5 verification matrix', () => {
     expect(ids('all')).toEqual(['00042', '00078', '00091', '00103', '00117']);
   });
 
-  it('A faire prepresse: 3 jobs (00078, 00091, 00103)', () => {
-    const result = ids('prepresse');
+  it('A faire bat: 3 jobs (00078, 00091, 00103)', () => {
+    const result = ids('bat');
     expect(result).toContain('00078');
     expect(result).toContain('00091');
     expect(result).toContain('00103');
@@ -82,33 +82,33 @@ describe('filterByTab — spec 6.5 verification matrix', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('Plaques a produire: 2 jobs (00078, 00091)', () => {
+  it('Plaques a produire: 1 job (00078 — only job with bat_approved + to_make)', () => {
     const result = ids('plaques');
     expect(result).toContain('00078');
-    expect(result).toContain('00091');
-    expect(result).toHaveLength(2);
+    expect(result).not.toContain('00091'); // 00091 has to_make but no bat_approved element
+    expect(result).toHaveLength(1);
   });
 });
 
 // ── filterByTab — specific exclusion rules ──────────────────────────────────
 
-describe('filterByTab — prepresse exclusion rules', () => {
+describe('filterByTab — bat exclusion rules', () => {
   const okJob = FLUX_STATIC_JOBS.find(j => j.id === '00042')!; // BAT = bat_approved
   const naJob = FLUX_STATIC_JOBS.find(j => j.id === '00117')!; // BAT = none
   const redJob = FLUX_STATIC_JOBS.find(j => j.id === '00078')!; // BAT = waiting_files (red)
 
-  it('excludes BAT=bat_approved from prepresse tab', () => {
-    expect(filterByTab(okJob, 'prepresse')).toBe(false);
+  it('excludes BAT=bat_approved from bat tab', () => {
+    expect(filterByTab(okJob, 'bat')).toBe(false);
   });
-  it('excludes BAT=none from prepresse tab', () => {
-    expect(filterByTab(naJob, 'prepresse')).toBe(false);
+  it('excludes BAT=none from bat tab', () => {
+    expect(filterByTab(naJob, 'bat')).toBe(false);
   });
-  it('includes BAT=waiting_files (red) in prepresse tab', () => {
-    expect(filterByTab(redJob, 'prepresse')).toBe(true);
+  it('includes BAT=waiting_files (red) in bat tab', () => {
+    expect(filterByTab(redJob, 'bat')).toBe(true);
   });
-  it('includes BAT=bat_sent (yellow) in prepresse tab', () => {
+  it('includes BAT=bat_sent (yellow) in bat tab', () => {
     const batSentJob = FLUX_STATIC_JOBS.find(j => j.id === '00103')!; // BAT = bat_sent
-    expect(filterByTab(batSentJob, 'prepresse')).toBe(true);
+    expect(filterByTab(batSentJob, 'bat')).toBe(true);
   });
 });
 
@@ -126,11 +126,11 @@ describe('filterByTab — multi-element worst-value aggregation', () => {
   it('00091: does not match formes filter (Formes worst = ordered, not to_order)', () => {
     expect(filterByTab(job91, 'formes')).toBe(false);
   });
-  it('00078: matches plaques filter (Plaques worst = to_make)', () => {
+  it('00078: matches plaques filter (e2 has bat_approved + to_make)', () => {
     expect(filterByTab(job78, 'plaques')).toBe(true);
   });
-  it('00091: matches plaques filter (Plaques worst = to_make)', () => {
-    expect(filterByTab(job91, 'plaques')).toBe(true);
+  it('00091: excluded from plaques (to_make elements lack bat_approved)', () => {
+    expect(filterByTab(job91, 'plaques')).toBe(false);
   });
 });
 
@@ -195,16 +195,16 @@ describe('computeTabCounts', () => {
   it('no search: matches spec 6.5 verification matrix', () => {
     const counts = computeTabCounts(jobs, '');
     expect(counts.all).toBe(5);
-    expect(counts.prepresse).toBe(3);
+    expect(counts.bat).toBe(3);
     expect(counts.papier).toBe(2);
     expect(counts.formes).toBe(1);
-    expect(counts.plaques).toBe(2);
+    expect(counts.plaques).toBe(1);
   });
 
   it('search "Ducros": counts reflect only matching jobs', () => {
     const counts = computeTabCounts(jobs, 'Ducros');
     expect(counts.all).toBe(1);       // only 00042
-    expect(counts.prepresse).toBe(0); // 00042 has BAT=bat_approved → excluded from prepresse
+    expect(counts.bat).toBe(0); // 00042 has BAT=bat_approved → excluded from bat
     expect(counts.papier).toBe(0);
     expect(counts.formes).toBe(0);
     expect(counts.plaques).toBe(0);
@@ -213,7 +213,7 @@ describe('computeTabCounts', () => {
   it('search "Müller": counts reflect 00078 only', () => {
     const counts = computeTabCounts(jobs, 'Müller');
     expect(counts.all).toBe(1);
-    expect(counts.prepresse).toBe(1);
+    expect(counts.bat).toBe(1);
     expect(counts.papier).toBe(1);
     expect(counts.formes).toBe(1);
     expect(counts.plaques).toBe(1);
@@ -222,7 +222,7 @@ describe('computeTabCounts', () => {
   it('search that matches nothing: all counts are 0', () => {
     const counts = computeTabCounts(jobs, 'zzz_no_match');
     expect(counts.all).toBe(0);
-    expect(counts.prepresse).toBe(0);
+    expect(counts.bat).toBe(0);
     expect(counts.papier).toBe(0);
     expect(counts.formes).toBe(0);
     expect(counts.plaques).toBe(0);
@@ -231,7 +231,7 @@ describe('computeTabCounts', () => {
   it('search "att.fich" matches 00078 and 00091 (worst BAT badge = Att.fich)', () => {
     const counts = computeTabCounts(jobs, 'att.fich');
     expect(counts.all).toBe(2);
-    expect(counts.prepresse).toBe(2);
+    expect(counts.bat).toBe(2);
   });
 });
 

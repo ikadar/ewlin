@@ -259,7 +259,8 @@ export function filterByTab(job: FluxJob, tab: TabId): boolean {
     case 'bat':       return bat !== 'bat_approved' && bat !== 'none';
     case 'papier':    return papier === 'to_order';
     case 'formes':    return formes === 'to_order';
-    case 'plaques':   return plaques === 'to_make';
+    case 'plaques':
+      return job.elements.some(el => el.plaques === 'to_make' && el.bat === 'bat_approved');
     default:          return true;
   }
 }
