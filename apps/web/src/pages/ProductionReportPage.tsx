@@ -227,10 +227,10 @@ export function ProductionReportPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={8} className="px-4 py-16 text-center text-flux-text-muted">Chargement…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-32 text-center text-flux-text-muted">Chargement…</td></tr>
               )}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-16 text-center text-flux-text-muted">Aucun événement</td></tr>
+                <tr><td colSpan={8} className="px-4 py-32 text-center text-flux-text-muted">Aucun événement</td></tr>
               )}
               {filtered.map((ev) => (
                 <EventRow key={ev.id} event={ev} exiting={exitingIds.has(ev.id)} onToggleSeen={handleToggleSeen} />

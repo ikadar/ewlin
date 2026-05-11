@@ -172,10 +172,10 @@ export function FacturationPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={5} className="px-4 py-16 text-center text-flux-text-muted">Chargement…</td></tr>
+                <tr><td colSpan={5} className="px-4 py-32 text-center text-flux-text-muted">Chargement…</td></tr>
               )}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-16 text-center text-flux-text-muted">Aucun dossier</td></tr>
+                <tr><td colSpan={5} className="px-4 py-32 text-center text-flux-text-muted">Aucun dossier</td></tr>
               )}
               {filtered.map((job) => (
                 <JobRow key={job.id} job={job} exiting={exitingIds.has(job.internalId!)} onToggleInvoiced={handleToggleInvoiced} />
