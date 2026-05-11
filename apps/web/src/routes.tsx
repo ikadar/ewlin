@@ -115,16 +115,18 @@ export function AppRoutes() {
         {/* Algorithm stats dashboard */}
         <Route path="/stats" element={<StatsPage />} />
 
-        {/* Logistique — réceptions et expéditions de l'atelier (Phase 1)
+        {/* Checklist — unified submenu for prérequis, magasin/expéditions, activité.
             Prod-only: hidden from Préprod (cf. RequireEnv). */}
-        <Route path="/logistique" element={<RequireEnv allowed="prod"><LogistiquePage /></RequireEnv>} />
-        <Route path="/rapport-production" element={<RequireEnv allowed="prod"><ProductionReportPage /></RequireEnv>} />
-        <Route path="/prerequis" element={<RequireEnv allowed="prod"><PrerequisLayout /></RequireEnv>}>
-          <Route index element={<PrerequisIndexRedirect />} />
-          <Route path="papier" element={<PapierPage />} />
-          <Route path="formes" element={<FormesPage />} />
-          <Route path="bat" element={<BatPage />} />
-          <Route path="plaques" element={<PlaquesPage />} />
+        <Route element={<RequireEnv allowed="prod"><PrerequisLayout /></RequireEnv>}>
+          <Route path="/prerequis">
+            <Route index element={<PrerequisIndexRedirect />} />
+            <Route path="papier" element={<PapierPage />} />
+            <Route path="formes" element={<FormesPage />} />
+            <Route path="bat" element={<BatPage />} />
+            <Route path="plaques" element={<PlaquesPage />} />
+          </Route>
+          <Route path="/logistique" element={<LogistiquePage />} />
+          <Route path="/rapport-production" element={<ProductionReportPage />} />
         </Route>
 
         {/* Historique & audit — submenu under HistoryLayout (analogous

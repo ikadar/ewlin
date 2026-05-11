@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, ListChecks, ClipboardList, FlaskConical, History } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, ListChecks, FlaskConical, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEnvAwareNavigate, useScenarioMode } from '../../contexts/ScenarioContext';
@@ -37,12 +37,10 @@ export function Sidebar() {
   const isFlux = location.pathname.startsWith('/flux') || isJcfFromFlux;
   const isStationSchedule = location.pathname.startsWith('/stations');
   const isStats = location.pathname.startsWith('/stats');
-  const isLogistique = location.pathname.startsWith('/logistique');
-  const isPrerequis = location.pathname.startsWith('/prerequis');
-  const isRapportProduction = location.pathname.startsWith('/rapport-production');
+  const isChecklist = location.pathname.startsWith('/logistique') || location.pathname.startsWith('/prerequis') || location.pathname.startsWith('/rapport-production');
   const isHistory = location.pathname.startsWith('/historique');
   const isScenarios = location.pathname.startsWith('/scenarios');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isPrerequis && !isRapportProduction && !isHistory && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isChecklist && !isHistory && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -104,27 +102,10 @@ export function Sidebar() {
           />
           {canSeeLogistique && (
             <SidebarButton
-              icon={Truck}
-              label="Logistique"
-              isActive={isLogistique}
-              onClick={() => navigate('/logistique')}
-            />
-          )}
-          {canSeeLogistique && (
-            <SidebarButton
               icon={ListChecks}
-              label="Prérequis"
-              isActive={isPrerequis}
+              label="Checklist"
+              isActive={isChecklist}
               onClick={() => navigate('/prerequis')}
-              tone={mode}
-            />
-          )}
-          {canSeeLogistique && (
-            <SidebarButton
-              icon={ClipboardList}
-              label="Rapport de production"
-              isActive={isRapportProduction}
-              onClick={() => navigate('/rapport-production')}
               tone={mode}
             />
           )}
