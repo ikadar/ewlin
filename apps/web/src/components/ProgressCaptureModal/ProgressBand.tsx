@@ -55,8 +55,12 @@ export function ProgressBand({
     sub = `Fin prévue à ${fmtTimeMin(slotEndMin)} — il y a ${fmtDuration(overdue)}`;
   } else {
     title = `Il est ${fmtTimeMin(nowMin)}, en théorie :`;
-    if (slotVolumePct != null) {
-      sub = `il me reste ${fmtDuration(remaining)} — j'en suis à ${volDone}% sur ${slotVolumePct}%`;
+    const isSetup = nowMin < runStart;
+    if (isSetup) {
+      const setupRemaining = runStart - nowMin;
+      sub = `calage en cours — encore ${fmtDuration(setupRemaining)}`;
+    } else if (slotVolumePct != null) {
+      sub = `il me reste ${fmtDuration(remaining)} — j'en suis à ${volDone}% sur ${Math.round(slotVolumePct)}%`;
     } else {
       sub = `il me reste ${fmtDuration(remaining)} — j'en suis à ${volDone}%`;
     }
