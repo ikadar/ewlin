@@ -896,7 +896,7 @@ export const FluxTable = memo(function FluxTable({
             <col style={{ width: '6rem' }} />
             <col style={{ width: '7rem' }} />
             <col style={{ width: '7rem' }} />
-            <col style={{ width: '4rem' }} />
+            <col style={{ width: '7rem' }} />
           </colgroup>
 
           <FluxTableHeader />
