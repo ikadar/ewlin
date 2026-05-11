@@ -15,6 +15,10 @@ const ACTIVITE_ITEMS = [
   { label: 'Rapport de production', path: '/rapport-production' },
 ];
 
+const COMPTABILITE_ITEMS = [
+  { label: 'Facturation', path: '/facturation' },
+];
+
 type SectionProps = {
   title: string;
   items: { label: string; path: string }[];
@@ -57,10 +61,13 @@ export function PrerequisSubmenu() {
         <Section title="Prérequis" items={PREREQUIS_ITEMS} preserveSearch />
 
         <div className="my-3 border-t border-flux-border" />
-        <Section title="Magasin et expéditions" items={MAGASIN_ITEMS} />
+        <Section title="Magasin et expéditions" items={MAGASIN_ITEMS} preserveSearch />
 
         <div className="my-3 border-t border-flux-border" />
-        <Section title="Activité" items={ACTIVITE_ITEMS} />
+        <Section title="Activité" items={ACTIVITE_ITEMS} preserveSearch />
+
+        <div className="my-3 border-t border-flux-border" />
+        <Section title="Comptabilité" items={COMPTABILITE_ITEMS} preserveSearch />
       </div>
     </div>
   );

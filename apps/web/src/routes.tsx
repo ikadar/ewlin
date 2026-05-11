@@ -52,6 +52,7 @@ import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { LogistiquePage } from './pages/LogistiquePage';
 import { ProductionReportPage } from './pages/ProductionReportPage';
+import { FacturationPage } from './pages/FacturationPage';
 import { ShippersPage } from './pages/ShippersPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OperatorSchedulePage from './pages/OperatorSchedulePage';
@@ -127,6 +128,7 @@ export function AppRoutes() {
           </Route>
           <Route path="/logistique" element={<LogistiquePage />} />
           <Route path="/rapport-production" element={<ProductionReportPage />} />
+          <Route path="/facturation" element={<FacturationPage />} />
         </Route>
 
         {/* Historique & audit — submenu under HistoryLayout (analogous
