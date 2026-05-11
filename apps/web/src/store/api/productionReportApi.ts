@@ -22,6 +22,14 @@ export const productionReportApi = createApi({
   baseQuery: baseQueryWithFixtureSupport,
   tagTypes: ['ProductionReport'],
   endpoints: (builder) => ({
+    createProductionEvent: builder.mutation<ProductionEventResponse, { taskId: string; jobInternalId: string; type: string; stationId: string }>({
+      query: (body) => ({
+        url: '/production-events',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['ProductionReport'],
+    }),
     getProductionEvents: builder.query<ProductionEventResponse[], void>({
       query: () => '/production-events',
       providesTags: ['ProductionReport'],
@@ -52,4 +60,4 @@ export const productionReportApi = createApi({
   }),
 });
 
-export const { useGetProductionEventsQuery, useToggleEventSeenMutation } = productionReportApi;
+export const { useGetProductionEventsQuery, useToggleEventSeenMutation, useCreateProductionEventMutation } = productionReportApi;

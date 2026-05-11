@@ -358,6 +358,7 @@ export type {
 export {
   useGetProductionEventsQuery,
   useToggleEventSeenMutation,
+  useCreateProductionEventMutation,
   productionReportApi,
 } from './api/productionReportApi';
 export type { ProductionEventResponse } from './api/productionReportApi';

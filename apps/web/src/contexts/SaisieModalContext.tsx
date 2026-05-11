@@ -17,6 +17,7 @@ import {
   useUpdateOperatorMutation,
   useGetStationsQuery,
   useUpdateStationMutation,
+  useCreateProductionEventMutation,
 } from '../store';
 
 export interface SaisieOpenParams {
@@ -51,6 +52,7 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
   const [reportSaisie] = useReportSaisieMutation();
   const [updateOperator] = useUpdateOperatorMutation();
   const [updateStation] = useUpdateStationMutation();
+  const [createProductionEvent] = useCreateProductionEventMutation();
   const { data: operators } = useGetOperatorsQuery();
   const { data: stations } = useGetStationsQuery();
 
@@ -88,7 +90,13 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
         stationGroupIds: ((station as Record<string, unknown>).stationGroupIds as string[] | undefined) ?? [],
       },
     }).unwrap();
-  }, [state, stations, updateStation]);
+    createProductionEvent({
+      taskId: state.assignment.taskId,
+      jobInternalId: state.assignment.jobId,
+      type: 'panne_machine',
+      stationId: state.stationId,
+    });
+  }, [state, stations, updateStation, createProductionEvent]);
 
   const handleBlockAbsence = useCallback(async () => {
     if (!state) return;
@@ -108,7 +116,13 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
         ],
       },
     }).unwrap();
-  }, [state, operators, updateOperator]);
+    createProductionEvent({
+      taskId: state.assignment.taskId,
+      jobInternalId: state.assignment.jobId,
+      type: 'absence',
+      stationId: state.stationId,
+    });
+  }, [state, operators, updateOperator, createProductionEvent]);
 
   return (
     <SaisieModalContext.Provider value={api}>
