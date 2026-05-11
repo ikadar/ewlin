@@ -85,7 +85,7 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
           ...existing,
           { startAt: toNaiveLocal(now), endAt: toNaiveLocal(endAt), reason: "Panne déclarée par opérateur" },
         ],
-        stationGroupIds: (station as Record<string, unknown>).stationGroupIds as string[] ?? [],
+        stationGroupIds: ((station as Record<string, unknown>).stationGroupIds as string[] | undefined) ?? [],
       },
     }).unwrap();
   }, [state, stations, updateStation]);

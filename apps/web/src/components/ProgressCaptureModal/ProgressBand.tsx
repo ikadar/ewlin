@@ -28,16 +28,19 @@ export function ProgressBand({
   slotVolumePct,
   tileColor = '59,130,246',
 }: ProgressBandProps): ReactElement {
-  const duration = Math.max(1, slotEndMin - slotStartMin);
-  const elapsed = Math.max(0, nowMin - slotStartMin);
+  const runStart = slotStartMin + setupMinutes;
+  const runDuration = Math.max(1, slotEndMin - runStart);
+  const totalDuration = Math.max(1, slotEndMin - slotStartMin);
+  const runElapsed = Math.max(0, nowMin - runStart);
   const remaining = Math.max(0, slotEndMin - nowMin);
+
   const pctFill = variant === 'done-past-end'
     ? 100
-    : Math.min(100, Math.round((elapsed / duration) * 100));
+    : Math.min(100, Math.round((Math.max(0, nowMin - slotStartMin) / totalDuration) * 100));
 
   const volDone = slotVolumePct != null
-    ? Math.round((elapsed / duration) * slotVolumePct)
-    : Math.min(100, Math.round((elapsed / duration) * 100));
+    ? Math.round((Math.max(0, runElapsed) / runDuration) * slotVolumePct)
+    : Math.min(100, Math.round((Math.max(0, runElapsed) / runDuration) * 100));
 
   const bg = variant === 'done-past-end'
     ? 'rgba(16,185,129, 0.22)'

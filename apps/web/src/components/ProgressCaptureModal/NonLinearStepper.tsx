@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactElement } from 'react';
+import { useState, useEffect, useCallback, type ReactElement } from 'react';
 import { Minus, Plus, AlertTriangle } from 'lucide-react';
 import { fmtTimeMin } from './timeUtils';
 
@@ -41,6 +41,8 @@ export function NonLinearStepper({
   onBlockedClick,
 }: NonLinearStepperProps): ReactElement {
   const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => { setStepIndex(0); }, [plannedEndMin]);
 
   const offset = getOffset(stepIndex);
   const currentTime = plannedEndMin + offset;
