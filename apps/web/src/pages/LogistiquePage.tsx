@@ -858,7 +858,7 @@ function Column({
       </header>
 
       {movements.length === 0 ? (
-        <div className="bg-flux-elevated border border-flux-border rounded-md text-center text-flux-text-muted text-xs italic py-8">
+        <div className="bg-flux-elevated border border-flux-border rounded-md text-center text-flux-text-muted text-xs italic py-16">
           Aucun mouvement
         </div>
       ) : (

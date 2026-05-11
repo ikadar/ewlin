@@ -27,14 +27,16 @@ function SortChevron({ col, active, dir }: { col: SortCol; active: SortCol; dir:
 
 const JobRow = memo(function JobRow({
   job,
+  exiting,
   onToggleInvoiced,
 }: {
   job: FluxJob;
+  exiting?: boolean;
   onToggleInvoiced: (internalId: string, invoiced: boolean) => void;
 }) {
   return (
     <tr
-      className="border-b border-flux-border group transition-colors hover:bg-flux-hover"
+      className={`border-b border-flux-border group hover:bg-flux-hover ${exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none' : 'transition-colors'}`}
       style={{ height: '2.25rem' }}
     >
       <td className="px-2 py-0 text-sm whitespace-nowrap">
@@ -111,9 +113,20 @@ export function FacturationPage() {
     else { setSortCol(col); setSortDir(col === 'shippedAt' ? 'desc' : 'asc'); }
   }, [sortCol]);
 
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
+
   const handleToggleInvoiced = useCallback((internalId: string, invoiced: boolean) => {
-    toggleInvoiced({ jobInternalId: internalId, invoiced });
-  }, [toggleInvoiced]);
+    const willLeave = (tab === 'a-facturer' && invoiced) || (tab === 'factures' && !invoiced);
+    if (willLeave) {
+      setExitingIds(prev => new Set(prev).add(internalId));
+      setTimeout(() => {
+        setExitingIds(prev => { const next = new Set(prev); next.delete(internalId); return next; });
+        toggleInvoiced({ jobInternalId: internalId, invoiced });
+      }, 1000);
+    } else {
+      toggleInvoiced({ jobInternalId: internalId, invoiced });
+    }
+  }, [toggleInvoiced, tab]);
 
   const hc = 'px-2 py-3 text-left text-sm font-medium whitespace-nowrap text-flux-text-secondary group cursor-pointer select-none';
 
@@ -159,13 +172,13 @@ export function FacturationPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-flux-text-muted">Chargement…</td></tr>
+                <tr><td colSpan={5} className="px-4 py-16 text-center text-flux-text-muted">Chargement…</td></tr>
               )}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-flux-text-muted">Aucun dossier</td></tr>
+                <tr><td colSpan={5} className="px-4 py-16 text-center text-flux-text-muted">Aucun dossier</td></tr>
               )}
               {filtered.map((job) => (
-                <JobRow key={job.id} job={job} onToggleInvoiced={handleToggleInvoiced} />
+                <JobRow key={job.id} job={job} exiting={exitingIds.has(job.internalId!)} onToggleInvoiced={handleToggleInvoiced} />
               ))}
             </tbody>
           </table>

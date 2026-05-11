@@ -80,14 +80,16 @@ function SortChevron({ col, active, dir }: { col: SortCol; active: SortCol; dir:
 
 const EventRow = memo(function EventRow({
   event,
+  exiting,
   onToggleSeen,
 }: {
   event: ProductionEventResponse;
+  exiting?: boolean;
   onToggleSeen: (id: string, seen: boolean) => void;
 }) {
   return (
     <tr
-      className={`border-b border-flux-border group transition-colors hover:bg-flux-hover ${event.seen ? 'opacity-40 hover:opacity-60' : ''}`}
+      className={`border-b border-flux-border group hover:bg-flux-hover ${exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none' : `transition-colors ${event.seen ? 'opacity-40 hover:opacity-60' : ''}`}`}
       style={{ height: '2.25rem' }}
     >
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
@@ -169,9 +171,20 @@ export function ProductionReportPage() {
     else { setSortCol(col); setSortDir(col === 'time' ? 'desc' : 'asc'); }
   }, [sortCol]);
 
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
+
   const handleToggleSeen = useCallback((id: string, seen: boolean) => {
-    toggleSeen({ id, seen });
-  }, [toggleSeen]);
+    const willLeave = (tab === 'important' || tab === 'info') ? seen : tab === 'seen' ? !seen : false;
+    if (willLeave) {
+      setExitingIds(prev => new Set(prev).add(id));
+      setTimeout(() => {
+        setExitingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+        toggleSeen({ id, seen });
+      }, 1000);
+    } else {
+      toggleSeen({ id, seen });
+    }
+  }, [toggleSeen, tab]);
 
   const hc = 'px-2 py-3 text-left text-sm font-medium whitespace-nowrap text-flux-text-secondary group cursor-pointer select-none';
 
@@ -214,13 +227,13 @@ export function ProductionReportPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-flux-text-muted">Chargement…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-16 text-center text-flux-text-muted">Chargement…</td></tr>
               )}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-flux-text-muted">Aucun événement</td></tr>
+                <tr><td colSpan={8} className="px-4 py-16 text-center text-flux-text-muted">Aucun événement</td></tr>
               )}
               {filtered.map((ev) => (
-                <EventRow key={ev.id} event={ev} onToggleSeen={handleToggleSeen} />
+                <EventRow key={ev.id} event={ev} exiting={exitingIds.has(ev.id)} onToggleSeen={handleToggleSeen} />
               ))}
             </tbody>
           </table>
