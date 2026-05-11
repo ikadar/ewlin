@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import type {
   Station,
   DaySchedule,
   ScheduleSnapshot,
   TaskAssignment,
+  InternalTask,
 } from '@flux/types';
-import { DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS } from '@flux/types';
+import { DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS, isInternalTask } from '@flux/types';
+import { useSaisieModal, type SaisieOpenParams } from '../../contexts/SaisieModalContext';
 import { Tile } from '../Tile';
 import { UnavailabilityOverlay } from '../StationColumns/UnavailabilityOverlay';
 import { OvertimeOverlay } from '../StationColumns/OvertimeOverlay';
@@ -56,6 +58,8 @@ export function FocusStationColumn({
   dayCount,
   collapses,
 }: FocusStationColumnProps) {
+  const saisieModal = useSaisieModal();
+
   const stationAssignments = useMemo<TaskAssignment[]>(() => {
     const filtered = snapshot.assignments.filter(
       (a) => !a.isOutsourced && a.targetId === station.id,
@@ -358,6 +362,25 @@ export function FocusStationColumn({
         }];
         const activeWindows = assignment.activeWindows;
         const useChunkWindows = !!cached.chunks && !!activeWindows && activeWindows.length === segments.length;
+        const handleTileClick = isInternalTask(cached.task)
+          ? () => {
+              const task = cached.task as InternalTask;
+              const opEntry = assignment.operators?.[0];
+              const op = opEntry ? snapshot.operators?.find((o) => o.id === opEntry.operatorId) : undefined;
+              saisieModal.open({
+                assignment,
+                taskDuration: task.duration,
+                job: { reference: cached.job.reference, client: cached.job.client },
+                machineName: station.name,
+                operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
+                operatorId: opEntry?.operatorId ?? '',
+                stationId: task.stationId,
+                now,
+                slotVolumePct: (assignment as Record<string, unknown>).slotVolumePct as number | undefined,
+              });
+            }
+          : undefined;
+
         return segments.map((seg, i) => (
           <Tile
             key={cached.chunks ? `${assignment.id}-chunk-${i}` : assignment.id}
@@ -384,6 +407,7 @@ export function FocusStationColumn({
             sawtoothTop={interrupt?.top}
             sawtoothBottom={interrupt?.bottom}
             stationName={station.name}
+            onSelect={handleTileClick ? () => handleTileClick() : undefined}
           />
         ));
       })}

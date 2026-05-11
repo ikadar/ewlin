@@ -1247,7 +1247,7 @@ export default function OperatorSchedulePage() {
         currentScheduledStart: assignment.scheduledStart,
         isPinned: assignment.isPinned ?? false,
         isCompleted: assignment.isCompleted ?? false,
-        openSaisie: hasStarted ? handleOpenSaisie : undefined,
+        openSaisie: handleOpenSaisie,
       });
     };
 
@@ -1568,7 +1568,7 @@ export default function OperatorSchedulePage() {
               void handleFuseTask(contextMenuState.taskId);
               setContextMenuState(null);
             }}
-            onSaisirAvancement={hasStarted && contextMenuState.openSaisie
+            onSaisirAvancement={contextMenuState.openSaisie
               ? () => {
                   contextMenuState.openSaisie!();
                   setContextMenuState(null);

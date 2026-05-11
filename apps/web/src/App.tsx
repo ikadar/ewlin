@@ -2227,7 +2227,7 @@ function AppContent() {
             onSplit={handleContextMenuSplit}
             onFuse={handleContextMenuFuse}
             isSplit={isContextMenuTaskSplit}
-            onSaisirAvancement={hasStarted ? handleContextMenuSaisirAvancement : undefined}
+            onSaisirAvancement={handleContextMenuSaisirAvancement}
             onDefinirDebut={!hasStarted ? handleContextMenuDefinirDebut : undefined}
             onClose={handleContextMenuClose}
           />

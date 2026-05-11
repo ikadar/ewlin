@@ -319,7 +319,7 @@ export function FocusOperatorColumn({
             currentScheduledStart: assignment.scheduledStart,
             isPinned: assignment.isPinned ?? false,
             isCompleted: assignment.isCompleted ?? false,
-            openSaisie: hasStarted ? handleOpenSaisie : undefined,
+            openSaisie: handleOpenSaisie,
           });
         };
 
@@ -342,6 +342,7 @@ export function FocusOperatorColumn({
             isMaskedTime={slice.isMasked}
             overrideLeft={overrideLeft}
             overrideWidth={overrideWidth}
+            onClick={handleOpenSaisie}
             onContextMenu={handleContextMenu}
             progressFill={progressFill}
             taskBadgePct={sliceBadgePct}

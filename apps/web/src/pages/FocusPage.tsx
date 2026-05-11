@@ -399,9 +399,6 @@ export default function FocusPage({ mode }: FocusPageProps) {
                     // would only expose "Définir heure de début…", which is
                     // a préprod-only affordance — so we suppress the menu
                     // entirely rather than opening an empty shell.
-                    const hasStarted =
-                      new Date(p.currentScheduledStart).getTime() <= now.getTime();
-                    if (scenarioMode === 'prod' && !hasStarted) return;
                     setContextMenuState({
                       x: p.x,
                       y: p.y,
@@ -446,10 +443,9 @@ export default function FocusPage({ mode }: FocusPageProps) {
             y={contextMenuState.y}
             isPinned={contextMenuState.isPinned}
             isCompleted={contextMenuState.isCompleted}
-            onSaisirAvancement={hasStarted && contextMenuState.openSaisie
-              ? contextMenuState.openSaisie
-              : undefined}
-            onDefinirDebut={!hasStarted && scenarioMode !== 'prod'
+            scenarioMode={scenarioMode}
+            onSaisirAvancement={contextMenuState.openSaisie}
+            onDefinirDebut={!hasStarted
               ? () => {
                   setPinDialogState({
                     taskId: contextMenuState.taskId,

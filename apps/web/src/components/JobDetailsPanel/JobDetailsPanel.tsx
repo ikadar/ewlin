@@ -443,7 +443,7 @@ export function JobDetailsPanel({
             onFuse={onFuseTask ? handleContextMenuFuse : undefined}
             isSplit={isContextMenuSplit}
             isUnassigned={contextMenu.isUnassigned}
-            onSaisirAvancement={hasStarted ? handleContextMenuSaisirAvancement : undefined}
+            onSaisirAvancement={handleContextMenuSaisirAvancement}
             onDefinirDebut={!hasStarted && !contextMenu.isUnassigned ? handleContextMenuDefinirDebut : undefined}
             onClose={handleContextMenuClose}
           />
