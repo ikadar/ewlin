@@ -274,6 +274,7 @@ export {
   useCreateStationMutation,
   useUpdateStationMutation,
   useDeleteStationMutation,
+  useAddStationExceptionMutation,
   stationApi,
 } from './api/stationApi';
 export type { StationResponse, StationInput } from './api/stationApi';
@@ -284,6 +285,7 @@ export {
   useUpdateOperatorMutation,
   useDeleteOperatorMutation,
   useReplaceSkillsMutation,
+  useAddOperatorAbsenceMutation,
   operatorApi,
 } from './api/operatorApi';
 export type { OperatorResponse, OperatorInput, OperatorSkillResponse } from './api/operatorApi';

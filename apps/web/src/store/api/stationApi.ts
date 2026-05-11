@@ -104,6 +104,25 @@ export const stationApi = createApi({
       }),
       invalidatesTags: ['Stations'],
     }),
+    addStationException: builder.mutation<
+      { startAt: string; endAt: string; reason: string | null },
+      { stationId: string; startAt: string; endAt: string; reason?: string }
+    >({
+      query: ({ stationId, ...body }) => ({
+        url: `/stations/${encodeURIComponent(stationId)}/exceptions`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Stations'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch {
+          // noop
+        }
+      },
+    }),
   }),
 });
 
@@ -112,4 +131,5 @@ export const {
   useCreateStationMutation,
   useUpdateStationMutation,
   useDeleteStationMutation,
+  useAddStationExceptionMutation,
 } = stationApi;

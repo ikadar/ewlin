@@ -13,10 +13,8 @@ import type { PredecessorInfo } from '../components/ProgressCaptureModal/Predece
 import { applyMinToDate } from '../components/Tile/saisieMath';
 import {
   useReportSaisieMutation,
-  useGetOperatorsQuery,
-  useUpdateOperatorMutation,
-  useGetStationsQuery,
-  useUpdateStationMutation,
+  useAddStationExceptionMutation,
+  useAddOperatorAbsenceMutation,
   useCreateProductionEventMutation,
 } from '../store';
 
@@ -50,11 +48,9 @@ function toNaiveLocal(date: Date): string {
 export function SaisieModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SaisieOpenParams | null>(null);
   const [reportSaisie] = useReportSaisieMutation();
-  const [updateOperator] = useUpdateOperatorMutation();
-  const [updateStation] = useUpdateStationMutation();
+  const [addStationException] = useAddStationExceptionMutation();
+  const [addOperatorAbsence] = useAddOperatorAbsenceMutation();
   const [createProductionEvent] = useCreateProductionEventMutation();
-  const { data: operators } = useGetOperatorsQuery();
-  const { data: stations } = useGetStationsQuery();
 
   const open = useCallback((params: SaisieOpenParams) => setState(params), []);
   const close = useCallback(() => setState(null), []);
@@ -72,23 +68,13 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
 
   const handleBlockMachine = useCallback(async () => {
     if (!state) return;
-    const station = stations?.find((s) => s.id === state.stationId);
-    if (!station) return;
     const now = new Date();
     const endAt = new Date(now.getTime() + BLOCK_DURATION_MS);
-    const existing = station.scheduleExceptions ?? [];
-    await updateStation({
-      id: state.stationId,
-      body: {
-        name: station.name,
-        status: station.status,
-        operatingSchedule: station.operatingSchedule,
-        scheduleExceptions: [
-          ...existing,
-          { startAt: toNaiveLocal(now), endAt: toNaiveLocal(endAt), reason: "Panne déclarée par opérateur" },
-        ],
-        stationGroupIds: ((station as Record<string, unknown>).stationGroupIds as string[] | undefined) ?? [],
-      },
+    await addStationException({
+      stationId: state.stationId,
+      startAt: toNaiveLocal(now),
+      endAt: toNaiveLocal(endAt),
+      reason: "Panne déclarée par opérateur",
     }).unwrap();
     createProductionEvent({
       taskId: state.assignment.taskId,
@@ -97,25 +83,17 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
       operatorId: state.operatorId,
       stationId: state.stationId,
     }).catch(() => {});
-  }, [state, stations, updateStation, createProductionEvent]);
+  }, [state, addStationException, createProductionEvent]);
 
   const handleBlockAbsence = useCallback(async () => {
     if (!state) return;
-    const operator = operators?.find((o) => o.id === state.operatorId);
-    if (!operator) return;
     const now = new Date();
     const endAt = new Date(now.getTime() + BLOCK_DURATION_MS);
-    const existing = operator.absences ?? [];
-    await updateOperator({
-      id: state.operatorId,
-      body: {
-        firstName: operator.firstName,
-        lastName: operator.lastName,
-        absences: [
-          ...existing,
-          { startAt: toNaiveLocal(now), endAt: toNaiveLocal(endAt), reason: "Absence déclarée par opérateur" },
-        ],
-      },
+    await addOperatorAbsence({
+      operatorId: state.operatorId,
+      startAt: toNaiveLocal(now),
+      endAt: toNaiveLocal(endAt),
+      reason: "Absence déclarée par opérateur",
     }).unwrap();
     createProductionEvent({
       taskId: state.assignment.taskId,
@@ -124,7 +102,7 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
       operatorId: state.operatorId,
       stationId: state.stationId,
     }).catch(() => {});
-  }, [state, operators, updateOperator, createProductionEvent]);
+  }, [state, addOperatorAbsence, createProductionEvent]);
 
   return (
     <SaisieModalContext.Provider value={api}>

@@ -133,6 +133,17 @@ export const operatorApi = createApi({
       }),
       invalidatesTags: ['Operators'],
     }),
+    addOperatorAbsence: builder.mutation<
+      { startAt: string; endAt: string; reason: string | null },
+      { operatorId: string; startAt: string; endAt: string; reason?: string }
+    >({
+      query: ({ operatorId, ...body }) => ({
+        url: `/operators/${encodeURIComponent(operatorId)}/absences`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Operators'],
+    }),
   }),
 });
 
@@ -143,4 +154,5 @@ export const {
   useDeleteOperatorMutation,
   useReplaceSkillsMutation,
   useReplaceConcurrentGroupsMutation,
+  useAddOperatorAbsenceMutation,
 } = operatorApi;
