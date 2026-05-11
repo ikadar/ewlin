@@ -18,6 +18,8 @@ interface RouteTwin {
 const ROUTE_TWINS: RouteTwin[] = [
   { match: /^\/logistique/, destination: { preprod: '/scenarios', prod: '/logistique' } },
   { match: /^\/scenarios/, destination: { preprod: '/scenarios', prod: '/logistique' } },
+  { match: /^\/prerequis/, destination: { preprod: '/scenarios', prod: '/prerequis' } },
+  { match: /^\/rapport-production/, destination: { preprod: '/scenarios', prod: '/rapport-production' } },
 ];
 
 /**

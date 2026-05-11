@@ -37,6 +37,7 @@ import { prodSnapshotApi } from './api/prodSnapshotApi';
 import { archiveApi } from './api/archiveApi';
 import { simulationApi } from './api/simulationApi';
 import { jobTestApi } from './api/jobTestApi';
+import { productionReportApi } from './api/productionReportApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -75,6 +76,7 @@ export const store = configureStore({
     [archiveApi.reducerPath]: archiveApi.reducer,
     [simulationApi.reducerPath]: simulationApi.reducer,
     [jobTestApi.reducerPath]: jobTestApi.reducer,
+    [productionReportApi.reducerPath]: productionReportApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -113,6 +115,7 @@ export const store = configureStore({
       .concat(archiveApi.middleware)
       .concat(simulationApi.middleware)
       .concat(jobTestApi.middleware)
+      .concat(productionReportApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we
@@ -167,7 +170,6 @@ export {
   useDeleteJobMutation,
   useClearJobAssignmentsMutation,
   useClearAllAssignmentsMutation,
-  useUpdateElementStatusMutation,
   useAssignTaskMutation,
   useRescheduleTaskMutation,
   useUnassignTaskMutation,
@@ -194,6 +196,8 @@ export {
   useUpdatePaperLeadTimeMutation,
   useGetFormeLeadTimeQuery,
   useUpdateFormeLeadTimeMutation,
+  useGetPlateLeadTimeQuery,
+  useUpdatePlateLeadTimeMutation,
   useGetNowOverrideQuery,
   useUpdateNowOverrideMutation,
   scheduleApi,
@@ -350,6 +354,13 @@ export type {
   ReportSaisieResult,
   ClearRecordedProgressResult,
 } from './api/saisieApi';
+
+export {
+  useGetProductionEventsQuery,
+  useToggleEventSeenMutation,
+  productionReportApi,
+} from './api/productionReportApi';
+export type { ProductionEventResponse } from './api/productionReportApi';
 
 export {
   useFeasibilityPreviewMutation,

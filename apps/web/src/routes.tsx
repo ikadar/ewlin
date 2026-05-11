@@ -46,10 +46,12 @@ import { SafetyZonePage } from './pages/SafetyZonePage';
 import { PrecedenceGapPage } from './pages/PrecedenceGapPage';
 import { PaperLeadTimePage } from './pages/PaperLeadTimePage';
 import { FormeLeadTimePage } from './pages/FormeLeadTimePage';
+import { PlateLeadTimePage } from './pages/PlateLeadTimePage';
 import { JobsDeTestPage } from './pages/JobsDeTestPage';
 import { FluxPage } from './pages/FluxPage';
 import { OutsourcedProvidersPage } from './pages/OutsourcedProvidersPage';
 import { LogistiquePage } from './pages/LogistiquePage';
+import { ProductionReportPage } from './pages/ProductionReportPage';
 import { ShippersPage } from './pages/ShippersPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OperatorSchedulePage from './pages/OperatorSchedulePage';
@@ -62,6 +64,11 @@ import { UserGroupsPage } from './pages/UserGroupsPage';
 import { ArchivesPage } from './pages/ArchivesPage';
 import { AuditPage } from './pages/AuditPage';
 import { ScenariosPage } from './pages/ScenariosPage';
+import { PapierPage } from './pages/PapierPage';
+import { FormesPage } from './pages/FormesPage';
+import { BatPage } from './pages/BatPage';
+import { PlaquesPage } from './pages/PlaquesPage';
+import { PrerequisLayout, PrerequisIndexRedirect } from './components/PrerequisLayout/PrerequisLayout';
 import { ScenarioShell } from './components/ScenarioShell';
 import { HistoryLayout } from './components/HistoryLayout';
 
@@ -111,6 +118,14 @@ export function AppRoutes() {
         {/* Logistique — réceptions et expéditions de l'atelier (Phase 1)
             Prod-only: hidden from Préprod (cf. RequireEnv). */}
         <Route path="/logistique" element={<RequireEnv allowed="prod"><LogistiquePage /></RequireEnv>} />
+        <Route path="/rapport-production" element={<RequireEnv allowed="prod"><ProductionReportPage /></RequireEnv>} />
+        <Route path="/prerequis" element={<RequireEnv allowed="prod"><PrerequisLayout /></RequireEnv>}>
+          <Route index element={<PrerequisIndexRedirect />} />
+          <Route path="papier" element={<PapierPage />} />
+          <Route path="formes" element={<FormesPage />} />
+          <Route path="bat" element={<BatPage />} />
+          <Route path="plaques" element={<PlaquesPage />} />
+        </Route>
 
         {/* Historique & audit — submenu under HistoryLayout (analogous
             to /settings/*) */}
@@ -147,6 +162,7 @@ export function AppRoutes() {
           <Route path="precedence-gap" element={<PrecedenceGapPage />} />
           <Route path="paper-lead-time" element={<PaperLeadTimePage />} />
           <Route path="forme-lead-time" element={<FormeLeadTimePage />} />
+          <Route path="plate-lead-time" element={<PlateLeadTimePage />} />
           <Route path="tests" element={<JobsDeTestPage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
           <Route path="shippers" element={<ShippersPage />} />

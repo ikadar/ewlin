@@ -20,6 +20,7 @@
  */
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
+import { productionReportApi } from './productionReportApi';
 import { scheduleApi } from './scheduleApi';
 
 export interface ReportSaisieRequest {
@@ -72,6 +73,7 @@ export const saisieApi = createApi({
           await queryFulfilled;
           // Force a re-fetch so we get the post-replan snapshot from the engine.
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(productionReportApi.util.invalidateTags(['ProductionReport']));
         } catch {
           patch.undo();
         }

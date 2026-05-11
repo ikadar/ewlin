@@ -1,4 +1,4 @@
-import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, FlaskConical, History } from 'lucide-react';
+import { CalendarDays, TowerControl, Settings, User, Sun, Moon, LogOut, Users, BarChart3, Truck, ListChecks, ClipboardList, FlaskConical, History } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEnvAwareNavigate, useScenarioMode } from '../../contexts/ScenarioContext';
@@ -38,9 +38,11 @@ export function Sidebar() {
   const isStationSchedule = location.pathname.startsWith('/stations');
   const isStats = location.pathname.startsWith('/stats');
   const isLogistique = location.pathname.startsWith('/logistique');
+  const isPrerequis = location.pathname.startsWith('/prerequis');
+  const isRapportProduction = location.pathname.startsWith('/rapport-production');
   const isHistory = location.pathname.startsWith('/historique');
   const isScenarios = location.pathname.startsWith('/scenarios');
-  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isHistory && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
+  const isOperatorSchedule = !isSettings && !isFlux && !isStationSchedule && !isStats && !isLogistique && !isPrerequis && !isRapportProduction && !isHistory && !isScenarios && (location.pathname === '/' || location.pathname.startsWith('/operator'));
 
   // Close menu on outside click
   useEffect(() => {
@@ -84,18 +86,21 @@ export function Sidebar() {
             label="Planning opérateurs"
             isActive={isOperatorSchedule}
             onClick={() => navigate('/')}
+            tone={mode}
           />
           <SidebarButton
             icon={CalendarDays}
             label="Planning machines"
             isActive={isStationSchedule}
             onClick={() => navigate('/stations')}
+            tone={mode}
           />
           <SidebarButton
             icon={TowerControl}
             label="Flux de production"
             isActive={isFlux}
             onClick={() => navigate('/flux')}
+            tone={mode}
           />
           {canSeeLogistique && (
             <SidebarButton
@@ -103,6 +108,24 @@ export function Sidebar() {
               label="Logistique"
               isActive={isLogistique}
               onClick={() => navigate('/logistique')}
+            />
+          )}
+          {canSeeLogistique && (
+            <SidebarButton
+              icon={ListChecks}
+              label="Prérequis"
+              isActive={isPrerequis}
+              onClick={() => navigate('/prerequis')}
+              tone={mode}
+            />
+          )}
+          {canSeeLogistique && (
+            <SidebarButton
+              icon={ClipboardList}
+              label="Rapport de production"
+              isActive={isRapportProduction}
+              onClick={() => navigate('/rapport-production')}
+              tone={mode}
             />
           )}
           <SidebarButton
