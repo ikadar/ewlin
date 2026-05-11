@@ -472,23 +472,18 @@ export function JcfElementsTable({
   );
 
   /**
-   * Resolves the displayed value of a prereq switch. needsForme and
-   * needsPlates start as `null` ("auto") so the chef sees the smart
-   * default, computed from the sequence ; once they click, the value
-   * becomes concrete and the smart default no longer applies.
+   * Resolves the displayed value of a prereq switch. All four start
+   * as `null` ("auto") so the chef sees the smart default ; once
+   * they click, the value becomes concrete and the smart default no
+   * longer applies.
    */
   const resolvePrereqValue = useCallback(
     (element: JcfElement, key: PrereqKey): boolean => {
-      if (key === 'needsBat') return element.needsBat;
-      if (key === 'needsPaper') return element.needsPaper;
-      if (key === 'needsForme') {
-        if (element.needsForme !== null) return element.needsForme;
-        return !hasTypoPressInSequence(element.sequence, postePresets);
-      }
-      if (key === 'needsPlates') {
-        if (element.needsPlates !== null) return element.needsPlates;
-        return hasOffsetPressInSequence(element.sequence, postePresets);
-      }
+      const val = element[key];
+      if (val !== null) return val;
+      if (key === 'needsBat' || key === 'needsPaper') return !!element.impression;
+      if (key === 'needsForme') return hasTypoPressInSequence(element.sequence, postePresets);
+      if (key === 'needsPlates') return hasOffsetPressInSequence(element.sequence, postePresets);
       return false;
     },
     [postePresets],
@@ -797,12 +792,10 @@ export function JcfElementsTable({
         );
       })}
 
-      {/* Prerequisite "needs" toggles — chef declares per element which
-          prereqs apply via switches. Forme defaults to "oui" unless
-          the sequence contains a Typo press ; Plaques defaults to
-          "non" unless the sequence contains a Presse offset.  Once
-          the chef clicks a switch the value becomes concrete and the
-          smart default no longer applies. */}
+      {/* Prerequisite "needs" toggles — all four start as null (auto).
+          BAT/Paper auto-enable when impression is filled ;
+          Forme auto-enables for Typo machines ;
+          Plates auto-enables for Presse offset. */}
       {(['needsBat', 'needsPaper', 'needsForme', 'needsPlates'] as const).map((key) => {
         const labels: Record<typeof key, string> = {
           needsBat: 'BAT requis',
@@ -827,9 +820,7 @@ export function JcfElementsTable({
             {elements.map((element, elementIndex) => {
               const isLastElement = elementIndex === elements.length - 1;
               const checked = resolvePrereqValue(element, key);
-              const isAutoDefault =
-                (key === 'needsForme' && element.needsForme === null)
-                || (key === 'needsPlates' && element.needsPlates === null);
+              const isAutoDefault = element[key] === null;
               return (
                 <div
                   key={`${elementIndex}-${key}`}
@@ -842,9 +833,12 @@ export function JcfElementsTable({
                     className="flex items-center gap-2 cursor-pointer text-xs select-none text-zinc-400 hover:text-zinc-200"
                     title={
                       isAutoDefault
-                        ? key === 'needsForme'
-                          ? 'Auto : "oui" sauf si la séquence contient une machine de catégorie Typo'
-                          : 'Auto : "non" sauf si la séquence contient une presse offset'
+                        ? {
+                            needsBat: 'Auto : "oui" si impression rempli',
+                            needsPaper: 'Auto : "oui" si impression rempli',
+                            needsForme: 'Auto : "oui" si la séquence contient une machine Typo',
+                            needsPlates: 'Auto : "oui" si la séquence contient une presse offset',
+                          }[key]
                         : undefined
                     }
                   >

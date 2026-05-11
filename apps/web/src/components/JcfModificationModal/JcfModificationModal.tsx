@@ -94,10 +94,11 @@ export interface ModificationChanges {
     dbId: string;
     sequenceDsl: string;
     commentaires: string | null;
-    needsBat: boolean;
-    needsPaper: boolean;
+    needsBat: boolean | null;
+    needsPaper: boolean | null;
     needsForme: boolean | null;
     needsPlates: boolean | null;
+    precedences: string;
   }>;
   /** Element DB ids that were removed (no longer present in the table). */
   deletedElementIds: string[];
@@ -163,6 +164,7 @@ export function JcfModificationModal({
         needsPaper: el.needsPaper,
         needsForme: el.needsForme,
         needsPlates: el.needsPlates,
+        precedences: el.precedences,
       });
     }
 

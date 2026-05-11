@@ -498,21 +498,14 @@ function AppContent() {
         : parseInt(jcfDeadlineRelativeDays, 10);
 
       // Resolve "auto" prereq switches (null on JcfElement) to a
-      // concrete boolean before saving — Forme defaults to "oui"
-      // unless the sequence contains a Typo press, Plates defaults
-      // to "non" unless the sequence contains a Presse offset. Once
-      // the chef has clicked a switch, the value is already concrete
-      // and these expressions become a no-op.
+      // concrete boolean before saving. Already-concrete values
+      // (chef clicked the switch) pass through unchanged.
       const elementsForSave: JcfElement[] = jcfElements.map((el) => ({
         ...el,
-        needsForme:
-          el.needsForme !== null
-            ? el.needsForme
-            : !hasTypoPressInSequence(el.sequence, snapshotPostes),
-        needsPlates:
-          el.needsPlates !== null
-            ? el.needsPlates
-            : hasOffsetPressInSequence(el.sequence, snapshotPostes),
+        needsBat: el.needsBat ?? !!el.impression,
+        needsPaper: el.needsPaper ?? !!el.impression,
+        needsForme: el.needsForme ?? hasTypoPressInSequence(el.sequence, snapshotPostes),
+        needsPlates: el.needsPlates ?? hasOffsetPressInSequence(el.sequence, snapshotPostes),
       }));
 
       if (isEditMode && editingJobId) {

@@ -22,21 +22,20 @@ export interface JcfElement {
    * initial prerequisite status on the backend (none vs first-
    * real-state).
    *
-   * Defaults:
-   *   needsBat   = true (always)
-   *   needsPaper = true (always)
-   *   needsForme = `null` → smart default "true unless sequence
-   *                contains a machine of category 'typo'"
-   *   needsPlates = `null` → smart default "false unless sequence
-   *                contains a machine of category 'Presse offset'"
+   * All four default to `null` (smart default). Rules:
+   *   needsBat    = `null` → true if impression field is non-empty
+   *   needsPaper  = `null` → true if impression field is non-empty
+   *   needsForme  = `null` → true if sequence contains a Typo machine
+   *   needsPlates = `null` → true if sequence contains a Presse offset
    *
-   * `null` on needsForme / needsPlates means "use smart default".
-   * As soon as the chef clicks a switch the value becomes concrete
-   * and the smart default no longer applies (sequence edits don't
-   * auto-flip a manually-set switch).
+   * Otherwise everything is OFF by default.
+   *
+   * `null` means "use smart default". As soon as the chef clicks a
+   * switch the value becomes concrete and the smart default no longer
+   * applies.
    */
-  needsBat: boolean;
-  needsPaper: boolean;
+  needsBat: boolean | null;
+  needsPaper: boolean | null;
   needsForme: boolean | null;
   needsPlates: boolean | null;
   /**
@@ -68,8 +67,8 @@ export const DEFAULT_ELEMENT: JcfElement = {
   qteFeuilles: '',
   commentaires: '',
   sequence: '',
-  needsBat: true,
-  needsPaper: true,
+  needsBat: null,
+  needsPaper: null,
   needsForme: null,
   needsPlates: null,
 };
