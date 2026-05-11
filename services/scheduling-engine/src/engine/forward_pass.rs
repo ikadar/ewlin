@@ -1904,6 +1904,22 @@ pub fn run_forward_pass(
                 tick_minutes,
                 start_date,
             );
+
+            // Release stale virtual-reservation cells beyond the action's
+            // actual end tick. When proficiency > 1.0, fewer real ticks are
+            // needed than the `art`-many cells the reservation loop marked.
+            let end_t = actions[action_idx].end_tick.unwrap_or(0);
+            let vr_station = actions[action_idx].station_idx;
+            let scan_limit = (end_t + actions[action_idx].original_art as usize)
+                .min(grid.num_ticks);
+            for t_clean in end_t..scan_limit {
+                match grid.station_action_at(vr_station, t_clean) {
+                    Some(idx) if idx == action_idx => grid.clear_station(vr_station, t_clean),
+                    Some(_) => break,
+                    None => {}
+                }
+            }
+
             assignments.push(assignment);
         }
 
@@ -7376,5 +7392,174 @@ mod borrow_tests {
         );
         // idle_ticks should be incremented since the action effectively stalled
         assert_eq!(actions[0].idle_ticks, 1, "borrowed tick counts as idle");
+    }
+}
+
+#[cfg(test)]
+mod virtual_reservation_cleanup_tests {
+    use super::*;
+    use crate::engine::similarity::SpecSnapshot;
+    use chrono::NaiveDate;
+    use std::collections::HashMap;
+
+    fn always_available(num_ops: usize, num_ticks: usize) -> OperatorAvailability {
+        let schedules: Vec<OperatorScheduleData> = (0..num_ops)
+            .map(|_| OperatorScheduleData {
+                schedules: None,
+                reference_week: None,
+                absences: Vec::new(),
+                overtimes: Vec::new(),
+            })
+            .collect();
+        let mut avail = OperatorAvailability::new(
+            num_ops,
+            num_ticks,
+            15,
+            NaiveDate::from_ymd_opt(2026, 5, 12).unwrap(),
+            schedules,
+        );
+        for op in 0..num_ops {
+            for t in 0..num_ticks {
+                while avail.data.get(op).map_or(0, |v| v.len()) <= t {
+                    avail.data.get_mut(op).map(|v| v.push(true));
+                }
+                if let Some(v) = avail.data.get_mut(op) {
+                    v[t] = true;
+                }
+            }
+        }
+        avail
+    }
+
+    fn make_action(idx: usize, job_id: &str, task_id: &str, run_ticks: u32) -> Action {
+        Action {
+            idx,
+            task_id: task_id.into(),
+            job_id: job_id.into(),
+            station_idx: 0,
+            setup_ticks: 0,
+            run_ticks,
+            art: run_ticks,
+            original_art: run_ticks,
+            task_total_ticks: run_ticks,
+            eat: 0,
+            last: u64::MAX,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: Vec::new(),
+            start_tick: None,
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            earliest_start_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks: 0,
+            tick_operator_log: Vec::new(),
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            is_pinned: false,
+            is_frozen_by_safety_zone: false,
+            chain_remaining_art: run_ticks,
+            pinned_start_tick: None,
+            pinned_end_tick: None,
+            peremption_count: 0,
+            pending_recalage: false,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
+            spec_snapshot: SpecSnapshot::default(),
+            setup_progress: 0.0,
+            setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
+            borrow_until_tick: None,
+            borrowed_op_to_restore: None,
+            force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
+        }
+    }
+
+    #[test]
+    fn proficiency_gt1_no_stale_reservation_gap() {
+        let num_ticks = 100;
+        let tick_minutes = 15;
+        let mut grid = ScheduleGrid::new(1, 1, num_ticks, tick_minutes as u32);
+        grid.init_station_capacities(&[1]);
+
+        let station_attrs = vec![StationAttrs {
+            attention_setup: 1.0,
+            attention_run: 1.0,
+            max_run_attention: 2.0,
+            masked_time_enabled: false,
+            peremption_ticks: 0,
+            min_setup_operators: 1,
+            max_setup_operators: 1,
+            min_run_operators: 1,
+            max_run_operators: 1,
+            max_chunk_ticks: 100,
+            setup_completions: Vec::new(),
+            chunk_mini_setup_multiplier: 0.0,
+            chunk_mini_task_percentage: 0.0,
+            similarity_criteria: Vec::new(),
+            similarity_score_rules: Vec::new(),
+        }];
+
+        let operator_skills = mk_skills(vec![vec![(0, 1.5)]]);
+        let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new()];
+        let mut avail = always_available(1, num_ticks);
+        let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
+        let start_date = NaiveDate::from_ymd_opt(2026, 5, 12).unwrap();
+        let urgency: HashMap<usize, f64> = HashMap::new();
+        let weights = [1.0_f64; 7];
+        let mut warnings = Vec::new();
+
+        let mut actions = vec![
+            make_action(0, "job-a", "task-a", 8),
+            make_action(1, "job-b", "task-b", 8),
+        ];
+
+        let assignments = run_forward_pass(
+            &mut grid,
+            &mut actions,
+            &station_attrs,
+            &operator_skills,
+            &mut avail,
+            &operator_groups,
+            tick_minutes as u32,
+            start_date,
+            &station_to_group,
+            0,
+            &urgency,
+            &weights,
+            0,
+            &mut warnings,
+        );
+
+        assert_eq!(
+            assignments.len(), 2,
+            "both actions must be placed"
+        );
+
+        let a0 = actions.iter().find(|a| a.task_id == "task-a").unwrap();
+        let a1 = actions.iter().find(|a| a.task_id == "task-b").unwrap();
+
+        assert!(a0.end_tick.is_some(), "task-a must complete");
+        assert!(a1.start_tick.is_some(), "task-b must start");
+
+        let gap = a1.start_tick.unwrap() as i64 - a0.end_tick.unwrap() as i64;
+        assert_eq!(
+            gap, 0,
+            "task-b must start immediately after task-a (gap={}). \
+             Stale virtual-reservation cells would cause gap > 0.",
+            gap
+        );
     }
 }
