@@ -57,13 +57,21 @@ html {
   --flux-frost-glow:      rgba(56, 189, 248, 0.45);
   --flux-frost-intensity: 0.5;
 
-  /* Operational row tints (dark mode):
-   *   late = red (deadline missed = most severe), conflict = yellow.
-   *   Planned and unplanned rows have no tint. */
-  --flux-late-row-bg: rgba(248,113,113,0.06);
-  --flux-late-sticky-bg: rgb(49,39,39);
-  --flux-conflict-row-bg: rgba(251,191,36,0.06);
-  --flux-conflict-sticky-bg: rgb(47,44,36);
+  /* Operational row tints (dark mode), aligned with FluxJobStatusDot hues.
+   *   late = red-500, conflict = yellow-400, shipped = green-500.
+   *   Hachured backgrounds = "prêt à partir" transition state (crossfade vers vert). */
+  --flux-late-row-bg: rgba(239,68,68,0.14);
+  --flux-late-sticky-bg: rgb(48,28,30);
+  --flux-conflict-row-bg: rgba(250,204,21,0.14);
+  --flux-conflict-sticky-bg: rgb(48,44,28);
+  --flux-shipped-row-bg: rgba(34,197,94,0.16);
+  --flux-shipped-sticky-bg: rgb(20,46,34);
+  --flux-late-ready-row-bg: repeating-linear-gradient(-45deg, rgba(239,68,68,0.17) 0, rgba(239,68,68,0.17) 6px, rgba(34,197,94,0.17) 6px, rgba(34,197,94,0.17) 12px);
+  --flux-late-ready-sticky-bg: repeating-linear-gradient(-45deg, rgb(46,29,32) 0, rgb(46,29,32) 6px, rgb(22,46,34) 6px, rgb(22,46,34) 12px);
+  --flux-conflict-ready-row-bg: repeating-linear-gradient(-45deg, rgba(250,204,21,0.15) 0, rgba(250,204,21,0.15) 6px, rgba(34,197,94,0.17) 6px, rgba(34,197,94,0.17) 12px);
+  --flux-conflict-ready-sticky-bg: repeating-linear-gradient(-45deg, rgb(46,42,28) 0, rgb(46,42,28) 6px, rgb(22,46,34) 6px, rgb(22,46,34) 12px);
+  --flux-planned-ready-row-bg: repeating-linear-gradient(-45deg, transparent 0, transparent 6px, rgba(34,197,94,0.15) 6px, rgba(34,197,94,0.15) 12px);
+  --flux-planned-ready-sticky-bg: repeating-linear-gradient(-45deg, rgb(19,24,32) 0, rgb(19,24,32) 6px, rgb(22,44,33) 6px, rgb(22,44,33) 12px);
 }
 
 /* ── D.L. BAT countdown urgency — dark mode defaults ── */
@@ -218,6 +226,18 @@ body {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
+}
+
+/* ── Row exit collapse (phase 2 after fade) ── */
+tr.flux-row-collapsing {
+  transition: height 300ms ease-out, border-color 300ms ease-out;
+  border-color: transparent !important;
+}
+tr.flux-row-collapsing > td {
+  transition: font-size 300ms ease-out, line-height 300ms ease-out;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden;
 }
 
 /* ── Scrollbar: hidden by default, visible where opted in ── */
@@ -448,17 +468,19 @@ html.light [data-testid^="tile-"][data-job-id] {
 
 /* Préprod mode viewport — emerald glow ("c'est ouvert, tu peux
    éditer"). Distinct from amber prod ("engagé, ne touche pas") et
-   violet scenario ("branche parallèle"). Same fixed/z-index/
-   pointer-events trio as the other env glows. */
+   violet scenario ("branche parallèle"). Halo monte depuis tout
+   le bord inférieur du viewport, renforcé par un liseré 5px. */
 .preprod-shell-glow::before {
   content: '';
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
   pointer-events: none;
   z-index: 9999;
-  box-shadow:
-    inset 0 0 0 2px rgba(16, 185, 129, 0.4),
-    inset 0 0 40px rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 -4px 8px rgba(16, 185, 129, 0.25);
 }
 .preprod-shell-glow::after {
   content: '';
@@ -467,22 +489,24 @@ html.light [data-testid^="tile-"][data-job-id] {
   pointer-events: none;
   z-index: 9999;
   background:
-    radial-gradient(ellipse at top left, rgba(16, 185, 129, 0.08), transparent 35%),
-    radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.08), transparent 35%);
+    linear-gradient(to top, rgba(16, 185, 129, 0.1), transparent 30%);
 }
 
 /* Prod mode viewport — amber glow ("plan engagé en atelier"),
-   distinct from emerald préprod et violet scenario. Same fixed/
-   z-index/pointer-events trio. */
+   distinct from emerald préprod et violet scenario. Halo monte
+   depuis tout le bord inférieur du viewport, renforcé par un
+   liseré 5px. */
 .prod-shell-glow::before {
   content: '';
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
   pointer-events: none;
   z-index: 9999;
-  box-shadow:
-    inset 0 0 0 2px rgba(245, 158, 11, 0.4),
-    inset 0 0 40px rgba(245, 158, 11, 0.12);
+  background: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 -4px 8px rgba(245, 158, 11, 0.25);
 }
 .prod-shell-glow::after {
   content: '';
@@ -491,8 +515,7 @@ html.light [data-testid^="tile-"][data-job-id] {
   pointer-events: none;
   z-index: 9999;
   background:
-    radial-gradient(ellipse at top left, rgba(245, 158, 11, 0.08), transparent 35%),
-    radial-gradient(ellipse at bottom right, rgba(245, 158, 11, 0.08), transparent 35%);
+    linear-gradient(to top, rgba(245, 158, 11, 0.1), transparent 30%);
 }
 
 /* Global cursor during pick mode */
@@ -713,12 +736,20 @@ html.light .dl-bat-j2      { color: #c2410c !important; }  /* orange-700 */
 html.light .dl-bat-j1      { color: #c2410c !important; }  /* orange-700 */
 html.light .dl-bat-overdue { color: #b91c1c !important; }  /* red-700 */
 
-/* Operational row tints (light mode): late = red, conflict = yellow */
+/* Operational row tints (light mode): late = red, conflict = yellow, shipped = green */
 html.light {
-  --flux-late-row-bg: rgba(220,38,38,0.08);
-  --flux-late-sticky-bg: rgba(220,38,38,0.08);
-  --flux-conflict-row-bg: rgba(202,138,4,0.08);
-  --flux-conflict-sticky-bg: rgba(202,138,4,0.08);
+  --flux-late-row-bg: rgba(220,38,38,0.10);
+  --flux-late-sticky-bg: rgba(220,38,38,0.10);
+  --flux-conflict-row-bg: rgba(202,138,4,0.10);
+  --flux-conflict-sticky-bg: rgba(202,138,4,0.10);
+  --flux-shipped-row-bg: rgba(22,163,74,0.12);
+  --flux-shipped-sticky-bg: rgba(22,163,74,0.12);
+  --flux-late-ready-row-bg: repeating-linear-gradient(-45deg, rgba(220,38,38,0.13) 0, rgba(220,38,38,0.13) 6px, rgba(22,163,74,0.13) 6px, rgba(22,163,74,0.13) 12px);
+  --flux-late-ready-sticky-bg: repeating-linear-gradient(-45deg, rgba(220,38,38,0.13) 0, rgba(220,38,38,0.13) 6px, rgba(22,163,74,0.13) 6px, rgba(22,163,74,0.13) 12px);
+  --flux-conflict-ready-row-bg: repeating-linear-gradient(-45deg, rgba(202,138,4,0.13) 0, rgba(202,138,4,0.13) 6px, rgba(22,163,74,0.13) 6px, rgba(22,163,74,0.13) 12px);
+  --flux-conflict-ready-sticky-bg: repeating-linear-gradient(-45deg, rgba(202,138,4,0.13) 0, rgba(202,138,4,0.13) 6px, rgba(22,163,74,0.13) 6px, rgba(22,163,74,0.13) 12px);
+  --flux-planned-ready-row-bg: repeating-linear-gradient(-45deg, transparent 0, transparent 6px, rgba(22,163,74,0.12) 6px, rgba(22,163,74,0.12) 12px);
+  --flux-planned-ready-sticky-bg: repeating-linear-gradient(-45deg, transparent 0, transparent 6px, rgba(22,163,74,0.12) 6px, rgba(22,163,74,0.12) 12px);
 }
 
 /* Active placement halo — purple instead of white */

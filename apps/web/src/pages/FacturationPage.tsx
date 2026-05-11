@@ -28,16 +28,22 @@ function SortChevron({ col, active, dir }: { col: SortCol; active: SortCol; dir:
 const JobRow = memo(function JobRow({
   job,
   exiting,
+  collapsing,
   onToggleInvoiced,
 }: {
   job: FluxJob;
   exiting?: boolean;
+  collapsing?: boolean;
   onToggleInvoiced: (internalId: string, invoiced: boolean) => void;
 }) {
   return (
     <tr
-      className={`border-b border-flux-border group hover:bg-flux-hover ${exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none' : 'transition-colors'}`}
-      style={{ height: '2.25rem' }}
+      className={`border-b border-flux-border group hover:bg-flux-hover ${
+        collapsing ? 'opacity-0 pointer-events-none flux-row-collapsing'
+        : exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none'
+        : 'transition-colors'
+      }`}
+      style={{ height: collapsing ? 0 : '2.25rem' }}
     >
       <td className="px-2 py-0 text-sm whitespace-nowrap">
         <span className="font-mono font-medium text-flux-text-primary">{job.id}</span>
@@ -114,6 +120,7 @@ export function FacturationPage() {
   }, [sortCol]);
 
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
+  const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set());
 
   const handleToggleInvoiced = useCallback((internalId: string, invoiced: boolean) => {
     const willLeave = (tab === 'a-facturer' && invoiced) || (tab === 'factures' && !invoiced);
@@ -121,7 +128,11 @@ export function FacturationPage() {
       setExitingIds(prev => new Set(prev).add(internalId));
       setTimeout(() => {
         setExitingIds(prev => { const next = new Set(prev); next.delete(internalId); return next; });
-        toggleInvoiced({ jobInternalId: internalId, invoiced });
+        setCollapsingIds(prev => new Set(prev).add(internalId));
+        setTimeout(() => {
+          setCollapsingIds(prev => { const next = new Set(prev); next.delete(internalId); return next; });
+          toggleInvoiced({ jobInternalId: internalId, invoiced });
+        }, 300);
       }, 1000);
     } else {
       toggleInvoiced({ jobInternalId: internalId, invoiced });
@@ -178,7 +189,7 @@ export function FacturationPage() {
                 <tr><td colSpan={5} className="px-4 py-32 text-center text-flux-text-muted">Aucun dossier</td></tr>
               )}
               {filtered.map((job) => (
-                <JobRow key={job.id} job={job} exiting={exitingIds.has(job.internalId!)} onToggleInvoiced={handleToggleInvoiced} />
+                <JobRow key={job.id} job={job} exiting={exitingIds.has(job.internalId!)} collapsing={collapsingIds.has(job.internalId!)} onToggleInvoiced={handleToggleInvoiced} />
               ))}
             </tbody>
           </table>

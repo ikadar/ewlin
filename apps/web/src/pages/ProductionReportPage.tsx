@@ -81,16 +81,22 @@ function SortChevron({ col, active, dir }: { col: SortCol; active: SortCol; dir:
 const EventRow = memo(function EventRow({
   event,
   exiting,
+  collapsing,
   onToggleSeen,
 }: {
   event: ProductionEventResponse;
   exiting?: boolean;
+  collapsing?: boolean;
   onToggleSeen: (id: string, seen: boolean) => void;
 }) {
   return (
     <tr
-      className={`border-b border-flux-border group hover:bg-flux-hover ${exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none' : `transition-colors ${event.seen ? 'opacity-40 hover:opacity-60' : ''}`}`}
-      style={{ height: '2.25rem' }}
+      className={`border-b border-flux-border group hover:bg-flux-hover ${
+        collapsing ? 'opacity-0 pointer-events-none flux-row-collapsing'
+        : exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none'
+        : `transition-colors ${event.seen ? 'opacity-40 hover:opacity-60' : ''}`
+      }`}
+      style={{ height: collapsing ? 0 : '2.25rem' }}
     >
       <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
         <TypeBadge type={event.type} />
@@ -172,6 +178,7 @@ export function ProductionReportPage() {
   }, [sortCol]);
 
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
+  const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set());
 
   const handleToggleSeen = useCallback((id: string, seen: boolean) => {
     const willLeave = (tab === 'important' || tab === 'info') ? seen : tab === 'seen' ? !seen : false;
@@ -179,7 +186,11 @@ export function ProductionReportPage() {
       setExitingIds(prev => new Set(prev).add(id));
       setTimeout(() => {
         setExitingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-        toggleSeen({ id, seen });
+        setCollapsingIds(prev => new Set(prev).add(id));
+        setTimeout(() => {
+          setCollapsingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+          toggleSeen({ id, seen });
+        }, 300);
       }, 1000);
     } else {
       toggleSeen({ id, seen });
@@ -233,7 +244,7 @@ export function ProductionReportPage() {
                 <tr><td colSpan={8} className="px-4 py-32 text-center text-flux-text-muted">Aucun événement</td></tr>
               )}
               {filtered.map((ev) => (
-                <EventRow key={ev.id} event={ev} exiting={exitingIds.has(ev.id)} onToggleSeen={handleToggleSeen} />
+                <EventRow key={ev.id} event={ev} exiting={exitingIds.has(ev.id)} collapsing={collapsingIds.has(ev.id)} onToggleSeen={handleToggleSeen} />
               ))}
             </tbody>
           </table>
