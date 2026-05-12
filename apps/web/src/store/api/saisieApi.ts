@@ -53,6 +53,7 @@ export const saisieApi = createApi({
         url: `/scenarios/prod/saisie/${encodeURIComponent(taskId)}`,
         method: 'POST',
         body: { estimatedEndTime },
+        headers: { 'X-Flux-Scenario': 'prod' },
       }),
       async onQueryStarted({ taskId, estimatedEndTime }, { dispatch, queryFulfilled }) {
         const now = new Date().toISOString();
@@ -96,6 +97,7 @@ export const saisieApi = createApi({
       query: () => ({
         url: '/scenarios/prod/clear-recorded-progress',
         method: 'POST',
+        headers: { 'X-Flux-Scenario': 'prod' },
       }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {

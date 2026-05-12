@@ -31,6 +31,7 @@ export const prodCompletionApi = createApi({
       query: (taskId) => ({
         url: `/scenarios/prod/completion/${encodeURIComponent(taskId)}`,
         method: 'POST',
+        headers: { 'X-Flux-Scenario': 'prod' },
       }),
       invalidatesTags: ['ProdSnapshot'],
       async onQueryStarted(taskId, { dispatch, queryFulfilled }) {

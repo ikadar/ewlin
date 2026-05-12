@@ -72,6 +72,7 @@ export const pinApi = createApi({
         url: `/scenarios/prod/pin/${encodeURIComponent(taskId)}`,
         method: 'POST',
         body: { targetDateTime },
+        headers: { 'X-Flux-Scenario': 'prod' },
       }),
       async onQueryStarted(_args, { dispatch, queryFulfilled }) {
         try {
