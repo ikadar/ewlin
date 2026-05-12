@@ -72,6 +72,7 @@ import { PlaquesPage } from './pages/PlaquesPage';
 import { PrerequisLayout, PrerequisIndexRedirect } from './components/PrerequisLayout/PrerequisLayout';
 import { ScenarioShell } from './components/ScenarioShell';
 import { HistoryLayout } from './components/HistoryLayout';
+import { QrCodesFocusPage } from './pages/QrCodesFocusPage';
 
 /**
  * Application routes.
@@ -170,6 +171,7 @@ export function AppRoutes() {
           <Route path="tests" element={<JobsDeTestPage />} />
           <Route path="providers" element={<OutsourcedProvidersPage />} />
           <Route path="shippers" element={<ShippersPage />} />
+          <Route path="qr-codes-focus" element={<QrCodesFocusPage />} />
           <Route path="users" element={<RequirePermission permission="admin.users"><UsersPage /></RequirePermission>} />
           <Route path="user-groups" element={<RequirePermission permission="admin.users"><UserGroupsPage /></RequirePermission>} />
         </Route>

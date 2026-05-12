@@ -23,11 +23,15 @@ const SETTINGS_ITEMS = [
   { label: 'Écart de précédence',         path: '/settings/precedence-gap' },
   { label: 'Délai papier',                path: '/settings/paper-lead-time' },
   { label: 'Délai forme',                 path: '/settings/forme-lead-time' },
+  { label: 'Délai plaques',              path: '/settings/plate-lead-time' },
+];
+
+const TOOLS_ITEMS = [
+  { label: 'QR codes plannings focus',    path: '/settings/qr-codes-focus' },
 ];
 
 const TESTS_ITEMS = [
-  { label: 'Jobs de test',                path: '/settings/jobs-de-test' },
-  { label: 'Now (override)',              path: '/settings/now-override' },
+  { label: 'Tests',                       path: '/settings/tests' },
 ];
 
 /**
@@ -72,6 +76,29 @@ export function SettingsSubmenu() {
         </p>
         <nav className="flex flex-col gap-1">
           {SETTINGS_ITEMS.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `px-3 py-2 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? 'bg-flux-hover text-white'
+                    : 'text-flux-text-secondary hover:text-white hover:bg-flux-surface'
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="my-3 border-t border-flux-border" />
+
+        <p className="text-xs font-medium text-flux-text-tertiary uppercase tracking-wider px-2 mb-2">
+          Outils
+        </p>
+        <nav className="flex flex-col gap-1">
+          {TOOLS_ITEMS.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
