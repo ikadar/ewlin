@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FileDown, Loader2, QrCode } from 'lucide-react';
-import { useGetStationsQuery, useGetOperatorsQuery } from '../store';
+import { useGetStationsQuery, useGetOperatorsQuery, useGetStationCategoriesQuery } from '../store';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 
@@ -21,6 +21,7 @@ interface FocusItem {
   kind: 'station' | 'operator';
   id: string;
   label: string;
+  subtitle: string;
 }
 
 function drawCropMarks(doc: jsPDF, x: number, y: number, w: number, h: number) {
@@ -95,12 +96,10 @@ async function generatePdf(items: FocusItem[]) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(140);
-      doc.text(
-        item.kind === 'station' ? 'STATION' : 'OPERATEUR',
-        x + CELL_W / 2,
-        qrY + QR_SIZE + 6,
-        { align: 'center' },
-      );
+      const subtitle = truncateText(doc, item.subtitle.toUpperCase(), CELL_W - 8);
+      doc.text(subtitle, x + CELL_W / 2, qrY + QR_SIZE + 6, {
+        align: 'center',
+      });
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
@@ -125,9 +124,12 @@ async function generatePdf(items: FocusItem[]) {
 export function QrCodesFocusPage() {
   const { data: stations, isLoading: stationsLoading } = useGetStationsQuery();
   const { data: operators, isLoading: operatorsLoading } = useGetOperatorsQuery();
+  const { data: categories, isLoading: categoriesLoading } = useGetStationCategoriesQuery();
   const [generating, setGenerating] = useState(false);
 
-  const isLoading = stationsLoading || operatorsLoading;
+  const isLoading = stationsLoading || operatorsLoading || categoriesLoading;
+
+  const categoryMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
 
   const items: FocusItem[] = [
     ...(stations ?? [])
@@ -136,7 +138,12 @@ export function QrCodesFocusPage() {
         (a, b) =>
           a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
       )
-      .map((s) => ({ kind: 'station' as const, id: s.id, label: s.name })),
+      .map((s) => ({
+        kind: 'station' as const,
+        id: s.id,
+        label: s.name,
+        subtitle: categoryMap.get(s.categoryId) ?? 'Station',
+      })),
     ...(operators ?? [])
       .slice()
       .sort(
@@ -148,6 +155,7 @@ export function QrCodesFocusPage() {
         kind: 'operator' as const,
         id: o.id,
         label: `${o.firstName} ${o.lastName}`,
+        subtitle: o.role ?? 'Operateur',
       })),
   ];
 
