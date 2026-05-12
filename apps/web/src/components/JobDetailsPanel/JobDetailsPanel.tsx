@@ -238,6 +238,7 @@ export function JobDetailsPanel({
     saisieModal.open({
       assignment,
       taskDuration: internalTask.duration,
+      jobId: job.id,
       job: { reference: job.reference, client: job.client },
       machineName: station?.name ?? internalTask.stationId,
       operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',

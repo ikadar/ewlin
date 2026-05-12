@@ -370,6 +370,7 @@ export function FocusStationColumn({
               saisieModal.open({
                 assignment,
                 taskDuration: task.duration,
+                jobId: cached.job.id,
                 job: { reference: cached.job.reference, client: cached.job.client },
                 machineName: station.name,
                 operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',

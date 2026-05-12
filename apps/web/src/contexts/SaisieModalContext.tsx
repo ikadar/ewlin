@@ -21,6 +21,7 @@ import {
 export interface SaisieOpenParams {
   assignment: TaskAssignment;
   taskDuration: { setupMinutes: number; runMinutes?: number };
+  jobId: string;
   job: { reference: string; client: string; designation?: string };
   machineName: string;
   operatorName: string;
@@ -78,7 +79,7 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
     }).unwrap();
     createProductionEvent({
       taskId: state.assignment.taskId,
-      jobInternalId: state.assignment.jobId,
+      jobInternalId: state.jobId,
       type: 'panne_machine',
       operatorId: state.operatorId,
       stationId: state.stationId,
@@ -97,7 +98,7 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
     }).unwrap();
     createProductionEvent({
       taskId: state.assignment.taskId,
-      jobInternalId: state.assignment.jobId,
+      jobInternalId: state.jobId,
       type: 'absence',
       operatorId: state.operatorId,
       stationId: state.stationId,

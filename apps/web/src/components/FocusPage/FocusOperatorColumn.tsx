@@ -295,6 +295,7 @@ export function FocusOperatorColumn({
               saisieModal.open({
                 assignment,
                 taskDuration: task.duration,
+                jobId: job.id,
                 job: { reference: job.reference, client: job.client },
                 machineName: station?.name ?? task.stationId,
                 operatorName: `${operator.firstName} ${operator.lastName}`.trim(),

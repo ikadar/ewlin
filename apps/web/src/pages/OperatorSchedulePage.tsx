@@ -1228,6 +1228,7 @@ export default function OperatorSchedulePage() {
           saisieModal.open({
             assignment,
             taskDuration: task.duration,
+            jobId: job.id,
             job: { reference: job.reference, client: job.client },
             machineName: stationName ?? task.stationId,
             operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
