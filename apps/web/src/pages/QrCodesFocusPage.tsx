@@ -4,16 +4,16 @@ import { useGetStationsQuery, useGetOperatorsQuery } from '../store';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 
-const A4_W = 210;
-const A4_H = 297;
+const PAGE_W = 297;
+const PAGE_H = 210;
 const MARGIN = 10;
 const GUTTER = 6;
-const COLS = 2;
-const ROWS = 4;
+const COLS = 4;
+const ROWS = 2;
 const PER_PAGE = COLS * ROWS;
-const CELL_W = (A4_W - 2 * MARGIN - (COLS - 1) * GUTTER) / COLS;
-const CELL_H = (A4_H - 2 * MARGIN - (ROWS - 1) * GUTTER) / ROWS;
-const QR_SIZE = 40;
+const CELL_W = (PAGE_W - 2 * MARGIN - (COLS - 1) * GUTTER) / COLS;
+const CELL_H = (PAGE_H - 2 * MARGIN - (ROWS - 1) * GUTTER) / ROWS;
+const QR_SIZE = 48;
 const CROP_LEN = 5;
 const CROP_GAP = 2;
 
@@ -64,7 +64,7 @@ async function generatePdf(items: FocusItem[]) {
     ),
   );
 
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const totalPages = Math.ceil(items.length / PER_PAGE);
 
   for (let page = 0; page < totalPages; page++) {
@@ -86,8 +86,10 @@ async function generatePdf(items: FocusItem[]) {
       doc.setLineWidth(0.4);
       doc.rect(x, y, CELL_W, CELL_H);
 
+      const contentH = QR_SIZE + 14;
+      const topPad = (CELL_H - contentH) / 2;
       const qrX = x + (CELL_W - QR_SIZE) / 2;
-      const qrY = y + 4;
+      const qrY = y + topPad;
       doc.addImage(qrDataUrls[start + idx], 'PNG', qrX, qrY, QR_SIZE, QR_SIZE);
 
       doc.setFont('helvetica', 'normal');
@@ -96,7 +98,7 @@ async function generatePdf(items: FocusItem[]) {
       doc.text(
         item.kind === 'station' ? 'STATION' : 'OPERATEUR',
         x + CELL_W / 2,
-        y + QR_SIZE + 9,
+        qrY + QR_SIZE + 6,
         { align: 'center' },
       );
 
@@ -104,14 +106,14 @@ async function generatePdf(items: FocusItem[]) {
       doc.setFontSize(11);
       doc.setTextColor(0);
       const label = truncateText(doc, item.label, CELL_W - 8);
-      doc.text(label, x + CELL_W / 2, y + QR_SIZE + 15, { align: 'center' });
+      doc.text(label, x + CELL_W / 2, qrY + QR_SIZE + 12, { align: 'center' });
     }
 
     if (totalPages > 1) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(160);
-      doc.text(`${page + 1} / ${totalPages}`, A4_W / 2, A4_H - 4, {
+      doc.text(`${page + 1} / ${totalPages}`, PAGE_W / 2, PAGE_H - 4, {
         align: 'center',
       });
     }
