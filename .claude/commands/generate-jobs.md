@@ -23,7 +23,7 @@ Report that all jobs, elements, tasks, walls, assignments, setup logs, modificat
 ### 2. Generate (default)
 
 Use sensible defaults if not specified:
-- **count**: default 50
+- **count**: default 150
 - **from**: default today (YYYY-MM-DD)
 - **to**: default 1 month from today (YYYY-MM-DD)
 - **purge**: default yes (include `--purge` flag)
