@@ -62,16 +62,15 @@ type AutoRecomputeEndpointName =
       'createProvider' | 'updateProvider' | 'deleteProvider'>
   // Element prerequisite status — flipping to Ready unblocks held tasks.
   | Extract<keyof typeof fluxApi.endpoints, 'updateElementPrerequisite'>
-  // Same intent via the JDP/schedule path (different optimistic-update
-  // pattern but identical effect on the engine view: paperStatus /
-  // batStatus / plateStatus / formeStatus changes shift the per-task
-  // earliestStartTick floor).
-  | Extract<keyof typeof scheduleApi.endpoints, 'updateElementStatus'>
+  // JCF modification — sequence, gates, or prerequisites changed.
+  | Extract<keyof typeof scheduleApi.endpoints, 'updateElementSequence'>
   // Paper lead-time hours — the global floor that gates tasks whose
   // element has paperStatus not Ready. Reducing it can unblock work.
   | Extract<keyof typeof scheduleApi.endpoints, 'updatePaperLeadTime'>
   // Forme (die) lead-time — same logic for formeStatus.
   | Extract<keyof typeof scheduleApi.endpoints, 'updateFormeLeadTime'>
+  // Plate lead-time — calendar-hour offset for plateStatus gate.
+  | Extract<keyof typeof scheduleApi.endpoints, 'updatePlateLeadTime'>
   // V2 progress capture — operator saisie d'avancement persists a new
   // productivityRatio + scheduledEnd on the assignment ; the engine then
   // propagates the run-only ratio to the remaining fragments of the job.
@@ -80,7 +79,13 @@ type AutoRecomputeEndpointName =
   // start. Not a toggle (cf. legacy isPinned flip): the start changes,
   // so the engine resolves slide-to-nearest on the next replan and
   // every successor is re-chained.
-  | Extract<keyof typeof pinApi.endpoints, 'pinAtTime'>;
+  | Extract<keyof typeof pinApi.endpoints, 'pinAtTime'>
+  // Operator incident — station exception blocks a time window on the
+  // machine, engine must replan around the blocked slot.
+  | Extract<keyof typeof stationApi.endpoints, 'addStationException'>
+  // Operator incident — absence blocks the operator's availability
+  // window, engine must reassign or defer affected tasks.
+  | Extract<keyof typeof operatorApi.endpoints, 'addOperatorAbsence'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -109,11 +114,14 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updateProvider',
   'deleteProvider',
   'updateElementPrerequisite',
-  'updateElementStatus',
+  'updateElementSequence',
   'updatePaperLeadTime',
   'updateFormeLeadTime',
+  'updatePlateLeadTime',
   'reportSaisie',
   'pinAtTime',
+  'addStationException',
+  'addOperatorAbsence',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {

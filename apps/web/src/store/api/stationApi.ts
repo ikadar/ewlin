@@ -8,6 +8,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 import { scheduleApi } from './scheduleApi';
+import { prodSnapshotApi } from './prodSnapshotApi';
 
 export interface StationResponse {
   id: string;
@@ -118,6 +119,7 @@ export const stationApi = createApi({
         try {
           await queryFulfilled;
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
         } catch {
           // noop
         }
