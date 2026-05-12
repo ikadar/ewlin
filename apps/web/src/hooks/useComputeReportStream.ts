@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ScheduleSnapshot } from '@flux/types';
-import { getDeadlineDate, SHIPPING_DEPARTURE_HOUR } from '@flux/types';
+import { getDeadlineDate, isInternalTask, SHIPPING_DEPARTURE_HOUR } from '@flux/types';
 import type { ComputeScheduleResult } from '../store';
 import { resolveScenarioHeader } from '../store/api/realBaseQuery';
 import { getJobIdForTask } from '../utils/taskHelpers';
@@ -88,9 +88,9 @@ function findLateJobs(
     if (o.scheduledEnd) endByTask.set(o.taskId, o.scheduledEnd);
   }
 
-  const completionByTask = new Map<string, boolean>();
+  const assignmentByTask = new Map<string, ScheduleSnapshot['assignments'][number]>();
   for (const a of snapshot.assignments) {
-    completionByTask.set(a.taskId, a.isCompleted);
+    assignmentByTask.set(a.taskId, a);
   }
 
   // Precompute task → jobId via elements so we don't rescan for each job.
@@ -115,7 +115,18 @@ function findLateJobs(
       const end = new Date(endStr);
       if (!latestEnd || end > latestEnd) latestEnd = end;
       if (end > deadline) isLate = true;
-      if (!completionByTask.get(task.id) && end < now) isLate = true;
+      // Silence = consent: only flag past-window tasks as late when an
+      // operator has explicitly declared partial progress (saisie).
+      const assignment = assignmentByTask.get(task.id);
+      if (!assignment?.isCompleted && end < now) {
+        const internal = isInternalTask(task) ? task : null;
+        const hasOperatorSaisie =
+          assignment?.lastSaisieAt != null || (internal?.lastSaisieAt ?? null) != null;
+        const partialProgress = internal?.recordedProgressPct ?? null;
+        if (hasOperatorSaisie && partialProgress != null && partialProgress < 100) {
+          isLate = true;
+        }
+      }
     }
 
     if (isLate) {
