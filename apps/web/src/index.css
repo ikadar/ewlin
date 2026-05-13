@@ -176,8 +176,10 @@ body {
  * See apps/web/src/hooks/useHoverCrosslink.ts + playground-jdp-grid-crosslink.html
  */
 .flux-hover-linked {
+  z-index: 15 !important;
+}
+.flux-hover-linked:not(.absolute) {
   position: relative;
-  z-index: 15;
 }
 .flux-hover-linked::before {
   content: '';
