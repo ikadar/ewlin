@@ -134,7 +134,7 @@ const EventRow = memo(function EventRow({
 });
 
 export function ProductionReportPage() {
-  const { data: events = [], isLoading } = useGetProductionEventsQuery();
+  const { data: events = [], isLoading, isError, error } = useGetProductionEventsQuery();
   const [toggleSeen] = useToggleEventSeenMutation();
   const [tab, setTab] = useState<FilterTab>('all');
   const [sortCol, setSortCol] = useState<SortCol>('time');
@@ -242,10 +242,15 @@ export function ProductionReportPage() {
               ))}
             </tbody>
           </table>
-          {isLoading && (
+          {isError && (
+            <div className="flex-1 flex items-center justify-center text-red-400 text-sm">
+              Erreur lors du chargement des événements{error && 'status' in error ? ` (${error.status})` : ''}
+            </div>
+          )}
+          {isLoading && !isError && (
             <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Chargement…</div>
           )}
-          {!isLoading && filtered.length === 0 && (
+          {!isLoading && !isError && filtered.length === 0 && (
             <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Aucun événement</div>
           )}
         </div>

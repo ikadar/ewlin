@@ -77,13 +77,32 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
       endAt: toNaiveLocal(endAt),
       reason: "Panne déclarée par opérateur",
     }).unwrap();
-    createProductionEvent({
+    await createProductionEvent({
       taskId: state.assignment.taskId,
       jobInternalId: state.jobId,
       type: 'panne_machine',
       operatorId: state.operatorId,
       stationId: state.stationId,
-    }).catch(() => {});
+    }).unwrap();
+  }, [state, addStationException, createProductionEvent]);
+
+  const handleBlockPrerequisite = useCallback(async () => {
+    if (!state) return;
+    const now = new Date();
+    const endAt = new Date(now.getTime() + BLOCK_DURATION_MS);
+    await addStationException({
+      stationId: state.stationId,
+      startAt: toNaiveLocal(now),
+      endAt: toNaiveLocal(endAt),
+      reason: "Blocage prérequis déclaré par opérateur",
+    }).unwrap();
+    await createProductionEvent({
+      taskId: state.assignment.taskId,
+      jobInternalId: state.jobId,
+      type: 'prerequis',
+      operatorId: state.operatorId,
+      stationId: state.stationId,
+    }).unwrap();
   }, [state, addStationException, createProductionEvent]);
 
   const handleBlockAbsence = useCallback(async () => {
@@ -96,13 +115,13 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
       endAt: toNaiveLocal(endAt),
       reason: "Absence déclarée par opérateur",
     }).unwrap();
-    createProductionEvent({
+    await createProductionEvent({
       taskId: state.assignment.taskId,
       jobInternalId: state.jobId,
       type: 'absence',
       operatorId: state.operatorId,
       stationId: state.stationId,
-    }).catch(() => {});
+    }).unwrap();
   }, [state, addOperatorAbsence, createProductionEvent]);
 
   return (
@@ -122,7 +141,7 @@ export function SaisieModalProvider({ children }: { children: ReactNode }) {
           setupMinutes={state.taskDuration.setupMinutes}
           slotVolumePct={state.slotVolumePct}
           tileColor={state.tileColor}
-          onBlockPrerequisite={undefined}
+          onBlockPrerequisite={handleBlockPrerequisite}
           onBlockMachine={handleBlockMachine}
           onBlockAbsence={handleBlockAbsence}
           predecessorInfo={state.predecessorInfo}

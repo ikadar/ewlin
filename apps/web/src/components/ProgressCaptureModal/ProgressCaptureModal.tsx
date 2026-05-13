@@ -82,6 +82,13 @@ export function ProgressCaptureModal({
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const variant = deriveSaisieVariant(scheduledStart, scheduledEnd, now);
 
+  const pickedTime = new Date(scheduledStart);
+  pickedTime.setHours(0, 0, 0, 0);
+  pickedTime.setMinutes(currentTimeMin);
+  const stepperLabel = pickedTime.getTime() > now.getTime()
+    ? "Je finirai à :"
+    : "J'ai terminé à :";
+
   useEffect(() => {
     if (isOpen) {
       setCurrentTimeMin(slotEndMin);
@@ -110,6 +117,10 @@ export function ProgressCaptureModal({
     try {
       await Promise.resolve(onSave(currentTimeMin));
       onClose();
+    } catch {
+      // 401 with expired refresh token: baseQueryWithReauth dispatches logout(),
+      // the modal just needs to close without crashing.
+      onClose();
     } finally {
       setSaving(false);
     }
@@ -126,6 +137,8 @@ export function ProgressCaptureModal({
       };
       const cb = callbacks[selectedReason];
       if (cb) await cb();
+      onClose();
+    } catch {
       onClose();
     } finally {
       setSaving(false);
@@ -212,7 +225,7 @@ export function ProgressCaptureModal({
             ) : (
               <NonLinearStepper
                 plannedEndMin={slotEndMin}
-                label={variant === 'done-past-end' ? "J'ai terminé à :" : "Je finirai à :"}
+                label={stepperLabel}
                 onTimeChange={handleTimeChange}
                 showBlockedButton={variant === 'in-progress'}
                 onBlockedClick={() => setBlockedMode(true)}
