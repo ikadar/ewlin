@@ -19,24 +19,22 @@
  */
 
 import { useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   ArrowRightToLine,
   ArrowRightFromLine,
+  ChevronLeft,
+  ChevronRight,
   MessageSquare,
   Pencil,
   X,
   AlertTriangle,
-  ArrowRight,
-  Clock,
-  CheckCircle2,
 } from 'lucide-react';
 import { PendingIcon, ProgressIcon, DoneIcon } from '../components/FluxTable/STCell';
 import {
   useGetFluxJobsQuery,
   useUpdateSTStatusMutation,
   useToggleJobShippedMutation,
+  useUpdateElementPrerequisiteMutation,
 } from '../store/api/fluxApi';
 import { useGetProvidersQuery } from '../store/api/providerApi';
 import {
@@ -51,21 +49,22 @@ import type {
   LogisticsAuditResponse,
   LogisticsRefType,
 } from '../store/api/logisticsApi';
-import { useGetSnapshotQuery } from '../store/api/scheduleApi';
+import { useGetSnapshotQuery, useGetPaperLeadTimeQuery, useGetFormeLeadTimeQuery } from '../store/api/scheduleApi';
 import { useAppSelector } from '../store';
 import { selectCurrentUser } from '../store/slices/authSlice';
 import type { FluxJob, FluxSTStatus } from '../components/FluxTable/fluxTypes';
 import type { TaskAssignment, Job as JobEntity, Task, OutsourcedProvider } from '@flux/types';
 import { isOutsourcedTask } from '@flux/types';
 import { calculateOutsourcingDates } from '../utils/outsourcingCalculation';
+import { computePaperEarliestStart } from '../utils/paperGate';
+import { computeFormeEarliestStart } from '../utils/formeGate';
+import type { PaperLeadTimeConfig, FormeLeadTimeConfig } from '@flux/types';
 
 // ============================================================================
 // Movement model
 // ============================================================================
 
-type MovementType = 'st' | 'client';
-type DateFilter = 'yesterday' | 'today' | 'tomorrow' | 'week';
-
+type MovementType = 'st' | 'client' | 'paper' | 'forme';
 interface Movement {
   id: string;
   kind: 'arrival' | 'departure';
@@ -103,6 +102,10 @@ interface Movement {
   isCompleted: boolean;
   /** What semantic action this checkbox corresponds to (used for audit log) */
   action: string;
+  /** Element UUID — paper/forme movements only (used for the prerequisite PATCH) */
+  elementId?: string;
+  /** Prerequisite column name — paper/forme movements only */
+  prerequisiteColumn?: 'papier' | 'formes';
 }
 
 interface ProviderTimes {
@@ -126,63 +129,31 @@ function isSameDay(a: Date, b: Date): boolean {
   return startOfDay(a).getTime() === startOfDay(b).getTime();
 }
 
-function startOfWeek(d: Date): Date {
-  const out = startOfDay(d);
-  const dow = out.getDay();
-  const offset = dow === 0 ? -6 : 1 - dow;
-  out.setDate(out.getDate() + offset);
-  return out;
-}
-
-function endOfWeek(d: Date): Date {
-  const start = startOfWeek(d);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 7);
-  return end;
-}
-
-function dateMatchesFilter(movement: Movement, filter: DateFilter, now: Date): boolean {
+function dateMatchesDay(movement: Movement, day: Date, now: Date): boolean {
   const today = startOfDay(now);
   const planned = movement.scheduledAt;
   const actual = movement.actualAt;
 
-  // A movement matches the filter if its planned OR actual date falls
-  // within the requested window — so a row stays visible under the
-  // filter where either of those dates lies.
-  const matches = (predicate: (d: Date) => boolean): boolean => {
-    if (planned !== null && predicate(planned)) return true;
-    if (actual !== null && predicate(actual)) return true;
-    return false;
-  };
+  if (planned !== null && isSameDay(planned, day)) return true;
+  if (actual !== null && isSameDay(actual, day)) return true;
 
-  switch (filter) {
-    case 'yesterday': {
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      return matches((d) => isSameDay(d, yesterday));
-    }
-    case 'today': {
-      if (matches((d) => isSameDay(d, today))) return true;
-      // Reliquat: still-pending past-due items also belong under "Aujourd'hui"
-      // so the warehouse staff sees what they should already have processed.
-      if (planned !== null && planned < today && !movement.isCompleted) return true;
-      // No fall-through to "today" for movements with neither a planned nor
-      // an actual date. These are non-calculable ST steps whose predecessor
-      // hasn't been placed by the engine yet (job stays in "Non planifiées"
-      // until the scheduler can fit it). Surfacing them under "Aujourd'hui"
-      // misleads the warehouse into processing a movement that nothing
-      // upstream commits to. They reappear automatically once the engine
-      // places the predecessor and we can compute departure/return dates.
-      return false;
-    }
-    case 'tomorrow': {
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
-      return matches((d) => isSameDay(d, tomorrow));
-    }
-    case 'week':
-      return matches((d) => d >= startOfWeek(now) && d < endOfWeek(now));
-  }
+  // Reliquat: when viewing today, include still-pending past-due items
+  // so the warehouse staff sees what they should already have processed.
+  const isToday = day.getTime() === today.getTime();
+  if (isToday && planned !== null && planned < today && !movement.isCompleted) return true;
+
+  return false;
+}
+
+function formatDateLabel(d: Date, now: Date): string {
+  const today = startOfDay(now);
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  const formatted = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+  const capitalized = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  if (diff === 0) return `Aujourd'hui — ${capitalized}`;
+  if (diff === -1) return `Hier — ${capitalized}`;
+  if (diff === 1) return `Demain — ${capitalized}`;
+  return capitalized;
 }
 
 function formatActualTime(d: Date | null, today: Date): string {
@@ -211,6 +182,11 @@ function formatPlannedTime(d: Date | null, today: Date, fallback: string): strin
   return `${dd}/${mo} ${hh}:${mm}`;
 }
 
+function parseDDMM(ddmm: string, referenceYear: number): Date {
+  const [d, m] = ddmm.split('/').map(Number);
+  return new Date(referenceYear, m - 1, d);
+}
+
 // ============================================================================
 // Derivation: FluxJob[] + Provider[] + Snapshot → Movement[]
 // ============================================================================
@@ -226,6 +202,9 @@ interface DeriveContext {
   tasksByElementId: Map<string, Task[]>;
   /** Last sequenceOrder across all elements of a job → used for oneWay detection */
   lastSequenceByJobInternalId: Map<string, { elementId: string; sequenceOrder: number }>;
+  paperLeadTime?: PaperLeadTimeConfig;
+  formeLeadTime?: FormeLeadTimeConfig;
+  now: Date;
 }
 
 function deriveMovements(ctx: DeriveContext): Movement[] {
@@ -339,6 +318,110 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           });
         }
       }
+
+      // ── Paper arrival ────────────────────────────────────────────────
+      if (element.papier === 'ordered' && element.paperOrderedAt && ctx.paperLeadTime) {
+        const orderedAt = parseDDMM(element.paperOrderedAt, ctx.now.getFullYear());
+        const arrivalDate = computePaperEarliestStart(
+          { paperStatus: 'ordered', paperOrderedAt: orderedAt.toISOString() },
+          ctx.paperLeadTime,
+          ctx.now,
+        );
+        movements.push({
+          id: `element-paper-${element.id}`,
+          kind: 'arrival',
+          type: 'paper',
+          refType: 'element',
+          refId: element.id,
+          scheduledAt: arrivalDate,
+          actualAt: null,
+          time: arrivalDate ? formatTimeOfDay(arrivalDate, '') : `${String(ctx.paperLeadTime.arrivalHour).padStart(2, '0')}:00`,
+          title: 'Réception papier',
+          subtitle: `Job #${job.id} — ${element.label}`,
+          counterparty: 'Fournisseur',
+          jobRef: `#${job.id}`,
+          jobInternalId: job.internalId,
+          elementId: element.id,
+          prerequisiteColumn: 'papier',
+          isCompleted: false,
+          action: 'paper_deliver',
+        });
+      } else if (element.papier === 'delivered' && element.paperDeliveredAt) {
+        const deliveredDate = parseDDMM(element.paperDeliveredAt, ctx.now.getFullYear());
+        if (isSameDay(deliveredDate, ctx.now)) {
+          movements.push({
+            id: `element-paper-${element.id}`,
+            kind: 'arrival',
+            type: 'paper',
+            refType: 'element',
+            refId: element.id,
+            scheduledAt: deliveredDate,
+            actualAt: deliveredDate,
+            time: formatTimeOfDay(deliveredDate, ''),
+            title: 'Réception papier',
+            subtitle: `Job #${job.id} — ${element.label}`,
+            counterparty: 'Fournisseur',
+            jobRef: `#${job.id}`,
+            jobInternalId: job.internalId,
+            elementId: element.id,
+            prerequisiteColumn: 'papier',
+            isCompleted: true,
+            action: 'paper_deliver',
+          });
+        }
+      }
+
+      // ── Forme arrival ────────────────────────────────────────────────
+      if (element.formes === 'ordered' && element.formeOrderedAt && ctx.formeLeadTime) {
+        const orderedAt = parseDDMM(element.formeOrderedAt, ctx.now.getFullYear());
+        const arrivalDate = computeFormeEarliestStart(
+          { formeStatus: 'ordered', formeOrderedAt: orderedAt.toISOString() },
+          ctx.formeLeadTime,
+          ctx.now,
+        );
+        movements.push({
+          id: `element-forme-${element.id}`,
+          kind: 'arrival',
+          type: 'forme',
+          refType: 'element',
+          refId: element.id,
+          scheduledAt: arrivalDate,
+          actualAt: null,
+          time: arrivalDate ? formatTimeOfDay(arrivalDate, '') : `${String(ctx.formeLeadTime.arrivalHour).padStart(2, '0')}:00`,
+          title: 'Réception forme',
+          subtitle: `Job #${job.id} — ${element.label}`,
+          counterparty: 'Fournisseur',
+          jobRef: `#${job.id}`,
+          jobInternalId: job.internalId,
+          elementId: element.id,
+          prerequisiteColumn: 'formes',
+          isCompleted: false,
+          action: 'forme_deliver',
+        });
+      } else if (element.formes === 'delivered' && element.formeDeliveredAt) {
+        const deliveredDate = parseDDMM(element.formeDeliveredAt, ctx.now.getFullYear());
+        if (isSameDay(deliveredDate, ctx.now)) {
+          movements.push({
+            id: `element-forme-${element.id}`,
+            kind: 'arrival',
+            type: 'forme',
+            refType: 'element',
+            refId: element.id,
+            scheduledAt: deliveredDate,
+            actualAt: deliveredDate,
+            time: formatTimeOfDay(deliveredDate, ''),
+            title: 'Réception forme',
+            subtitle: `Job #${job.id} — ${element.label}`,
+            counterparty: 'Fournisseur',
+            jobRef: `#${job.id}`,
+            jobInternalId: job.internalId,
+            elementId: element.id,
+            prerequisiteColumn: 'formes',
+            isCompleted: true,
+            action: 'forme_deliver',
+          });
+        }
+      }
     }
 
     if (internalJob === undefined || job.internalId === undefined) continue;
@@ -401,16 +484,15 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
 const TYPE_BADGE_CLASS: Record<MovementType, string> = {
   st: 'text-blue-300 bg-blue-500/10',
   client: 'text-amber-300 bg-amber-500/10',
+  paper: 'text-teal-300 bg-teal-500/10',
+  forme: 'text-purple-300 bg-purple-500/10',
 };
 
 const TYPE_BADGE_LABEL: Record<MovementType, string> = {
   st: 'ST',
   client: 'CLIENT',
-};
-
-const TYPE_FULL_LABEL: Record<MovementType, string> = {
-  st: 'Sous-traitant',
-  client: 'Client',
+  paper: 'PAPIER',
+  forme: 'FORME',
 };
 
 /**
@@ -434,6 +516,12 @@ function computeTransition(m: Movement): { status?: FluxSTStatus; action: string
   if (m.type === 'client') {
     return { action: m.isCompleted ? 'client_revert_ship' : 'client_ship' };
   }
+  if (m.type === 'paper') {
+    return { action: m.isCompleted ? 'paper_revert_deliver' : 'paper_deliver' };
+  }
+  if (m.type === 'forme') {
+    return { action: m.isCompleted ? 'forme_revert_deliver' : 'forme_deliver' };
+  }
   return null;
 }
 
@@ -453,12 +541,10 @@ function formatAuditTooltip(audit: LogisticsAuditResponse): string {
 // ============================================================================
 
 export function LogistiquePage() {
-  const navigate = useNavigate();
-  const [filter, setFilter] = useState<DateFilter>('today');
+  const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [openCommentId, setOpenCommentId] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [draft, setDraft] = useState<string>('');
-  const [sheetMovement, setSheetMovement] = useState<Movement | null>(null);
 
   const currentUser = useAppSelector(selectCurrentUser);
   const actorName = currentUser?.displayName ?? 'Utilisateur';
@@ -466,8 +552,11 @@ export function LogistiquePage() {
   const { data: jobs = [] } = useGetFluxJobsQuery();
   const { data: providers = [] } = useGetProvidersQuery();
   const { data: snapshot } = useGetSnapshotQuery();
+  const { data: paperLeadTime } = useGetPaperLeadTimeQuery();
+  const { data: formeLeadTime } = useGetFormeLeadTimeQuery();
   const [updateSTStatus] = useUpdateSTStatusMutation();
   const [toggleJobShipped] = useToggleJobShippedMutation();
+  const [updateElementPrerequisite] = useUpdateElementPrerequisiteMutation();
   const [createNote] = useCreateLogisticsNoteMutation();
   const [deleteNote] = useDeleteLogisticsNoteMutation();
   const [createAudit] = useCreateLogisticsAuditMutation();
@@ -551,8 +640,11 @@ export function LogistiquePage() {
         tasksByTaskId,
         tasksByElementId,
         lastSequenceByJobInternalId,
+        paperLeadTime,
+        formeLeadTime,
+        now,
       }),
-    [jobs, providersByName, providersById, assignmentsByTaskId, jobsByInternalId, tasksByTaskId, tasksByElementId, lastSequenceByJobInternalId],
+    [jobs, providersByName, providersById, assignmentsByTaskId, jobsByInternalId, tasksByTaskId, tasksByElementId, lastSequenceByJobInternalId, paperLeadTime, formeLeadTime, now],
   );
 
   const allTaskRefIds = useMemo(
@@ -561,6 +653,10 @@ export function LogistiquePage() {
   );
   const allJobRefIds = useMemo(
     () => allMovements.filter((m) => m.refType === 'job').map((m) => m.refId),
+    [allMovements],
+  );
+  const allElementRefIds = useMemo(
+    () => allMovements.filter((m) => m.refType === 'element').map((m) => m.refId),
     [allMovements],
   );
 
@@ -580,10 +676,18 @@ export function LogistiquePage() {
     { refType: 'job', refIds: allJobRefIds },
     { skip: allJobRefIds.length === 0 },
   );
+  const { data: elementNotes = [] } = useGetLogisticsNotesQuery(
+    { refType: 'element', refIds: allElementRefIds },
+    { skip: allElementRefIds.length === 0 },
+  );
+  const { data: elementAudits = [] } = useGetLatestLogisticsAuditsQuery(
+    { refType: 'element', refIds: allElementRefIds },
+    { skip: allElementRefIds.length === 0 },
+  );
 
   const notesByRef = useMemo(() => {
     const map = new Map<string, LogisticsNoteResponse>();
-    for (const n of [...taskNotes, ...jobNotes]) {
+    for (const n of [...taskNotes, ...jobNotes, ...elementNotes]) {
       const key = `${n.refType}:${n.refId}`;
       const existing = map.get(key);
       if (!existing || existing.createdAt < n.createdAt) {
@@ -591,15 +695,15 @@ export function LogistiquePage() {
       }
     }
     return map;
-  }, [taskNotes, jobNotes]);
+  }, [taskNotes, jobNotes, elementNotes]);
 
   const auditsByRef = useMemo(() => {
     const map = new Map<string, LogisticsAuditResponse>();
-    for (const a of [...taskAudits, ...jobAudits]) {
+    for (const a of [...taskAudits, ...jobAudits, ...elementAudits]) {
       map.set(`${a.refType}:${a.refId}`, a);
     }
     return map;
-  }, [taskAudits, jobAudits]);
+  }, [taskAudits, jobAudits, elementAudits]);
 
   // Hydrate actualAt from audits when the underlying entity doesn't carry
   // a "did-this-action-at" timestamp. Today this only matters for ST
@@ -616,8 +720,8 @@ export function LogistiquePage() {
   );
 
   const filteredMovements = useMemo(
-    () => hydratedMovements.filter((m) => dateMatchesFilter(m, filter, now)),
-    [hydratedMovements, filter, now],
+    () => hydratedMovements.filter((m) => dateMatchesDay(m, selectedDate, now)),
+    [hydratedMovements, selectedDate, now],
   );
 
   const reliquat = useMemo(
@@ -643,6 +747,14 @@ export function LogistiquePage() {
         await updateSTStatus({ taskId: m.refId, status: transition.status });
       } else if (m.type === 'client' && m.jobInternalId !== undefined) {
         await toggleJobShipped({ jobInternalId: m.jobInternalId, shipped: !m.isCompleted });
+      } else if ((m.type === 'paper' || m.type === 'forme') && m.elementId && m.prerequisiteColumn) {
+        const parentJob = jobs.find((j) => j.elements.some((e) => e.id === m.elementId));
+        await updateElementPrerequisite({
+          elementId: m.elementId,
+          jobId: parentJob?.internalId ?? '',
+          column: m.prerequisiteColumn,
+          value: m.isCompleted ? 'ordered' : 'delivered',
+        });
       }
       await createAudit({
         refType: m.refType,
@@ -651,7 +763,7 @@ export function LogistiquePage() {
         actorName,
       });
     },
-    [updateSTStatus, toggleJobShipped, createAudit, actorName],
+    [updateSTStatus, toggleJobShipped, updateElementPrerequisite, jobs, createAudit, actorName],
   );
 
   const handleSaveNote = useCallback(
@@ -673,52 +785,41 @@ export function LogistiquePage() {
     [deleteNote],
   );
 
-  const handleNavigateToJob = useCallback(
-    (jobInternalId?: string) => {
-      if (jobInternalId === undefined) return;
-      navigate(`/job/${jobInternalId}`);
-    },
-    [navigate],
-  );
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-flux-base flex flex-col">
-      <header className="border-b border-flux-border px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-flux-text-secondary hover:text-flux-text-primary transition-colors"
-            title="Retour (Esc)"
-          >
-            <ArrowLeft size={20} />
-            <span>Retour</span>
-          </button>
-          <div>
-            <h1 className="text-xl font-semibold text-flux-text-primary">Logistique</h1>
-            <div className="text-flux-text-tertiary text-xs">Réceptions et expéditions de l'atelier</div>
-          </div>
-        </div>
+      <header className="border-b border-flux-border px-6 py-4">
+        <h1 className="text-xl font-semibold text-flux-text-primary">Expéditions</h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="flex items-center justify-between gap-6 flex-wrap mb-5">
-          <div className="flex gap-1">
-            {(['yesterday', 'today', 'tomorrow', 'week'] as DateFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 text-sm rounded border transition-colors ${
-                  filter === f
-                    ? 'bg-flux-hover border-flux-border-light text-flux-text-primary'
-                    : 'border-flux-border text-flux-text-secondary hover:bg-flux-hover hover:text-flux-text-primary'
-                }`}
-              >
-                {f === 'yesterday' ? 'Hier' : f === 'today' ? "Aujourd'hui" : f === 'tomorrow' ? 'Demain' : 'Cette semaine'}
-              </button>
-            ))}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d; })}
+              className="w-8 h-8 inline-flex items-center justify-center rounded border border-flux-border text-flux-text-secondary hover:bg-flux-hover hover:text-flux-text-primary transition-colors"
+              title="Jour précédent"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(startOfDay(new Date()))}
+              className="px-3 py-1.5 text-sm rounded border border-flux-border text-flux-text-primary hover:bg-flux-hover transition-colors min-w-[200px] text-center"
+              title="Revenir à aujourd'hui"
+            >
+              {formatDateLabel(selectedDate, now)}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d; })}
+              className="w-8 h-8 inline-flex items-center justify-center rounded border border-flux-border text-flux-text-secondary hover:bg-flux-hover hover:text-flux-text-primary transition-colors"
+              title="Jour suivant"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
 
           <div className="flex gap-6 text-sm text-flux-text-tertiary">
@@ -763,7 +864,6 @@ export function LogistiquePage() {
             onDraftChange={setDraft}
             onSave={handleSaveNote}
             onDeleteNote={handleDeleteNote}
-            onOpenSheet={setSheetMovement}
           />
           <Column
             title="Départs"
@@ -788,20 +888,9 @@ export function LogistiquePage() {
             onDraftChange={setDraft}
             onSave={handleSaveNote}
             onDeleteNote={handleDeleteNote}
-            onOpenSheet={setSheetMovement}
           />
         </div>
       </main>
-
-      {sheetMovement && (
-        <DetailSheet
-          movement={sheetMovement}
-          note={notesByRef.get(`${sheetMovement.refType}:${sheetMovement.refId}`) ?? null}
-          audit={auditsByRef.get(`${sheetMovement.refType}:${sheetMovement.refId}`) ?? null}
-          onClose={() => setSheetMovement(null)}
-          onNavigateToJob={handleNavigateToJob}
-        />
-      )}
     </div>
   );
 }
@@ -826,7 +915,6 @@ interface ColumnProps {
   onDraftChange: (v: string) => void;
   onSave: (m: Movement, content: string) => void;
   onDeleteNote: (id: string) => void;
-  onOpenSheet: (m: Movement) => void;
 }
 
 function Column({
@@ -845,7 +933,6 @@ function Column({
   onDraftChange,
   onSave,
   onDeleteNote,
-  onOpenSheet,
 }: ColumnProps) {
   return (
     <section>
@@ -889,7 +976,6 @@ function Column({
                   audit={audit}
                   onCheck={onCheck}
                   onToggleComment={onToggleComment}
-                  onOpenSheet={onOpenSheet}
                 />
                 {isCommentOpen && (
                   <div className="px-3.5 pl-[88px] pb-3 pt-1 bg-flux-surface border-t border-dashed border-flux-border">
@@ -952,10 +1038,9 @@ interface MovementRowProps {
   audit: LogisticsAuditResponse | undefined;
   onCheck: (m: Movement) => void;
   onToggleComment: (id: string) => void;
-  onOpenSheet: (m: Movement) => void;
 }
 
-function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpenSheet }: MovementRowProps) {
+function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment }: MovementRowProps) {
   const today = startOfDay(new Date());
   const isOverdue = !movement.isCompleted && movement.scheduledAt !== null && movement.scheduledAt < today;
   const overdueDays = isOverdue && movement.scheduledAt
@@ -978,7 +1063,7 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
   // check-circle). Same icon component, same .st-* color classes — keeps
   // the warehouse staff's mental model consistent across screens.
   const stateIcon = (() => {
-    if (movement.type === 'client') {
+    if (movement.type === 'client' || movement.type === 'paper' || movement.type === 'forme') {
       return movement.isCompleted ? <DoneIcon /> : <PendingIcon />;
     }
     if (movement.stStatus === 'progress') return <ProgressIcon />;
@@ -986,7 +1071,9 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
     return <PendingIcon />;
   })();
   const stateColorClass = (() => {
-    if (movement.type === 'client') return movement.isCompleted ? 'st-done' : 'st-pending';
+    if (movement.type === 'client' || movement.type === 'paper' || movement.type === 'forme') {
+      return movement.isCompleted ? 'st-done' : 'st-pending';
+    }
     if (movement.stStatus === 'progress') return 'st-progress';
     if (movement.stStatus === 'done') return 'st-done';
     return 'st-pending';
@@ -1017,9 +1104,8 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
 
   return (
     <div
-      className={`grid items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors ${rowClass}`}
+      className={`grid items-center gap-3 px-3.5 py-2.5 transition-colors ${rowClass}`}
       style={{ gridTemplateColumns: '92px 84px 76px 1fr auto' }}
-      onClick={() => onOpenSheet(movement)}
       data-testid={`logistics-movement-${movement.id}`}
       data-completed={movement.isCompleted ? 'true' : 'false'}
       data-kind={movement.kind}
@@ -1052,7 +1138,7 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
         </div>
         <div className="text-flux-text-tertiary text-xs truncate">{movement.subtitle}</div>
       </div>
-      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={() => onToggleComment(movement.id)}
@@ -1081,95 +1167,3 @@ function MovementRow({ movement, hasNote, audit, onCheck, onToggleComment, onOpe
   );
 }
 
-// ============================================================================
-// Side-sheet
-// ============================================================================
-
-interface DetailSheetProps {
-  movement: Movement;
-  note: LogisticsNoteResponse | null;
-  audit: LogisticsAuditResponse | null;
-  onClose: () => void;
-  onNavigateToJob: (jobInternalId?: string) => void;
-}
-
-function DetailSheet({ movement, note, audit, onClose, onNavigateToJob }: DetailSheetProps) {
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
-      <aside className="fixed top-0 right-0 w-[420px] h-screen bg-flux-elevated border-l border-flux-border-light z-50 flex flex-col">
-        <div className="px-5 py-4 border-b border-flux-border flex items-center justify-between">
-          <h3 className="text-base font-semibold text-flux-text-primary">{movement.title}</h3>
-          <button onClick={onClose} className="p-1 text-flux-text-tertiary hover:text-flux-text-primary">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          <Field
-            label="Type"
-            value={
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${TYPE_BADGE_CLASS[movement.type]}`}>
-                {TYPE_FULL_LABEL[movement.type]}
-              </span>
-            }
-          />
-          <Field label="Heure prévue" value={movement.time || '—'} />
-          <Field label="Contrepartie" value={movement.counterparty} />
-          <Field label="Référence" value={movement.jobRef} />
-          <Field label="Détail" value={movement.subtitle} />
-          <Field
-            label="Statut"
-            value={
-              movement.isCompleted ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-                  <span>Effectué{audit ? ` — ${formatAuditTooltip(audit)}` : ''}</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5">
-                  <Clock size={14} className="text-flux-text-tertiary shrink-0" />
-                  <span>En attente</span>
-                </span>
-              )
-            }
-          />
-          {note && (
-            <Field
-              label="Commentaire"
-              value={
-                <div className="bg-flux-surface border-l-2 border-blue-400 px-2.5 py-2 rounded-r text-flux-text-secondary">
-                  {note.note}
-                </div>
-              }
-            />
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              onNavigateToJob(movement.jobInternalId);
-              onClose();
-            }}
-            disabled={movement.jobInternalId === undefined}
-            className="mt-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-flux-text-primary rounded text-xs font-medium inline-flex items-center gap-1.5"
-          >
-            Voir le job complet <ArrowRight size={12} />
-          </button>
-        </div>
-      </aside>
-    </>
-  );
-}
-
-interface FieldProps {
-  label: string;
-  value: React.ReactNode;
-}
-
-function Field({ label, value }: FieldProps) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-flux-text-muted font-semibold mb-0.5">{label}</div>
-      <div className="text-sm text-flux-text-primary">{value}</div>
-    </div>
-  );
-}

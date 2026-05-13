@@ -10,7 +10,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 
-export type LogisticsRefType = 'task' | 'job';
+export type LogisticsRefType = 'task' | 'job' | 'element';
 
 export interface LogisticsNoteResponse {
   id: string;
