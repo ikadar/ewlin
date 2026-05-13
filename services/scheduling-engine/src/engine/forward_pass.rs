@@ -3446,15 +3446,17 @@ fn emit_in_progress_assignment(
     };
 
     // Pass 1 — dry walk: count productive ticks (operator available AND
-    // station free for us) without mutating the grid. Detect peremption
-    // mid-walk : consecutive idle_run ≥ peremption_ticks means the
-    // calage physically died during the post-NOW gap.
+    // station free for us) without mutating the grid. The walk skips
+    // non-productive ticks (station closed, operator off-shift, blocked
+    // range) and extends the envelope around them. No peremption check:
+    // this function is only called for tasks confirmed in-progress (PHP
+    // or heuristic), and the upstream `evaluate_setup_inheritance` guard
+    // already handles peremption before we get here. The dry walk's job
+    // is purely geometric — map productive ticks into an envelope.
     let scan_cap = start_t.saturating_add(total_productive_needed.saturating_mul(10).max(48));
     let mut productive_count = 0usize;
-    let mut idle_run: u32 = 0;
     let mut last_productive_tick = start_t;
     let mut t = start_t;
-    let mut peremption_violated = false;
 
     while productive_count < total_productive_needed && t < scan_cap {
         if t >= grid.num_ticks {
@@ -3468,39 +3470,22 @@ fn emit_in_progress_assignment(
         if is_productive {
             productive_count += 1;
             last_productive_tick = t;
-            idle_run = 0;
-        } else {
-            idle_run = idle_run.saturating_add(1);
-            if peremption_ticks > 0 && idle_run >= peremption_ticks {
-                peremption_violated = true;
-                break;
-            }
         }
         t += 1;
     }
 
-    if peremption_violated || productive_count < total_productive_needed {
-        // Calage perdu en cours d'exécution post-NOW : abandon. The action
-        // becomes a regular non-pinned task ; the scoring loop will replan
-        // it with a complete fresh setup at NOW or later.
-        let reason = if peremption_violated {
-            "peremption"
-        } else {
-            "horizon_too_short"
-        };
+    if productive_count < total_productive_needed {
         warnings.push(Warning {
             task_id: Some(actions[i].task_id.clone()),
-            message: format!(
-                "Calage partiel perdu en cours ({reason}) — replanification \
-                 complète avec calage neuf depuis NOW."
-            ),
+            message: "Horizon trop court pour placer la tâche en cours — \
+                 replanification complète.".to_string(),
         });
         actions[i].forced_start_tick = None;
         actions[i].already_eaten_ticks = 0;
         actions[i].is_in_progress = false;
         actions[i].task_elapsed_ticks = 0;
         actions[i].setup_inherited = false;
-        actions[i].setup_lost_reason = Some(reason.to_string());
+        actions[i].setup_lost_reason = Some("horizon_too_short".to_string());
         return false;
     }
 
@@ -3668,43 +3653,58 @@ fn pre_place_pinned_actions(
             // Partial-calage validity check : same physics as
             // `evaluate_setup_inheritance` for completed calages, applied
             // to the partial setup's *implicit* anchor (`pinned_start_tick`,
-            // i.e. the moment the operator started the calage). If the
-            // gap to NOW exceeds peremption_ticks, or a foreign setup
-            // intercalated on the station between start and NOW, the
-            // partial work is physically lost — abandon the in-progress
-            // state and let the scoring loop replan a full setup at a
-            // fresh placement.
+            // i.e. the moment the operator started the calage).
             //
-            // Why use `pinned_start_tick` instead of `lastSetupAt` : the
-            // latter is only stamped when the run starts (post-setup-
-            // completion), so it's null for partial calages. The former
-            // is the only timestamp we have for the start of the calage
-            // activity. Conservative — it assumes the calage *started*
-            // at start_t, regardless of how much progress the operator
-            // actually made — but symmetric with how peremption applies
-            // to completed calages (anchored at last activity).
+            // Peremption is DISABLED for explicitly in-progress tasks:
+            // PHP's `is_in_progress` flag means the operator is physically
+            // on the machine right now — the calage survived every
+            // overnight closure between start_t and NOW. The wall-clock
+            // gap (now_tick − start_t) includes those closures, so a raw
+            // comparison against peremption_ticks would always reject
+            // multi-day in-progress tasks. Post-NOW peremption is still
+            // checked by `emit_in_progress_assignment`'s dry walk (which
+            // only counts post-NOW idle ticks).
+            //
+            // The `crosses_now_heuristic` path (not explicitly flagged by
+            // PHP) keeps peremption enabled — we have no hard confirmation
+            // that the operator is still on the machine.
+            //
+            // Intercalation checks (foreign setup on the same station
+            // between start and NOW) remain active in both paths — if
+            // another task recaled the station, the in-progress calage
+            // IS dead regardless.
             //
             // Self-task entries in `setup_completions` aren't flagged as
             // intercalation (cf. `evaluate_setup_inheritance` line ~2867),
             // so a saisie that re-anchored mid-setup is correctly ignored.
             let candidate_station = actions[i].station_idx;
             let attrs = station_attrs.get(candidate_station);
-            let peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
-            let setup_completions: &[SetupCompletionEntry] =
-                attrs.map(|s| s.setup_completions.as_slice()).unwrap_or(&[]);
-            let self_task_id = actions[i].task_id.clone();
-            let calage_outcome = evaluate_setup_inheritance(
-                start_t as i64,
-                Some(candidate_station),
-                &self_task_id,
-                now_tick,
-                candidate_station,
-                i,
-                peremption_ticks,
-                grid,
-                setup_completions,
-                now_tick,
-            );
+            let raw_peremption_ticks = attrs.map(|s| s.peremption_ticks).unwrap_or(0);
+            // Explicit is_in_progress (PHP saisie) → operator confirmed they
+            // are physically on the machine. Skip BOTH peremption AND
+            // intercalation: the operator's declaration overrides any
+            // foreign setup the old schedule placed on this station between
+            // start_t and now. Only the heuristic path (no PHP confirmation)
+            // keeps the full calage validity check.
+            let calage_outcome: Result<(), &str> = if actions[i].is_in_progress {
+                Ok(())
+            } else {
+                let setup_completions: &[SetupCompletionEntry] =
+                    attrs.map(|s| s.setup_completions.as_slice()).unwrap_or(&[]);
+                let self_task_id = actions[i].task_id.clone();
+                evaluate_setup_inheritance(
+                    start_t as i64,
+                    Some(candidate_station),
+                    &self_task_id,
+                    now_tick,
+                    candidate_station,
+                    i,
+                    raw_peremption_ticks,
+                    grid,
+                    setup_completions,
+                    now_tick,
+                )
+            };
 
             if let Err(reason) = calage_outcome {
                 // Partial calage perdu : drop every in-progress / pin
@@ -6306,22 +6306,22 @@ mod safety_zone_chunk_mini_tests {
         );
     }
 
-    /// Calage partiel périmé : the operator started a setup at tick 60 but
-    /// abandoned it (no saisie, no productivity log). Replan happens at
-    /// now_tick=200, gap = 140 ticks. Station's peremption_ticks=24
-    /// (= 6h at 15 min/tick) — gap > peremption, so the partial calage
-    /// is physically lost (ink dried, registers shifted).
+    /// Calage partiel périmé via heuristic : the task's pinned envelope
+    /// crosses NOW (start_t=60, pinned_end=261, now=200) but PHP did NOT
+    /// set `is_in_progress` — the engine detects the cross via
+    /// `crosses_now_heuristic` and evaluates setup inheritance with the
+    /// real peremption threshold. Gap = 140 ticks > peremption_ticks = 24
+    /// → the partial calage is physically lost.
     ///
-    /// Expected behaviour : no in-progress assignment is emitted from
-    /// pre_place ; the action's pin/in-progress markers are cleared so
-    /// the scoring loop replans it as a fresh action with a complete
-    /// setup at NOW. A warning surfaces in the compute output so the
-    /// user understands why the tile shifted.
+    /// Note: when PHP explicitly sets `is_in_progress`, peremption is
+    /// disabled in `evaluate_setup_inheritance` because the operator is
+    /// confirmed on the machine — overnight closures inflate the
+    /// wall-clock gap but the calage is alive. The heuristic path
+    /// (no PHP confirmation) keeps peremption active.
     #[test]
     fn partial_calage_peremption_abandons_in_progress() {
-        let mut action = make_action(0, 0, 1, 8, 60, /*is_frozen_by_safety_zone=*/ true);
-        action.is_in_progress = true;
-        action.task_elapsed_ticks = 2;
+        let mut action = make_action(0, 0, 1, 200, 60, /*is_frozen_by_safety_zone=*/ true);
+        // is_in_progress deliberately NOT set — triggers crosses_now_heuristic path
         let availability = restricted_availability(300, &[(0, 300)]);
 
         let mut attrs = station_attrs_default();
@@ -6362,27 +6362,28 @@ mod safety_zone_chunk_mini_tests {
         );
     }
 
-    /// Calage partiel volé : the operator started a setup at tick 60, then
-    /// a foreign task's setup completed on the same station at tick 70
-    /// (recorded in `setup_completions`). The original operator's partial
-    /// work is now overwritten — the machine is configured for someone
-    /// else's job. Even with peremption_ticks=0 (no time-based decay),
-    /// the intercalation alone is enough to invalidate the partial calage.
+    /// Explicit is_in_progress + foreign intercalation : the operator's
+    /// saisie (PHP flag) says they are physically on the machine. A
+    /// foreign setup completed on the same station between start and now
+    /// (from the OLD schedule that is now outdated). Because the operator
+    /// confirmed presence, the intercalation check is skipped — the
+    /// saisie overrides the stale schedule data.
     ///
-    /// Expected behaviour : same as peremption — abandon the in-progress
-    /// state, no assignment emitted, scoring loop replans fresh.
+    /// Expected behaviour : assignment emitted, in-progress preserved.
+    /// Contrast with the heuristic path (no PHP flag) which still
+    /// evaluates both peremption and intercalation.
     #[test]
-    fn partial_calage_intercalation_abandons_in_progress() {
+    fn partial_calage_intercalation_skipped_for_explicit_in_progress() {
         let mut action = make_action(0, 0, 1, 8, 60, /*is_frozen_by_safety_zone=*/ true);
         action.is_in_progress = true;
         action.task_elapsed_ticks = 2;
         let availability = restricted_availability(300, &[(0, 300)]);
 
         let mut attrs = station_attrs_default();
-        attrs.peremption_ticks = 0; // ignore peremption — we want to isolate the intercalation
+        attrs.peremption_ticks = 0;
         attrs.setup_completions = vec![SetupCompletionEntry {
             task_id: "foreign-task".to_string(),
-            at_tick: 70, // strictly between our start (60) and now (100)
+            at_tick: 70,
         }];
 
         let (actions, assignments, warnings) = run_pre_place_full(
@@ -6393,18 +6394,12 @@ mod safety_zone_chunk_mini_tests {
             /*now_tick=*/ 100,
         );
 
-        assert_eq!(assignments.len(), 0, "no assignment emitted");
-        assert!(!actions[0].is_in_progress, "in-progress markers cleared");
-        assert!(actions[0].forced_start_tick.is_none());
-        assert_eq!(actions[0].already_eaten_ticks, 0);
-        assert_eq!(
-            actions[0].setup_lost_reason.as_deref(),
-            Some("intercalated_setup"),
-            "diagnostic tag distinguishes vol from peremption"
-        );
+        assert_eq!(assignments.len(), 1, "assignment emitted despite intercalation");
+        assert!(actions[0].is_in_progress, "in-progress preserved");
+        assert_eq!(actions[0].forced_start_tick, Some(60));
         assert!(
-            warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
-            "warning emitted: {warnings:?}"
+            !warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "no calage-lost warning for explicit in-progress: {warnings:?}"
         );
     }
 
@@ -6511,20 +6506,21 @@ mod safety_zone_chunk_mini_tests {
         );
     }
 
-    /// Station closure that lasts longer than peremption — the partial
-    /// calage CANNOT survive the gap. The walk-time peremption check
-    /// fires, the in-progress markers are cleared, no assignment is
-    /// emitted, and the action falls through to the scoring loop for a
-    /// fresh complete-setup replan.
+    /// Station closure that lasts longer than peremption — the dry walk
+    /// does NOT check peremption (it only computes the geometric envelope).
+    /// The 30-tick closure is walked around: the envelope extends past it
+    /// and the assignment is emitted with `activeWindows` that split the
+    /// tile at the closure boundary. Peremption for in-progress tasks is
+    /// handled exclusively by `evaluate_setup_inheritance` upstream.
     #[test]
-    fn closure_inside_post_now_exceeds_peremption_abandons() {
+    fn closure_inside_post_now_extends_envelope_even_past_peremption() {
         let mut action = make_action(0, 0, 3, 24, 100, /*is_frozen_by_safety_zone=*/ true);
         action.is_in_progress = true;
         action.task_elapsed_ticks = 1;
         let availability = restricted_availability(400, &[(0, 400)]);
 
         let mut attrs = station_attrs_default();
-        attrs.peremption_ticks = 4; // very tight (20 min) so the 30-tick closure exceeds it
+        attrs.peremption_ticks = 4; // tight, but dry walk ignores it
 
         // 30-tick closure starting just after the 2 productive ticks.
         let mut grid = ScheduleGrid::new(1, 1, 400, 15);
@@ -6552,19 +6548,34 @@ mod safety_zone_chunk_mini_tests {
             &mut warnings,
         );
 
-        assert_eq!(assignments.len(), 0, "no assignment — calage perdu mid-walk");
-        assert!(!actions[0].is_in_progress, "is_in_progress cleared");
-        assert!(actions[0].forced_start_tick.is_none(), "forced_start_tick cleared");
-        assert_eq!(actions[0].already_eaten_ticks, 0, "no chunk-mini credit retained");
         assert_eq!(
-            actions[0].setup_lost_reason.as_deref(),
-            Some("peremption"),
-            "diagnostic tag distinguishes mid-walk peremption from horizon limits"
+            assignments.len(), 1,
+            "assignment emitted — dry walk extends around the closure"
         );
+        assert_eq!(actions[0].start_tick, Some(100), "start anchored at past");
+        // 27 productive ticks + 30 closure ticks = envelope of 57 ticks
+        assert_eq!(
+            actions[0].end_tick, Some(157),
+            "end stretched past the 30-tick closure"
+        );
+        assert!(actions[0].is_in_progress, "calage preserved");
         assert!(
-            warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
-            "user-facing warning : {warnings:?}"
+            !warnings.iter().any(|w| w.message.contains("Calage partiel perdu")),
+            "no abandon warning : {warnings:?}"
         );
+        // Verify closure ticks are NOT in the operator log → activeWindows
+        // will split the tile at the closure boundary.
+        let logged_ticks: Vec<usize> = actions[0]
+            .tick_operator_log
+            .iter()
+            .map(|&(t, _)| t)
+            .collect();
+        for closure_t in 102..132 {
+            assert!(
+                !logged_ticks.contains(&closure_t),
+                "tick {closure_t} (closure) must not appear in tick_operator_log"
+            );
+        }
     }
 
     /// Negative control : when the partial calage is still within
