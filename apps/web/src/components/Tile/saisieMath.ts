@@ -14,7 +14,8 @@ export function applyMinToDate(baseIso: string, minutesFromMidnight: number): st
   const result = new Date(base);
   result.setHours(0, 0, 0, 0);
   result.setMinutes(minutesFromMidnight);
-  return result.toISOString();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${result.getFullYear()}-${pad(result.getMonth() + 1)}-${pad(result.getDate())}T${pad(result.getHours())}:${pad(result.getMinutes())}:${pad(result.getSeconds())}`;
 }
 
 /**
