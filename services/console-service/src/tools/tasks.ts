@@ -100,29 +100,46 @@ export const updateTaskDurationTool: ToolDefinition = {
   },
 };
 
-export const recordTaskProgressTool: ToolDefinition = {
-  name: 'record_task_progress',
+interface SaisieResult {
+  taskId: string;
+  scheduledEnd: string;
+  lastSaisieAt: string;
+  productivityRatio: number;
+  recordedProgressPct: number;
+  recordedAt: string;
+}
+
+export const reportProgressTool: ToolDefinition = {
+  name: 'report_progress',
   description:
-    "Enregistre un avancement déclaré sur une tâche, exprimé en pourcentage (0..100) du temps de roule. Usage typique : l'opérateur ou le chef dit en langage naturel \"on est à 70% sur la task X du job Y\". Écrit l'ancrage (recordedProgressPct + recordedAt) directement sur la tâche, SANS recalculer scheduledEnd ni le ratio de productivité — pas de replan déclenché. Pour reporter une heure de fin estimée (qui DÉCLENCHE un replan), utiliser saisie via la modale ou un autre tool. La tâche est résolue via resolve_task_in_job.",
+    "Saisie d'avancement terrain : l'opérateur ou le chef déclare quand une tâche EN COURS finira réellement. C'est l'équivalent IA de la modale de saisie d'avancement. Appelle le vrai endpoint de saisie qui : (1) calcule le ratio de productivité, (2) met à jour scheduledEnd, (3) enregistre le % de progression, (4) cascade-invalide les tâches aval si extension, (5) émet un ProductionEvent, (6) déclenche un replan. La tâche DOIT être en cours (scheduledStart ≤ now < scheduledEnd). Utiliser list_running_tasks pour vérifier et obtenir le scheduledEnd courant si besoin de calculer un offset ('+30min de retard' → scheduledEnd + 30min). NE PAS confondre avec update_task_duration (modifie la recette) ni extend_running_task (corrige la durée théorique).",
   inputSchema: z.object({
-    taskId: uuidField('resolve_task_in_job').describe("UUID de la tâche."),
-    taskLabel: z.string().min(1).describe("Nom lisible (ex 'MBO XL du job 12345')."),
-    progressPct: z
-      .number()
-      .min(0)
-      .max(100)
-      .describe("Pourcentage d'avancement déclaré, 0..100."),
+    taskId: uuidField('resolve_task_in_job').describe("UUID de la tâche en cours."),
+    taskLabel: z.string().min(1).describe("Nom lisible (ex 'MBO XL du dossier 35202')."),
+    date: z.string().describe("Date YYYY-MM-DD de l'heure de fin estimée."),
+    time: z.string().describe("Heure HH:MM de fin estimée. Ex : l'opérateur dit 'je finirai à 14h' → '14:00'. Dit '30 min de retard' et scheduledEnd=13:30 → '14:00'."),
   }),
   handler: async (input, ctx) => {
-    const preview = `Avancement enregistré : ${input.taskLabel} à ${Math.round(input.progressPct)}%`;
-    if (ctx.dryRun) {
-      return { ok: true, preview, data: { dryRun: true, ...input } };
+    let estimatedEndTime: string;
+    try {
+      estimatedEndTime = toIsoWithLocalOffset(input.date, input.time);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
-    const result = await ctx.php.post<unknown>(
-      `/api/v1/scenarios/prod/record-progress/${input.taskId}`,
-      { progressPct: input.progressPct },
+    const preview = `Saisie : ${input.taskLabel} finira à ${input.time} le ${input.date}`;
+    if (ctx.dryRun) {
+      return { ok: true, preview, data: { dryRun: true, estimatedEndTime, ...input } };
+    }
+    const result = await ctx.php.post<SaisieResult>(
+      `/api/v1/scenarios/prod/saisie/${input.taskId}`,
+      { estimatedEndTime },
     );
-    return { ok: true, preview, data: { task: result } };
+    const ratio = result.productivityRatio;
+    const statusLabel =
+      ratio >= 1.0 ? 'en avance ou à l\'heure' :
+      ratio >= 0.8 ? 'léger retard' : 'retard significatif';
+    const fullPreview = `${preview} — ratio ${ratio.toFixed(2)} (${statusLabel}), progression ${Math.round(result.recordedProgressPct)}%`;
+    return { ok: true, preview: fullPreview, data: result };
   },
 };
 
@@ -528,7 +545,7 @@ export const listRunningTasksTool: ToolDefinition = {
 export const extendRunningTaskTool: ToolDefinition = {
   name: 'extend_running_task',
   description:
-    "Pour une tâche en cours d'exécution qui va durer plus longtemps que prévu (ex: l'opérateur appelle et dit 'ce ne sera pas fini à 11h30 mais à 14h'). Met à jour la durée totale puis re-planifie automatiquement toutes les tâches aval impactées (même station + chaîne de précédence), en protégeant les tâches déjà en cours, terminées ou épinglées. Utiliser `update_task_duration` à la place pour une tâche pas encore démarrée.",
+    "Corrige la durée de recette (runMinutes théoriques) d'une tâche en cours quand on découvre que la durée PLANIFIÉE était fausse. Ex : 'cette tâche fait 4h de run, pas 2h comme prévu dans le devis' — on corrige la fiche technique. NE PAS utiliser pour une saisie d'avancement terrain ('je finirai à 14h', '30 min de retard') — utiliser report_progress à la place, qui écrit le ratio de productivité et enregistre la progression. Utiliser `update_task_duration` pour une tâche pas encore démarrée.",
   inputSchema: z.object({
     taskId: uuidField('resolve_task_in_job').describe("UUID de la tâche en cours."),
     taskLabel: z
