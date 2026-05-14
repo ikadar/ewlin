@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig, FormeLeadTimeConfig } from '@flux/types';
+import type { Task, TaskAssignment, Station, StationCategory, Job, Element, OutsourcedProvider, InternalTask, PaperLeadTimeConfig, FormeLeadTimeConfig, PlateLeadTimeConfig } from '@flux/types';
 import { isMultiElementJob } from '@flux/types';
 import { isLastTaskOfJob, compareTaskOrder } from '../../utils/taskHelpers';
 import { TaskTile } from './TaskTile';
@@ -55,6 +55,8 @@ export interface TaskListProps {
   paperLeadTime?: PaperLeadTimeConfig;
   /** Forme (die) lead-time configuration (shop-wide); drives the Forme pill tooltip date */
   formeLeadTime?: FormeLeadTimeConfig;
+  /** Plate lead-time configuration (shop-wide); drives the Plaques pill tooltip date */
+  plateLeadTime?: PlateLeadTimeConfig;
 }
 
 /**
@@ -84,6 +86,7 @@ export function TaskList({
   onJumpToOperatorSlice,
   paperLeadTime,
   formeLeadTime,
+  plateLeadTime,
 }: TaskListProps) {
   const now = useNow();
   // Create lookup maps for efficient access (memoized to avoid rebuilding on every render)
@@ -250,7 +253,7 @@ export function TaskList({
               const opObj = snapshotOperators?.find(o => o.id === op.operatorId);
               return {
                 operatorId: op.operatorId,
-                name: opObj ? `${opObj.firstName} ${opObj.lastName}` : op.operatorId.slice(0, 8),
+                name: opObj ? `${opObj.firstName} ${opObj.lastName}` : '—',
                 attention: op.attention,
                 from: op.from,
                 to: op.to,
@@ -287,6 +290,7 @@ export function TaskList({
             batDeadline={job.batDeadline ?? null}
             paperLeadTime={paperLeadTime}
             formeLeadTime={formeLeadTime}
+            plateLeadTime={plateLeadTime}
           >
             {renderTaskTiles(elementTasks, element)}
           </ElementSection>
