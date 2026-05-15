@@ -9,7 +9,6 @@ import type {
 } from '@flux/types';
 import {
   categories,
-  groups,
   generateElementsForJobs,
   type JobWithoutElementIds,
 } from './shared';
@@ -67,7 +66,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
       name: 'Lunch Break Station',
       status: 'Available',
       categoryId: 'cat-offset',
-      groupId: 'grp-offset',
       capacity: 1,
       operatingSchedule: {
         monday: lunchBreakSchedule,
@@ -85,7 +83,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
       name: 'Split Shift Station',
       status: 'Available',
       categoryId: 'cat-offset',
-      groupId: 'grp-offset',
       capacity: 1,
       operatingSchedule: {
         monday: splitShiftSchedule,
@@ -103,7 +100,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
       name: 'Short Day Station',
       status: 'Available',
       categoryId: 'cat-cutting',
-      groupId: 'grp-cutting',
       capacity: 1,
       operatingSchedule: {
         monday: shortDaySchedule,
@@ -171,7 +167,6 @@ export function createUnavailabilityOverlayFixture(): ScheduleSnapshot {
     generatedAt: today.toISOString(),
     stations: overlayStations,
     categories,
-    groups,
     providers: [],
     jobs: jobs as Job[],
     elements: generateElementsForJobs(jobs, tasks),

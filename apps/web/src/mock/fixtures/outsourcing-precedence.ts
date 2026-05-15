@@ -31,7 +31,6 @@ const testProviders: OutsourcedProvider[] = [
     latestDepartureTime: '14:00',
     receptionTime: '09:00',
     transitDays: 1,
-    groupId: 'grp-outsourced',
   },
   {
     id: 'provider-slow',
@@ -41,7 +40,6 @@ const testProviders: OutsourcedProvider[] = [
     latestDepartureTime: '12:00',
     receptionTime: '10:00',
     transitDays: 2,
-    groupId: 'grp-outsourced',
   },
 ];
 

@@ -30,7 +30,6 @@ import type {
   TaskAssignment,
   Station,
   StationCategory,
-  StationGroup,
 } from '@flux/types';
 import {
   today,
@@ -57,22 +56,6 @@ const fixtureCategories: StationCategory[] = [
   },
 ];
 
-// Groups including die-cutting
-const fixtureGroups: StationGroup[] = [
-  {
-    id: 'grp-offset',
-    name: 'Presses Offset',
-    maxConcurrent: 10,
-    isOutsourcedProviderGroup: false,
-  },
-  {
-    id: 'grp-die-cutting',
-    name: 'Découpe',
-    maxConcurrent: 1,
-    isOutsourcedProviderGroup: false,
-  },
-];
-
 // Stations with 7-day operating schedule
 const fixtureStations: Station[] = [
   {
@@ -80,7 +63,6 @@ const fixtureStations: Station[] = [
     name: 'Komori G40',
     status: 'Available',
     categoryId: 'cat-offset',
-    groupId: 'grp-offset',
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -90,7 +72,6 @@ const fixtureStations: Station[] = [
     name: 'Bobst SP 102',
     status: 'Available',
     categoryId: 'cat-die-cutting',
-    groupId: 'grp-die-cutting',
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -268,7 +249,6 @@ export function createFormeDateTrackingFixture(): ScheduleSnapshot {
     generatedAt: new Date().toISOString(),
     stations: fixtureStations,
     categories: fixtureCategories,
-    groups: fixtureGroups,
     providers,
     jobs,
     elements,

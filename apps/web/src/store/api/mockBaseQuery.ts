@@ -2488,7 +2488,6 @@ let mockStationStore: StationResponse[] = getSnapshot().stations.map((s, i) => (
   name: s.name,
   status: s.status as StationResponse['status'],
   categoryId: s.categoryId,
-  groupId: s.groupId,
   capacity: s.capacity,
   displayOrder: i,
   operatingSchedule: (s.operatingSchedule as unknown as Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }>) ?? null,
@@ -2521,7 +2520,7 @@ const handleGetStations = async (): Promise<{ data: StationResponse[] }> => {
 const handleCreateStation = async (
   args: FetchArgs
 ): Promise<{ data: StationResponse } | { error: FetchBaseQueryError }> => {
-  const body = args.body as { name?: string; status?: string; categoryId?: string; groupId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
+  const body = args.body as { name?: string; status?: string; categoryId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
   const name = body.name?.trim();
 
   if (!name) {
@@ -2546,7 +2545,6 @@ const handleCreateStation = async (
     name,
     status: (body.status ?? 'Available') as StationResponse['status'],
     categoryId: body.categoryId ?? '',
-    groupId: body.groupId ?? '',
     capacity: body.capacity ?? 1,
     displayOrder: body.displayOrder ?? 0,
     operatingSchedule: (body.operatingSchedule as StationResponse['operatingSchedule']) ?? null,
@@ -2567,7 +2565,6 @@ const handleCreateStation = async (
         name: newStation.name,
         status: newStation.status,
         categoryId: newStation.categoryId,
-        groupId: newStation.groupId,
         capacity: newStation.capacity,
         operatingSchedule: (newStation.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
         exceptions: (newStation.scheduleExceptions ?? []).map((e) => ({
@@ -2593,7 +2590,7 @@ const handleUpdateStation = async (
     return { error: { status: 400, data: { error: 'BadRequest', message: 'Missing station ID' } } };
   }
 
-  const body = args.body as { name?: string; status?: string; categoryId?: string; groupId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
+  const body = args.body as { name?: string; status?: string; categoryId?: string; capacity?: number; displayOrder?: number; operatingSchedule?: Record<string, unknown> | null; scheduleExceptions?: unknown[] | null };
   const name = body.name?.trim();
 
   if (!name) {
@@ -2625,7 +2622,6 @@ const handleUpdateStation = async (
     name,
     status: (body.status ?? existing.status) as StationResponse['status'],
     categoryId: body.categoryId ?? existing.categoryId,
-    groupId: body.groupId ?? existing.groupId,
     capacity: body.capacity ?? existing.capacity,
     displayOrder: body.displayOrder ?? existing.displayOrder,
     operatingSchedule: body.operatingSchedule !== undefined ? (body.operatingSchedule as StationResponse['operatingSchedule']) : existing.operatingSchedule,
@@ -2645,7 +2641,6 @@ const handleUpdateStation = async (
             name: updated.name,
             status: updated.status,
             categoryId: updated.categoryId,
-            groupId: updated.groupId,
             capacity: updated.capacity,
             operatingSchedule: (updated.operatingSchedule as unknown as import('@flux/types').OperatingSchedule | null) ?? { monday: { isOperating: false, slots: [] }, tuesday: { isOperating: false, slots: [] }, wednesday: { isOperating: false, slots: [] }, thursday: { isOperating: false, slots: [] }, friday: { isOperating: false, slots: [] }, saturday: { isOperating: false, slots: [] }, sunday: { isOperating: false, slots: [] } },
             exceptions: (updated.scheduleExceptions ?? []).map((e) => ({

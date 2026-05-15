@@ -41,7 +41,6 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     tasks: [],
     assignments: [],
     stations: [],
-    groups: [],
     categories: [
       { id: 'cat-offset', name: 'Offset', similarityCriteria: [], similarityScoreRules: [] },
       { id: 'cat-cutting', name: 'Cutting', similarityCriteria: [], similarityScoreRules: [] },
@@ -190,7 +189,7 @@ describe('getPredecessorConstraint', () => {
       tasks: [task1, task2],
       assignments: [assignment],
       stations: [
-        { id: 'station-cutting', name: 'Cutting', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
+        { id: 'station-cutting', name: 'Cutting', status: 'Available', capacity: 1, categoryId: 'cat-cutting', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
     });
 
@@ -224,7 +223,7 @@ describe('getPredecessorConstraint', () => {
       tasks: [printTask, cutTask],
       assignments: [assignment],
       stations: [
-        { id: 'station-offset', name: 'Offset Press', status: 'Available', capacity: 1, categoryId: 'cat-offset', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
+        { id: 'station-offset', name: 'Offset Press', status: 'Available', capacity: 1, categoryId: 'cat-offset', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] },
       ],
       categories: [
         { id: 'cat-offset', name: 'Offset', similarityCriteria: [], similarityScoreRules: [] },
@@ -269,7 +268,6 @@ describe('getPredecessorConstraint', () => {
         latestDepartureTime: '14:00',
         receptionTime: '09:00',
         transitDays: 1,
-        groupId: 'grp-external',
       }],
     });
 
@@ -332,7 +330,7 @@ describe('getSuccessorConstraint', () => {
       elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
@@ -362,7 +360,7 @@ describe('getSuccessorConstraint', () => {
       elements: [createElement('job-1')],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getSuccessorConstraint(task1, snapshot, 6, PIXELS_PER_HOUR, undefined, []);
@@ -415,7 +413,6 @@ function createProvider(id: string, transitDays: number = 1): OutsourcedProvider
     latestDepartureTime: '14:00',
     receptionTime: '09:00',
     transitDays,
-    groupId: 'grp-external',
   };
 }
 
@@ -622,7 +619,7 @@ describe('getSuccessorConstraint with outsourced successor (v0.5.12)', () => {
       elements: [createElement('job-1', ['task-int', 'task-out'])],
       tasks: [internalTask, outsourcedTask],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
       providers: [createProvider('provider-1')],
     });
 
@@ -653,7 +650,7 @@ describe('getSuccessorConstraint with outsourced successor (v0.5.12)', () => {
       elements: [createElement('job-1', ['task-int', 'task-out'])],
       tasks: [internalTask, outsourcedTask],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
       providers: [createProvider('provider-1')],
     });
 
@@ -690,7 +687,7 @@ describe('getOutsourcingTimeInfo (v0.5.13)', () => {
       elements: [createElement('job-1', ['task-1', 'task-2'])],
       tasks: [task1, task2],
       assignments: [assignment],
-      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', groupId: 'group-1', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
+      stations: [{ id: 'station-1', name: 'Station', status: 'Available', capacity: 1, categoryId: 'cat-cutting', operatingSchedule: DEFAULT_OPERATING_SCHEDULE, exceptions: [] }],
     });
 
     const result = getOutsourcingTimeInfo(task2, snapshot, 6, PIXELS_PER_HOUR, undefined, []);

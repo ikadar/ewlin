@@ -17,8 +17,6 @@ export function getValidationMessage(conflict: ScheduleConflict): string {
       return getPrecedenceMessage(conflict);
     case 'ApprovalGateConflict':
       return getApprovalMessage(conflict);
-    case 'GroupCapacityConflict':
-      return getGroupCapacityMessage(conflict);
     case 'StationMismatchConflict':
       return 'Station incompatible';
     case 'DeadlineConflict':
@@ -62,7 +60,6 @@ export function getPrimaryValidationMessage(
     'ApprovalGateConflict',     // BAT not approved
     'AvailabilityConflict',     // Station closed
     'PrecedenceConflict',       // Sequence violation
-    'GroupCapacityConflict',    // Capacity exceeded
     'DeadlineConflict',         // Will miss deadline
   ];
 
@@ -188,18 +185,6 @@ function getApprovalMessage(conflict: ScheduleConflict): string {
   }
 
   return 'Approbation requise';
-}
-
-function getGroupCapacityMessage(conflict: ScheduleConflict): string {
-  const details = conflict.details as Record<string, unknown> | undefined;
-  const current = details?.currentUsage as number | undefined;
-  const max = details?.maxConcurrent as number | undefined;
-
-  if (current !== undefined && max !== undefined) {
-    return `Capacité groupe dépassée (${current}/${max})`;
-  }
-
-  return 'Capacité groupe dépassée';
 }
 
 function getDeadlineMessage(conflict: ScheduleConflict): string {

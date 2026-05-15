@@ -186,7 +186,6 @@ export function FocusStationColumn({
     snapshot.conflicts.forEach((conflict) => {
       if (
         (conflict.type === 'PrecedenceConflict' ||
-          conflict.type === 'GroupCapacityConflict' ||
           conflict.type === 'AvailabilityConflict') &&
         conflict.taskId
       ) {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Settings } from 'lucide-react';
 import {
   useGetStationsQuery,
@@ -6,7 +6,6 @@ import {
 } from '../../store/api/stationApi';
 import type { StationInput } from '../../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../../store/api/stationCategoryApi';
-import { useGetSnapshotQuery } from '../../store';
 import { StationFormModal } from '../../pages/StationsPage';
 
 export interface StationSettingsButtonProps {
@@ -19,13 +18,7 @@ export function StationSettingsButton({ stationId, stationLabel }: StationSettin
 
   const { data: stations = [] } = useGetStationsQuery();
   const { data: categories = [] } = useGetStationCategoriesQuery();
-  const { data: snapshotData } = useGetSnapshotQuery();
   const [updateStation, { isLoading: isUpdating }] = useUpdateStationMutation();
-
-  const groups = useMemo(
-    () => (snapshotData?.groups ?? []).filter((g) => !g.isOutsourcedProviderGroup),
-    [snapshotData],
-  );
 
   const station = stations.find((s) => s.id === stationId) ?? null;
 
@@ -52,7 +45,6 @@ export function StationSettingsButton({ stationId, stationLabel }: StationSettin
         <StationFormModal
           initial={station}
           categories={categories}
-          groups={groups}
           onSave={handleSave}
           onCancel={() => setIsOpen(false)}
           isSaving={isUpdating}

@@ -11,7 +11,6 @@ const dccProvider: OutsourcedProvider = {
     latestDepartureTime: '14:00',
     receptionTime: '09:00',
     transitDays: 3,
-    groupId: 'grp-outsourced-dcc',
 };
 
 export function createLouisPhase1Fixture(): ScheduleSnapshot {
@@ -62,10 +61,6 @@ export function createLouisPhase1Fixture(): ScheduleSnapshot {
     return {
         ...base,
         providers: [dccProvider],
-        groups: [
-            ...base.groups,
-            { id: 'grp-outsourced-dcc', name: 'Reliure DCC (ext.)', maxConcurrent: 999, isOutsourcedProviderGroup: true },
-        ],
         jobs,
         elements,
         tasks,

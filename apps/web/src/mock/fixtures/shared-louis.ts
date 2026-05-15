@@ -2,7 +2,6 @@ import type {
   ScheduleSnapshot,
   Station,
   StationCategory,
-  StationGroup,
   DaySchedule,
   SimilarityCriterion,
 } from '@flux/types';
@@ -51,27 +50,12 @@ export const louisCategories: StationCategory[] = [
   { id: 'cat-packaging',     name: 'Conditionnement',         similarityCriteria: FINISHING_CRITERIA,     similarityScoreRules: [] },
 ];
 
-// --- Groups (9) -------------------------------------------------------------
-
-export const louisGroups: StationGroup[] = [
-  { id: 'grp-offset',        name: 'Presses Offset',          maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-cutting',       name: 'Massicots',               maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-pelliculeuse',  name: 'Pelliculeuses',           maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-typo',          name: 'Typographie',             maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-folding',       name: 'Plieuses',                maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-booklet',       name: 'Encarteuses-Piqueuses',   maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-assembly',      name: 'Assembleuses',            maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-saddle-stitch', name: 'Assembleuses-Piqueuses',  maxConcurrent: 10, isOutsourcedProviderGroup: false },
-  { id: 'grp-packaging',     name: 'Conditionnement',         maxConcurrent: 10, isOutsourcedProviderGroup: false },
-];
-
 // --- Station helper ---------------------------------------------------------
 
 function makeStation(
   id: string,
   name: string,
   categoryId: string,
-  groupId: string,
   schedule: Station['operatingSchedule'],
 ): Station {
   return {
@@ -79,7 +63,6 @@ function makeStation(
     name,
     status: 'Available',
     categoryId,
-    groupId,
     capacity: 1,
     operatingSchedule: schedule,
     exceptions: [],
@@ -127,36 +110,36 @@ const condSchedule = weekdays('07:00', '14:00');
 
 export const louisStations: Station[] = [
   // Presses Offset (3)
-  makeStation('station-komori-g40',    'Komori G40',       'cat-offset',        'grp-offset',        komoriG40Schedule),
-  makeStation('station-ryobi-524',     'Ryobi 524',        'cat-offset',        'grp-offset',        ryobi524Schedule),
-  makeStation('station-sm52',          'Heidelberg SM52',  'cat-offset',        'grp-offset',        sm52Schedule),
+  makeStation('station-komori-g40',    'Komori G40',       'cat-offset',        komoriG40Schedule),
+  makeStation('station-ryobi-524',     'Ryobi 524',        'cat-offset',        ryobi524Schedule),
+  makeStation('station-sm52',          'Heidelberg SM52',  'cat-offset',        sm52Schedule),
 
   // Massicot (1)
-  makeStation('station-polar-137',     'Polar 137',        'cat-cutting',       'grp-cutting',       polar137Schedule),
+  makeStation('station-polar-137',     'Polar 137',        'cat-cutting',       polar137Schedule),
 
   // Pelliculeuse (1)
-  makeStation('station-semipack',      'Semipack',         'cat-pelliculeuse',  'grp-pelliculeuse',  semipackSchedule),
+  makeStation('station-semipack',      'Semipack',         'cat-pelliculeuse',  semipackSchedule),
 
   // Typo (1)
-  makeStation('station-sbg',           'SBG',              'cat-typo',          'grp-typo',          sbgSchedule),
+  makeStation('station-sbg',           'SBG',              'cat-typo',          sbgSchedule),
 
   // Plieuses (3)
-  makeStation('station-b26',           'B26',              'cat-folding',       'grp-folding',       plieuseSchedule),
-  makeStation('station-mbo-s',         'MBO S',            'cat-folding',       'grp-folding',       plieuseSchedule),
-  makeStation('station-mbo-m80',       'MBO M80',          'cat-folding',       'grp-folding',       plieuseSchedule),
+  makeStation('station-b26',           'B26',              'cat-folding',       plieuseSchedule),
+  makeStation('station-mbo-s',         'MBO S',            'cat-folding',       plieuseSchedule),
+  makeStation('station-mbo-m80',       'MBO M80',          'cat-folding',       plieuseSchedule),
 
   // Encarteuse-piqueuse (1)
-  makeStation('station-hohner',        'Hohner',           'cat-booklet',       'grp-booklet',       hohnerSchedule),
+  makeStation('station-hohner',        'Hohner',           'cat-booklet',       hohnerSchedule),
 
   // Assembleuse (1)
-  makeStation('station-horizon-60h',   'Horizon 60H',      'cat-assembly',      'grp-assembly',      horizonSchedule),
+  makeStation('station-horizon-60h',   'Horizon 60H',      'cat-assembly',      horizonSchedule),
 
   // Assembleuse-piqueuse (1)
-  makeStation('station-horizon-ass',   'Horizon ASS',      'cat-saddle-stitch', 'grp-saddle-stitch', horizonSchedule),
+  makeStation('station-horizon-ass',   'Horizon ASS',      'cat-saddle-stitch', horizonSchedule),
 
   // Conditionnement (2)
-  makeStation('station-filmeuse',      'Filmeuse',         'cat-packaging',     'grp-packaging',     condSchedule),
-  makeStation('station-carton',        'Carton',           'cat-packaging',     'grp-packaging',     condSchedule),
+  makeStation('station-filmeuse',      'Filmeuse',         'cat-packaging',     condSchedule),
+  makeStation('station-carton',        'Carton',           'cat-packaging',     condSchedule),
 ];
 
 // --- Helpers ----------------------------------------------------------------
@@ -177,7 +160,6 @@ export function louisBaseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'elements' 
     generatedAt: new Date().toISOString(),
     stations: louisStations,
     categories: louisCategories,
-    groups: louisGroups,
     providers: [],
   };
 }

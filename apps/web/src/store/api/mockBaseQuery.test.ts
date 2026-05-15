@@ -14,7 +14,6 @@ const emptySnapshot: ScheduleSnapshot = {
   generatedAt: '',
   stations: [],
   categories: [],
-  groups: [],
   providers: [],
   jobs: [],
   elements: [],

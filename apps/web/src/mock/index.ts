@@ -21,7 +21,6 @@ export {
 export {
   // Station generators
   generateStationCategories,
-  generateStationGroups,
   generateOperatingSchedule,
   generateScheduleExceptions,
   generateStations,

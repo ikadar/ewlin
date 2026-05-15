@@ -5,7 +5,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateStationCategories,
-  generateStationGroups,
   generateOperatingSchedule,
   generateStations,
   generateProviders,
@@ -34,33 +33,6 @@ describe('generateStationCategories', () => {
     const offsetCategory = categories.find((c) => c.id === 'cat-offset');
     expect(offsetCategory).toBeDefined();
     expect(offsetCategory?.similarityCriteria.length).toBeGreaterThan(0);
-  });
-});
-
-describe('generateStationGroups', () => {
-  it('returns an array of station groups', () => {
-    const groups = generateStationGroups();
-    expect(Array.isArray(groups)).toBe(true);
-    expect(groups.length).toBeGreaterThan(0);
-  });
-
-  it('each group has required fields', () => {
-    const groups = generateStationGroups();
-    for (const group of groups) {
-      expect(group).toHaveProperty('id');
-      expect(group).toHaveProperty('name');
-      expect(group).toHaveProperty('maxConcurrent');
-      expect(group).toHaveProperty('isOutsourcedProviderGroup');
-    }
-  });
-
-  it('includes outsourced provider groups with unlimited capacity', () => {
-    const groups = generateStationGroups();
-    const providerGroups = groups.filter((g) => g.isOutsourcedProviderGroup);
-    expect(providerGroups.length).toBeGreaterThan(0);
-    for (const group of providerGroups) {
-      expect(group.maxConcurrent).toBeNull();
-    }
   });
 });
 
@@ -113,7 +85,6 @@ describe('generateStations', () => {
       expect(station).toHaveProperty('name');
       expect(station).toHaveProperty('status');
       expect(station).toHaveProperty('categoryId');
-      expect(station).toHaveProperty('groupId');
       expect(station).toHaveProperty('capacity');
       expect(station).toHaveProperty('operatingSchedule');
       expect(station).toHaveProperty('exceptions');
@@ -151,7 +122,6 @@ describe('generateProviders', () => {
       expect(provider).toHaveProperty('supportedActionTypes');
       expect(provider).toHaveProperty('latestDepartureTime');
       expect(provider).toHaveProperty('receptionTime');
-      expect(provider).toHaveProperty('groupId');
     }
   });
 
@@ -175,7 +145,6 @@ describe('generateAllStationData', () => {
   it('returns all station data combined', () => {
     const data = generateAllStationData();
     expect(data).toHaveProperty('categories');
-    expect(data).toHaveProperty('groups');
     expect(data).toHaveProperty('stations');
     expect(data).toHaveProperty('providers');
   });
@@ -188,19 +157,4 @@ describe('generateAllStationData', () => {
     }
   });
 
-  it('station groupIds reference valid groups', () => {
-    const data = generateAllStationData();
-    const groupIds = new Set(data.groups.map((g) => g.id));
-    for (const station of data.stations) {
-      expect(groupIds.has(station.groupId)).toBe(true);
-    }
-  });
-
-  it('provider groupIds reference valid groups', () => {
-    const data = generateAllStationData();
-    const groupIds = new Set(data.groups.map((g) => g.id));
-    for (const provider of data.providers) {
-      expect(groupIds.has(provider.groupId)).toBe(true);
-    }
-  });
 });

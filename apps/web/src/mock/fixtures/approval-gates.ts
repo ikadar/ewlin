@@ -29,7 +29,6 @@ export function createApprovalGatesFixture(): ScheduleSnapshot {
       name: 'Komori G40',
       status: 'Available',
       categoryId: 'cat-offset',
-      groupId: 'grp-offset',
       capacity: 1,
       operatingSchedule: sevenDayOperatingSchedule,
       exceptions: [],

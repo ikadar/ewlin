@@ -25,7 +25,6 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
     generatedAt: '2026-02-04T10:00:00.000Z',
     stations: [],
     categories: [],
-    groups: [],
     providers: [],
     jobs: [],
     elements: [],

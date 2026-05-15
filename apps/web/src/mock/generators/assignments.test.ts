@@ -149,7 +149,7 @@ describe('generateConflicts', () => {
       expect(conflict).toHaveProperty('type');
       expect(conflict).toHaveProperty('message');
       expect(conflict).toHaveProperty('taskId');
-      expect(['PrecedenceConflict', 'DeadlineConflict', 'StationConflict', 'GroupCapacityConflict', 'ApprovalGateConflict', 'AvailabilityConflict']).toContain(conflict.type);
+      expect(['PrecedenceConflict', 'DeadlineConflict', 'StationConflict', 'ApprovalGateConflict', 'AvailabilityConflict']).toContain(conflict.type);
     }
   });
 });

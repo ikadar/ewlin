@@ -76,7 +76,6 @@ const mockStations: Station[] = [
     name: 'Komori G40',
     status: 'Available',
     categoryId: 'cat-1',
-    groupId: 'group-1',
     capacity: 1,
     operatingSchedule: {
       monday: weekdaySchedule,
@@ -94,7 +93,6 @@ const mockStations: Station[] = [
     name: 'Polar 137',
     status: 'Available',
     categoryId: 'cat-2',
-    groupId: 'group-2',
     capacity: 1,
     operatingSchedule: {
       monday: weekdaySchedule,

@@ -20,7 +20,6 @@ import {
   generateElementsForJobs,
   sevenDayOperatingSchedule,
   categories,
-  groups,
   providers,
   type JobWithoutElementIds,
 } from './shared';
@@ -32,7 +31,7 @@ const stationsWithSevenDaySchedule: Station[] = [
     name: 'Komori G40',
     status: 'Available',
     categoryId: 'cat-offset',
-    groupId: 'grp-offset',
+
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -42,7 +41,7 @@ const stationsWithSevenDaySchedule: Station[] = [
     name: 'Heidelberg Speedmaster',
     status: 'Available',
     categoryId: 'cat-offset',
-    groupId: 'grp-offset',
+
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -52,7 +51,7 @@ const stationsWithSevenDaySchedule: Station[] = [
     name: 'Polar 137',
     status: 'Available',
     categoryId: 'cat-cutting',
-    groupId: 'grp-cutting',
+
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -216,7 +215,6 @@ export function createPickRescheduleFixture(): ScheduleSnapshot {
     ...base,
     stations: stationsWithSevenDaySchedule,
     categories,
-    groups,
     providers,
     jobs: jobs as Job[],
     elements,

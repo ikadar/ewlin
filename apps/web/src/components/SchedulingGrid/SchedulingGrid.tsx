@@ -1,13 +1,12 @@
-import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, StationGroup, Element, Operator } from '@flux/types';
+import type { Station, Job, TaskAssignment, Task, StationCategory, ScheduleConflict, Element, Operator } from '@flux/types';
 import type { DryingTimeInfo, OutsourcingTimeInfo } from '../../utils';
 import { getDeadlineDate, DIE_CUTTING_CATEGORY_ID, DIE_CUTTING_KEYWORDS, isInternalTask } from '@flux/types';
 import { TimelineColumn, PIXELS_PER_HOUR } from '../TimelineColumn';
-import { StationHeader, type GroupCapacityInfo } from '../StationHeaders/StationHeader';
+import { StationHeader } from '../StationHeaders/StationHeader';
 import { StationColumn } from '../StationColumns/StationColumn';
 import { Tile } from '../Tile';
 import { useEffect, useState, useMemo, useRef, useImperativeHandle, forwardRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { timeToYPosition } from '../TimelineColumn';
-import { buildGroupCapacityMap } from '../../utils/groupCapacity';
 import { useVirtualScroll, isAssignmentVisible } from '../../hooks';
 import { isElementBlocked, getPrerequisiteBlockingInfo } from '../../utils';
 import { computeTileDataCache, type CachedTileData, type ElementBlockingInfo } from '../../utils/stationTileData';
@@ -78,8 +77,6 @@ export interface SchedulingGridProps {
   onTogglePin?: (assignmentId: string) => void;
   /** Schedule conflicts for conflict visualization (REQ-12) */
   conflicts?: ScheduleConflict[];
-  /** Station groups for capacity visualization (REQ-18) */
-  groups?: StationGroup[];
   /** REQ-09.2: Callback when grid scrolls (for DateStrip + Minimap sync) */
   onScroll?: (scrollTop: number, scrollLeft: number) => void;
   /** v0.3.46: Total number of days for virtual scrolling (default: 365) */
@@ -138,7 +135,6 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       onDeselect,
       onTogglePin,
       conflicts = [],
-      groups = [],
       onScroll,
       totalDays = 365,
       bufferDays = 7,
@@ -387,22 +383,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
     return cache;
   }, [elements, taskMap, stationMap, categoryMap, jobMap]);
 
-  // REQ-18: Calculate group capacity info for each station
-  const groupCapacityMap = useMemo((): Map<string, GroupCapacityInfo> => {
-    if (groups.length === 0) return new Map();
-    return buildGroupCapacityMap(stations, groups, assignments, now);
-  }, [stations, groups, assignments, now]);
-
-  // REQ-12 & REQ-18: Calculate set of task IDs with conflicts for visual feedback
+  // REQ-12: Calculate set of task IDs with conflicts for visual feedback
   const conflictTaskIds = useMemo(() => {
     const taskIds = new Set<string>();
     conflicts.forEach((conflict) => {
       // REQ-12: Precedence conflicts
       if (conflict.type === 'PrecedenceConflict' && conflict.taskId) {
-        taskIds.add(conflict.taskId);
-      }
-      // REQ-18: Group capacity conflicts
-      if (conflict.type === 'GroupCapacityConflict' && conflict.taskId) {
         taskIds.add(conflict.taskId);
       }
       // Availability conflicts (tile on unavailable period)
@@ -749,15 +735,12 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
               const isCollapsed = false;
               // Check if station has tiles
               const stationAssignments = assignmentsByStation.get(station.id) || [];
-              // REQ-18: Get group capacity info for this station
-              const groupCapacity = groupCapacityMap.get(station.id);
               const headerCategory = categoryMap.get(station.categoryId);
               return (
                 <StationHeader
                   key={station.id}
                   station={station}
                   isCollapsed={isCollapsed}
-                  groupCapacity={groupCapacity}
                   displayMode={displayMode}
                   category={headerCategory}
                 />

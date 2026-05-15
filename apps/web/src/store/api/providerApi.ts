@@ -16,7 +16,6 @@ export interface ProviderResponse {
   latestDepartureTime: string;
   receptionTime: string;
   transitDays: number;
-  groupId: string;
   createdAt: string;
   updatedAt: string;
 }

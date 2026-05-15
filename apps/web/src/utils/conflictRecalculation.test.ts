@@ -19,7 +19,6 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
         id: 'station-1',
         name: 'Station 1',
         categoryId: 'cat-1',
-        groupId: 'group-1',
         capacity: 1,
         status: 'Available',
         operatingSchedule: {
@@ -42,7 +41,6 @@ function createTestSnapshot(overrides: Partial<ScheduleSnapshot> = {}): Schedule
         similarityScoreRules: [],
       },
     ],
-    groups: [],
     providers: [],
     jobs: [
       {

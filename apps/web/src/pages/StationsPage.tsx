@@ -15,7 +15,7 @@ import {
   useDeleteStationMutation,
 } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
-import { useGetSnapshotQuery } from '../store';
+
 import type { StationResponse, StationInput } from '../store/api/stationApi';
 import {
   FluxSelect,
@@ -66,17 +66,16 @@ function todayFullDayRange(): { startAt: string; endAt: string } {
 export interface StationFormModalProps {
   initial?: StationResponse | null;
   categories: { id: string; name: string }[];
-  groups: { id: string; name: string }[];
   onSave: (data: StationInput) => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
 }
 
-export function StationFormModal({ initial, categories, groups, onSave, onCancel, isSaving }: StationFormModalProps) {
+export function StationFormModal({ initial, categories, onSave, onCancel, isSaving }: StationFormModalProps) {
   const [name, setName] = useState(initial?.name ?? '');
+  const [code, setCode] = useState(initial?.code ?? '');
   const [status, setStatus] = useState<string>(initial?.status ?? 'Available');
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? categories[0]?.id ?? '');
-  const [groupId, setGroupId] = useState(initial?.groupId ?? groups[0]?.id ?? '');
   const [capacity, setCapacity] = useState(String(initial?.capacity ?? 1));
   const [displayOrder, setDisplayOrder] = useState(String(initial?.displayOrder ?? 0));
 
@@ -179,9 +178,9 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
 
     await onSave({
       name: name.trim(),
+      code: code.trim() || null,
       status,
       categoryId,
-      groupId,
       capacity: parseInt(capacity, 10) || 1,
       displayOrder: parseInt(displayOrder, 10) || 0,
       operatingSchedule: (initial?.operatingSchedule as Record<string, unknown>) ?? null,
@@ -209,21 +208,34 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto px-6 pb-4 flex flex-col gap-4">
-          {/* Row 1: Name */}
-          <div>
-            <label className="block text-sm text-flux-text-secondary mb-1">
-              Nom <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              data-testid="station-name-input"
-              className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
-              placeholder="Ex : Komori G40"
-            />
+          {/* Row 1: Name + Code */}
+          <div className="grid grid-cols-[1fr_120px] gap-3">
+            <div>
+              <label className="block text-sm text-flux-text-secondary mb-1">
+                Nom <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                data-testid="station-name-input"
+                className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                placeholder="Ex : Komori G40"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-flux-text-secondary mb-1">Code</label>
+              <input
+                type="text"
+                maxLength={10}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary"
+                placeholder="G40"
+              />
+            </div>
           </div>
 
           {/* Row 2: Status + Capacity + DisplayOrder */}
@@ -260,26 +272,15 @@ export function StationFormModal({ initial, categories, groups, onSave, onCancel
             </div>
           </div>
 
-          {/* Row 3: Category + Group */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm text-flux-text-secondary mb-1">Catégorie</label>
-              <FluxSelect
-                value={categoryId}
-                onChange={setCategoryId}
-                options={categories.map((c) => ({ value: c.id, label: c.name }))}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-flux-text-secondary mb-1">Groupe</label>
-              <FluxSelect
-                value={groupId}
-                onChange={setGroupId}
-                options={groups.map((g) => ({ value: g.id, label: g.name }))}
-                className="w-full"
-              />
-            </div>
+          {/* Row 3: Category */}
+          <div>
+            <label className="block text-sm text-flux-text-secondary mb-1">Catégorie</label>
+            <FluxSelect
+              value={categoryId}
+              onChange={setCategoryId}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              className="w-full"
+            />
           </div>
 
           {/* Operator Algorithm Fields */}
@@ -549,21 +550,9 @@ export function StationsPage() {
   const [deleteStation] = useDeleteStationMutation();
 
   const { data: categories = [] } = useGetStationCategoriesQuery();
-  const { data: snapshotData } = useGetSnapshotQuery();
-
-  const groups = useMemo(
-    () => (snapshotData?.groups ?? []).filter((g) => !g.isOutsourcedProviderGroup),
-    [snapshotData]
-  );
-
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories]
-  );
-
-  const groupById = useMemo(
-    () => new Map((snapshotData?.groups ?? []).map((g) => [g.id, g.name])),
-    [snapshotData]
   );
 
   // Keyboard shortcuts
@@ -600,10 +589,9 @@ export function StationsPage() {
       (s) =>
         s.name.toLowerCase().includes(query) ||
         s.status.toLowerCase().includes(query) ||
-        (categoryById.get(s.categoryId) ?? '').toLowerCase().includes(query) ||
-        (groupById.get(s.groupId) ?? '').toLowerCase().includes(query)
+        (categoryById.get(s.categoryId) ?? '').toLowerCase().includes(query)
     );
-  }, [stations, searchQuery, categoryById, groupById]);
+  }, [stations, searchQuery, categoryById]);
 
   // Handlers
   const handleSaveCreate = async (data: StationInput) => {
@@ -701,7 +689,6 @@ export function StationsPage() {
                     <th className="text-left px-4 py-3 font-medium">Nom</th>
                     <th className="text-left px-4 py-3 font-medium">Statut</th>
                     <th className="text-left px-4 py-3 font-medium">Catégorie</th>
-                    <th className="text-left px-4 py-3 font-medium">Groupe</th>
                     <th className="text-left px-4 py-3 font-medium">Cap.</th>
                     <th className="text-left px-4 py-3 font-medium">Ordre</th>
                     <th className="text-left px-4 py-3 font-medium">Créé le</th>
@@ -728,11 +715,6 @@ export function StationsPage() {
                       <td className="px-4 py-0 text-flux-text-secondary">
                         {categoryById.get(station.categoryId) ?? (
                           <span className="text-flux-text-muted text-xs font-mono">{station.categoryId}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-0 text-flux-text-secondary">
-                        {groupById.get(station.groupId) ?? (
-                          <span className="text-flux-text-muted text-xs font-mono">{station.groupId}</span>
                         )}
                       </td>
                       <td className="px-4 py-0 text-flux-text-secondary">{station.capacity}</td>
@@ -775,7 +757,6 @@ export function StationsPage() {
         <StationFormModal
           initial={null}
           categories={categories}
-          groups={groups}
           onSave={handleSaveCreate}
           onCancel={() => setIsCreating(false)}
           isSaving={isCreatingLoading}
@@ -787,7 +768,6 @@ export function StationsPage() {
         <StationFormModal
           initial={editingStation}
           categories={categories}
-          groups={groups}
           onSave={handleSaveEdit}
           onCancel={() => setEditingStation(null)}
           isSaving={isUpdatingLoading}

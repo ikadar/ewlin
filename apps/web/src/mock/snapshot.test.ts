@@ -23,7 +23,6 @@ describe('createSnapshot', () => {
     expect(snapshot).toHaveProperty('generatedAt');
     expect(snapshot).toHaveProperty('stations');
     expect(snapshot).toHaveProperty('categories');
-    expect(snapshot).toHaveProperty('groups');
     expect(snapshot).toHaveProperty('providers');
     expect(snapshot).toHaveProperty('jobs');
     expect(snapshot).toHaveProperty('tasks');
@@ -57,7 +56,6 @@ describe('createSnapshot', () => {
 
     expect(snapshot.stations.length).toBeGreaterThan(0);
     expect(snapshot.categories.length).toBeGreaterThan(0);
-    expect(snapshot.groups.length).toBeGreaterThan(0);
     expect(snapshot.providers.length).toBeGreaterThan(0);
     expect(snapshot.jobs.length).toBeGreaterThan(0);
     expect(snapshot.tasks.length).toBeGreaterThan(0);
@@ -285,12 +283,4 @@ describe('data integrity', () => {
     }
   });
 
-  it('all station groupIds reference existing groups', () => {
-    const snapshot = createSnapshot();
-    const groupIds = new Set(snapshot.groups.map((g) => g.id));
-
-    for (const station of snapshot.stations) {
-      expect(groupIds.has(station.groupId)).toBe(true);
-    }
-  });
 });

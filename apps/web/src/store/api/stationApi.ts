@@ -13,9 +13,9 @@ import { prodSnapshotApi } from './prodSnapshotApi';
 export interface StationResponse {
   id: string;
   name: string;
+  code: string | null;
   status: 'Available' | 'InUse' | 'Maintenance' | 'OutOfService';
   categoryId: string;
-  groupId: string;
   capacity: number;
   displayOrder: number;
   operatingSchedule: Record<string, { isOperating: boolean; slots: { start: string; end: string }[] }> | null;
@@ -37,9 +37,9 @@ export interface StationResponse {
 
 export interface StationInput {
   name: string;
+  code?: string | null;
   status: string;
   categoryId: string;
-  groupId: string;
   capacity: number;
   displayOrder: number;
   operatingSchedule: Record<string, unknown> | null;

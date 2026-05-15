@@ -13,18 +13,6 @@ export interface OffScreenInfo {
   below: number;
 }
 
-/** Group capacity information for display */
-export interface GroupCapacityInfo {
-  /** Group ID */
-  groupId: string;
-  /** Group name */
-  groupName: string;
-  /** Maximum concurrent tasks (null = unlimited) */
-  maxConcurrent: number | null;
-  /** Current number of concurrent tasks in the group */
-  currentUsage: number;
-}
-
 export interface StationHeaderProps {
   /** Station to display */
   station: Station;
@@ -34,8 +22,6 @@ export interface StationHeaderProps {
   onOffScreenClick?: (direction: 'up' | 'down') => void;
   /** Whether this header is collapsed (during drag to another station) */
   isCollapsed?: boolean;
-  /** Group capacity information (REQ-18) */
-  groupCapacity?: GroupCapacityInfo;
   /** Current display mode (for dynamic column width) */
   displayMode?: 'produit' | 'tirage';
   /** Station category (for columnWidth lookup) */
@@ -51,7 +37,6 @@ export function StationHeader({
   offScreen,
   onOffScreenClick,
   isCollapsed: _isCollapsed = false,
-  groupCapacity: _groupCapacity, // REQ-06: Group capacity display removed from header
   displayMode: _displayMode,
   category,
 }: StationHeaderProps) {

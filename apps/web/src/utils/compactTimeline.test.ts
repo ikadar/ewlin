@@ -9,7 +9,6 @@ function createSnapshot(overrides: Partial<ScheduleSnapshot> = {}): ScheduleSnap
     generatedAt: new Date().toISOString(),
     stations: [],
     categories: [],
-    groups: [],
     providers: [],
     jobs: [],
     elements: [],
@@ -28,7 +27,6 @@ function createStation(id: string, name: string = id): Station {
     id,
     name,
     categoryId: 'cat-1',
-    groupId: 'grp-1',
     capacity: 1,
     status: 'Available',
     operatingSchedule: {

@@ -11,7 +11,6 @@ const mockStation: Station = {
   name: 'Komori G40',
   status: 'Available',
   categoryId: 'cat-1',
-  groupId: 'group-1',
   capacity: 1,
   operatingSchedule: {
     monday: {

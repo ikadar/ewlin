@@ -5,7 +5,6 @@
 
 export {
   generateStationCategories,
-  generateStationGroups,
   generateOperatingSchedule,
   generateScheduleExceptions,
   generateStations,

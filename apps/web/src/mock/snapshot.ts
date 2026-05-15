@@ -54,7 +54,6 @@ export function createSnapshot(options: SnapshotOptions = {}): ScheduleSnapshot 
     generatedAt: new Date().toISOString(),
     stations: stationData.stations,
     categories: stationData.categories,
-    groups: stationData.groups,
     providers: stationData.providers,
     jobs: jobData.jobs,
     elements: jobData.elements,

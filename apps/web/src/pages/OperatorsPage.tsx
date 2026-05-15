@@ -8,7 +8,13 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Plus, FolderOpen, Archive, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Plus, FolderOpen, Archive, RotateCcw } from 'lucide-react';
+import {
+  FluxSearchInput,
+  FLUX_TABLE_SHELL,
+  FLUX_BODY_TR,
+  FLUX_BODY_TR_STYLE,
+} from '../components/FluxStyledTable';
 import {
   useGetOperatorsQuery,
   useCreateOperatorMutation,
@@ -44,6 +50,53 @@ const DEFAULT_SCHEDULE: OperatingSchedule = {
 };
 
 const INPUT_CLASS = 'w-full px-3 py-[7px] text-sm leading-[1.5] bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-text-secondary';
+
+// ============================================================================
+// SkillPie — proficiency indicator as pie chart
+// ============================================================================
+
+/** SVG pie-wedge path starting at 12 o'clock, sweeping clockwise. */
+function piePath(cx: number, cy: number, r: number, deg: number): string {
+  const rad = (deg * Math.PI) / 180;
+  const x = cx + r * Math.sin(rad);
+  const y = cy - r * Math.cos(rad);
+  return `M${cx},${cy} L${cx},${cy - r} A${r},${r} 0 ${deg > 180 ? 1 : 0},1 ${x},${y} Z`;
+}
+
+function SkillPie({ value, filled, title }: { value: number; filled: boolean; title?: string }) {
+  const s = 16, c = 8, ri = 5, ro = 7, sw = 1.5;
+  const v = Math.min(value, 1.5);
+  const innerDeg = Math.min(v, 1) * 360;
+  const outerDeg = Math.max(0, v - 1) * 360;
+  const ic = 2 * Math.PI * ri;
+  const oc = 2 * Math.PI * ro;
+
+  return (
+    <svg width="14" height="14" viewBox={`0 0 ${s} ${s}`} className="inline-block align-middle">
+      {title && <title>{title}</title>}
+      <circle cx={c} cy={c} r={ri} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
+      {filled ? (
+        innerDeg >= 360
+          ? <circle cx={c} cy={c} r={ri} fill="white" />
+          : innerDeg > 0 ? <path d={piePath(c, c, ri, innerDeg)} fill="white" /> : null
+      ) : (
+        innerDeg > 0 && (
+          innerDeg >= 360
+            ? <circle cx={c} cy={c} r={ri} fill="none" stroke="white" strokeWidth={sw} />
+            : <circle cx={c} cy={c} r={ri} fill="none" stroke="white" strokeWidth={sw}
+                strokeDasharray={`${(innerDeg / 360) * ic} ${ic}`} transform={`rotate(-90 ${c} ${c})`} />
+        )
+      )}
+      {outerDeg > 0 && (
+        <>
+          <circle cx={c} cy={c} r={ro} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
+          <circle cx={c} cy={c} r={ro} fill="none" stroke="white" strokeWidth={sw}
+            strokeDasharray={`${(outerDeg / 360) * oc} ${oc}`} transform={`rotate(-90 ${c} ${c})`} />
+        </>
+      )}
+    </svg>
+  );
+}
 
 // ============================================================================
 // Helpers
@@ -96,21 +149,21 @@ function buildSkillMap(skills: OperatorSkillResponse[]): Map<string, SkillValues
 function groupStationsByCategory(
   stations: StationResponse[],
   categories: StationCategoryResponse[],
-): { categoryName: string; stations: StationResponse[] }[] {
-  const catMap = new Map(categories.map((c) => [c.id, c.name]));
-  const groups = new Map<string, StationResponse[]>();
+): { categoryName: string; categoryAbbrev: string; stations: StationResponse[] }[] {
+  const catMap = new Map(categories.map((c) => [c.id, { name: c.name, abbrev: c.abbreviation ?? c.name }]));
+  const groups = new Map<string, { abbrev: string; stations: StationResponse[] }>();
 
   for (const station of stations) {
-    const catName = catMap.get(station.categoryId) ?? 'Sans catégorie';
-    if (!groups.has(catName)) groups.set(catName, []);
-    groups.get(catName)!.push(station);
+    const cat = catMap.get(station.categoryId) ?? { name: 'Sans catégorie', abbrev: '?' };
+    if (!groups.has(cat.name)) groups.set(cat.name, { abbrev: cat.abbrev, stations: [] });
+    groups.get(cat.name)!.stations.push(station);
   }
 
-  // Sort categories alphabetically, stations alphabetically within each group
   return Array.from(groups.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([categoryName, stns]) => ({
+    .map(([categoryName, { abbrev, stations: stns }]) => ({
       categoryName,
+      categoryAbbrev: abbrev,
       stations: [...stns].sort((a, b) => a.name.localeCompare(b.name)),
     }));
 }
@@ -190,6 +243,12 @@ const SLIDER_STYLE = `
   cursor: grab;
 }
 `;
+
+// Skill-matrix sticky column styles (mirrors FluxTable frozen zones)
+const stickyCell = 'sticky z-20 bg-flux-elevated group-hover:bg-flux-hover';
+const stickyCorner = 'sticky z-40 bg-flux-hover';
+const LEFT_SHADOW = { boxShadow: '4px 0 8px -2px var(--flux-frozen-shadow)' } as const;
+const RIGHT_SHADOW = { boxShadow: '-4px 0 8px -2px var(--flux-frozen-shadow)' } as const;
 
 // ============================================================================
 // SkillRow — station proficiency row, split per-phase (Calage / Roule)
@@ -1200,6 +1259,12 @@ export default function OperatorsPage() {
     [stations],
   );
 
+  // Group stations by category for the skill matrix header
+  const groupedStations = useMemo(
+    () => groupStationsByCategory(stations, categories),
+    [stations, categories],
+  );
+
   // Keyboard shortcuts
   useEffect(() => {
     if (editingOperator || isCreating || deletingOperator) return;
@@ -1372,28 +1437,17 @@ export default function OperatorsPage() {
 
         {!isLoading && !error && (
           <>
-            {/* Search bar */}
-            <div className="mb-4 flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary"
-                  aria-hidden="true"
-                />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Rechercher... (/)"
-                  aria-label="Rechercher un opérateur"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-flux-hover border border-flux-border-light rounded-lg text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-border-light"
-                />
-              </div>
-              <span className="text-flux-text-tertiary text-sm">
-                {filteredOperators.length} opérateur
-                {filteredOperators.length !== 1 ? 's' : ''}
-                {searchQuery && ` / ${operators.length}`}
-              </span>
+            {/* Search bar + archive toggle */}
+            <div className="flex items-center gap-4 mb-4">
+              <FluxSearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                inputRef={searchInputRef}
+                resultCount={filteredOperators.length}
+                totalCount={operators.length}
+                countLabel="opérateur"
+                ariaLabel="Rechercher un opérateur"
+              />
               <button
                 onClick={() => setShowArchived(!showArchived)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors border ${
@@ -1407,94 +1461,140 @@ export default function OperatorsPage() {
               </button>
             </div>
 
-            {/* Table */}
-            <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-flux-hover">
-                  <tr className="bg-flux-hover border-b border-flux-border text-flux-text-secondary">
-                    <th className="text-left px-4 py-3 font-medium">Prénom</th>
-                    <th className="text-left px-4 py-3 font-medium">Nom</th>
-                    <th className="text-left px-4 py-3 font-medium">Fonction</th>
-                    <th className="text-left px-4 py-3 font-medium">Calage</th>
-                    <th className="text-left px-4 py-3 font-medium">Roule</th>
-                    <th className="px-4 py-0" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredOperators.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center text-flux-text-muted py-12">
-                        Aucun opérateur trouvé
-                      </td>
+            {/* Skill matrix table */}
+            <div className={FLUX_TABLE_SHELL}>
+              <div className="overflow-auto" style={{ maxHeight: '75vh' }}>
+                <table
+                  className="w-full table-fixed"
+                  style={{
+                    fontSize: '13px',
+                    minWidth: `${322 + groupedStations.reduce((n, g) => n + g.stations.length, 0) * 44}px`,
+                  }}
+                >
+                  <colgroup>
+                    <col style={{ width: '7rem' }} />
+                    <col style={{ width: '7rem' }} />
+                    <col style={{ width: '8rem' }} />
+                    {groupedStations.flatMap((g) =>
+                      g.stations.map((s) => <col key={s.id} style={{ width: '2.75rem' }} />),
+                    )}
+                    <col style={{ width: '4.5rem' }} />
+                  </colgroup>
+
+                  <thead className="sticky top-0 z-30 bg-flux-hover">
+                    {/* Row 1: category group headers + frozen corners */}
+                    <tr className="bg-flux-hover border-b border-flux-border">
+                      <th className={`${stickyCorner} left-0 px-4 py-2 text-left text-sm font-medium text-flux-text-secondary`} rowSpan={2}>Prénom</th>
+                      <th className={`${stickyCorner} left-[7rem] px-4 py-2 text-left text-sm font-medium text-flux-text-secondary`} rowSpan={2}>Nom</th>
+                      <th className={`${stickyCorner} left-[14rem] px-4 py-2 text-left text-sm font-medium text-flux-text-secondary`} rowSpan={2} style={LEFT_SHADOW}>Fonction</th>
+                      {groupedStations.map((g) => (
+                        <th
+                          key={g.categoryName}
+                          colSpan={g.stations.length}
+                          className="px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-flux-text-secondary border-l-2 border-l-flux-border-light whitespace-nowrap overflow-hidden text-ellipsis"
+                          title={g.categoryName}
+                        >
+                          {g.categoryAbbrev}
+                        </th>
+                      ))}
+                      <th className={`${stickyCorner} right-0 py-2`} rowSpan={2} style={RIGHT_SHADOW} />
                     </tr>
-                  )}
-                  {filteredOperators.map((operator) => {
-                    return (
-                    <tr
-                      key={operator.id}
-                      className={`border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9${operator.archivedAt ? ' opacity-40' : ''}`}
-                    >
-                      <td className="px-4 py-0 text-flux-text-primary font-medium">{operator.firstName}</td>
-                      <td className="px-4 py-3 text-flux-text-primary">{operator.lastName}</td>
-                      <td className="px-4 py-0 text-flux-text-secondary">{operator.role || <span className="text-flux-text-muted italic">—</span>}</td>
-                      <td className="px-4 py-0 text-flux-text-secondary">
-                        {(() => {
-                          const setupStations = operator.skills
-                            .filter((s) => (s.setupProficiency ?? 0) > 0)
-                            .map((s) => stationById.get(s.stationId) ?? s.stationId);
-                          return setupStations.length > 0
-                            ? setupStations.join(', ')
-                            : <span className="text-flux-text-muted italic">—</span>;
-                        })()}
-                      </td>
-                      <td className="px-4 py-0 text-flux-text-secondary">
-                        {(() => {
-                          const runStations = operator.skills
-                            .filter((s) => (s.runProficiency ?? s.proficiency ?? 0) > 0)
-                            .map((s) => stationById.get(s.stationId) ?? s.stationId);
-                          return runStations.length > 0
-                            ? runStations.join(', ')
-                            : <span className="text-flux-text-muted italic">—</span>;
-                        })()}
-                      </td>
-                      <td className="px-4 py-0">
-                        <div className="flex items-center gap-2 justify-end">
-                          {operator.archivedAt ? (
-                            <button
-                              onClick={() => handleRestore(operator.id)}
-                              className="text-amber-400 hover:text-amber-300 transition-colors"
-                              title="Restaurer"
-                            >
-                              <RotateCcw className="w-4 h-4" strokeWidth={2} />
-                            </button>
-                          ) : (
-                            <>
+
+                    {/* Row 2: station codes */}
+                    <tr className="bg-flux-hover border-b border-flux-border">
+                      {groupedStations.flatMap((g, gi) =>
+                        g.stations.map((s, si) => (
+                          <th
+                            key={s.id}
+                            className={`px-0 py-1 text-center text-[11px] font-medium text-flux-text-muted overflow-hidden text-ellipsis${si === 0 ? ' border-l-2 border-flux-border-light' : ''}`}
+                            title={s.name}
+                          >
+                            {s.code ?? s.name}
+                          </th>
+                        )),
+                      )}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredOperators.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={3 + groupedStations.reduce((n, g) => n + g.stations.length, 0) + 1}
+                          className="text-center text-flux-text-muted py-12"
+                        >
+                          Aucun opérateur trouvé
+                        </td>
+                      </tr>
+                    )}
+                    {filteredOperators.map((operator) => (
+                      <tr
+                        key={operator.id}
+                        className={`${FLUX_BODY_TR}${operator.archivedAt ? ' opacity-40' : ''}`}
+                        style={FLUX_BODY_TR_STYLE}
+                      >
+                        <td className={`${stickyCell} left-0 px-4 py-0 text-sm text-flux-text-primary font-medium`}>{operator.firstName}</td>
+                        <td className={`${stickyCell} left-[7rem] px-4 py-0 text-sm text-flux-text-primary`}>{operator.lastName}</td>
+                        <td className={`${stickyCell} left-[14rem] px-4 py-0 text-sm text-flux-text-secondary truncate`} style={LEFT_SHADOW}>
+                          {operator.role || <span className="text-flux-text-muted italic">—</span>}
+                        </td>
+                        {groupedStations.flatMap((g, gi) =>
+                          g.stations.map((s, si) => {
+                            const skill = operator.skills.find((sk) => sk.stationId === s.id);
+                            const hasSetup = (skill?.setupProficiency ?? 0) > 0;
+                            const hasRun = (skill?.runProficiency ?? skill?.proficiency ?? 0) > 0;
+                            return (
+                              <td
+                                key={s.id}
+                                className={`px-0 py-0 text-center${si === 0 ? ' border-l border-flux-border' : ''}`}
+                              >
+                                {hasSetup && hasRun ? (
+                                  <SkillPie value={skill!.runProficiency ?? skill!.proficiency ?? 1} filled title={`${s.name} — Calage + Roule (${(skill!.runProficiency ?? 1).toFixed(2)})`} />
+                                ) : hasRun ? (
+                                  <SkillPie value={skill!.runProficiency ?? skill!.proficiency ?? 1} filled={false} title={`${s.name} — Roule (${(skill!.runProficiency ?? skill!.proficiency ?? 1).toFixed(2)})`} />
+                                ) : null}
+                              </td>
+                            );
+                          }),
+                        )}
+                        <td className={`${stickyCell} right-0 px-2 py-0`} style={RIGHT_SHADOW}>
+                          <div className="flex items-center justify-end gap-2">
+                            {operator.archivedAt ? (
                               <button
-                                onClick={() => {
-                                  setDeleteError(null);
-                                  setDeletingOperator(operator);
-                                }}
+                                onClick={() => handleRestore(operator.id)}
                                 className="text-amber-400 hover:text-amber-300 transition-colors"
-                                title="Archiver"
+                                title="Restaurer"
                               >
-                                <Archive className="w-4 h-4" strokeWidth={2} />
+                                <RotateCcw className="w-4 h-4" strokeWidth={2} />
                               </button>
-                              <button
-                                onClick={() => setEditingOperator(operator)}
-                                className="text-blue-400 hover:text-blue-300 transition-colors"
-                                title="Modifier"
-                              >
-                                <FolderOpen className="w-4 h-4" strokeWidth={2} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setDeleteError(null);
+                                    setDeletingOperator(operator);
+                                  }}
+                                  className="text-amber-400 hover:text-amber-300 transition-colors"
+                                  title="Archiver"
+                                >
+                                  <Archive className="w-4 h-4" strokeWidth={2} />
+                                </button>
+                                <button
+                                  onClick={() => setEditingOperator(operator)}
+                                  className="text-blue-400 hover:text-blue-300 transition-colors"
+                                  title="Modifier"
+                                >
+                                  <FolderOpen className="w-4 h-4" strokeWidth={2} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

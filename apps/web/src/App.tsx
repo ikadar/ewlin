@@ -273,7 +273,6 @@ function AppContent() {
         generatedAt: new Date().toISOString(),
         stations: [],
         categories: [],
-        groups: [],
         providers: [],
         jobs: [],
         elements: [],
@@ -924,12 +923,12 @@ function AppContent() {
   }, [selectedJob?.workshopExitDate]);
 
   // Conflict task IDs for sidebar highlighting + DateStrip markers
-  // Only PrecedenceConflict and GroupCapacityConflict trigger amber glow —
+  // PrecedenceConflict triggers amber glow —
   // other types (ApprovalGateConflict, DeadlineConflict, etc.) have their own indicators.
   const conflictTaskIds = useMemo(() => {
     const ids = new Set<string>();
     for (const c of snapshot.conflicts) {
-      if (c.type === 'PrecedenceConflict' || c.type === 'GroupCapacityConflict') {
+      if (c.type === 'PrecedenceConflict') {
         ids.add(c.taskId);
         if (c.relatedTaskId) ids.add(c.relatedTaskId);
       }
@@ -2153,7 +2152,6 @@ function AppContent() {
           onTogglePin={handleTogglePin}
           conflicts={snapshot.conflicts}
           pixelsPerHour={pixelsPerHour}
-          groups={snapshot.groups}
           onContextMenu={handleContextMenuOpen}
           displayMode={displayMode}
           lateJobIds={lateJobIds}

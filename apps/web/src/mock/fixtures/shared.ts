@@ -2,7 +2,6 @@ import type {
   ScheduleSnapshot,
   Station,
   StationCategory,
-  StationGroup,
   Job,
   Element,
   Task,
@@ -76,39 +75,6 @@ export const categories: StationCategory[] = [
   },
 ];
 
-export const groups: StationGroup[] = [
-  {
-    id: 'grp-offset',
-    name: 'Presses Offset',
-    maxConcurrent: 10,
-    isOutsourcedProviderGroup: false,
-  },
-  {
-    id: 'grp-cutting',
-    name: 'Massicots',
-    maxConcurrent: 10,
-    isOutsourcedProviderGroup: false,
-  },
-  {
-    id: 'grp-folding',
-    name: 'Plieuses',
-    maxConcurrent: 10,
-    isOutsourcedProviderGroup: false,
-  },
-  {
-    id: 'grp-saddle-stitch',
-    name: 'Encarteuses-Piqueuses',
-    maxConcurrent: 10,
-    isOutsourcedProviderGroup: false,
-  },
-  {
-    id: 'grp-packaging',
-    name: 'Conditionnement',
-    maxConcurrent: 10,
-    isOutsourcedProviderGroup: false,
-  },
-];
-
 const standardOperatingSchedule = {
   monday: standardDaySchedule,
   tuesday: standardDaySchedule,
@@ -125,7 +91,6 @@ export const stations: Station[] = [
     name: 'Presse Offset',
     status: 'Available',
     categoryId: 'cat-offset',
-    groupId: 'grp-offset',
     capacity: 1,
     operatingSchedule: standardOperatingSchedule,
     exceptions: [],
@@ -135,7 +100,6 @@ export const stations: Station[] = [
     name: 'Massicot',
     status: 'Available',
     categoryId: 'cat-cutting',
-    groupId: 'grp-cutting',
     capacity: 1,
     operatingSchedule: standardOperatingSchedule,
     exceptions: [],
@@ -145,7 +109,6 @@ export const stations: Station[] = [
     name: 'Plieuse',
     status: 'Available',
     categoryId: 'cat-folding',
-    groupId: 'grp-folding',
     capacity: 1,
     operatingSchedule: standardOperatingSchedule,
     exceptions: [],
@@ -155,7 +118,6 @@ export const stations: Station[] = [
     name: 'Encarteuse-Piqueuse',
     status: 'Available',
     categoryId: 'cat-saddle-stitch',
-    groupId: 'grp-saddle-stitch',
     capacity: 1,
     operatingSchedule: standardOperatingSchedule,
     exceptions: [],
@@ -165,7 +127,6 @@ export const stations: Station[] = [
     name: 'Conditionnement',
     status: 'Available',
     categoryId: 'cat-packaging',
-    groupId: 'grp-packaging',
     capacity: 1,
     operatingSchedule: standardOperatingSchedule,
     exceptions: [],
@@ -194,7 +155,6 @@ export function baseSnapshot(): Omit<ScheduleSnapshot, 'jobs' | 'elements' | 'ta
     generatedAt: new Date().toISOString(),
     stations,
     categories,
-    groups,
     providers,
     operators: [],
   };

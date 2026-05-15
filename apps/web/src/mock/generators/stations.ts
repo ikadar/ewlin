@@ -6,7 +6,6 @@
 import type {
   Station,
   StationCategory,
-  StationGroup,
   OperatingSchedule,
   DaySchedule,
   TimeSlot,
@@ -87,58 +86,6 @@ export function generateStationCategories(): StationCategory[] {
       description: 'Travaux externalisés',
       similarityCriteria: [],
       similarityScoreRules: [],
-    },
-  ];
-}
-
-// ============================================================================
-// Station Groups
-// ============================================================================
-
-export function generateStationGroups(): StationGroup[] {
-  return [
-    {
-      id: 'grp-offset',
-      name: 'Presses Offset',
-      maxConcurrent: 2,
-      isOutsourcedProviderGroup: false,
-    },
-    {
-      id: 'grp-digital',
-      name: 'Impression Numérique',
-      maxConcurrent: 2,
-      isOutsourcedProviderGroup: false,
-    },
-    {
-      id: 'grp-cutting',
-      name: 'Massicots',
-      maxConcurrent: 2,
-      isOutsourcedProviderGroup: false,
-    },
-    {
-      id: 'grp-finishing',
-      name: 'Finition',
-      maxConcurrent: 3,
-      isOutsourcedProviderGroup: false,
-    },
-    {
-      id: 'grp-die-cutting',
-      name: 'Découpe',
-      maxConcurrent: 1,
-      isOutsourcedProviderGroup: false,
-    },
-    // Provider groups (unlimited capacity)
-    {
-      id: 'grp-clement',
-      name: 'Clément',
-      maxConcurrent: null,
-      isOutsourcedProviderGroup: true,
-    },
-    {
-      id: 'grp-reliure',
-      name: 'Reliure Express',
-      maxConcurrent: null,
-      isOutsourcedProviderGroup: true,
     },
   ];
 }
@@ -232,31 +179,30 @@ interface StationDefinition {
   id: string;
   name: string;
   categoryId: string;
-  groupId: string;
   scheduleType: 'standard' | 'extended' | '24h';
 }
 
 const STATION_DEFINITIONS: StationDefinition[] = [
   // Offset presses
-  { id: 'sta-komori-g40', name: 'Komori G40', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'extended' },
-  { id: 'sta-heidelberg-sm', name: 'Heidelberg Speedmaster', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'extended' },
-  { id: 'sta-komori-ls', name: 'Komori LS29', categoryId: 'cat-offset', groupId: 'grp-offset', scheduleType: 'standard' },
+  { id: 'sta-komori-g40', name: 'Komori G40', categoryId: 'cat-offset', scheduleType: 'extended' },
+  { id: 'sta-heidelberg-sm', name: 'Heidelberg Speedmaster', categoryId: 'cat-offset', scheduleType: 'extended' },
+  { id: 'sta-komori-ls', name: 'Komori LS29', categoryId: 'cat-offset', scheduleType: 'standard' },
 
   // Digital presses
-  { id: 'sta-xerox', name: 'Xerox Versant', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
-  { id: 'sta-hp-indigo', name: 'HP Indigo 7900', categoryId: 'cat-digital', groupId: 'grp-digital', scheduleType: 'standard' },
+  { id: 'sta-xerox', name: 'Xerox Versant', categoryId: 'cat-digital', scheduleType: 'standard' },
+  { id: 'sta-hp-indigo', name: 'HP Indigo 7900', categoryId: 'cat-digital', scheduleType: 'standard' },
 
   // Cutters
-  { id: 'sta-polar-137', name: 'Polar 137', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
-  { id: 'sta-massicot', name: 'Massicot Ideal', categoryId: 'cat-cutting', groupId: 'grp-cutting', scheduleType: 'standard' },
+  { id: 'sta-polar-137', name: 'Polar 137', categoryId: 'cat-cutting', scheduleType: 'standard' },
+  { id: 'sta-massicot', name: 'Massicot Ideal', categoryId: 'cat-cutting', scheduleType: 'standard' },
 
   // Finishing
-  { id: 'sta-stahl', name: 'Stahl TH82', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
-  { id: 'sta-muller', name: 'Muller Martini', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
-  { id: 'sta-horizon', name: 'Horizon BQ-270', categoryId: 'cat-finishing', groupId: 'grp-finishing', scheduleType: 'standard' },
+  { id: 'sta-stahl', name: 'Stahl TH82', categoryId: 'cat-finishing', scheduleType: 'standard' },
+  { id: 'sta-muller', name: 'Muller Martini', categoryId: 'cat-finishing', scheduleType: 'standard' },
+  { id: 'sta-horizon', name: 'Horizon BQ-270', categoryId: 'cat-finishing', scheduleType: 'standard' },
 
   // Die-cutting
-  { id: 'sta-bobst', name: 'Bobst SP 102', categoryId: 'cat-die-cutting', groupId: 'grp-die-cutting', scheduleType: 'standard' },
+  { id: 'sta-bobst', name: 'Bobst SP 102', categoryId: 'cat-die-cutting', scheduleType: 'standard' },
 ];
 
 export function generateStations(): Station[] {
@@ -265,7 +211,6 @@ export function generateStations(): Station[] {
     name: def.name,
     status: 'Available' as StationStatus,
     categoryId: def.categoryId,
-    groupId: def.groupId,
     capacity: 1,
     operatingSchedule: generateOperatingSchedule(def.scheduleType),
     exceptions: generateScheduleExceptions(def.id),
@@ -286,7 +231,6 @@ export function generateProviders(): OutsourcedProvider[] {
       latestDepartureTime: '14:00',
       receptionTime: '09:00',
       transitDays: 1,
-      groupId: 'grp-clement',
     },
     {
       id: 'prov-reliure',
@@ -296,7 +240,6 @@ export function generateProviders(): OutsourcedProvider[] {
       latestDepartureTime: '12:00',
       receptionTime: '10:00',
       transitDays: 1,
-      groupId: 'grp-reliure',
     },
   ];
 }
@@ -307,7 +250,6 @@ export function generateProviders(): OutsourcedProvider[] {
 
 export interface StationData {
   categories: StationCategory[];
-  groups: StationGroup[];
   stations: Station[];
   providers: OutsourcedProvider[];
 }
@@ -315,7 +257,6 @@ export interface StationData {
 export function generateAllStationData(): StationData {
   return {
     categories: generateStationCategories(),
-    groups: generateStationGroups(),
     stations: generateStations(),
     providers: generateProviders(),
   };

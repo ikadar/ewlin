@@ -29,7 +29,6 @@ const createMockProvider = (overrides: Partial<OutsourcedProvider> = {}): Outsou
   latestDepartureTime: '14:00',
   receptionTime: '09:00',
   transitDays: 1,
-  groupId: 'group-1',
   ...overrides,
 });
 

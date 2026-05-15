@@ -20,7 +20,6 @@ const mockStation: Station = {
   name: 'Test Station',
   status: 'Available',
   categoryId: 'cat-1',
-  groupId: 'group-1',
   capacity: 1,
   operatingSchedule: {
     monday: { isOperating: true, slots: [{ start: '06:00', end: '22:00' }] },
@@ -82,7 +81,6 @@ const mockSnapshot: ScheduleSnapshot = {
   generatedAt: '2025-12-01T00:00:00Z',
   stations: [mockStation],
   categories: [{ id: 'cat-1', name: 'Category 1', similarityCriteria: [], similarityScoreRules: [] }],
-  groups: [],
   jobs: [mockJob],
   elements: [
     {

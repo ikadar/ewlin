@@ -46,7 +46,6 @@ import {
   today,
   isoDate,
   categories,
-  groups,
   providers,
   sevenDayOperatingSchedule,
 } from './shared';
@@ -58,7 +57,7 @@ const fixtureStations: Station[] = [
     name: 'Komori G40',
     status: 'Available',
     categoryId: 'cat-offset',
-    groupId: 'grp-offset',
+
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -68,7 +67,7 @@ const fixtureStations: Station[] = [
     name: 'Heidelberg Speedmaster',
     status: 'Available',
     categoryId: 'cat-offset',
-    groupId: 'grp-offset',
+
     capacity: 1,
     operatingSchedule: sevenDayOperatingSchedule,
     exceptions: [],
@@ -322,7 +321,6 @@ export function createBlockingVisualFixture(): ScheduleSnapshot {
     generatedAt: new Date().toISOString(),
     stations: fixtureStations,
     categories,
-    groups,
     providers,
     jobs,
     elements,
