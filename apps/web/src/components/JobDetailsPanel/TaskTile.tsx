@@ -89,7 +89,6 @@ const TILE_STYLES: Record<TileState, {
     borderColor: '#22c55e',
     bg: 'bg-[rgba(34,197,94,0.09)]',
     nameColor: 'text-green-300',
-    opacity: 'opacity-50',
   },
   late: {
     borderColor: '#ef4444',
@@ -318,15 +317,42 @@ export const TaskTile = memo(function TaskTile({
                 explains the shorter run-only duration ; the "recalage" chip
                 appears when the engine offered to inherit but rejected it
                 (peremption, intercalation, mismatch) so the operator
-                understands a fresh setup is included. */}
-            {task.type === 'Internal' && ((task as InternalTask).recordedProgressPct ?? 0) > 0 && (
-              <span
-                className="text-[10.5px] tabular-nums text-emerald-300 bg-emerald-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
-                title="Avancement déjà enregistré sur cette tâche — la durée affichée correspond au reste à produire."
-              >
-                {Math.round((task as InternalTask).recordedProgressPct ?? 0)}% déjà fait
-              </span>
-            )}
+                understands a fresh setup is included.
+                Multi-operator cap: the wall is cross-scenario, so Prod
+                may have finalized at 100 % while this scenario's operator
+                windows haven't all started. Cap the badge by the proportion
+                of operator-window time that is actually past. */}
+            {(() => {
+              const rawPct = task.type === 'Internal' ? ((task as InternalTask).recordedProgressPct ?? 0) : 0;
+              if (rawPct <= 0) return null;
+              let cappedPct = rawPct;
+              if (operatorAssignments && operatorAssignments.length > 1) {
+                const nowMs = now.getTime();
+                let completedMin = 0;
+                let totalMin = 0;
+                for (const op of operatorAssignments) {
+                  if (!op.from || !op.to) continue;
+                  const fromMs = new Date(op.from).getTime();
+                  const toMs = new Date(op.to).getTime();
+                  const windowMin = (toMs - fromMs) / 60_000;
+                  totalMin += windowMin;
+                  if (nowMs >= toMs) completedMin += windowMin;
+                  else if (nowMs > fromMs) completedMin += (nowMs - fromMs) / 60_000;
+                }
+                if (totalMin > 0) {
+                  cappedPct = Math.min(rawPct, (completedMin / totalMin) * 100);
+                }
+              }
+              if (cappedPct <= 0) return null;
+              return (
+                <span
+                  className="text-[10.5px] tabular-nums text-emerald-300 bg-emerald-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
+                  title="Avancement déjà enregistré sur cette tâche — la durée affichée correspond au reste à produire."
+                >
+                  {Math.round(cappedPct)}% déjà fait
+                </span>
+              );
+            })()}
             {task.type === 'Internal'
               && ((task as InternalTask).recordedProgressPct ?? 0) > 0
               && assignment?.setupInherited === false && (
