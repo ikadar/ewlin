@@ -120,7 +120,6 @@ const defaultSnapshot: ScheduleSnapshot = {
   generatedAt: new Date().toISOString(),
   stations: [],
   categories: [],
-  groups: [],
   providers: [],
   jobs: [],
   elements: [],
@@ -989,6 +988,28 @@ export default function OperatorSchedulePage() {
         ? { start: taskStart, end: new Date(taskStart.getTime() + setupMinutes * 60_000) }
         : undefined;
 
+      const progressFill = (assignment && task && isInternalTask(task))
+        ? (isCompletedNow
+            ? { pct: 100, isLate: false }
+            : computeChunkProgress(
+                slice.from.toISOString(),
+                slice.to.toISOString(),
+                now.getTime(),
+              ))
+        : undefined;
+
+      const sliceBadgePct = ((): number => {
+        if (!assignment?.operators?.length) return 100;
+        const opWindowMinutes = (op: { from?: string; to?: string }): number => {
+          if (!op.from || !op.to) return 0;
+          return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
+        };
+        const totalOpMin = assignment.operators.reduce((s, op) => s + opWindowMinutes(op), 0);
+        if (totalOpMin <= 0) return 100;
+        const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
+        return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
+      })();
+
       return (
         <TileSegment
           key={`lens-${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -1015,6 +1036,8 @@ export default function OperatorSchedulePage() {
           isPinned={assignment?.isPinned ?? false}
           onTogglePin={scenarioMode !== 'prod' ? handleTogglePin : undefined}
           isSelected={selectedJobId === job.id}
+          progressFill={progressFill}
+          taskBadgePct={sliceBadgePct}
           {...positionProps}
         />
       );
