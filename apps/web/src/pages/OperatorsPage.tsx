@@ -22,7 +22,6 @@ import { useGetStationsQuery } from '../store/api/stationApi';
 import type { StationResponse } from '../store/api/stationApi';
 import { useGetStationCategoriesQuery } from '../store/api/stationCategoryApi';
 import type { StationCategoryResponse } from '../store/api/stationCategoryApi';
-import { useGetSnapshotQuery } from '../store/api/scheduleApi';
 import {
   RotatingScheduleEditor,
   FluxSelect,
@@ -1189,81 +1188,12 @@ export default function OperatorsPage() {
 
   const { data: stations = [] } = useGetStationsQuery();
   const { data: categories = [] } = useGetStationCategoriesQuery();
-  // Snapshot is consumed for the planned-load KPI per operator. We tolerate
-  // it being unavailable (mock mode, snapshot fetch error) by falling back
-  // to "—" in the column. No suspense boundary; the page renders without
-  // KPI data when the snapshot hasn't loaded yet.
-  const { data: snapshot } = useGetSnapshotQuery();
 
   // Build station name lookup
   const stationById = useMemo(
     () => new Map(stations.map((s) => [s.id, s.name])),
     [stations],
   );
-
-  /**
-   * Per-operator planned load in minutes, computed from the snapshot's
-   * assignments. Each operator entry sums the duration of every operator
-   * segment (from/to) where they appear, across all assignments. This is
-   * a "scheduled hours" KPI — the higher it is, the busier the operator
-   * is on the current plan. Combined with the profile column, run-only
-   * specialists with low load surface as candidates for more work, and
-   * polyvalent ops with high load are prime targets for the caleur volant
-   * borrow pattern (P3b can pull them off mid-run for setups elsewhere).
-   *
-   * Returns Map<operatorId, plannedMinutes>; missing operators imply 0.
-   */
-  const plannedLoadMinutes = useMemo(() => {
-    const map = new Map<string, number>();
-    const assignments = snapshot?.assignments;
-    if (!Array.isArray(assignments)) return map;
-    for (const a of assignments) {
-      if (!a.operators || a.operators.length === 0) continue;
-      for (const op of a.operators) {
-        const fromIso = op.from ?? a.scheduledStart;
-        const toIso = op.to ?? a.scheduledEnd;
-        if (!fromIso || !toIso) continue;
-        const minutes = Math.max(
-          0,
-          (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60000,
-        );
-        map.set(op.operatorId, (map.get(op.operatorId) ?? 0) + minutes);
-      }
-    }
-    return map;
-  }, [snapshot]);
-
-  /**
-   * Classify an operator's overall profile from their skill matrix:
-   * - "Roule-only" — every skilled station has setupProficiency=0 (run-only specialist)
-   * - "Caleur-only" — every skilled station has runProficiency=0 (rare; pure setter)
-   * - "Polyvalent" — versatile on at least one station (both phases > 0)
-   * - "Mixte" — mix of run-only and calage-only stations across the matrix
-   * - "—" — no skills
-   *
-   * The "Polyvalent" tag is the one that surfaces caleur volant candidates;
-   * "Roule-only" highlights the operators the engine should keep occupied
-   * continuously per the P3a spécialisation rule.
-   */
-  type OperatorProfile = 'Polyvalent' | 'Roule-only' | 'Caleur-only' | 'Mixte' | '—';
-  const profileForOperator = (op: OperatorResponse): OperatorProfile => {
-    if (op.skills.length === 0) return '—';
-    let hasVersatile = false;
-    let hasRunOnly = false;
-    let hasCalageOnly = false;
-    for (const s of op.skills) {
-      const setup = s.setupProficiency ?? s.proficiency ?? 0;
-      const run = s.runProficiency ?? s.proficiency ?? 0;
-      if (setup > 0 && run > 0) hasVersatile = true;
-      else if (setup === 0 && run > 0) hasRunOnly = true;
-      else if (setup > 0 && run === 0) hasCalageOnly = true;
-    }
-    if (hasVersatile) return 'Polyvalent';
-    if (hasRunOnly && hasCalageOnly) return 'Mixte';
-    if (hasRunOnly) return 'Roule-only';
-    if (hasCalageOnly) return 'Caleur-only';
-    return '—';
-  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1461,37 +1391,20 @@ export default function OperatorsPage() {
                     <th className="text-left px-4 py-3 font-medium">Prénom</th>
                     <th className="text-left px-4 py-3 font-medium">Nom</th>
                     <th className="text-left px-4 py-3 font-medium">Fonction</th>
-                    <th className="text-left px-4 py-3 font-medium">Profil</th>
-                    <th className="text-right px-4 py-3 font-medium" title="Heures planifiées sur l'horizon courant — somme des présences opérateur sur les assignments">
-                      Charge
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium">Compétences</th>
+                    <th className="text-left px-4 py-3 font-medium">Calage</th>
+                    <th className="text-left px-4 py-3 font-medium">Roule</th>
                     <th className="px-4 py-0" />
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOperators.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center text-flux-text-muted py-12">
+                      <td colSpan={6} className="text-center text-flux-text-muted py-12">
                         Aucun opérateur trouvé
                       </td>
                     </tr>
                   )}
                   {filteredOperators.map((operator) => {
-                    const profile = profileForOperator(operator);
-                    const loadMin = plannedLoadMinutes.get(operator.id) ?? 0;
-                    const loadHours = loadMin / 60;
-                    const loadLabel = loadMin > 0 ? `${loadHours.toFixed(1)} h` : '—';
-                    const profileBadgeClass =
-                      profile === 'Polyvalent'
-                        ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                        : profile === 'Roule-only'
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        : profile === 'Caleur-only'
-                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                        : profile === 'Mixte'
-                        ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
-                        : 'bg-transparent text-flux-text-muted border-transparent';
                     return (
                     <tr
                       key={operator.id}
@@ -1500,36 +1413,25 @@ export default function OperatorsPage() {
                       <td className="px-4 py-0 text-flux-text-primary font-medium">{operator.firstName}</td>
                       <td className="px-4 py-3 text-flux-text-primary">{operator.lastName}</td>
                       <td className="px-4 py-0 text-flux-text-secondary">{operator.role || <span className="text-flux-text-muted italic">—</span>}</td>
-                      <td className="px-4 py-0">
-                        <span
-                          className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded border ${profileBadgeClass}`}
-                          title={
-                            profile === 'Polyvalent'
-                              ? 'Cale ET roule au moins une station — candidat caleur volant'
-                              : profile === 'Roule-only'
-                              ? 'Sait rouler mais pas caler — à occuper en continu (cible spécialisation algo)'
-                              : profile === 'Caleur-only'
-                              ? 'Sait caler mais pas rouler — purement spécialiste mise en route'
-                              : profile === 'Mixte'
-                              ? 'Différent par station : run-only sur certaines, calage-only sur d’autres'
-                              : 'Aucune compétence saisie'
-                          }
-                        >
-                          {profile}
-                        </span>
-                      </td>
-                      <td
-                        className="px-4 py-0 text-right font-mono text-flux-text-secondary"
-                        title={loadMin > 0 ? `${Math.round(loadMin)} min planifiées sur l'horizon courant` : 'Aucune assignation sur l\'horizon courant'}
-                      >
-                        {loadLabel}
+                      <td className="px-4 py-0 text-flux-text-secondary">
+                        {(() => {
+                          const setupStations = operator.skills
+                            .filter((s) => (s.setupProficiency ?? 0) > 0)
+                            .map((s) => stationById.get(s.stationId) ?? s.stationId);
+                          return setupStations.length > 0
+                            ? setupStations.join(', ')
+                            : <span className="text-flux-text-muted italic">—</span>;
+                        })()}
                       </td>
                       <td className="px-4 py-0 text-flux-text-secondary">
-                        {operator.skills.length > 0
-                          ? operator.skills
-                              .map((s) => stationById.get(s.stationId) ?? s.stationId)
-                              .join(', ')
-                          : <span className="text-flux-text-muted italic">Aucune</span>}
+                        {(() => {
+                          const runStations = operator.skills
+                            .filter((s) => (s.runProficiency ?? s.proficiency ?? 0) > 0)
+                            .map((s) => stationById.get(s.stationId) ?? s.stationId);
+                          return runStations.length > 0
+                            ? runStations.join(', ')
+                            : <span className="text-flux-text-muted italic">—</span>;
+                        })()}
                       </td>
                       <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
