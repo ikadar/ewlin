@@ -252,11 +252,13 @@ export const Tile = memo(function Tile({
     ? computeProgressBorderImage(progress.pct, progress.isLate, 'vertical', inlineColors.border)
     : undefined;
 
-  // Teeth + label follow the progress gradient when visible: the top of
-  // the tile is always inside the green zone (gradient fills top-down).
   const completedRgb = getStateRgb('completed');
   const completedInline = getStateInlineColors('completed');
   const progressAwareRgb = showGradient ? completedRgb : stateRgb;
+  const lateRgb = getStateRgb('late');
+  const bottomTeethRgb = showGradient
+    ? (progress?.isLate ? lateRgb : completedRgb)
+    : stateRgb;
   const labelTextColor = showGradient ? completedInline.text : inlineColors.text;
 
   // Handle click — select this job
@@ -410,7 +412,7 @@ export const Tile = memo(function Tile({
               <path
                 d={buildSawtoothSvgPath(100, renderHeight, 'bottom', teethCount)}
                 fill="none"
-                stroke={`rgb(${stateRgb.border})`}
+                stroke={`rgb(${bottomTeethRgb.border})`}
                 strokeWidth={1.5}
                 strokeOpacity={0.7}
                 vectorEffect="non-scaling-stroke"
