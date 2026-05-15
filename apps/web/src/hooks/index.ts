@@ -33,6 +33,12 @@ export type { ComputeToast, ComputeToastType, ComputeToastAction, ComputeToastMe
 export { useHoverCrosslink, pulseTaskTiles } from './useHoverCrosslink';
 export type { HoverCrosslinkProps } from './useHoverCrosslink';
 
+export { useSort } from './useSort';
+export type { UseSortResult } from './useSort';
+
+export { useRowExitAnimation } from './useRowExitAnimation';
+export type { UseRowExitAnimationResult } from './useRowExitAnimation';
+
 // NOTE: do NOT re-export useLiftAndRecompute from this barrel.
 // It depends on AutoRecomputeContext, which itself imports from
 // '../hooks' — re-exporting here closes a circular module cycle

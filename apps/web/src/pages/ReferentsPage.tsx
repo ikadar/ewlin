@@ -7,7 +7,8 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
+import { FluxSearchInput } from '@/components/FluxStyledTable';
 import {
   useGetReferentsQuery,
   useCreateReferentMutation,
@@ -232,29 +233,15 @@ export function ReferentsPage() {
 
         {!isLoading && !error && (
           <>
-            {/* Search bar */}
-            <div className="mb-4 flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary"
-                  aria-hidden="true"
-                />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Rechercher... (/)"
-                  aria-label="Rechercher un référent"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-flux-hover border border-flux-border-light rounded-lg text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-flux-border-light"
-                />
-              </div>
-              <span className="text-flux-text-tertiary text-sm">
-                {filteredReferents.length} référent
-                {filteredReferents.length !== 1 ? 's' : ''}
-                {searchQuery && ` / ${referents.length}`}
-              </span>
-            </div>
+            <FluxSearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              ariaLabel="Rechercher un référent"
+              resultCount={filteredReferents.length}
+              totalCount={referents.length}
+              countLabel="référent"
+              inputRef={searchInputRef}
+            />
 
             {/* Table */}
             <div className={FLUX_TABLE_SHELL}>

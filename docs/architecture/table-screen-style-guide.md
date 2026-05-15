@@ -697,18 +697,151 @@ Apply via `.flux-tooltip` class. Use `title` attribute for simple browser toolti
 
 ---
 
+## 17. Shared Primitives
+
+Reusable hooks and components extracted from existing table screens.
+**Use these instead of writing inline sort/tab/toggle/search/empty code.**
+
+### 17.1 Hooks
+
+#### `useSort<T>(defaultCol, defaultDir?, defaultDirForCol?)`
+
+```tsx
+import { useSort } from '@/hooks/useSort';
+
+type SortCol = 'ref' | 'designation' | 'shippedAt';
+const { sortCol, sortDir, handleSort } = useSort<SortCol>('shippedAt', 'desc',
+  (col) => col === 'shippedAt' ? 'desc' : 'asc',  // optional per-column default
+);
+```
+
+#### `useRowExitAnimation(onCommit, fadeDuration?, collapseDuration?)`
+
+```tsx
+import { useRowExitAnimation } from '@/hooks/useRowExitAnimation';
+
+const { exitingIds, collapsingIds, triggerExit } = useRowExitAnimation(
+  (id) => mutation({ id, value }),
+);
+// Row: exiting → 1000ms opacity fade → collapsing → 300ms height collapse → onCommit
+```
+
+### 17.2 Components
+
+All imported from `@/components/FluxStyledTable`.
+
+| Component | Props | Description |
+|-----------|-------|-------------|
+| `SortChevron<T>` | `col, active, dir` | Chevron indicator: inactive=ChevronsUpDown (hidden), active=Up/Down (blue) |
+| `SortableHeader<T>` | `col, active, dir, onSort, align?, className?, children` | Clickable `<th>` with embedded SortChevron |
+| `FluxToggle` | `active, onToggle?, activeDate?, activeTitle?, inactiveTitle?, readOnly?` | CircleCheck/Circle toggle (emerald/zinc) |
+| `FluxSearchInput` | `value, onChange, placeholder?, ariaLabel?, resultCount?, totalCount?, countLabel?, inputRef?` | Search icon + input + count badge |
+| `FluxEmptyState` | `icon?, title, message?, error?` | Centered empty/loading/error placeholder |
+
+### 17.3 Style Constants
+
+All imported from `@/components/FluxStyledTable`.
+
+| Constant | Purpose |
+|----------|---------|
+| `FLUX_TABLE_SHELL` | Card wrapper (border + rounded + clip) |
+| `FLUX_TABLE_CARD` | Full-page card (SHELL + flex + m-4) |
+| `FLUX_TABLE` | `<table>` element |
+| `FLUX_THEAD` | Sticky `<thead>` |
+| `FLUX_HEADER_TR` | Header `<tr>` |
+| `FLUX_HEADER_CELL` | Standard `<th>` (left-aligned) |
+| `FLUX_HEADER_CELL_SORTABLE` | Clickable `<th>` with group hover |
+| `FLUX_BODY_TR` | Data `<tr>` with hover |
+| `FLUX_BODY_TR_STYLE` | Inline style = `{ height: '2.25rem' }` |
+| `FLUX_BODY_CELL` | Standard `<td>` |
+| `FLUX_BODY_CELL_PRIMARY` | Primary-text `<td>` (name/id column) |
+| `FLUX_TAB_BAR` | Tab bar container |
+| `FLUX_TAB_BASE` | Base tab button classes |
+| `FLUX_TAB_ACTIVE` | Active tab (blue underline, white text) |
+| `FLUX_TAB_INACTIVE` | Inactive tab (transparent, muted) |
+
+### 17.4 FluxTabBar (generic)
+
+```tsx
+import { FluxTabBar } from '@/components/FluxTabBar';
+
+type MyTab = 'all' | 'pending' | 'done';
+const TABS: { key: MyTab; label: string }[] = [
+  { key: 'all', label: 'Tous' },
+  { key: 'pending', label: 'En attente' },
+  { key: 'done', label: 'Terminés' },
+];
+
+<FluxTabBar tabs={TABS} activeTab={tab} counts={counts} onTabChange={setTab} />
+```
+
+### 17.5 Templates
+
+#### Flat table with tabs (Facturation / Activité pattern)
+
+```tsx
+const { sortCol, sortDir, handleSort } = useSort<SortCol>('date', 'desc');
+const { exitingIds, collapsingIds, triggerExit } = useRowExitAnimation(commitFn);
+
+<div className="flex flex-col flex-1 overflow-hidden bg-flux-base">
+  <div className={FLUX_TABLE_CARD}>
+    <FluxTabBar tabs={TABS} activeTab={tab} counts={counts} onTabChange={setTab} />
+    <div className="flex-1 overflow-y-auto flex flex-col">
+      <table className={FLUX_TABLE}>
+        <thead className={FLUX_THEAD}>
+          <tr className={FLUX_HEADER_TR}>
+            <SortableHeader col="name" active={sortCol} dir={sortDir} onSort={handleSort}>Nom</SortableHeader>
+            ...
+          </tr>
+        </thead>
+        <tbody>...</tbody>
+      </table>
+      {isEmpty && <FluxEmptyState title="Aucun élément" />}
+    </div>
+  </div>
+</div>
+```
+
+#### Settings CRUD table (Clients / Référents pattern)
+
+```tsx
+<FluxSearchInput value={query} onChange={setQuery} countLabel="client"
+  resultCount={filtered.length} totalCount={all.length} inputRef={searchRef} />
+<div className={FLUX_TABLE_SHELL}>
+  <table className={FLUX_TABLE}>
+    <thead className={FLUX_THEAD}>
+      <tr className={FLUX_HEADER_TR}>
+        <th className={FLUX_HEADER_CELL}>Nom</th>
+        <th className={FLUX_HEADER_CELL}>Description</th>
+        <th className={FLUX_HEADER_CELL_RIGHT}>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {items.map(item => (
+        <tr className={FLUX_BODY_TR} style={FLUX_BODY_TR_STYLE}>
+          <td className={FLUX_BODY_CELL_PRIMARY}>{item.name}</td>
+          <td className={FLUX_BODY_CELL}>{item.desc}</td>
+          <td className={FLUX_BODY_CELL_ACTIONS}><FluxRowActions onEdit={...} onDelete={...} /></td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+```
+
+---
+
 ## Summary Checklist
 
-When building a new table screen, verify:
+When building a new table screen:
 
-- [ ] Page uses `min-h-screen bg-zinc-900 flex flex-col` (CRUD) or `flex-1 bg-flux-base` (dashboard)
-- [ ] Header/toolbar has `border-b`, action button on the right
-- [ ] Search bar has `Search` icon, `pl-10`, `rounded-lg`
-- [ ] Table uses `<table className="w-full text-sm">`
-- [ ] Header row has `border-b`, `text-zinc-400` / `text-flux-text-secondary`
-- [ ] Data rows have `border-b`, `hover:bg-*`, `transition-colors`
-- [ ] Actions column is right-aligned with icon buttons
-- [ ] Empty state uses `colSpan`, `text-center`, `py-12`
-- [ ] Modals use `fixed inset-0 z-50`, `bg-black/60` overlay
-- [ ] All `transition-colors` on interactive elements
-- [ ] No raw hex colors — use tokens or Tailwind classes
+1. **Choose the container:** `FLUX_TABLE_CARD` (dashboard) or `FLUX_TABLE_SHELL` (settings CRUD)
+2. **Sort state:** `useSort<MySortCol>(defaultCol, defaultDir, defaultDirForCol?)`
+3. **Headers:** `SortableHeader` for sortable columns, `FLUX_HEADER_CELL` for static
+4. **Rows:** `FLUX_BODY_TR` + `FLUX_BODY_TR_STYLE`, cells with `FLUX_BODY_CELL` / `FLUX_BODY_CELL_PRIMARY`
+5. **Tabs:** `FluxTabBar` with typed tab array + counts
+6. **Toggles:** `FluxToggle` for any CircleCheck/Circle pattern
+7. **Search:** `FluxSearchInput` with `countLabel` for the entity name
+8. **Empty state:** `FluxEmptyState` for loading, empty, and error states
+9. **Row exit animation:** `useRowExitAnimation(commitFn)` for tab-filtered toggle actions
+10. **Row actions:** `FluxRowActions` for the standard delete + edit icon pair

@@ -76,3 +76,23 @@ export const FLUX_BODY_CELL_RIGHT =
 
 /** Body cell for the actions column — right-aligned + flex-end inside. */
 export const FLUX_BODY_CELL_ACTIONS = FLUX_BODY_CELL_RIGHT;
+
+/** Full-page table card: extends FLUX_TABLE_SHELL with flex layout for pages like Facturation, Activité. */
+export const FLUX_TABLE_CARD =
+  `${FLUX_TABLE_SHELL} flex flex-col flex-1 m-4`;
+
+/** Tab bar container sitting above the table. */
+export const FLUX_TAB_BAR =
+  'flex items-end border-b border-flux-border bg-flux-elevated px-4';
+
+/** Base classes for each tab button. */
+export const FLUX_TAB_BASE =
+  'px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-1.5';
+
+/** Active tab: blue underline + white text. */
+export const FLUX_TAB_ACTIVE =
+  'border-blue-500 text-white bg-flux-elevated';
+
+/** Inactive tab: transparent underline + muted text. */
+export const FLUX_TAB_INACTIVE =
+  'border-transparent text-flux-text-secondary hover:text-white hover:bg-flux-hover/50';

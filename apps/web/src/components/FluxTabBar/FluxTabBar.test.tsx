@@ -1,44 +1,59 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FluxTabBar } from './FluxTabBar';
-import type { TabId } from '../FluxTable/fluxFilters';
 
-const defaultCounts: Record<TabId, number> = {
+type TestTab = 'all' | 'bat' | 'papier' | 'formes' | 'plaques' | 'soustraitance' | 'a-facturer';
+
+const TABS: { key: TestTab; label: string }[] = [
+  { key: 'all', label: 'Tous' },
+  { key: 'bat', label: 'BAT à traiter' },
+  { key: 'papier', label: 'Cdes papier' },
+  { key: 'formes', label: 'Cdes formes' },
+  { key: 'plaques', label: 'Plaques à produire' },
+  { key: 'soustraitance', label: 'S-T à faire' },
+  { key: 'a-facturer', label: 'À facturer' },
+];
+
+const defaultCounts: Record<TestTab, number> = {
   all: 5,
-  prepresse: 3,
+  bat: 3,
   papier: 2,
   formes: 1,
   plaques: 2,
   soustraitance: 0,
+  'a-facturer': 1,
 };
 
 describe('FluxTabBar', () => {
-  it('renders all 6 tabs', () => {
+  it('renders all tabs', () => {
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={vi.fn()}
       />
     );
     expect(screen.getByTestId('flux-tab-all')).toBeInTheDocument();
-    expect(screen.getByTestId('flux-tab-prepresse')).toBeInTheDocument();
+    expect(screen.getByTestId('flux-tab-bat')).toBeInTheDocument();
     expect(screen.getByTestId('flux-tab-papier')).toBeInTheDocument();
     expect(screen.getByTestId('flux-tab-formes')).toBeInTheDocument();
     expect(screen.getByTestId('flux-tab-plaques')).toBeInTheDocument();
     expect(screen.getByTestId('flux-tab-soustraitance')).toBeInTheDocument();
+    expect(screen.getByTestId('flux-tab-a-facturer')).toBeInTheDocument();
   });
 
   it('renders tab labels', () => {
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={vi.fn()}
       />
     );
     expect(screen.getByText('Tous')).toBeInTheDocument();
-    expect(screen.getByText('À faire prépresse')).toBeInTheDocument();
+    expect(screen.getByText('BAT à traiter')).toBeInTheDocument();
     expect(screen.getByText('Cdes papier')).toBeInTheDocument();
     expect(screen.getByText('Cdes formes')).toBeInTheDocument();
     expect(screen.getByText('Plaques à produire')).toBeInTheDocument();
@@ -48,6 +63,7 @@ describe('FluxTabBar', () => {
   it('marks active tab with aria-selected=true', () => {
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="papier"
         counts={defaultCounts}
         onTabChange={vi.fn()}
@@ -60,13 +76,14 @@ describe('FluxTabBar', () => {
   it('renders count badges with correct values', () => {
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={vi.fn()}
       />
     );
     expect(screen.getByTestId('flux-tab-count-all')).toHaveTextContent('5');
-    expect(screen.getByTestId('flux-tab-count-prepresse')).toHaveTextContent('3');
+    expect(screen.getByTestId('flux-tab-count-bat')).toHaveTextContent('3');
     expect(screen.getByTestId('flux-tab-count-papier')).toHaveTextContent('2');
     expect(screen.getByTestId('flux-tab-count-formes')).toHaveTextContent('1');
     expect(screen.getByTestId('flux-tab-count-plaques')).toHaveTextContent('2');
@@ -76,19 +93,21 @@ describe('FluxTabBar', () => {
     const onTabChange = vi.fn();
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={onTabChange}
       />
     );
-    fireEvent.click(screen.getByTestId('flux-tab-prepresse'));
-    expect(onTabChange).toHaveBeenCalledWith('prepresse');
+    fireEvent.click(screen.getByTestId('flux-tab-bat'));
+    expect(onTabChange).toHaveBeenCalledWith('bat');
   });
 
   it('calls onTabChange for each tab correctly', () => {
     const onTabChange = vi.fn();
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={onTabChange}
@@ -105,34 +124,10 @@ describe('FluxTabBar', () => {
     expect(onTabChange).toHaveBeenCalledWith('plaques');
   });
 
-  it('renders the keyboard hint bar', () => {
-    render(
-      <FluxTabBar
-        activeTab="all"
-        counts={defaultCounts}
-        onTabChange={vi.fn()}
-      />
-    );
-    expect(screen.getByTestId('flux-keyboard-hints')).toBeInTheDocument();
-  });
-
-  it('renders keyboard shortcuts in hint bar', () => {
-    render(
-      <FluxTabBar
-        activeTab="all"
-        counts={defaultCounts}
-        onTabChange={vi.fn()}
-      />
-    );
-    const hints = screen.getByTestId('flux-keyboard-hints');
-    expect(hints).toHaveTextContent('↔');
-    expect(hints).toHaveTextContent('Alt');
-    expect(hints).toHaveTextContent('F');
-  });
-
   it('tab list has correct aria role', () => {
     render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={vi.fn()}
@@ -144,6 +139,7 @@ describe('FluxTabBar', () => {
   it('count badges update when counts prop changes', () => {
     const { rerender } = render(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={defaultCounts}
         onTabChange={vi.fn()}
@@ -153,11 +149,26 @@ describe('FluxTabBar', () => {
 
     rerender(
       <FluxTabBar
+        tabs={TABS}
         activeTab="all"
         counts={{ ...defaultCounts, all: 3 }}
         onTabChange={vi.fn()}
       />
     );
     expect(screen.getByTestId('flux-tab-count-all')).toHaveTextContent('3');
+  });
+
+  it('supports custom testIdPrefix', () => {
+    render(
+      <FluxTabBar
+        tabs={[{ key: 'x', label: 'X' }]}
+        activeTab="x"
+        counts={{ x: 1 }}
+        onTabChange={vi.fn()}
+        testIdPrefix="custom"
+      />
+    );
+    expect(screen.getByTestId('custom-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-x')).toBeInTheDocument();
   });
 });

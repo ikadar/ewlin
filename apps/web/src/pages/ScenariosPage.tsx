@@ -17,8 +17,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Trash2, FolderOpen, Clock, AlertTriangle, Check, GitMerge,
-  ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react';
+import { SortableHeader } from '@/components/FluxStyledTable';
+import { useSort } from '@/hooks/useSort';
 import {
   useGetSimulationsQuery,
   useForkSimulationMutation,
@@ -77,8 +78,10 @@ export function ScenariosPage() {
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
-  const [sortColumn, setSortColumn] = useState<SortColumn>('lastTouchedAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const { sortCol: sortColumn, sortDir: sortDirection, handleSort: handleSortChange } = useSort<SortColumn>(
+    'lastTouchedAt', 'desc',
+    (col) => col === 'name' ? 'asc' : 'desc',
+  );
   const [focusedIdx, setFocusedIdx] = useState<number>(-1);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -91,15 +94,6 @@ export function ScenariosPage() {
     );
     return [...filtered].sort((a, b) => compareScenarios(a, b, sortColumn, sortDirection));
   }, [data?.simulations, search, sortColumn, sortDirection]);
-
-  const handleSortChange = useCallback((col: SortColumn) => {
-    if (sortColumn === col) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(col);
-      setSortDirection(col === 'name' ? 'asc' : 'desc');
-    }
-  }, [sortColumn]);
 
   const handleFork = useCallback(
     async (name: string) => {
@@ -231,11 +225,11 @@ export function ScenariosPage() {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-30 bg-flux-hover">
                     <tr className="bg-flux-hover border-b border-flux-border">
-                      <SortableHeader col="name"           current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Nom</SortableHeader>
-                      <SortableHeader col="createdAt"      current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Forké le</SortableHeader>
-                      <SortableHeader col="lastTouchedAt"  current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Dernière vue</SortableHeader>
-                      <SortableHeader col="ttlExpiresAt"   current={sortColumn} dir={sortDirection} onSort={handleSortChange}>Expire dans</SortableHeader>
-                      <SortableHeader col="modifications"  current={sortColumn} dir={sortDirection} onSort={handleSortChange} align="right">Modifs</SortableHeader>
+                      <SortableHeader col="name"           active={sortColumn} dir={sortDirection} onSort={handleSortChange}>Nom</SortableHeader>
+                      <SortableHeader col="createdAt"      active={sortColumn} dir={sortDirection} onSort={handleSortChange}>Forké le</SortableHeader>
+                      <SortableHeader col="lastTouchedAt"  active={sortColumn} dir={sortDirection} onSort={handleSortChange}>Dernière vue</SortableHeader>
+                      <SortableHeader col="ttlExpiresAt"   active={sortColumn} dir={sortDirection} onSort={handleSortChange}>Expire dans</SortableHeader>
+                      <SortableHeader col="modifications"  active={sortColumn} dir={sortDirection} onSort={handleSortChange} align="right">Modifs</SortableHeader>
                       <th className="px-2 py-3 text-right text-sm font-medium whitespace-nowrap text-flux-text-secondary">
                         Actions
                       </th>
@@ -277,50 +271,6 @@ export function ScenariosPage() {
         />
       )}
     </div>
-  );
-}
-
-/**
- * Sort indicator chevron — same shape and behaviour as
- * FluxTable.SortChevron: inactive-but-sortable shows a faded
- * up/down chevrons that fades in on group-hover; active shows a
- * single blue arrow pointing in the sort direction.
- */
-function SortChevron({ col, active, dir }: { col: SortColumn; active: SortColumn; dir: SortDirection }) {
-  if (col !== active) {
-    return (
-      <ChevronsUpDown
-        className="w-3 h-3 text-flux-text-muted opacity-0 group-hover:opacity-100 transition-opacity inline ml-0.5"
-        strokeWidth={2}
-      />
-    );
-  }
-  return dir === 'asc'
-    ? <ChevronUp className="w-3 h-3 text-blue-400 inline ml-0.5" strokeWidth={2.5} />
-    : <ChevronDown className="w-3 h-3 text-blue-400 inline ml-0.5" strokeWidth={2.5} />;
-}
-
-/**
- * Header cell — clickable th itself (mirrors FluxTable's
- * sortableHeader pattern), with the chevron group-hover behaviour.
- */
-function SortableHeader({
-  col, current, dir, onSort, align, children,
-}: {
-  col: SortColumn;
-  current: SortColumn;
-  dir: SortDirection;
-  onSort: (col: SortColumn) => void;
-  align?: 'right';
-  children: React.ReactNode;
-}) {
-  const base = 'px-2 py-3 text-sm font-medium whitespace-nowrap text-flux-text-secondary';
-  const sortable = `${base} ${align === 'right' ? 'text-right' : 'text-left'} group cursor-pointer select-none`;
-  return (
-    <th className={sortable} onClick={() => onSort(col)}>
-      {children}
-      <SortChevron col={col} active={current} dir={dir} />
-    </th>
   );
 }
 

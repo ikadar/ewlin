@@ -10,8 +10,10 @@
  * @see v0.4.34 - JCF: Template CRUD & Apply
  */
 
-import { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Trash2, Pencil, Play } from 'lucide-react';
+import { useMemo } from 'react';
+import { Trash2, Pencil, Play } from 'lucide-react';
+import { SortChevron } from '@/components/FluxStyledTable';
+import { useSort } from '@/hooks/useSort';
 import type { JcfTemplate } from '@flux/types';
 
 export interface JcfTemplateListProps {
@@ -57,30 +59,6 @@ function getAriaSort(
 }
 
 /**
- * Sort indicator icon component.
- */
-function SortIcon({
-  column,
-  sortColumn,
-  sortDirection,
-}: {
-  column: SortColumn;
-  sortColumn: SortColumn;
-  sortDirection: SortDirection;
-}) {
-  if (sortColumn === column) {
-    return sortDirection === 'asc' ? (
-      <ChevronUp size={14} className="inline ml-[3px] text-blue-400" aria-hidden="true" />
-    ) : (
-      <ChevronDown size={14} className="inline ml-[3px] text-blue-400" aria-hidden="true" />
-    );
-  }
-  return (
-    <ChevronsUpDown size={14} className="inline ml-[3px] opacity-0 group-hover/th:opacity-100 text-flux-text-tertiary transition-opacity" aria-hidden="true" />
-  );
-}
-
-/**
  * Format ISO date to relative French string.
  */
 function formatRelativeDate(isoDate: string): string {
@@ -112,8 +90,7 @@ export function JcfTemplateList({
   onEditClick,
   onUseClick,
 }: JcfTemplateListProps) {
-  const [sortColumn, setSortColumn] = useState<SortColumn>('updatedAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const { sortCol: sortColumn, sortDir: sortDirection, handleSort } = useSort<SortColumn>('updatedAt', 'desc');
 
   const sortedTemplates = useMemo(() => {
     return [...templates].sort((a, b) => {
@@ -121,17 +98,6 @@ export function JcfTemplateList({
       return sortDirection === 'asc' ? comparison : -comparison;
     });
   }, [templates, sortColumn, sortDirection]);
-
-  const handleSort = useCallback((column: SortColumn) => {
-    setSortColumn((prev) => {
-      if (prev === column) {
-        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-        return prev;
-      }
-      setSortDirection('asc');
-      return column;
-    });
-  }, []);
 
   // Empty state
   if (templates.length === 0) {
@@ -150,7 +116,7 @@ export function JcfTemplateList({
 
   // Header styles
   const thClass =
-    'py-3 font-medium cursor-pointer hover:text-flux-text-primary transition-colors text-left group/th';
+    'py-3 font-medium cursor-pointer hover:text-flux-text-primary transition-colors text-left group';
 
   return (
     <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden">
@@ -164,7 +130,7 @@ export function JcfTemplateList({
             aria-sort={getAriaSort('name', sortColumn, sortDirection)}
           >
             Nom
-            <SortIcon column="name" sortColumn={sortColumn} sortDirection={sortDirection} />
+            <SortChevron col="name" active={sortColumn} dir={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px]`}
@@ -172,7 +138,7 @@ export function JcfTemplateList({
             aria-sort={getAriaSort('clientName', sortColumn, sortDirection)}
           >
             Client
-            <SortIcon column="clientName" sortColumn={sortColumn} sortDirection={sortDirection} />
+            <SortChevron col="clientName" active={sortColumn} dir={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px]`}
@@ -180,7 +146,7 @@ export function JcfTemplateList({
             aria-sort={getAriaSort('category', sortColumn, sortDirection)}
           >
             Catégorie
-            <SortIcon column="category" sortColumn={sortColumn} sortDirection={sortDirection} />
+            <SortChevron col="category" active={sortColumn} dir={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px] text-right`}
@@ -188,7 +154,7 @@ export function JcfTemplateList({
             aria-sort={getAriaSort('elementsCount', sortColumn, sortDirection)}
           >
             Éléments
-            <SortIcon column="elementsCount" sortColumn={sortColumn} sortDirection={sortDirection} />
+            <SortChevron col="elementsCount" active={sortColumn} dir={sortDirection} />
           </th>
           <th
             className={`${thClass} px-[13px]`}
@@ -196,7 +162,7 @@ export function JcfTemplateList({
             aria-sort={getAriaSort('updatedAt', sortColumn, sortDirection)}
           >
             Modifié
-            <SortIcon column="updatedAt" sortColumn={sortColumn} sortDirection={sortDirection} />
+            <SortChevron col="updatedAt" active={sortColumn} dir={sortDirection} />
           </th>
           <th className="py-3 pr-[13px]">
             <span className="sr-only">Actions</span>

@@ -21,6 +21,7 @@ import {
   pathnameToTab,
   tabToPathname,
   TAB_IDS,
+  TAB_LABELS,
   type FluxFilters,
 } from '@/components/FluxTable/fluxFilters';
 import { sortFluxJobs, type SortColumn, type SortDirection } from '@/components/FluxTable/fluxSort';
@@ -397,9 +398,11 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
 
             {/* Tab bar */}
             <FluxTabBar
+              tabs={TAB_IDS.map(id => ({ key: id, label: TAB_LABELS[id] }))}
               activeTab={activeTab}
               counts={tabCounts}
               onTabChange={handleTabChange}
+              ariaLabel="Filtres du tableau de flux"
             />
 
             {/* Table — fills remaining height */}

@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
-import { CircleCheck, Circle, Trash2, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Trash2, FolderOpen } from 'lucide-react';
+import { SortChevron, FluxToggle } from '@/components/FluxStyledTable';
 import {
   type FluxJob,
   type FluxElement,
@@ -156,38 +157,6 @@ const subRowStickyCell = 'sticky z-20 bg-flux-surface group-hover:bg-flux-hover/
 const stickyHeaderCell = 'sticky z-30 bg-flux-hover';
 
 /**
- * Sort indicator chevron for a column header (v0.5.21).
- * - Active ascending: single up arrow, blue, always visible.
- * - Active descending: single down arrow, blue, always visible.
- * - Inactive sortable: double chevron, opacity-0, appears on group-hover.
- */
-function SortChevron({ col, active, dir }: { col: SortColumn; active: SortColumn; dir: SortDirection }) {
-  const isActive = col === active;
-  if (!isActive) {
-    return (
-      <ChevronsUpDown
-        className="w-3 h-3 text-flux-text-muted opacity-0 group-hover:opacity-100 transition-opacity inline ml-0.5"
-        strokeWidth={2}
-      />
-    );
-  }
-  if (dir === 'asc') {
-    return (
-      <ChevronUp
-        className="w-3 h-3 text-blue-400 inline ml-0.5"
-        strokeWidth={2.5}
-      />
-    );
-  }
-  return (
-    <ChevronDown
-      className="w-3 h-3 text-blue-400 inline ml-0.5"
-      strokeWidth={2.5}
-    />
-  );
-}
-
-/**
  * Header row for the Flux table.
  * Sortable columns show a chevron indicator; clicking triggers onSortChange.
  * Parti and Actions are not sortable (spec 3.6).
@@ -333,13 +302,14 @@ function FluxTableHeader() {
         >
           <div className="flex items-center gap-1 whitespace-nowrap">Facturé</div>
         </th>
-        {/* Actions — frozen right + left shadow */}
-        <th
-          className={`${stickyHeaderCell} right-0 px-4 py-3 text-left text-sm font-medium text-flux-text-secondary`}
-          style={RIGHT_SHADOW}
-        >
-          Actions
-        </th>
+        {ctx.canEditJobShape && (
+          <th
+            className={`${stickyHeaderCell} right-0 px-4 py-3 text-left text-sm font-medium text-flux-text-secondary`}
+            style={RIGHT_SHADOW}
+          >
+            Actions
+          </th>
+        )}
       </tr>
     </thead>
   );
@@ -613,62 +583,38 @@ const FluxTableRow = memo(function FluxTableRow({
         )}
       </td>
 
-      {/* Parti — read-only display (clickability removed per UX decision) */}
       <td className="px-2 py-0 whitespace-nowrap">
-        <span className="flex items-center gap-1.5">
-          {job.parti.shipped ? (
-            <>
-              <CircleCheck className="w-4 h-4 text-emerald-500" strokeWidth={2} />
-              {job.parti.date && (
-                <span className="text-flux-text-muted" style={{ fontSize: '11px' }}>
-                  {job.parti.date}
-                </span>
-              )}
-            </>
-          ) : (
-            <Circle className="w-4 h-4 text-zinc-600" strokeWidth={2} />
-          )}
-        </span>
+        <FluxToggle
+          active={job.parti.shipped}
+          activeDate={job.parti.date}
+          readOnly
+        />
       </td>
 
-      {/* Facturé — clickable toggle */}
       <td className="px-2 py-0 whitespace-nowrap">
-        <button
-          type="button"
-          className="flex items-center gap-1.5 cursor-pointer hover:opacity-80"
-          onClick={() => ctx.onToggleInvoiced?.(job.internalId, !job.facture.invoiced)}
-          title={job.facture.invoiced ? 'Marquer comme non facturé' : 'Marquer comme facturé'}
+        <FluxToggle
+          active={job.facture.invoiced}
+          onToggle={() => ctx.onToggleInvoiced?.(job.internalId, !job.facture.invoiced)}
+          activeDate={job.facture.date}
+          activeTitle="Marquer comme non facturé"
+          inactiveTitle="Marquer comme facturé"
+        />
+      </td>
+
+      {ctx.canEditJobShape && (
+        <td
+          className={`${stickyCell} right-0 px-4 py-0`}
+          style={tint ? { ...RIGHT_SHADOW, background: tint.sticky } : RIGHT_SHADOW}
         >
-          {job.facture.invoiced ? (
-            <>
-              <CircleCheck className="w-4 h-4 text-emerald-500" strokeWidth={2} />
-              {job.facture.date && (
-                <span className="text-flux-text-muted" style={{ fontSize: '11px' }}>
-                  {job.facture.date}
-                </span>
-              )}
-            </>
-          ) : (
-            <Circle className="w-4 h-4 text-zinc-600" strokeWidth={2} />
-          )}
-        </button>
-      </td>
-
-      {/* Actions — frozen right */}
-      <td
-        className={`${stickyCell} right-0 px-4 py-0`}
-        style={tint ? { ...RIGHT_SHADOW, background: tint.sticky } : RIGHT_SHADOW}
-      >
-        <div className="flex items-center gap-2">
-          <button
-            className="text-red-400 hover:text-red-300 transition-colors"
-            onClick={() => ctx.onDeleteJob(job.id)}
-            title="Supprimer"
-            data-testid="flux-action-delete"
-          >
-            <Trash2 className="w-4 h-4" strokeWidth={2} />
-          </button>
-          {ctx.canEditJobShape && (
+          <div className="flex items-center gap-2">
+            <button
+              className="text-red-400 hover:text-red-300 transition-colors"
+              onClick={() => ctx.onDeleteJob(job.id)}
+              title="Supprimer"
+              data-testid="flux-action-delete"
+            >
+              <Trash2 className="w-4 h-4" strokeWidth={2} />
+            </button>
             <button
               className="text-blue-400 hover:text-blue-300 transition-colors"
               onClick={() => ctx.onEditJob(job.id)}
@@ -677,9 +623,9 @@ const FluxTableRow = memo(function FluxTableRow({
             >
               <FolderOpen className="w-4 h-4" strokeWidth={2} />
             </button>
-          )}
-        </div>
-      </td>
+          </div>
+        </td>
+      )}
     </tr>
   );
 });
@@ -800,11 +746,12 @@ function FluxSubRow({
       {/* Facturé — empty */}
       <td />
 
-      {/* Actions — empty (frozen right placeholder) */}
-      <td
-        className={`${subRowStickyCell} right-0`}
-        style={RIGHT_SHADOW}
-      />
+      {ctx.canEditJobShape && (
+        <td
+          className={`${subRowStickyCell} right-0`}
+          style={RIGHT_SHADOW}
+        />
+      )}
     </tr>
   );
 }

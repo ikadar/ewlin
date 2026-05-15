@@ -1,14 +1,28 @@
 import { useState, useMemo, useCallback, memo } from 'react';
-import { CircleCheck, Circle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import {
   useGetProductionEventsQuery,
   useToggleEventSeenMutation,
   type ProductionEventResponse,
 } from '@/store';
+import { useSort } from '@/hooks/useSort';
+import { useRowExitAnimation } from '@/hooks/useRowExitAnimation';
+import { FluxTabBar } from '@/components/FluxTabBar';
+import {
+  SortableHeader,
+  FluxToggle,
+  FluxEmptyState,
+  FLUX_TABLE_CARD,
+  FLUX_TABLE,
+  FLUX_THEAD,
+  FLUX_HEADER_TR,
+  FLUX_HEADER_CELL,
+  FLUX_BODY_TR,
+  FLUX_BODY_TR_STYLE,
+  FLUX_BODY_CELL,
+} from '@/components/FluxStyledTable';
 
 type FilterTab = 'all' | 'important' | 'info' | 'seen';
 type SortCol = 'type' | 'job' | 'task' | 'offset' | 'station' | 'operator' | 'time';
-type SortDir = 'asc' | 'desc';
 
 const TABS: { key: FilterTab; label: string }[] = [
   { key: 'all', label: 'Tous' },
@@ -70,13 +84,7 @@ function timeAgo(iso: string): string {
   return `il y a ${Math.floor(hrs / 24)}j`;
 }
 
-function SortChevron({ col, active, dir }: { col: SortCol; active: SortCol; dir: SortDir }) {
-  if (col !== active) {
-    return <ChevronsUpDown className="w-3 h-3 text-flux-text-muted opacity-0 group-hover:opacity-100 transition-opacity inline ml-0.5" strokeWidth={2} />;
-  }
-  if (dir === 'asc') return <ChevronUp className="w-3 h-3 text-blue-400 inline ml-0.5" strokeWidth={2.5} />;
-  return <ChevronDown className="w-3 h-3 text-blue-400 inline ml-0.5" strokeWidth={2.5} />;
-}
+const defaultDirForCol = (col: SortCol) => col === 'time' ? 'desc' as const : 'asc' as const;
 
 const EventRow = memo(function EventRow({
   event,
@@ -91,17 +99,17 @@ const EventRow = memo(function EventRow({
 }) {
   return (
     <tr
-      className={`border-b border-flux-border group hover:bg-flux-hover ${
+      className={`${FLUX_BODY_TR} ${
         collapsing ? 'opacity-0 pointer-events-none flux-row-collapsing'
         : exiting ? 'opacity-0 transition-opacity duration-1000 pointer-events-none'
-        : `transition-colors ${event.seen ? 'opacity-40 hover:opacity-60' : ''}`
+        : event.seen ? 'opacity-40 hover:opacity-60' : ''
       }`}
-      style={{ height: collapsing ? 0 : '2.25rem' }}
+      style={collapsing ? { height: 0 } : FLUX_BODY_TR_STYLE}
     >
-      <td className="px-2 py-0 text-sm text-flux-text-secondary whitespace-nowrap">
+      <td className={`${FLUX_BODY_CELL} px-2 whitespace-nowrap`}>
         <TypeBadge type={event.type} />
       </td>
-      <td className="px-4 py-0 text-sm whitespace-nowrap">
+      <td className={`${FLUX_BODY_CELL} whitespace-nowrap`}>
         {event.jobReference && (
           <>
             <span className="font-mono font-medium text-flux-text-primary">{event.jobReference}</span>
@@ -110,24 +118,18 @@ const EventRow = memo(function EventRow({
           </>
         )}
       </td>
-      <td className="px-4 py-0 text-sm text-flux-text-secondary whitespace-nowrap">{event.taskName ?? '—'}</td>
-      <td className="px-4 py-0 text-sm whitespace-nowrap"><OffsetCell event={event} /></td>
-      <td className="px-4 py-0 text-sm text-flux-text-secondary whitespace-nowrap">{event.stationName ?? '—'}</td>
-      <td className="px-4 py-0 text-sm text-flux-text-secondary whitespace-nowrap">{event.operatorName ?? '—'}</td>
-      <td className="px-4 py-0 text-sm text-flux-text-muted whitespace-nowrap text-right" style={{ fontSize: '11px' }}>{timeAgo(event.createdAt)}</td>
+      <td className={`${FLUX_BODY_CELL} whitespace-nowrap`}>{event.taskName ?? '—'}</td>
+      <td className={`${FLUX_BODY_CELL} whitespace-nowrap`}><OffsetCell event={event} /></td>
+      <td className={`${FLUX_BODY_CELL} whitespace-nowrap`}>{event.stationName ?? '—'}</td>
+      <td className={`${FLUX_BODY_CELL} whitespace-nowrap`}>{event.operatorName ?? '—'}</td>
+      <td className={`${FLUX_BODY_CELL} whitespace-nowrap text-right text-flux-text-muted`} style={{ fontSize: '11px' }}>{timeAgo(event.createdAt)}</td>
       <td className="px-2 py-0 whitespace-nowrap">
-        <button
-          type="button"
-          className="flex items-center gap-1.5 cursor-pointer hover:opacity-80"
-          onClick={() => onToggleSeen(event.id, !event.seen)}
-          title={event.seen ? 'Marquer comme non vu' : 'Marquer comme vu'}
-        >
-          {event.seen ? (
-            <CircleCheck className="w-4 h-4 text-emerald-500" strokeWidth={2} />
-          ) : (
-            <Circle className="w-4 h-4 text-zinc-600" strokeWidth={2} />
-          )}
-        </button>
+        <FluxToggle
+          active={event.seen}
+          onToggle={() => onToggleSeen(event.id, !event.seen)}
+          activeTitle="Marquer comme non vu"
+          inactiveTitle="Marquer comme vu"
+        />
       </td>
     </tr>
   );
@@ -137,11 +139,10 @@ export function ProductionReportPage() {
   const { data: events = [], isLoading, isError, error } = useGetProductionEventsQuery();
   const [toggleSeen] = useToggleEventSeenMutation();
   const [tab, setTab] = useState<FilterTab>('all');
-  const [sortCol, setSortCol] = useState<SortCol>('time');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const { sortCol, sortDir, handleSort } = useSort<SortCol>('time', 'desc', defaultDirForCol);
 
   const counts = useMemo(() => {
-    const c = { all: events.length, important: 0, info: 0, seen: 0 };
+    const c: Record<FilterTab, number> = { all: events.length, important: 0, info: 0, seen: 0 };
     for (const e of events) {
       if (e.seen) c.seen++;
       else c[severity(e.type)]++;
@@ -172,68 +173,46 @@ export function ProductionReportPage() {
     return list;
   }, [events, tab, sortCol, sortDir]);
 
-  const handleSort = useCallback((col: SortCol) => {
-    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortCol(col); setSortDir(col === 'time' ? 'desc' : 'asc'); }
-  }, [sortCol]);
+  const commitSeen = useCallback((id: string) => {
+    const ev = events.find(e => e.id === id);
+    if (ev) toggleSeen({ id, seen: !ev.seen });
+  }, [toggleSeen, events]);
 
-  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
-  const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set());
+  const { exitingIds, collapsingIds, triggerExit } = useRowExitAnimation(commitSeen);
 
   const handleToggleSeen = useCallback((id: string, seen: boolean) => {
     const willLeave = (tab === 'important' || tab === 'info') ? seen : tab === 'seen' ? !seen : false;
     if (willLeave) {
-      setExitingIds(prev => new Set(prev).add(id));
-      setTimeout(() => {
-        setExitingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-        setCollapsingIds(prev => new Set(prev).add(id));
-        setTimeout(() => {
-          setCollapsingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-          toggleSeen({ id, seen });
-        }, 300);
-      }, 1000);
+      triggerExit(id);
     } else {
       toggleSeen({ id, seen });
     }
-  }, [toggleSeen, tab]);
-
-  const hc = 'px-2 py-3 text-left text-sm font-medium whitespace-nowrap text-flux-text-secondary group cursor-pointer select-none';
+  }, [toggleSeen, tab, triggerExit]);
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-flux-base">
-      <div className="bg-flux-elevated rounded-lg border border-flux-border overflow-hidden flex flex-col flex-1 m-4">
-        {/* Tab bar — FluxTabBar */}
-        <div className="flex items-end border-b border-flux-border bg-flux-elevated px-4">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={[
-                'px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-1.5',
-                tab === t.key
-                  ? 'border-blue-500 text-white bg-flux-elevated'
-                  : 'border-transparent text-flux-text-secondary hover:text-white hover:bg-flux-hover/50',
-              ].join(' ')}
-            >
-              <span>{t.label}</span>
-              <span className="text-sm text-flux-text-muted">({counts[t.key]})</span>
-            </button>
-          ))}
-        </div>
+      <div className={FLUX_TABLE_CARD}>
+        <FluxTabBar
+          tabs={TABS}
+          activeTab={tab}
+          counts={counts}
+          onTabChange={setTab}
+          testIdPrefix="report-tab"
+        />
 
         {/* Table */}
         <div className="flex-1 overflow-y-auto flex flex-col">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-30 bg-flux-hover">
-              <tr className="bg-flux-hover border-b border-flux-border">
-                <th className={hc} onClick={() => handleSort('type')}>Type <SortChevron col="type" active={sortCol} dir={sortDir} /></th>
-                <th className={hc} onClick={() => handleSort('job')}>Job <SortChevron col="job" active={sortCol} dir={sortDir} /></th>
-                <th className={hc} onClick={() => handleSort('task')}>Tâche <SortChevron col="task" active={sortCol} dir={sortDir} /></th>
-                <th className={hc} onClick={() => handleSort('offset')}>Écart <SortChevron col="offset" active={sortCol} dir={sortDir} /></th>
-                <th className={hc} onClick={() => handleSort('station')}>Station <SortChevron col="station" active={sortCol} dir={sortDir} /></th>
-                <th className={hc} onClick={() => handleSort('operator')}>Opérateur <SortChevron col="operator" active={sortCol} dir={sortDir} /></th>
-                <th className={`${hc} text-right`} onClick={() => handleSort('time')}>Quand <SortChevron col="time" active={sortCol} dir={sortDir} /></th>
-                <th className="px-2 py-3 text-left text-sm font-medium whitespace-nowrap text-flux-text-secondary">Vu</th>
+          <table className={FLUX_TABLE}>
+            <thead className={FLUX_THEAD}>
+              <tr className={FLUX_HEADER_TR}>
+                <SortableHeader col="type" active={sortCol} dir={sortDir} onSort={handleSort}>Type</SortableHeader>
+                <SortableHeader col="job" active={sortCol} dir={sortDir} onSort={handleSort}>Job</SortableHeader>
+                <SortableHeader col="task" active={sortCol} dir={sortDir} onSort={handleSort}>Tâche</SortableHeader>
+                <SortableHeader col="offset" active={sortCol} dir={sortDir} onSort={handleSort}>Écart</SortableHeader>
+                <SortableHeader col="station" active={sortCol} dir={sortDir} onSort={handleSort}>Station</SortableHeader>
+                <SortableHeader col="operator" active={sortCol} dir={sortDir} onSort={handleSort}>Opérateur</SortableHeader>
+                <SortableHeader col="time" active={sortCol} dir={sortDir} onSort={handleSort} align="right">Quand</SortableHeader>
+                <th className={FLUX_HEADER_CELL}>Vu</th>
               </tr>
             </thead>
             <tbody>
@@ -243,16 +222,13 @@ export function ProductionReportPage() {
             </tbody>
           </table>
           {isError && (
-            <div className="flex-1 flex items-center justify-center text-red-400 text-sm">
-              Erreur lors du chargement des événements{error && 'status' in error ? ` (${error.status})` : ''}
-            </div>
+            <FluxEmptyState
+              title={`Erreur lors du chargement des événements${error && 'status' in error ? ` (${error.status})` : ''}`}
+              error
+            />
           )}
-          {isLoading && !isError && (
-            <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Chargement…</div>
-          )}
-          {!isLoading && !isError && filtered.length === 0 && (
-            <div className="flex-1 flex items-center justify-center text-flux-text-muted text-sm">Aucun événement</div>
-          )}
+          {isLoading && !isError && <FluxEmptyState title="Chargement…" />}
+          {!isLoading && !isError && filtered.length === 0 && <FluxEmptyState title="Aucun événement" />}
         </div>
       </div>
     </div>

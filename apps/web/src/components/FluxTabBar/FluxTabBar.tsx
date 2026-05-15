@@ -1,58 +1,55 @@
 import { memo } from 'react';
-import { TAB_IDS, TAB_LABELS, type TabId } from '../FluxTable/fluxFilters';
+import {
+  FLUX_TAB_BAR,
+  FLUX_TAB_BASE,
+  FLUX_TAB_ACTIVE,
+  FLUX_TAB_INACTIVE,
+} from '../FluxStyledTable/styles';
 
-interface FluxTabBarProps {
-  activeTab: TabId;
-  counts: Record<TabId, number>;
-  onTabChange: (tab: TabId) => void;
+interface FluxTabBarProps<T extends string> {
+  tabs: { key: T; label: string }[];
+  activeTab: T;
+  counts: Record<T, number>;
+  onTabChange: (tab: T) => void;
+  ariaLabel?: string;
+  testIdPrefix?: string;
 }
 
-/**
- * Tab bar for the Production Flow Dashboard.
- * 5 tabs with active/inactive visual state and dynamic count badges.
- * Includes a keyboard shortcut hint bar on the right.
- * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 3.3, 3.4
- */
-export const FluxTabBar = memo(function FluxTabBar({
+function FluxTabBarInner<T extends string>({
+  tabs,
   activeTab,
   counts,
   onTabChange,
-}: FluxTabBarProps) {
+  ariaLabel = 'Filtres',
+  testIdPrefix = 'flux-tab',
+}: FluxTabBarProps<T>) {
   return (
-    <div
-      className="flex items-end border-b border-flux-border bg-flux-elevated px-4"
-      data-testid="flux-tab-bar"
-    >
-      {/* Tabs */}
-      <div className="flex items-end gap-0" role="tablist" aria-label="Filtres du tableau de flux">
-        {TAB_IDS.map(tab => {
-          const isActive = tab === activeTab;
+    <div className={FLUX_TAB_BAR} data-testid={`${testIdPrefix}-bar`}>
+      <div className="flex items-end gap-0" role="tablist" aria-label={ariaLabel}>
+        {tabs.map(tab => {
+          const isActive = tab.key === activeTab;
           return (
             <button
-              key={tab}
+              key={tab.key}
               role="tab"
               aria-selected={isActive}
-              onClick={() => onTabChange(tab)}
-              data-testid={`flux-tab-${tab}`}
-              className={[
-                'px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-1.5',
-                isActive
-                  ? 'border-blue-500 text-white bg-flux-elevated'
-                  : 'border-transparent text-flux-text-secondary hover:text-white hover:bg-flux-hover/50',
-              ].join(' ')}
+              onClick={() => onTabChange(tab.key)}
+              data-testid={`${testIdPrefix}-${tab.key}`}
+              className={`${FLUX_TAB_BASE} ${isActive ? FLUX_TAB_ACTIVE : FLUX_TAB_INACTIVE}`}
             >
-              <span>{TAB_LABELS[tab]}</span>
+              <span>{tab.label}</span>
               <span
                 className="text-sm text-flux-text-muted"
-                data-testid={`flux-tab-count-${tab}`}
+                data-testid={`${testIdPrefix}-count-${tab.key}`}
               >
-                ({counts[tab]})
+                ({counts[tab.key]})
               </span>
             </button>
           );
         })}
       </div>
-
     </div>
   );
-});
+}
+
+export const FluxTabBar = memo(FluxTabBarInner) as typeof FluxTabBarInner;
