@@ -71,6 +71,7 @@ export interface OperatorResponse {
   concurrentGroups: ConcurrentGroupResponse[];
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
 }
 
 export interface OperatorInput {
@@ -90,8 +91,11 @@ export const operatorApi = createApi({
   baseQuery: baseQueryWithFixtureSupport,
   tagTypes: ['Operators'],
   endpoints: (builder) => ({
-    getOperators: builder.query<OperatorResponse[], void>({
-      query: () => '/operators',
+    getOperators: builder.query<OperatorResponse[], { includeArchived?: boolean } | void>({
+      query: (params) => {
+        const includeArchived = params && 'includeArchived' in params && params.includeArchived;
+        return includeArchived ? '/operators?includeArchived=true' : '/operators';
+      },
       transformResponse: (response: OperatorResponse[] | { items: OperatorResponse[] }) =>
         Array.isArray(response) ? response : (response.items ?? []),
       providesTags: ['Operators'],
@@ -116,6 +120,13 @@ export const operatorApi = createApi({
       query: (id) => ({
         url: `/operators/${id}`,
         method: 'DELETE',
+      }),
+      invalidatesTags: ['Operators'],
+    }),
+    restoreOperator: builder.mutation<OperatorResponse, string>({
+      query: (id) => ({
+        url: `/operators/${id}/restore`,
+        method: 'PATCH',
       }),
       invalidatesTags: ['Operators'],
     }),
@@ -163,6 +174,7 @@ export const {
   useCreateOperatorMutation,
   useUpdateOperatorMutation,
   useDeleteOperatorMutation,
+  useRestoreOperatorMutation,
   useReplaceSkillsMutation,
   useReplaceConcurrentGroupsMutation,
   useAddOperatorAbsenceMutation,

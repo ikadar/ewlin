@@ -8,12 +8,13 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, Plus, FolderOpen, Trash2 } from 'lucide-react';
+import { Search, ArrowLeft, Plus, FolderOpen, Archive, RotateCcw } from 'lucide-react';
 import {
   useGetOperatorsQuery,
   useCreateOperatorMutation,
   useUpdateOperatorMutation,
   useDeleteOperatorMutation,
+  useRestoreOperatorMutation,
   useReplaceSkillsMutation,
   useReplaceConcurrentGroupsMutation,
 } from '../store/api/operatorApi';
@@ -1178,11 +1179,15 @@ export default function OperatorsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [deletingOperator, setDeletingOperator] = useState<OperatorResponse | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
-  const { data: operators = [], isLoading, error } = useGetOperatorsQuery();
+  const { data: operators = [], isLoading, error } = useGetOperatorsQuery(
+    showArchived ? { includeArchived: true } : undefined,
+  );
   const [createOperator, { isLoading: isCreatingLoading }] = useCreateOperatorMutation();
   const [updateOperator, { isLoading: isUpdatingLoading }] = useUpdateOperatorMutation();
   const [deleteOperator] = useDeleteOperatorMutation();
+  const [restoreOperator] = useRestoreOperatorMutation();
   const [replaceSkills] = useReplaceSkillsMutation();
   const [replaceConcurrentGroups] = useReplaceConcurrentGroupsMutation();
 
@@ -1313,8 +1318,16 @@ export default function OperatorsPage() {
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ??
-        "Erreur lors de la suppression";
+        "Erreur lors de l'archivage";
       setDeleteError(msg);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      await restoreOperator(id).unwrap();
+    } catch {
+      // noop — RTK Query will refetch
     }
   };
 
@@ -1381,6 +1394,17 @@ export default function OperatorsPage() {
                 {filteredOperators.length !== 1 ? 's' : ''}
                 {searchQuery && ` / ${operators.length}`}
               </span>
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors border ${
+                  showArchived
+                    ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+                    : 'text-flux-text-tertiary border-flux-border hover:text-flux-text-secondary'
+                }`}
+              >
+                <Archive size={14} />
+                Archivés
+              </button>
             </div>
 
             {/* Table */}
@@ -1408,7 +1432,7 @@ export default function OperatorsPage() {
                     return (
                     <tr
                       key={operator.id}
-                      className="border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9"
+                      className={`border-b border-flux-border group hover:bg-flux-hover transition-colors cursor-pointer h-9${operator.archivedAt ? ' opacity-40' : ''}`}
                     >
                       <td className="px-4 py-0 text-flux-text-primary font-medium">{operator.firstName}</td>
                       <td className="px-4 py-3 text-flux-text-primary">{operator.lastName}</td>
@@ -1435,23 +1459,35 @@ export default function OperatorsPage() {
                       </td>
                       <td className="px-4 py-0">
                         <div className="flex items-center gap-2 justify-end">
-                          <button
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeletingOperator(operator);
-                            }}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" strokeWidth={2} />
-                          </button>
-                          <button
-                            onClick={() => setEditingOperator(operator)}
-                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                            title="Modifier"
-                          >
-                            <FolderOpen className="w-4 h-4" strokeWidth={2} />
-                          </button>
+                          {operator.archivedAt ? (
+                            <button
+                              onClick={() => handleRestore(operator.id)}
+                              className="text-amber-400 hover:text-amber-300 transition-colors"
+                              title="Restaurer"
+                            >
+                              <RotateCcw className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setDeleteError(null);
+                                  setDeletingOperator(operator);
+                                }}
+                                className="text-amber-400 hover:text-amber-300 transition-colors"
+                                title="Archiver"
+                              >
+                                <Archive className="w-4 h-4" strokeWidth={2} />
+                              </button>
+                              <button
+                                onClick={() => setEditingOperator(operator)}
+                                className="text-blue-400 hover:text-blue-300 transition-colors"
+                                title="Modifier"
+                              >
+                                <FolderOpen className="w-4 h-4" strokeWidth={2} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1488,15 +1524,15 @@ export default function OperatorsPage() {
         />
       )}
 
-      {/* Delete confirmation */}
+      {/* Archive confirmation */}
       {deletingOperator && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="bg-flux-elevated border border-flux-border-light rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h2 className="text-flux-text-primary font-medium mb-2">Supprimer l'opérateur</h2>
+            <h2 className="text-flux-text-primary font-medium mb-2">Archiver l'opérateur</h2>
             <p className="text-sm text-flux-text-secondary mb-4">
-              Supprimer{' '}
+              Archiver{' '}
               <span className="font-medium text-flux-text-primary">{deletingOperator.firstName} {deletingOperator.lastName}</span> ?
-              Cette action est irréversible.
+              L'opérateur n'apparaitra plus dans le planning. Vous pourrez le restaurer.
             </p>
             {deleteError && (
               <p className="text-sm text-red-400 mb-3">{deleteError}</p>
@@ -1513,9 +1549,9 @@ export default function OperatorsPage() {
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="px-3 py-1.5 text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded transition-colors"
               >
-                Supprimer
+                Archiver
               </button>
             </div>
           </div>
