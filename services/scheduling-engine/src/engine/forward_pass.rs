@@ -1017,7 +1017,6 @@ enum AssignOutcome {
 }
 
 /// Main forward pass: schedule all actions onto the grid.
-/// `station_to_group` maps station_idx → Option<(group_idx, max_concurrent)> for group capacity.
 /// `operator_groups[op_idx]` is the list of concurrent station pairs that
 /// operator can supervise simultaneously (Phase 2b masked time model).
 ///
@@ -1050,7 +1049,6 @@ pub fn run_forward_pass(
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     tick_minutes: u32,
     start_date: NaiveDate,
-    station_to_group: &[Option<(usize, u32)>],
     now_tick: usize,
     station_urgency_boost: &HashMap<usize, f64>,
     score_weights: &[f64; 7],
@@ -1458,14 +1456,6 @@ pub fn run_forward_pass(
                 }
             }
 
-            if action.station_idx < station_to_group.len() {
-                if let Some((group_idx, max_concurrent)) = station_to_group[action.station_idx] {
-                    if grid.group_active_count(group_idx, t) >= max_concurrent {
-                        continue;
-                    }
-                }
-            }
-
             let slack = action.last as i64 - t as i64 - action.art as i64;
             let raw_urgency: i64 = if slack <= 0 {
                 10000 + (-slack) as i64
@@ -1684,7 +1674,6 @@ pub fn run_forward_pass(
                 operator_skills,
                 operator_availability,
                 operator_groups,
-                station_to_group,
                 tick_minutes,
                 grow_ticks,
             );
@@ -1769,7 +1758,6 @@ pub fn run_forward_pass(
                 operator_skills,
                 operator_availability,
                 operator_groups,
-                station_to_group,
                 tick_minutes,
                 grow_ticks,
             );
@@ -1816,7 +1804,6 @@ pub fn run_forward_pass(
                 operator_skills,
                 operator_availability,
                 operator_groups,
-                station_to_group,
                 tick_minutes,
                 grow_ticks,
             );
@@ -2270,19 +2257,11 @@ fn assign_action_at_tick(
     operator_skills: &[Vec<SkillEntry>],
     operator_availability: &mut OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
-    station_to_group: &[Option<(usize, u32)>],
     tick_minutes: u32,
     grow_ticks: usize,
 ) -> AssignOutcome {
     let station_idx = actions[action_idx].station_idx;
     let attrs = &station_attrs[station_idx];
-
-    // Group concurrency: skip this tick if the station's group is at capacity
-    let group_idx = if station_idx < station_to_group.len() {
-        station_to_group[station_idx].map(|(g, _)| g)
-    } else {
-        None
-    };
 
     // Station occupied by another action? (rare — only if the algorithm
     // failed to coordinate; we don't reserve here.)
@@ -2547,9 +2526,7 @@ fn assign_action_at_tick(
         // Stall path
         actions[action_idx].idle_ticks += 1;
         grid.assign_station(station_idx, t, action_idx);
-        if let Some(g) = group_idx {
-            grid.increment_group(g, t);
-        }
+
         apply_peremption_rule(
             &mut actions[action_idx],
             setup_ticks,
@@ -2592,7 +2569,7 @@ fn assign_action_at_tick(
                     }
                 }
                 grid.assign_station(station_idx, skip_to, action_idx);
-                if let Some(g) = group_idx { grid.increment_group(g, skip_to); }
+
                 // Peremption is a physical property (ink dries, registration
                 // shifts) — it keeps running regardless of operator presence,
                 // so each skipped tick must count toward idle_ticks. Without
@@ -2617,9 +2594,6 @@ fn assign_action_at_tick(
     // Successful assignment
     actions[action_idx].idle_ticks = 0;
     grid.assign_station(station_idx, t, action_idx);
-    if let Some(g) = group_idx {
-        grid.increment_group(g, t);
-    }
     for &op_idx in &operators {
         if !operator_availability.is_available(op_idx, t) {
             eprintln!(
@@ -5077,7 +5051,6 @@ mod peremption_tests {
         let mut actions = vec![action];
         let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]);
         let groups = vec![vec![]];
-        let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
 
         for t in 0..(peremption_ticks as usize) {
             let outcome = assign_action_at_tick(
@@ -5089,7 +5062,7 @@ mod peremption_tests {
                 &skills,
                 &mut availability,
                 &groups,
-                &station_to_group,
+
                 15,
                 96,
             );
@@ -5189,7 +5162,6 @@ mod peremption_tests {
         let mut actions = vec![action];
         let skills = mk_skills(vec![vec![(0usize, 1.0f64)]]);
         let groups = vec![vec![]];
-        let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
 
         // Place tick 0 and follow the action through the consecutive
         // window. Every tick in [0, 9) must succeed; ticks at and after
@@ -5206,7 +5178,7 @@ mod peremption_tests {
                 &skills,
                 &mut availability,
                 &groups,
-                &station_to_group,
+
                 5,
                 num_ticks,
             );
@@ -7526,7 +7498,6 @@ mod virtual_reservation_cleanup_tests {
         let operator_skills = mk_skills(vec![vec![(0, 1.5)]]);
         let operator_groups: Vec<Vec<PreparedConcurrentGroup>> = vec![Vec::new()];
         let mut avail = always_available(1, num_ticks);
-        let station_to_group: Vec<Option<(usize, u32)>> = vec![None];
         let start_date = NaiveDate::from_ymd_opt(2026, 5, 12).unwrap();
         let urgency: HashMap<usize, f64> = HashMap::new();
         let weights = [1.0_f64; 7];
@@ -7546,7 +7517,6 @@ mod virtual_reservation_cleanup_tests {
             &operator_groups,
             tick_minutes as u32,
             start_date,
-            &station_to_group,
             0,
             &urgency,
             &weights,

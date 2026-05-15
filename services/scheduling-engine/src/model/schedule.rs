@@ -6,19 +6,6 @@ use super::station::StationInput;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct StationGroupInput {
-    pub id: String,
-    pub station_ids: Vec<String>,
-    #[serde(default = "default_max_concurrent")]
-    pub max_concurrent: u32,
-}
-
-fn default_max_concurrent() -> u32 {
-    1
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ComputeRequest {
     pub stations: Vec<StationInput>,
     #[serde(default)]
@@ -26,8 +13,6 @@ pub struct ComputeRequest {
     pub jobs: Vec<JobInput>,
     #[serde(default)]
     pub options: Option<ComputeOptions>,
-    #[serde(default)]
-    pub station_groups: Vec<StationGroupInput>,
     /// Pre-occupied slots from existing assignments. The engine blocks these
     /// station+operator ticks in the grid before the forward pass, so new
     /// tasks are placed in the remaining gaps only.

@@ -789,7 +789,6 @@ mod tests {
                     perturbed_starts: 0,
                     ..ComputeOptions::default()
                 }),
-                station_groups: vec![],
                 occupied_slots: vec![],
                 setup_completion_log: vec![], reference_time: None,
             };
@@ -901,7 +900,6 @@ mod tests {
                     perturbed_starts: 0,
                     ..ComputeOptions::default()
                 }),
-                station_groups: vec![],
                 occupied_slots: vec![],
                 setup_completion_log: vec![], reference_time: None,
             };

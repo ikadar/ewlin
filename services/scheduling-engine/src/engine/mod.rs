@@ -199,7 +199,6 @@ fn compute_inner(
         start_date,
         options.multi_start,
         options.perturbed_starts,
-        &request.station_groups,
         &station_blocked_ranges,
         &occupied_slots_parsed,
         &request.setup_completion_log,
@@ -226,7 +225,6 @@ fn compute_inner(
             fbi_max_iterations,
             start_date,
             2, // max_attempts (reduced to leave budget for SA)
-            &request.station_groups,
             &request.setup_completion_log,
             now_tick,
             options.precedence_min_gap_ticks,
@@ -259,7 +257,6 @@ fn compute_inner(
             tick_minutes,
             options.horizon_days,
             start_date,
-            &request.station_groups,
             &station_blocked_ranges,
             &occupied_slots_parsed,
             &request.setup_completion_log,
@@ -1773,7 +1770,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -1808,7 +1805,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -1868,14 +1865,14 @@ mod integration_tests {
             operators: vec![paired_op],
             jobs: jobs.clone(),
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         });
         let unpaired_result = compute(&ComputeRequest {
             stations,
             operators: vec![unpaired_op],
             jobs,
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         });
 
         let paired_makespan = paired_result
@@ -1935,7 +1932,7 @@ mod integration_tests {
             operators: vec![op],
             jobs: vec![make_job("job-a", "sbg", 60)],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -1975,7 +1972,7 @@ mod integration_tests {
                 make_job("job-b", "mbo-xl", 60),
             ],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2077,7 +2074,7 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![job],
             options: options(),
-            station_groups: Vec::new(), occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
+            occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
         let result = compute(&request);
@@ -2291,7 +2288,6 @@ mod integration_tests {
             operators: vec![alice],
             jobs,
             options: Some(ComputeOptions { horizon_days: 2, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         setup_completion_log: Vec::new(), reference_time: None,
         };
@@ -2377,7 +2373,6 @@ mod integration_tests {
                 make_2step_job("A", fmt(8)),  // listed second, tight
             ],
             options: Some(ComputeOptions { horizon_days: 3, tick_minutes: 60, fbi_max_iterations: 3, multi_start: false, perturbed_starts: 0, skip_lns: Some(true), lns_budget_ms: None, precedence_min_gap_ticks: 1 }),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         setup_completion_log: Vec::new(), reference_time: None,
         };
@@ -2458,7 +2453,6 @@ mod integration_tests {
             operators: vec![alice],
             jobs: vec![make_pinned_job("J1", 5), make_pinned_job("J2", 5)],
             options: options(),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
@@ -2568,7 +2562,6 @@ mod integration_tests {
                 make_pinned_job("B", b_pinned_start, b_pinned_end),
             ],
             options: options(),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
 
@@ -2748,7 +2741,6 @@ mod integration_tests {
                 lns_budget_ms: None,
                 precedence_min_gap_ticks: 1,
             }),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         setup_completion_log: Vec::new(), reference_time: None,
         };
@@ -2917,7 +2909,6 @@ mod integration_tests {
                 lns_budget_ms: None,
                 precedence_min_gap_ticks: 1,
             }),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(),
         setup_completion_log: Vec::new(), reference_time: None,
         };
@@ -3000,7 +2991,6 @@ mod integration_tests {
             operators: vec![operator.clone()],
             jobs: vec![make_single_task_job("j", "s1", 60, None)],
             options: options(),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
         let baseline_result = compute(&baseline);
@@ -3016,7 +3006,6 @@ mod integration_tests {
             operators: vec![operator],
             jobs: vec![make_single_task_job("j", "s1", 60, Some(120))],
             options: options(),
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
         };
         let ratio_result = compute(&with_ratio);
@@ -3114,7 +3103,6 @@ mod integration_tests {
                 operators: vec![operator],
                 jobs: vec![job],
                 options: options(),
-                station_groups: Vec::new(),
                 occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
             }
         };
@@ -3373,7 +3361,6 @@ mod setup_run_split_e2e_tests {
             stations,
             jobs,
             operators,
-            station_groups: Vec::new(),
             occupied_slots: Vec::new(), setup_completion_log: Vec::new(), reference_time: None,
             options: Some(ComputeOptions {
                 horizon_days: 2,

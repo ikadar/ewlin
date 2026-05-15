@@ -11,7 +11,7 @@ use rand::SeedableRng;
 use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
 use crate::model::progress::ProgressEvent;
-use crate::model::schedule::{ComputedAssignment, ScheduleStats, StationGroupInput};
+use crate::model::schedule::{ComputedAssignment, ScheduleStats};
 use crate::model::station::StationInput;
 
 use super::backward_pass::BackwardOrdering;
@@ -37,7 +37,6 @@ pub fn lns_improve(
     tick_minutes: u32,
     horizon_days: u32,
     start_date: NaiveDate,
-    station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     setup_completion_log: &[crate::model::schedule::SetupCompletion],
@@ -236,7 +235,7 @@ pub fn lns_improve(
             &modified_jobs, stations, operators,
             tick_minutes, horizon_days, 1, // single FBI iteration
             start_date, BackwardOrdering::TierFirst,
-            station_groups, station_blocked_ranges, occupied_slots,
+            station_blocked_ranges, occupied_slots,
             setup_completion_log,
             &None, now_tick, &default_weights,
             precedence_min_gap_ticks,

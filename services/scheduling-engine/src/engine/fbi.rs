@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 
 use crate::model::schedule::{
-    ComputedAssignment, ScheduleStats, SetupCompletion, StationGroupInput, Warning,
+    ComputedAssignment, ScheduleStats, SetupCompletion, Warning,
 };
 use crate::model::station::StationInput;
 use crate::model::operator::OperatorInput;
@@ -295,8 +295,6 @@ pub fn run_with_fbi(
         );
 
         // Run forward pass
-        // No station groups in base FBI (empty mapping)
-        let station_to_group: Vec<Option<(usize, u32)>> = vec![None; num_stations];
         let assignments = run_forward_pass(
             &mut grid,
             &mut actions,
@@ -306,7 +304,6 @@ pub fn run_with_fbi(
             &operator_groups,
             tick_minutes,
             start_date,
-            &station_to_group,
             now_tick,
             &station_urgency_boost,
             &score_weights,
@@ -399,7 +396,7 @@ pub fn run_with_fbi(
     (best_assignments, best_actions, best_stats, iteration_count)
 }
 
-/// Run FBI with a specific backward ordering and station groups.
+/// Run FBI with a specific backward ordering.
 pub fn run_with_fbi_ordering(
     jobs: &[JobInput],
     stations: &[StationInput],
@@ -409,7 +406,6 @@ pub fn run_with_fbi_ordering(
     max_iterations: u32,
     start_date: NaiveDate,
     ordering: BackwardOrdering,
-    _station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     setup_completion_log: &[SetupCompletion],
@@ -445,7 +441,6 @@ pub fn run_with_multi_start_fbi(
     start_date: NaiveDate,
     multi_start: bool,
     perturbed_starts: u32,
-    station_groups: &[StationGroupInput],
     station_blocked_ranges: &[Vec<(usize, usize)>],
     occupied_slots: &[(usize, Vec<usize>, usize, usize)],
     setup_completion_log: &[SetupCompletion],
@@ -469,7 +464,7 @@ pub fn run_with_multi_start_fbi(
     let (mut best_a, mut best_act, mut best_s, i1) = run_with_fbi_ordering(
         jobs, stations, operators,
         tick_minutes, horizon_days, max_iterations, start_date,
-        BackwardOrdering::TierFirst, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
+        BackwardOrdering::TierFirst, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
         now_tick, &default_weights,
         precedence_min_gap_ticks,
         &mut warnings_p1,
@@ -492,7 +487,7 @@ pub fn run_with_multi_start_fbi(
         let (a2, act2, s2, i2) = run_with_fbi_ordering(
             jobs, stations, operators,
             tick_minutes, horizon_days, max_iterations, start_date,
-            BackwardOrdering::EarliestDeadline, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
+            BackwardOrdering::EarliestDeadline, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
             &mut warnings_p2,
@@ -522,7 +517,7 @@ pub fn run_with_multi_start_fbi(
         let (a3, act3, s3, i3) = run_with_fbi_ordering(
             jobs, stations, operators,
             tick_minutes, horizon_days, max_iterations, start_date,
-            BackwardOrdering::SlackFirst, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
+            BackwardOrdering::SlackFirst, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
             now_tick, &default_weights,
             precedence_min_gap_ticks,
             &mut warnings_p3,
@@ -566,7 +561,7 @@ pub fn run_with_multi_start_fbi(
             let (ap, actp, sp, ip) = run_with_fbi_ordering(
                 jobs, stations, operators,
                 tick_minutes, horizon_days, max_iterations, start_date,
-                ordering, station_groups, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
+                ordering, station_blocked_ranges, occupied_slots, setup_completion_log, progress,
                 now_tick, &weights,
                 precedence_min_gap_ticks,
                 &mut warnings_pp,
