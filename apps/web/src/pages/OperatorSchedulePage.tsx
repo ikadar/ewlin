@@ -204,11 +204,13 @@ export default function OperatorSchedulePage() {
   const snapshot = useMemo(() => snapshotData ?? defaultSnapshot, [snapshotData]);
   const operators = snapshot.operators ?? [];
 
+  const lookbackDays = snapshot.lookbackDays ?? 6;
   const gridStartDate = useMemo(() => {
     const d = getNow();
+    d.setDate(d.getDate() - lookbackDays);
     d.setHours(START_HOUR, 0, 0, 0);
     return d;
-  }, []);
+  }, [lookbackDays]);
 
   // ---- Virtual scrolling (same as SchedulingGrid) ----
   const [scrollTop, setScrollTop] = useState(0);
