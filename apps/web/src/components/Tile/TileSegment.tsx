@@ -325,7 +325,7 @@ export function TileSegment({
             <path
               d={buildSawtoothSvgPath(width, 0, 'top', teethCount)}
               fill="none"
-              stroke={colors.border}
+              stroke={showGradient ? getStateInlineColors('completed').border : colors.border}
               strokeWidth={1.5}
               strokeOpacity={0.7}
             />

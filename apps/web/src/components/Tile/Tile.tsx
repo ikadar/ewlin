@@ -203,39 +203,21 @@ export const Tile = memo(function Tile({
 
   // No-news = good-news auto-completion : a tile whose scheduledEnd is past
   // `now` reads as completed regardless of the explicit `isCompleted` flag.
-  // Logic centralised in `isCompletedEffective` so JDP, station grid, focus
-  // view and minimap all agree on the silent-completion frontier.
   // For chunk tiles, a chunk is considered effectively completed once its
   // OWN window has ended — otherwise a future chunk of a partly-past
-  // assignment would also flip to completed-green, contradicting the
-  // "this stint hasn't started" reading the chef expects.
+  // assignment would also flip to completed-green.
   const completionEndIso = windowEnd ?? assignment.scheduledEnd;
   const baseEffectivelyCompleted = isCompletedEffective(
     assignment.isCompleted,
     completionEndIso,
     now.getTime(),
   );
-  const effectiveTileState =
-    tileState !== 'shipped' && tileState !== 'completed' && baseEffectivelyCompleted
-      ? ('completed' as TileState)
-      : tileState;
 
-  // Get state-based color classes
-  const colorClasses = getStateColorClasses(effectiveTileState);
-  const stateRgb = getStateRgb(effectiveTileState);
-
-  // Completion is the modal-driven, derived state. The explicit
-  // `assignment.isCompleted` flag still feeds `tileState` upstream.
-  const isCompleted = effectiveTileState === 'completed' || effectiveTileState === 'shipped';
-
-  // Fond-vert : two flavours.
-  //   - Chunk tile (windowStart/End passed) : per-window wallclock progress —
-  //     past chunks 100, future chunks 0, active chunk fills linearly. The
-  //     saisie remains task-level and is reflected by the engine reshuffling
-  //     window boundaries on recompute, so we don't blend it in here.
-  //   - Continuous tile : the original task-level optimistic projection
-  //     blends wallclock + saisie anchor extrapolation.
-  const progress = isCompleted
+  // Compute progress BEFORE effectiveTileState so saisie-driven completion
+  // (extrapolation reaches 100 % before scheduledEnd) also flips the tile
+  // to completed-green rather than falling into the blue gap between
+  // "gradient off (pct >= 100)" and "state still default".
+  const rawProgress = baseEffectivelyCompleted
     ? null
     : windowStart && windowEnd
       ? computeChunkProgress(windowStart, windowEnd, now.getTime())
@@ -248,6 +230,20 @@ export const Tile = memo(function Tile({
           task.recordedAt,
           now.getTime(),
         );
+  const progressCompleted = rawProgress !== null && rawProgress.pct >= 100;
+
+  const effectiveTileState =
+    tileState !== 'shipped' && tileState !== 'completed' && (baseEffectivelyCompleted || progressCompleted)
+      ? ('completed' as TileState)
+      : tileState;
+
+  // Get state-based color classes
+  const colorClasses = getStateColorClasses(effectiveTileState);
+  const stateRgb = getStateRgb(effectiveTileState);
+
+  const isCompleted = effectiveTileState === 'completed' || effectiveTileState === 'shipped';
+  const progress = isCompleted ? null : rawProgress;
+
   const showGradient = progress !== null
     && (progress.pct > 0 || progress.isLate)
     && progress.pct < 100;
@@ -258,11 +254,13 @@ export const Tile = memo(function Tile({
   const bodyBorderImage = showGradient && progress
     ? computeProgressBorderImage(progress.pct, progress.isLate, 'vertical', baseInline.border)
     : undefined;
-  // Label text follows the green portion when progress is shown — the
-  // label sits at the top of the tile so it's always inside the green
-  // band when partial progress is rendered. This matches the visual of
-  // a fully-completed tile (`text-green-300`) so the partial-progress
-  // tile reads consistently with the all-green case.
+
+  // Teeth + label follow the progress gradient when visible: the top of
+  // the tile is always inside the green zone (gradient fills top-down),
+  // so text and sawtooth strokes at the top should read green, not the
+  // base state's blue.
+  const completedRgb = getStateRgb('completed');
+  const progressAwareRgb = showGradient ? completedRgb : stateRgb;
   const labelTextClass = showGradient ? 'text-green-300' : colorClasses.text;
 
   // Handle click — select this job
@@ -410,7 +408,7 @@ export const Tile = memo(function Tile({
               <path
                 d={buildSawtoothSvgPath(100, 0, 'top', teethCount)}
                 fill="none"
-                stroke={`rgb(${stateRgb.border})`}
+                stroke={`rgb(${progressAwareRgb.border})`}
                 strokeWidth={1.5}
                 strokeOpacity={0.7}
                 vectorEffect="non-scaling-stroke"
