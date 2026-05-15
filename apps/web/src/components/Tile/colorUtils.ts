@@ -3,20 +3,12 @@
  * Color encodes tile state (late, conflict, blocked, completed, default)
  * rather than per-job decorative colors.
  *
- * All state-based colors (Tailwind classes, rgb triplets, rgba inline
- * styles, hex) derive from the single PALETTE + OPACITY source of truth
- * below. Adding a new state only requires updating those two tables and
- * the Tailwind `stateColorMap` (the latter can't be derived because
- * Tailwind demands literal class names at author time).
+ * All state-based colors derive from the single PALETTE + OPACITY source
+ * of truth below. Adding a new state only requires updating those two
+ * tables.
  */
 
 export type TileState = 'shipped' | 'late' | 'conflict' | 'blocked' | 'completed' | 'default';
-
-export interface ColorClasses {
-  border: string;
-  runBg: string;
-  text: string;
-}
 
 /**
  * Derived completion. A tile whose `scheduledEnd` is past `now` is considered
@@ -61,8 +53,7 @@ export function computeTileState(
 }
 
 // Canonical palette per state. `rgb` is the main triplet (tile fill + border
-// stroke); `textRgb` is the lighter tint used for text. Hex values match the
-// Tailwind palette so `stateColorMap` classes below stay visually consistent.
+// stroke); `textRgb` is the lighter tint used for text.
 const PALETTE: Record<TileState, {
   rgb: string;
   textRgb: string;
@@ -92,46 +83,6 @@ const OPACITY: Record<TileState, { run: number; setup: number }> = {
 /** All valid tile states, derived from PALETTE so it stays in sync. */
 export const ALL_TILE_STATES = Object.keys(PALETTE) as TileState[];
 
-const stateColorMap: Record<TileState, ColorClasses> = {
-  shipped: {
-    border: 'border-l-emerald-500',
-    runBg: 'bg-emerald-500/[0.09]',
-    text: 'text-emerald-300',
-  },
-  default: {
-    border: 'border-l-blue-500',
-    runBg: 'bg-blue-500/[0.12]',
-    text: 'text-blue-300',
-  },
-  completed: {
-    border: 'border-l-green-500',
-    runBg: 'bg-green-500/[0.09]',
-    text: 'text-green-300',
-  },
-  conflict: {
-    border: 'border-l-amber-500',
-    runBg: 'bg-amber-500/[0.09]',
-    text: 'text-amber-300',
-  },
-  late: {
-    border: 'border-l-red-500',
-    runBg: 'bg-red-500/[0.09]',
-    text: 'text-red-300',
-  },
-  blocked: {
-    border: 'border-l-zinc-500',
-    runBg: 'bg-zinc-500/[0.06]',
-    text: 'text-zinc-400',
-  },
-};
-
-/**
- * Get Tailwind classes for a tile state.
- */
-export function getStateColorClasses(state: TileState): ColorClasses {
-  return stateColorMap[state];
-}
-
 export interface InlineColors {
   bg: string;       // rgba(r,g,b, runOpacity) — main body fill
   setupBg: string;  // rgba(r,g,b, setupOpacity) — setup + re-calage band fill
@@ -140,8 +91,8 @@ export interface InlineColors {
 }
 
 /**
- * Get inline-style colors for tile fragments that can't use Tailwind classes
- * (e.g. TileSegment, whose clip-path demands explicit rgba backgrounds).
+ * Get inline-style colors for a tile state. Single rendering path for
+ * Tile, TileSegment, DragPreview, and any other tile-derived component.
  */
 export function getStateInlineColors(state: TileState): InlineColors {
   const p = PALETTE[state];

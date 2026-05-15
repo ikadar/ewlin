@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Tile } from './Tile';
 import { SwapButtons } from './SwapButtons';
 import { SimilarityIndicators } from './SimilarityIndicators';
-import { getStateColorClasses, computeTileState } from './colorUtils';
+import { getStateInlineColors, computeTileState } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { TaskAssignment, InternalTask, Job } from '@flux/types';
 
@@ -82,46 +82,44 @@ describe('colorUtils', () => {
     });
   });
 
-  describe('getStateColorClasses', () => {
-    const states: TileState[] = ['default', 'completed', 'conflict', 'late', 'blocked'];
+  describe('getStateInlineColors', () => {
+    const states: TileState[] = ['default', 'completed', 'conflict', 'late', 'blocked', 'shipped'];
 
-    it('returns classes for all 5 states', () => {
+    it('returns inline colors for all states', () => {
       states.forEach((state) => {
-        const classes = getStateColorClasses(state);
-        expect(classes.border).toBeTruthy();
-        expect(classes.runBg).toBeTruthy();
-        expect(classes.text).toBeTruthy();
+        const colors = getStateInlineColors(state);
+        expect(colors.bg).toBeTruthy();
+        expect(colors.border).toBeTruthy();
+        expect(colors.text).toBeTruthy();
+        expect(colors.setupBg).toBeTruthy();
       });
     });
 
-    it('returns blue classes for default state', () => {
-      const classes = getStateColorClasses('default');
-      expect(classes.border).toBe('border-l-blue-500');
-      expect(classes.text).toBe('text-blue-300');
+    it('returns blue for default state', () => {
+      const c = getStateInlineColors('default');
+      expect(c.border).toBe('#3b82f6');
+      expect(c.text).toBe('#93c5fd');
     });
 
-    it('returns green classes for completed state', () => {
-      const classes = getStateColorClasses('completed');
-      expect(classes.border).toBe('border-l-green-500');
-      expect(classes.text).toBe('text-green-300');
+    it('returns green for completed state', () => {
+      const c = getStateInlineColors('completed');
+      expect(c.border).toBe('#22c55e');
+      expect(c.text).toBe('#86efac');
     });
 
-    it('returns amber classes for conflict state', () => {
-      const classes = getStateColorClasses('conflict');
-      expect(classes.border).toBe('border-l-amber-500');
-      expect(classes.text).toBe('text-amber-300');
+    it('returns amber for conflict state', () => {
+      const c = getStateInlineColors('conflict');
+      expect(c.border).toBe('#f59e0b');
     });
 
-    it('returns red classes for late state', () => {
-      const classes = getStateColorClasses('late');
-      expect(classes.border).toBe('border-l-red-500');
-      expect(classes.text).toBe('text-red-300');
+    it('returns red for late state', () => {
+      const c = getStateInlineColors('late');
+      expect(c.border).toBe('#ef4444');
     });
 
-    it('returns zinc classes for blocked state', () => {
-      const classes = getStateColorClasses('blocked');
-      expect(classes.border).toBe('border-l-zinc-500');
-      expect(classes.text).toBe('text-zinc-400');
+    it('returns zinc for blocked state', () => {
+      const c = getStateInlineColors('blocked');
+      expect(c.border).toBe('#71717a');
     });
   });
 });

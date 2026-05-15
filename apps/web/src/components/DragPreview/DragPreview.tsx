@@ -1,5 +1,5 @@
 import type { Task, Job } from '@flux/types';
-import { getStateColorClasses } from '../Tile';
+import { getStateInlineColors } from '../Tile/colorUtils';
 
 export interface DragPreviewProps {
   /** The task being dragged */
@@ -15,13 +15,10 @@ export interface DragPreviewProps {
  * Displays a semi-transparent version of the task tile.
  */
 export function DragPreview({ task, job, pixelsPerHour = 80 }: DragPreviewProps) {
-  // Use default state color for preview
-  const colors = getStateColorClasses('default');
+  const colors = getStateInlineColors('default');
 
-  // Get station name for internal tasks
   const stationName = task.type === 'Internal' ? task.stationId : 'Outsourced';
 
-  // Format duration
   const formatDuration = (): string => {
     if (task.type === 'Internal') {
       const totalMinutes = task.duration.setupMinutes + task.duration.runMinutes;
@@ -32,8 +29,6 @@ export function DragPreview({ task, job, pixelsPerHour = 80 }: DragPreviewProps)
     return `${task.duration.openDays}j`;
   };
 
-  // Calculate height based on duration (similar to TaskTile)
-  // Heights scale with pixelsPerHour: at 80px/h min=40, max=200, outsourced=60
   const getHeight = (): number => {
     const scale = pixelsPerHour / 80;
     const minHeight = Math.round(40 * scale);
@@ -44,22 +39,26 @@ export function DragPreview({ task, job, pixelsPerHour = 80 }: DragPreviewProps)
       const height = Math.max(minHeight, Math.round((totalMinutes / 60) * pixelsPerHour));
       return Math.min(height, maxHeight);
     }
-    return Math.round(60 * scale); // Outsourced tasks
+    return Math.round(60 * scale);
   };
 
   return (
     <div
-      className={`w-56 pt-1 px-2 pb-2 text-sm border-l-4 ${colors.border} ${colors.runBg} opacity-80 shadow-lg rounded cursor-grabbing pointer-events-none`}
-      style={{ height: `${getHeight()}px` }}
+      className="w-56 pt-1 px-2 pb-2 text-sm border-l-4 opacity-80 shadow-lg rounded cursor-grabbing pointer-events-none"
+      style={{
+        height: `${getHeight()}px`,
+        borderLeftColor: colors.border,
+        background: colors.bg,
+      }}
       data-testid="drag-preview"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`font-medium truncate min-w-0 ${colors.text}`}>
+        <span className="font-medium truncate min-w-0" style={{ color: colors.text }}>
           {stationName}
         </span>
         <span className="text-zinc-400 shrink-0">{formatDuration()}</span>
       </div>
-      <div className={`text-xs ${colors.text} opacity-70 truncate mt-0.5`}>
+      <div className="text-xs opacity-70 truncate mt-0.5" style={{ color: colors.text }}>
         {job.reference} · {job.client}
       </div>
     </div>

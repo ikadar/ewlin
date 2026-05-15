@@ -712,7 +712,15 @@ html.light .bg-\[rgba\(16\,185\,129\,0\.09\)\] { background-color: rgba(5,150,10
 html.light .bg-emerald-500\/\[0\.14\] { background-color: rgba(5,150,105,0.22) !important; }
 html.light .bg-emerald-500\/\[0\.09\] { background-color: rgba(5,150,105,0.16) !important; }
 
-/* Tile name text — use darker, saturated versions for light bg */
+/* Tile name text — use darker, saturated versions for light bg.
+   Tiles use inline `color` via data-tile-state; other components still
+   use Tailwind text classes so both selectors are kept. */
+html.light [data-tile-state="shipped"]   [data-testid="tile-content"] { color: #065f46 !important; }
+html.light [data-tile-state="default"]   [data-testid="tile-content"] { color: #4338ca !important; }
+html.light [data-tile-state="completed"] [data-testid="tile-content"] { color: #052e16 !important; }
+html.light [data-tile-state="conflict"]  [data-testid="tile-content"] { color: #a16207 !important; }
+html.light [data-tile-state="late"]      [data-testid="tile-content"] { color: #b91c1c !important; }
+html.light [data-tile-state="blocked"]   [data-testid="tile-content"] { color: #71717a !important; }
 html.light .text-emerald-300 { color: #065f46 !important; }  /* emerald-800 */
 html.light .text-blue-300   { color: #4338ca !important; }  /* indigo-700 */
 html.light .text-blue-400   { color: #4f46e5 !important; }  /* indigo-600 */

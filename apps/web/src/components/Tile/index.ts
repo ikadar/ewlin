@@ -12,8 +12,8 @@ export type { SimilarityIndicatorsProps } from './SimilarityIndicators';
 
 export { SimilarityBadge } from './SimilarityBadge';
 
-export { getStateColorClasses, computeTileState } from './colorUtils';
-export type { TileState, ColorClasses } from './colorUtils';
+export { computeTileState } from './colorUtils';
+export type { TileState } from './colorUtils';
 
 export { getFieldValue, valuesMatch, compareSimilarity } from './similarityUtils';
 export type { SimilarityResult } from './similarityUtils';

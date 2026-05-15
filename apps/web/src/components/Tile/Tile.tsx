@@ -2,14 +2,13 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
 import type { TaskAssignment, Job, InternalTask, Element, SimilarityScore, StationCategory } from '@flux/types';
 import { PIXELS_PER_HOUR } from '../TimelineColumn';
-import { getStateColorClasses, getStateRgb, isCompletedEffective } from './colorUtils';
+import { getStateInlineColors, getStateRgb, isCompletedEffective } from './colorUtils';
 import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import { ProgressFill, computeProgressBgGradient, computeProgressBorderImage } from './ProgressFill';
 import { TaskBadge } from './TaskBadge';
 import { computeOptimisticProgress, computeChunkProgress } from './saisieMath';
-import { getStateInlineColors } from './colorUtils';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
 import { useNow } from '../../contexts/NowContext';
@@ -237,8 +236,7 @@ export const Tile = memo(function Tile({
       ? ('completed' as TileState)
       : tileState;
 
-  // Get state-based color classes
-  const colorClasses = getStateColorClasses(effectiveTileState);
+  const inlineColors = getStateInlineColors(effectiveTileState);
   const stateRgb = getStateRgb(effectiveTileState);
 
   const isCompleted = effectiveTileState === 'completed' || effectiveTileState === 'shipped';
@@ -247,21 +245,19 @@ export const Tile = memo(function Tile({
   const showGradient = progress !== null
     && (progress.pct > 0 || progress.isLate)
     && progress.pct < 100;
-  const baseInline = getStateInlineColors(effectiveTileState);
   const bodyBg = showGradient && progress
-    ? computeProgressBgGradient(progress.pct, progress.isLate, 'vertical', baseInline.bg)
+    ? computeProgressBgGradient(progress.pct, progress.isLate, 'vertical', inlineColors.bg)
     : undefined;
   const bodyBorderImage = showGradient && progress
-    ? computeProgressBorderImage(progress.pct, progress.isLate, 'vertical', baseInline.border)
+    ? computeProgressBorderImage(progress.pct, progress.isLate, 'vertical', inlineColors.border)
     : undefined;
 
   // Teeth + label follow the progress gradient when visible: the top of
-  // the tile is always inside the green zone (gradient fills top-down),
-  // so text and sawtooth strokes at the top should read green, not the
-  // base state's blue.
+  // the tile is always inside the green zone (gradient fills top-down).
   const completedRgb = getStateRgb('completed');
+  const completedInline = getStateInlineColors('completed');
   const progressAwareRgb = showGradient ? completedRgb : stateRgb;
-  const labelTextClass = showGradient ? 'text-green-300' : colorClasses.text;
+  const labelTextColor = showGradient ? completedInline.text : inlineColors.text;
 
   // Handle click — select this job
   const handleClick = () => {
@@ -331,6 +327,7 @@ export const Tile = memo(function Tile({
       data-station-id={task.stationId}
       data-has-conflict={hasConflict ? 'true' : undefined}
       data-is-blocked={isBlocked ? 'true' : undefined}
+      data-tile-state={effectiveTileState}
       data-pinned={assignment.isPinned ? 'true' : 'false'}
       data-safety-frozen={isSafetyFrozen ? 'true' : undefined}
       data-safety-overridden={inSafetyZone && isFrozenOverridden ? 'true' : undefined}
@@ -344,21 +341,16 @@ export const Tile = memo(function Tile({
       {/* Clipped body wrapper. The clip-path is applied here (not on the root)
           so that the folder-tab and other overflow-outside children (label
           overlay, tooltip) are not clipped away on tiles with teeth. The
-          left border lives inside the wrapper so it follows the tooth shape.
-          When fond-vert is partial, the body bg + left border carry the
-          green→default linear-gradient inline (replacing the Tailwind
-          runBg + border-l-* classes) so the top portion is pixel-perfect
-          identical to a fully-completed tile. */}
+          left border lives inside the wrapper so it follows the tooth shape. */}
       <div
-        className={`absolute inset-0 ${borderStyleClass} ${showGradient ? '' : colorClasses.border} ${showGradient ? '' : colorClasses.runBg}`}
+        className={`absolute inset-0 ${borderStyleClass}`}
         style={{
           clipPath,
           borderLeftWidth: `${TILE_BORDER_WIDTH_PX}px`,
-          ...(showGradient ? {
-            background: bodyBg,
-            borderLeftStyle: 'solid' as const,
-            borderImage: bodyBorderImage,
-          } : {}),
+          borderLeftStyle: 'solid',
+          borderLeftColor: showGradient ? undefined : inlineColors.border,
+          borderImage: showGradient ? bodyBorderImage : undefined,
+          background: showGradient ? bodyBg : inlineColors.bg,
         }}
       >
         {/* Calage overlays (initial setup + post-peremption recalages).
@@ -451,7 +443,8 @@ export const Tile = memo(function Tile({
         style={{ top: `${extTop + 2}px`, bottom: `${extBottom + 2}px` }}
       >
         <div
-          className={`${labelTextClass} text-[11px] font-medium leading-tight truncate`}
+          className="text-[11px] font-medium leading-tight truncate"
+          style={{ color: labelTextColor }}
           data-testid="tile-content"
         >
           {onTogglePin && (
