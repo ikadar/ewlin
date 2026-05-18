@@ -7,7 +7,6 @@ import type { TileState } from './colorUtils';
 import type { SimilarityResult } from './similarityUtils';
 import { SimilarityBadge } from './SimilarityBadge';
 import { ProgressFill, computeProgressBgGradient, computeProgressBorderImage } from './ProgressFill';
-import { TaskBadge } from './TaskBadge';
 import { computeOptimisticProgress, computeChunkProgress } from './saisieMath';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
@@ -421,13 +420,6 @@ export const Tile = memo(function Tile({
           </svg>
         )}
 
-        {/* Task badge (Q10 of 2026-05-04 mindmap) — share of the task this
-            tile represents. Always rendered (forceShow) so the chef sees
-            "100%" on unsplit tasks even before they start ; chunk-split
-            FE breakdown by activeWindow is a follow-up (currently every
-            tile reads `taskSlotVolumePct` = 100 from the engine). */}
-        <TaskBadge pct={assignment.taskSlotVolumePct ?? 100} forceShow />
-
         {/* Optimistic fond-vert marker (Q4-Q7 of 2026-05-04 mindmap).
             The visual is painted by the body wrapper above via inline
             `background: linear-gradient(...)` + `borderImage` ; this
@@ -490,11 +482,6 @@ export const Tile = memo(function Tile({
             ? tirageLabel
             : produitLabel ?? `${job.reference} · ${job.client}`}
         </div>
-        {operatorNames && (
-          <div className="text-[9px] text-zinc-400 truncate leading-tight mt-0.5">
-            {operatorNames}
-          </div>
-        )}
       </div>
 
     </div>
