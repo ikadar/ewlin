@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Smartphone } from 'lucide-react';
 import type { Operator } from '@flux/types';
 import { OperatorSettingsButton } from './OperatorSettingsButton';
 import { useScenarioMode } from '../../contexts/ScenarioContext';
@@ -36,14 +36,24 @@ export function OperatorHeader({ operator, columnWidth }: OperatorHeaderProps) {
           <OperatorSettingsButton operatorId={operator.id} operatorLabel={fullName} />
         )}
         {mode === 'prod' && (
-          <Link
-            to={`/focus/operator/${operator.id}${location.search}`}
-            aria-label={`Ouvrir la vue focus de ${fullName}`}
-            className="shrink-0 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
-            data-testid={`operator-header-focus-link-${operator.id}`}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Link>
+          <>
+            <Link
+              to={`/focus/operator/${operator.id}${location.search}`}
+              aria-label={`Ouvrir la vue focus de ${fullName}`}
+              className="shrink-0 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
+              data-testid={`operator-header-focus-link-${operator.id}`}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+            <Link
+              to={`/mobile/operator/${operator.id}`}
+              aria-label={`Ouvrir la vue mobile de ${fullName}`}
+              className="shrink-0 text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-emerald-300"
+              data-testid={`operator-header-mobile-link-${operator.id}`}
+            >
+              <Smartphone className="w-4 h-4" />
+            </Link>
+          </>
         )}
       </div>
     </div>

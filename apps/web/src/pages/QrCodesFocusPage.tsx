@@ -52,12 +52,12 @@ function truncateText(doc: jsPDF, text: string, maxWidth: number): string {
   return t + '…';
 }
 
-async function generatePdf(items: FocusItem[]) {
+async function generatePdf(items: FocusItem[], urlPrefix: 'focus' | 'mobile' = 'focus') {
   const origin = window.location.origin;
 
   const qrDataUrls = await Promise.all(
     items.map((item) =>
-      QRCode.toDataURL(`${origin}/focus/${item.kind}/${item.id}`, {
+      QRCode.toDataURL(`${origin}/${urlPrefix}/${item.kind}/${item.id}`, {
         width: 512,
         margin: 1,
         errorCorrectionLevel: 'M',
@@ -118,14 +118,14 @@ async function generatePdf(items: FocusItem[]) {
     }
   }
 
-  doc.save('qr-codes-plannings-focus.pdf');
+  doc.save(urlPrefix === 'mobile' ? 'qr-codes-mobile.pdf' : 'qr-codes-plannings-focus.pdf');
 }
 
 export function QrCodesFocusPage() {
   const { data: stations, isLoading: stationsLoading } = useGetStationsQuery();
   const { data: operators, isLoading: operatorsLoading } = useGetOperatorsQuery();
   const { data: categories, isLoading: categoriesLoading } = useGetStationCategoriesQuery();
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState<false | 'focus' | 'mobile'>(false);
 
   const isLoading = stationsLoading || operatorsLoading || categoriesLoading;
 
@@ -159,11 +159,11 @@ export function QrCodesFocusPage() {
       })),
   ];
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (prefix: 'focus' | 'mobile') => {
     if (items.length === 0) return;
-    setGenerating(true);
+    setGenerating(prefix);
     try {
-      await generatePdf(items);
+      await generatePdf(items, prefix);
     } finally {
       setGenerating(false);
     }
@@ -193,18 +193,32 @@ export function QrCodesFocusPage() {
         </div>
       ) : (
         <>
-          <button
-            onClick={handleGenerate}
-            disabled={generating || items.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {generating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileDown className="w-4 h-4" />
-            )}
-            {generating ? 'Generation...' : 'Generer le PDF'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleGenerate('focus')}
+              disabled={!!generating || items.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {generating === 'focus' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileDown className="w-4 h-4" />
+              )}
+              {generating === 'focus' ? 'Generation...' : 'QR codes Focus (desktop)'}
+            </button>
+            <button
+              onClick={() => handleGenerate('mobile')}
+              disabled={!!generating || items.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {generating === 'mobile' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileDown className="w-4 h-4" />
+              )}
+              {generating === 'mobile' ? 'Generation...' : 'QR codes Mobile'}
+            </button>
+          </div>
 
           <p className="mt-4 text-xs text-flux-text-tertiary">
             {stations?.length ?? 0} station

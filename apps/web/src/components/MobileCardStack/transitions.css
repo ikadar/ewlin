@@ -1,0 +1,44 @@
+/* View Transitions API: native scroll-up + content swap */
+
+@keyframes vt-up-out {
+  from { transform: translateY(0);     opacity: 1; }
+  to   { transform: translateY(-100%); opacity: 0; }
+}
+@keyframes vt-up-in {
+  from { transform: translateY(100%);  opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+::view-transition-old(vt-active),
+::view-transition-old(vt-peek),
+::view-transition-old(vt-grace) {
+  animation: vt-up-out 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+::view-transition-new(vt-active),
+::view-transition-new(vt-peek),
+::view-transition-new(vt-grace) {
+  animation: vt-up-in 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+/* Don't animate the root — only named slots */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Flash overlay for task completion */
+@keyframes card-flash-green {
+  0% { opacity: 0.45; }
+  100% { opacity: 0; }
+}
+.mobile-card-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(16, 185, 129, 0.35);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: card-flash-green 0.5s ease-out forwards;
+}

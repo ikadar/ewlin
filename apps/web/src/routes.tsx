@@ -58,6 +58,8 @@ import OperatorsPage from './pages/OperatorsPage';
 import OperatorSchedulePage from './pages/OperatorSchedulePage';
 import FocusPage from './pages/FocusPage';
 import { FocusLayout } from './components/FocusLayout';
+import { MobileLayout } from './components/MobileLayout';
+import { MobilePage } from './pages/MobilePage';
 import StatsPage from './pages/StatsPage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
@@ -88,6 +90,12 @@ export function AppRoutes() {
       <Route element={<RequireAuth><FocusLayout /></RequireAuth>}>
         <Route path="/focus/operator/:id" element={<FocusPage mode="operator" />} />
         <Route path="/focus/station/:id" element={<FocusPage mode="station" />} />
+      </Route>
+
+      {/* Mobile card stack — operator at-the-machine view */}
+      <Route element={<MobileLayout />}>
+        <Route path="/mobile/operator/:id" element={<MobilePage mode="operator" />} />
+        <Route path="/mobile/station/:id" element={<MobilePage mode="station" />} />
       </Route>
 
       {/* V2 scenario shell — full-screen layout outside RootLayout. */}

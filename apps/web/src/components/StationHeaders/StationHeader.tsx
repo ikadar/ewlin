@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Smartphone } from 'lucide-react';
 import type { Station, StationCategory } from '@flux/types';
 import { getDefaultCategoryWidth } from '../../utils/tileLabelResolver';
 import { OffScreenIndicator } from './OffScreenIndicator';
@@ -72,14 +72,24 @@ export function StationHeader({
           <StationSettingsButton stationId={station.id} stationLabel={station.name} />
         )}
         {mode === 'prod' && (
-          <Link
-            to={`/focus/station/${station.id}${location.search}`}
-            aria-label={`Ouvrir la vue focus de ${station.name}`}
-            className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
-            data-testid={`station-header-focus-link-${station.id}`}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Link>
+          <>
+            <Link
+              to={`/focus/station/${station.id}${location.search}`}
+              aria-label={`Ouvrir la vue focus de ${station.name}`}
+              className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-zinc-200"
+              data-testid={`station-header-focus-link-${station.id}`}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+            <Link
+              to={`/mobile/station/${station.id}`}
+              aria-label={`Ouvrir la vue mobile de ${station.name}`}
+              className="text-zinc-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-emerald-300"
+              data-testid={`station-header-mobile-link-${station.id}`}
+            >
+              <Smartphone className="w-4 h-4" />
+            </Link>
+          </>
         )}
       </div>
     </div>
