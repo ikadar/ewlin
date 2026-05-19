@@ -1,10 +1,11 @@
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useCallback, type ReactElement } from 'react';
 import { TaskCard } from './TaskCard';
 import { GracePeek } from './GracePeek';
 import { NextPeek } from './NextPeek';
 import { Clock } from 'lucide-react';
 import { isoToMinFromMidnight } from '../Tile/saisieMath';
 import { fmtTimeMin } from '../ProgressCaptureModal/timeUtils';
+import { useMarkNotCompletedMutation } from '../../store/api/saisieApi';
 import './transitions.css';
 import type { TaskAssignment, ScheduleSnapshot, InternalTask } from '@flux/types';
 
@@ -24,6 +25,7 @@ function resolveTaskInfo(assignment: TaskAssignment, snapshot: ScheduleSnapshot)
 
 export function TaskCardStack({ assignments, snapshot, mode }: TaskCardStackProps): ReactElement {
   const now = useMemo(() => new Date(), []);
+  const [markNotCompleted] = useMarkNotCompletedMutation();
   const nowMs = now.getTime();
 
   const current = assignments.find(a => {
@@ -60,10 +62,10 @@ export function TaskCardStack({ assignments, snapshot, mode }: TaskCardStackProp
   const graceInfo = graceCandidate ? resolveTaskInfo(graceCandidate, snapshot) : null;
   const nextInfo = nextAfterActive ? resolveTaskInfo(nextAfterActive, snapshot) : null;
 
-  const handleNotDone = () => {
-    // TODO: wire markTaskNotCompleted mutation
-    console.log('[Mobile] Not done pressed for', graceCandidate?.taskId);
-  };
+  const handleNotDone = useCallback(() => {
+    if (!graceCandidate) return;
+    markNotCompleted({ taskId: graceCandidate.taskId });
+  }, [graceCandidate, markNotCompleted]);
 
   return (
     <div className="flex-1 flex flex-col p-3.5 gap-2.5 overflow-hidden">

@@ -38,6 +38,16 @@ export interface ReportSaisieResult {
   lastSaisieAt: string;
 }
 
+export interface MarkNotCompletedRequest {
+  taskId: string;
+}
+
+export interface MarkNotCompletedResult {
+  taskId: string;
+  scheduledEnd: string;
+  reverted: true;
+}
+
 export interface ClearRecordedProgressResult {
   /** Number of tasks whose anchor was nulled (zero when nothing to do). */
   cleared: number;
@@ -93,6 +103,33 @@ export const saisieApi = createApi({
      * CTRL+ALT+Z dialog's "Réinitialiser aussi les saisies d'avancement"
      * checkbox (off by default — the gesture is destructive).
      */
+    markNotCompleted: builder.mutation<MarkNotCompletedResult, MarkNotCompletedRequest>({
+      query: ({ taskId }) => ({
+        url: `/scenarios/prod/uncomplete/${encodeURIComponent(taskId)}`,
+        method: 'POST',
+        headers: { 'X-Flux-Scenario': 'prod' },
+      }),
+      async onQueryStarted({ taskId }, { dispatch, queryFulfilled }) {
+        const patchProd = dispatch(
+          prodSnapshotApi.util.updateQueryData('getProdSnapshot', undefined, (draft) => {
+            if (!draft) return;
+            const a = draft.assignments.find((x) => x.taskId === taskId);
+            if (a) {
+              a.isCompleted = false;
+              a.completedAt = null;
+              a.updatedAt = new Date().toISOString();
+            }
+          }),
+        );
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+        } catch {
+          patchProd.undo();
+        }
+      },
+    }),
     clearRecordedProgress: builder.mutation<ClearRecordedProgressResult, void>({
       query: () => ({
         url: '/scenarios/prod/clear-recorded-progress',
@@ -112,4 +149,4 @@ export const saisieApi = createApi({
   }),
 });
 
-export const { useReportSaisieMutation, useClearRecordedProgressMutation } = saisieApi;
+export const { useReportSaisieMutation, useMarkNotCompletedMutation, useClearRecordedProgressMutation } = saisieApi;
