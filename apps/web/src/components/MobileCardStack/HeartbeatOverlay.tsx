@@ -42,7 +42,7 @@ export function HeartbeatOverlay({ timeRemainingMin, thresholdMin, active }: Hea
     };
   }, [active, timeRemainingMin, thresholdMin]);
 
-  if (!active) return null;
+  if (!active || thresholdMin <= 0) return null;
 
   return (
     <div
