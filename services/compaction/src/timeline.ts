@@ -144,11 +144,6 @@ export function findEarliestValidStart(
         advanced = true;
         break;
       }
-      if (conflict.type === 'GroupCapacityConflict') {
-        earliest = new Date(earliest.getTime() + 15 * 60 * 1000);
-        advanced = true;
-        break;
-      }
       if (conflict.type === 'AvailabilityConflict') {
         earliest = new Date(earliest.getTime() + 15 * 60 * 1000);
         advanced = true;
