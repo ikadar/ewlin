@@ -238,3 +238,71 @@ def test_dsl_station_with_spaces_uses_underscores():
     op = _op("ASSDU", 5, 10)
     r = resolve(op, _ctx(nb_postes=8), CONFIG)
     assert to_dsl_line(op, r) == "Duplo_20P(5+10)"
+
+
+# ============ NORMALIZE (collapse_to_run + min_total_minutes) ============
+
+CONFIG_WITH_NORMALIZE = {
+    **CONFIG,
+    "mapping": {
+        **CONFIG["mapping"],
+        "MASSI": {
+            "rule": "duration_threshold",
+            "threshold_minutes": 20,
+            "le": "P137",
+            "gt": "P137N",
+            "normalize": {
+                "collapse_to_run": True,
+                "min_total_minutes": 5,
+            },
+        },
+    },
+}
+
+
+def test_normalize_collapse_sums_setup_into_run():
+    """5+15 → 0+20 when collapse_to_run is set."""
+    op = _op("MASSI", 5, 15)
+    r = resolve(op, _ctx(), CONFIG_WITH_NORMALIZE)
+    assert r.setup_min_override == 0
+    assert r.run_min_override == 20
+    assert to_dsl_line(op, r) == "P137(0+20)"
+
+
+def test_normalize_floor_bumps_small_total():
+    """1+2 → 0+5 because total 3 < floor 5."""
+    op = _op("MASSI", 1, 2)
+    r = resolve(op, _ctx(), CONFIG_WITH_NORMALIZE)
+    assert r.run_min_override == 5
+    assert to_dsl_line(op, r) == "P137(0+5)"
+
+
+def test_normalize_keeps_zero_setup_format_with_force_flag():
+    """Even when setup is naturally 0, collapse_to_run forces 0+X format."""
+    op = _op("MASSI", 0, 12)
+    r = resolve(op, _ctx(), CONFIG_WITH_NORMALIZE)
+    assert to_dsl_line(op, r) == "P137(0+12)"
+
+
+def test_normalize_does_not_change_station_decision():
+    """Tiny op gets bumped to 5, but station picked from ORIGINAL total (still ≤20)."""
+    op = _op("MASSI", 0, 1)  # original total 1, bumped to 5
+    r = resolve(op, _ctx(), CONFIG_WITH_NORMALIZE)
+    assert r.station_name == "P137"  # original total 1 ≤ 20
+    assert to_dsl_line(op, r) == "P137(0+5)"
+
+
+def test_normalize_skipped_for_other_nusec():
+    """ENCA has no normalize block → durations unchanged, default DSL format."""
+    op = _op("ENCA", 5, 15)
+    r = resolve(op, _ctx(), CONFIG_WITH_NORMALIZE)
+    assert r.setup_min_override is None
+    assert to_dsl_line(op, r) == "Heidelberg(5+15)"
+
+
+def test_normalize_zero_duration_still_skipped():
+    """0+0 MASSI hits the generic skip-if-zero gate BEFORE normalize."""
+    op = _op("MASSI", 0, 0)
+    r = resolve(op, _ctx(), CONFIG_WITH_NORMALIZE)
+    assert r.kind == "skip"
+    assert r.skip_reason == "zero_duration"

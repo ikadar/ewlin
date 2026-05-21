@@ -4,7 +4,7 @@
 api:
   base_url: http://localhost/api/v1
   auth:
-    email: julien.pichoff@wheel.digital
+    email: ordo@wheel.digital
     password_env: FLUX_API_PASSWORD
 
 # NUSEC à ignorer systématiquement (CTP = prepresse, TRANS = logistique,
@@ -26,6 +26,14 @@ mapping:
     threshold_minutes: 20
     le: P137
     gt: P137N
+    # Normalize MASSI tasks: collapse setup into run (0+X), floor 5 min total.
+    # Rationale: MasterPrint splits massicot work into many tiny ops (Refente,
+    # Coupe finition, etc.) on the same physical machine. Setup is bundled
+    # into run, and durations below 5 min are bumped — single short task per
+    # MASSI op, no phantom-short tiles.
+    normalize:
+      collapse_to_run: true
+      min_total_minutes: 5
 
   CONDI:
     rule: libop_keywords
@@ -76,6 +84,19 @@ mapping:
   TABLE:
     rule: fixed
     station: Table
+
+# Mapping CDMAC (référentiel dv_machf) → nom de station Flux.
+# Source : dv_cximp.CDMAC_1 = code de la presse retenue. Si absent ici, le
+# builder retombe sur dv_machf.LIBMA (libellé lisible) comme nom de station.
+press_mapping:
+  G37: G37
+  G37-5: G37          # variante 5 couleurs, même station physique
+  "754": "754"
+  "754G": "754"       # variante typographique du même CDMAC
+  GTO: GTO
+  RICOH: Ricoh 9500
+  "928": "928-2"
+  "928-2": "928-2"
 
 defaults:
   deadline_relative_working_days_fallback: 10

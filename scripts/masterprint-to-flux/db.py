@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from typing import Iterable
 
 
+import os
+
 CONTAINER = "flux-mariadb"
 ENV_FILE = "/opt/flux/.env.temp"
 
@@ -29,6 +31,11 @@ class ExistingJob:
 
 
 def _db_password() -> str:
+    # Local override: dev machines that don't have /opt/flux/.env.temp can
+    # set FLUX_DB_PASSWORD directly. Server-side cron still reads ENV_FILE.
+    env_pwd = os.environ.get("FLUX_DB_PASSWORD")
+    if env_pwd:
+        return env_pwd
     with open(ENV_FILE) as f:
         for line in f:
             if line.startswith("MARIADB_PASSWORD="):

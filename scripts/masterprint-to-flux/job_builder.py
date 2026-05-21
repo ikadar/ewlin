@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from csv_loader import Db, Dossier
+from press_resolver import get_launches_for_impression, get_machine_for_impression, resolve_press
 from station_resolver import Resolution, ResolverContext, resolve, to_dsl_line
 
 
@@ -14,6 +15,9 @@ class ImportTrace:
     numdo: str
     skipped_operations: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # Set to True when a press impression has no di_lance time → user decision is to
+    # reject the dossier entirely (cleaned at the bucket source but defensive here).
+    rejected_for_missing_press_time: bool = False
 
 
 def _format_int(v: float) -> int:
@@ -74,6 +78,46 @@ def _build_element(
     )
 
     dsl_lines: list[str] = []
+
+    # 1. Press tasks (DV_CXIMP × DI_LANCE × DV_MACHF) — non-GLOBAL elements only.
+    # Émises EN PREMIER pour qu'elles précèdent les ops de façonnage (massicot, etc.).
+    if not is_global and dossier.nodev:
+        for impression in db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), []):
+            if not impression.cdmac_1:
+                continue  # Insert client / pas d'impression : pas de press task à émettre.
+            machine = get_machine_for_impression(impression, db)
+            if machine is None:
+                trace.warnings.append(
+                    f"press_machine_unknown CDMAC_1={impression.cdmac_1} NOPAP={nopap}"
+                )
+                continue
+            launches = get_launches_for_impression(impression, dossier.numdo[:11], machine, db)
+            press_res = resolve_press(impression, dossier.numdo[:11], machine, launches, config)
+            if press_res is None:
+                # Pas de di_lance → le dossier ne devrait pas être dans Ordo (cf. décision
+                # utilisateur 2026-05-21 : filtrage côté bucket). Rejet défensif ici.
+                trace.rejected_for_missing_press_time = True
+                trace.warnings.append(
+                    f"press_no_launch CDMAC_1={impression.cdmac_1} NOPAP={nopap} NUMDO={dossier.numdo}"
+                )
+                return None
+            press_token = press_res.station_name or "?"
+            dsl_lines.append(
+                f"# Press {press_token} (CDMAC_1={impression.cdmac_1}, "
+                f"NBCR={impression.nbcr}/NBCV={impression.nbcv}, NREPI={impression.nrepi})"
+            )
+            # to_dsl_line lit op.setup_min / op.run_min uniquement quand l'override est None,
+            # donc on peut passer un Operation factice ; mais press_res a déjà les overrides
+            # → un op vide suffit.
+            from csv_loader import Operation
+            fake_op = Operation(
+                nodev=dossier.nodev, nopap=nopap, xno="", numop=None, libop=None,
+                nusec=None, typop=None, intss=None, cdmac=impression.cdmac_1,
+                setup_min=0, run_min=0,
+            )
+            dsl_lines.append(to_dsl_line(fake_op, press_res))
+
+    # 2. Opérations annexes (DV_OPEDV) — façonnage, prepresse, etc.
     for op in ops:
         resolution = resolve(op, ctx, config)
         if resolution.kind == "skip":
@@ -94,14 +138,15 @@ def _build_element(
         return None
 
     # Gates : GLOBAL n'a rien à attendre ; PAP* a BAT + papier obligatoires,
-    # forme si CYLIN dans les ops d'origine, plaques si DSL produit du G37/754/GTO.
+    # forme si CYLIN dans les ops d'origine, plaques si DSL produit du offset
+    # (toutes les presses sauf Ricoh 9500 / numérique).
     if is_global:
         needs_bat = needs_paper = needs_forme = needs_plates = False
     else:
         needs_bat = True
         needs_paper = "papier" in spec
         needs_forme = any(op.nusec == "CYLIN" for op in ops)
-        offset_tokens = ("G37(", "754(", "GTO(")
+        offset_tokens = ("G37(", "G37-5(", "754(", "GTO(", "928-2(")
         needs_plates = any(line.startswith(offset_tokens) for line in dsl_lines)
 
     element: dict = {
@@ -168,6 +213,11 @@ def build(dossier: Dossier, db: Db, config: dict) -> tuple[dict | None, ImportTr
     elements: list[dict] = []
     for nopap in sorted_nopap:
         element = _build_element(db, dossier, nopap, ops_by_nopap[nopap], config, trace)
+        if trace.rejected_for_missing_press_time:
+            # Décision utilisateur 2026-05-21 : un dossier dont une presse n'a pas de
+            # di_lance n'a rien à faire dans Ordo. Le bucket les filtre normalement ;
+            # on rejette défensivement ici.
+            return None, trace
         if element is not None:
             elements.append(element)
 

@@ -24,6 +24,12 @@ class Resolution:
     action_type: str | None = None
     days: int | None = None
     skip_reason: str | None = None
+    # Per-NUSEC duration adjustments (None = use op.setup_min / op.run_min unchanged).
+    # Driven by `normalize:` block on the mapping rule.
+    setup_min_override: int | None = None
+    run_min_override: int | None = None
+    # When true, to_dsl_line emits "STATION(0+X)" verbatim even if setup is 0.
+    force_setup_run_format: bool = False
 
 
 def _station_dsl_name(name: str) -> str:
@@ -125,16 +131,47 @@ def resolve(op: Operation, ctx: ResolverContext, config: dict) -> Resolution:
     if station_name is None:
         return Resolution(kind="skip", skip_reason=f"NUSEC_{op.nusec}_no_match")
 
-    return Resolution(kind="station", station_name=station_name)
+    resolution = Resolution(kind="station", station_name=station_name)
+    _apply_normalize(resolution, rule.get("normalize"), op)
+    return resolution
+
+
+def _apply_normalize(resolution: Resolution, normalize: dict | None, op: Operation) -> None:
+    """Mutate `resolution` with duration overrides from the rule's `normalize:` block.
+
+    Supported keys:
+      collapse_to_run: bool  → setup = 0, run = setup + run (sum into run, force 0+X format).
+      min_total_minutes: int → final total (setup_override + run_override) bumped to this floor.
+    """
+    if not normalize:
+        return
+
+    setup = op.setup_min
+    run = op.run_min
+
+    if normalize.get("collapse_to_run"):
+        run = setup + run
+        setup = 0
+        resolution.force_setup_run_format = True
+
+    floor = normalize.get("min_total_minutes")
+    if floor is not None and (setup + run) < floor:
+        # Bump the run side so setup stays whatever the collapse step decided.
+        run = floor - setup
+
+    resolution.setup_min_override = setup
+    resolution.run_min_override = run
 
 
 def to_dsl_line(op: Operation, resolution: Resolution) -> str:
     """Construit la ligne DSL pour une résolution donnée."""
     if resolution.kind == "station":
         token = _station_dsl_name(resolution.station_name or "")
-        if op.setup_min == 0:
-            return f"{token}({op.run_min})"
-        return f"{token}({op.setup_min}+{op.run_min})"
+        setup = resolution.setup_min_override if resolution.setup_min_override is not None else op.setup_min
+        run = resolution.run_min_override if resolution.run_min_override is not None else op.run_min
+        if setup == 0 and not resolution.force_setup_run_format:
+            return f"{token}({run})"
+        return f"{token}({setup}+{run})"
     if resolution.kind == "outsourced":
         provider_token = _station_dsl_name(resolution.provider_name or "")
         return f"ST:{provider_token}({resolution.days}j):{resolution.action_type}"
