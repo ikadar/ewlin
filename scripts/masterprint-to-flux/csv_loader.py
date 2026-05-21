@@ -175,13 +175,22 @@ class Impression:
 
 @dataclass
 class Launch:
-    """Ligne DI_LANCE : temps presse alloués/réels par (NUMDO × NUSEC × XNO)."""
+    """Ligne DI_LANCE : temps presse alloués/réels par (NUMDO × NUSEC × XNO).
+
+    Since 2026-05-21, MasterPrint export pre-aggregates the per-step
+    TPSALLOUE_x into CALAGE_H (setup) + ROULE_H (run) + TOTAL_H. Use these
+    canonical fields rather than re-summing TPSALLOUE_x via dv_machf.NUSEC_x.
+    Raw TPSALLOUE_x kept for debug/traceability.
+    """
     numdo: str              # avec suffixe /A /B éventuel
     nusec: str              # nom de la machine (G37, 754-2, RICOH, …)
     tache: str | None
     nopap: str | None
     pag: int | None
-    tps_alloue_h: list[float]   # 10 valeurs en heures
+    calage_h: float         # setup time pre-aggregated by MasterPrint export
+    roule_h: float          # run time pre-aggregated by MasterPrint export
+    total_h: float          # = calage_h + roule_h, kept for sanity check
+    tps_alloue_h: list[float]   # 10 valeurs en heures (raw, debug)
     tps_reel_h: list[float]
 
     @property
@@ -418,6 +427,9 @@ def load_all(inbox: Path) -> Db:
                 tache=_opt_str(row.get("TACHE", "")),
                 nopap=_opt_str(row.get("NOPAP", "")),
                 pag=_opt_int(row.get("PAG", "")),
+                calage_h=_opt_float(row.get("CALAGE_H", "")) or 0.0,
+                roule_h=_opt_float(row.get("ROULE_H", "")) or 0.0,
+                total_h=_opt_float(row.get("TOTAL_H", "")) or 0.0,
                 tps_alloue_h=tps_alloue,
                 tps_reel_h=tps_reel,
             )

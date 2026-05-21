@@ -192,14 +192,16 @@ function FluxTableHeader() {
         >
           Client <SortChevron col="client" active={sortColumn} dir={sortDirection} />
         </th>
-        {/* Designation — frozen left + right shadow */}
+        {/* Référence (was Désignation) — frozen left + right shadow. 2026-05-21:
+            shows job reference (NUMDO MasterPrint) instead of free-text description
+            since reference is the operator-facing identifier. Sort key unchanged. */}
         <th
           className={`${stickyHeaderCell} left-[26.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
-          title="Désignation"
+          title="Référence"
           onClick={() => onSortChange('designation')}
         >
-          Désignation <SortChevron col="designation" active={sortColumn} dir={sortDirection} />
+          Référence <SortChevron col="designation" active={sortColumn} dir={sortDirection} />
         </th>
         {/* Référent */}
         <th
@@ -441,7 +443,7 @@ const FluxTableRow = memo(function FluxTableRow({
         <TruncatedCell fullText={job.client} />
       </td>
 
-      {/* Designation — frozen left + right shadow */}
+      {/* Référence (was Désignation) — frozen left + right shadow */}
       <td
         className={`${cellBase} left-[26.5rem]`}
         style={tint ? { ...LEFT_SHADOW, background: tint.sticky } : LEFT_SHADOW}
@@ -449,7 +451,7 @@ const FluxTableRow = memo(function FluxTableRow({
       >
         <div className="flex items-center min-w-0">
           <div className="flex-1 min-w-0">
-            <TruncatedCell fullText={job.designation} />
+            <TruncatedCell fullText={job.id} />
           </div>
           {isMulti && (
             <span className="ml-1 shrink-0 text-flux-text-muted" style={{ fontSize: '10px' }}>

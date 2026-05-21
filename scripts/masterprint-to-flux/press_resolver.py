@@ -42,24 +42,23 @@ def _press_nusec(machine: Machine) -> str | None:
     return max(counts, key=counts.get)
 
 
-def _press_minutes_from_launches(machine: Machine, launches: list[Launch], press_nusec: str) -> int:
-    """Sum TPSALLOUE_i across all launches, for indices where NUSEC_i == press_nusec.
+def _press_setup_run_minutes(launches: list[Launch]) -> tuple[int, int]:
+    """Aggregate CALAGE_H + ROULE_H across all launches → (setup_min, run_min).
 
-    Multiple launches can exist for the same (numdo_root, nusec) when the dossier
-    has /A /B variants — we aggregate all of them into one press task.
+    Since the 2026-05-21 MasterPrint export refresh, di_lance carries
+    pre-aggregated CALAGE_H (setup) and ROULE_H (run) per row, summed from
+    the per-step TPSALLOUE_x grid. Use them directly: no more heuristic over
+    dv_machf.NUSEC_x indices.
+
+    Multiple launches can exist for the same (numdo_root, nusec) when the
+    dossier has /A /B variants — sum across all of them into one press task.
     """
-    indices_press = [
-        i for i, n in enumerate(machine.nusec_by_index, start=1)
-        if n == press_nusec
-    ]
-    if not indices_press:
-        return 0
-    total_h = 0.0
+    cal_h = 0.0
+    run_h = 0.0
     for launch in launches:
-        for idx in indices_press:
-            if 1 <= idx <= len(launch.tps_alloue_h):
-                total_h += launch.tps_alloue_h[idx - 1]
-    return round(total_h * 60)
+        cal_h += launch.calage_h
+        run_h += launch.roule_h
+    return round(cal_h * 60), round(run_h * 60)
 
 
 def resolve_press(
@@ -75,7 +74,7 @@ def resolve_press(
       - CDMAC_1 is empty (insert client / pas d'impression)
       - machine référentiel introuvable
       - aucun Launch dispo (dossier pas encore lancé en prod)
-      - temps presse total nul
+      - setup + run minutes both zero
     """
     if not impression.cdmac_1:
         return None
@@ -84,8 +83,8 @@ def resolve_press(
     press_nusec = _press_nusec(machine)
     if press_nusec is None:
         return None
-    total_min = _press_minutes_from_launches(machine, launches, press_nusec)
-    if total_min == 0:
+    setup_min, run_min = _press_setup_run_minutes(launches)
+    if setup_min == 0 and run_min == 0:
         return None
 
     press_mapping: dict[str, str] = config.get("press_mapping", {})
@@ -94,8 +93,8 @@ def resolve_press(
     return Resolution(
         kind="station",
         station_name=station_name,
-        setup_min_override=0,
-        run_min_override=total_min,
+        setup_min_override=setup_min,
+        run_min_override=run_min,
         force_setup_run_format=True,
     )
 
