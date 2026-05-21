@@ -54,7 +54,9 @@ class Dossier:
     dtliv: date | None
     clotu: str | None
     nodev: str | None
-    desig: str | None
+    desig: str | None          # generic category ("INTERIEUR DE CLASSEUR", "BROCHURES DOS CARRE COLLE")
+    reftr_1: str | None        # dossier-specific description ("CARNET DE LIAISON REF 71484C…")
+    reftr_2: str | None        # complementary info ("ECOLE PRIMAIRE CHARLEMAGNE 13000 MARSEILLE")
 
 
 @dataclass
@@ -284,6 +286,8 @@ def load_all(inbox: Path) -> Db:
             clotu=_opt_str(row.get("CLOTU", "")),
             nodev=_opt_str(row.get("NODEV", "")),
             desig=_opt_str(row.get("DESIG", "")),
+            reftr_1=_opt_str(row.get("REFTR_1", "")),
+            reftr_2=_opt_str(row.get("REFTR_2", "")),
         ))
 
     # 4. Opérations

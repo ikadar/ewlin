@@ -185,7 +185,16 @@ def build(dossier: Dossier, db: Db, config: dict) -> tuple[dict | None, ImportTr
         trace.warnings.append(f"client_unknown_codec={dossier.codec}")
         client_name = dossier.codec or "(client inconnu)"
 
-    description = dossier.desig or (devis.libel if devis else None) or "(sans description)"
+    # Description = dossier-specific REFTR_1 — REFTR_2 (added to aa_dossi 2026-05-21).
+    # These are unique per-job descriptions ("CARNET DE LIAISON REF…", "JOURNAL DE LA
+    # CLASSE") vs DESIG which is a generic category ("INTERIEUR DE CLASSEUR" repeats
+    # across dozens of dossiers). Fallback chain preserves legacy behavior when both
+    # REFTR_x are empty.
+    reftr_parts = [p for p in (dossier.reftr_1, dossier.reftr_2) if p]
+    if reftr_parts:
+        description = " — ".join(reftr_parts)
+    else:
+        description = dossier.desig or (devis.libel if devis else None) or "(sans description)"
 
     request: dict = {
         "reference": dossier.numdo,
