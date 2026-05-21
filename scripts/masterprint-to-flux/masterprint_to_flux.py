@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Pipeline d'import : MasterPrint CSV -> Flux API.
+"""Pipeline d'import : MasterPrint CSV -> Flux API avec gestion du diff.
 
 Phases :
-1. Load    : lit les CSV, login Flux, récupère les références existantes
+1. Load     : lit les CSV, login Flux, charge l'état existant (id+hash+has_started)
 2. Transform : construit les CreateJobRequest en mémoire
-3. Push    : POST les nouveaux jobs (sauf --dry-run)
-4. Report  : écrit un JSON de bilan + log
+3. Diff     : pour chaque dossier — nouveau / inchangé / modifié / disparu
+4. Push     : POST / PUT / DELETE selon le cas (sauf --dry-run)
+5. Report   : JSON détaillé par job
 
 Usage :
     FLUX_API_PASSWORD=... python3 masterprint_to_flux.py [--dry-run] [--config FILE]
-
-Le fichier de config (--config) par défaut = masterprint-mapping.yaml dans le même dossier.
 """
 
 from __future__ import annotations
@@ -26,11 +25,11 @@ from pathlib import Path
 
 import yaml
 
-# Import des modules locaux (le script doit être exécuté depuis son dossier ou le dossier dans PYTHONPATH)
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import csv_loader
+import db as db_mod
 import flux_api
 import job_builder
 
@@ -58,11 +57,11 @@ def write_report(path: Path, payload: dict) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Import MasterPrint dossiers into Flux")
+    parser = argparse.ArgumentParser(description="Import MasterPrint dossiers into Flux with diff tracking")
     parser.add_argument("--config", default=str(SCRIPT_DIR / "masterprint-mapping.yaml"))
-    parser.add_argument("--inbox", help="Override inbox directory (otherwise from config)")
-    parser.add_argument("--report", help="Override report path (otherwise from config)")
-    parser.add_argument("--dry-run", action="store_true", help="Skip Phase 3 (no POST)")
+    parser.add_argument("--inbox", help="Override inbox directory")
+    parser.add_argument("--report", help="Override report path")
+    parser.add_argument("--dry-run", action="store_true", help="Skip Phase 4 (no API calls modifying state)")
     parser.add_argument("--limit", type=int, help="Process only N dossiers (debugging)")
     args = parser.parse_args()
 
@@ -70,26 +69,23 @@ def main() -> int:
     paths = config.get("paths", {})
     inbox = Path(args.inbox or paths.get("inbox", "."))
     report_path = Path(args.report or paths.get("report", "report.json"))
-    log_path = paths.get("log")
-    setup_logging(log_path)
+    setup_logging(paths.get("log"))
     log = logging.getLogger("mp2flux")
 
     log.info(f"=== Run start {'(DRY-RUN)' if args.dry_run else ''} ===")
     log.info(f"Inbox: {inbox}")
-    log.info(f"Config: {args.config}")
 
-    # Phase 1 — Load
+    # =============== Phase 1 — Load ===============
     try:
-        db = csv_loader.load_all(inbox)
+        csv_db = csv_loader.load_all(inbox)
     except FileNotFoundError as e:
         log.error(f"Missing CSV: {e}")
         return 2
-    log.info(f"Loaded: {len(db.dossiers)} dossiers, "
-             f"{sum(len(o) for o in db.ops_by_nodev.values())} operations, "
-             f"{sum(len(t) for t in db.tirages_by_nodev.values())} tirages")
+    log.info(f"Loaded CSV: {len(csv_db.dossiers)} dossiers, "
+             f"{sum(len(o) for o in csv_db.ops_by_nodev.values())} operations")
 
-    token = None
-    existing_refs: set[str] = set()
+    token: str | None = None
+    existing_jobs: dict[str, db_mod.ExistingJob] = {}
     if not args.dry_run:
         api_cfg = config["api"]
         password = os.environ.get(api_cfg["auth"]["password_env"], "")
@@ -98,89 +94,168 @@ def main() -> int:
             return 3
         try:
             token = flux_api.login(api_cfg["base_url"], api_cfg["auth"]["email"], password)
-            existing_refs = flux_api.list_existing_references(api_cfg["base_url"], token)
-        except (flux_api.AuthError, flux_api.ApiError) as e:
-            log.error(f"API init failed: {e}")
+        except flux_api.AuthError as e:
+            log.error(f"API auth failed: {e}")
             return 4
-        log.info(f"API OK, {len(existing_refs)} existing references in Flux")
+        try:
+            existing_jobs = db_mod.load_existing_jobs()
+        except RuntimeError as e:
+            log.error(f"DB load failed: {e}")
+            return 5
+        log.info(f"Flux DB: {len(existing_jobs)} jobs ({sum(1 for j in existing_jobs.values() if j.has_started)} started, "
+                 f"{sum(1 for j in existing_jobs.values() if j.masterprint_hash)} with mp_hash)")
 
-    # Phase 2 — Transform
-    dossiers = db.dossiers[: args.limit] if args.limit else db.dossiers
-    requests: list[tuple[dict, job_builder.ImportTrace]] = []
-    skipped_dossiers: list[dict] = []
+    # =============== Phase 2 — Transform ===============
+    dossiers = csv_db.dossiers[: args.limit] if args.limit else csv_db.dossiers
+    built: list[tuple[dict, job_builder.ImportTrace, str]] = []  # (request, trace, hash)
+    rejected_dossiers: list[dict] = []
     skipped_ops_counter: Counter = Counter()
 
     for d in dossiers:
-        req, trace = job_builder.build(d, db, config)
+        req, trace = job_builder.build(d, csv_db, config)
         for op_skip in trace.skipped_operations:
             skipped_ops_counter[op_skip["reason"]] += 1
         if req is None:
-            skipped_dossiers.append({"numdo": d.numdo, "warnings": trace.warnings})
+            rejected_dossiers.append({"numdo": d.numdo, "warnings": trace.warnings})
             continue
-        requests.append((req, trace))
+        mp_hash = db_mod.compute_mp_hash(req)
+        built.append((req, trace, mp_hash))
 
-    log.info(f"Transformed: {len(requests)} jobs built, {len(skipped_dossiers)} dossiers rejected")
+    log.info(f"Transformed: {len(built)} jobs built, {len(rejected_dossiers)} dossiers rejected")
 
-    # Phase 3 — Push
-    push_stats: Counter = Counter()
-    errors: list[dict] = []
-    if not args.dry_run:
-        for req, trace in requests:
-            ref = req["reference"]
-            if ref in existing_refs:
-                push_stats["already_existing"] += 1
-                continue
-            assert token is not None
-            try:
-                status, body = flux_api.create_job(config["api"]["base_url"], token, req)
-            except Exception as e:
-                push_stats["server_error"] += 1
-                errors.append({"reference": ref, "phase": "post", "error": str(e)})
-                continue
-            if status == 201:
-                push_stats["created"] += 1
-            elif status == 400:
-                push_stats["validation_error"] += 1
-                errors.append({"reference": ref, "status": 400, "body": body})
-            elif status in (401, 403):
-                push_stats["auth_error"] += 1
-                errors.append({"reference": ref, "status": status, "body": body})
+    # =============== Phase 3 — Diff ===============
+    new_refs = {r["reference"] for r, _, _ in built}
+    actions = {"create": [], "update": [], "unchanged": [], "backfill": [], "delete": []}
+    for req, trace, mp_hash in built:
+        ref = req["reference"]
+        if ref not in existing_jobs:
+            actions["create"].append((req, trace, mp_hash))
+        else:
+            existing = existing_jobs[ref]
+            if existing.masterprint_hash is None:
+                # First time tracking — silent backfill (assume current = synced)
+                actions["backfill"].append((req, trace, mp_hash, existing))
+            elif existing.masterprint_hash == mp_hash:
+                actions["unchanged"].append((req, existing))
             else:
-                push_stats["server_error"] += 1
-                errors.append({"reference": ref, "status": status, "body": body})
-    else:
-        push_stats["dry_run_skipped"] = len(requests)
+                actions["update"].append((req, trace, mp_hash, existing))
+    # Suppression : jobs en BDD avec mp_hash NON NULL mais absents de l'export
+    for ref, info in existing_jobs.items():
+        if info.masterprint_hash is not None and ref not in new_refs:
+            actions["delete"].append(info)
 
-    # Phase 4 — Report
+    log.info(f"Diff: +{len(actions['create'])} new, ~{len(actions['update'])} changed, "
+             f"={len(actions['unchanged'])} unchanged, "
+             f"backfill={len(actions['backfill'])}, -{len(actions['delete'])} deleted")
+
+    # =============== Phase 4 — Push ===============
+    push_stats: Counter = Counter()
+    detail = {"created": [], "updated": [], "deleted": [], "modified_after_start": [], "errors": []}
+
+    if args.dry_run:
+        push_stats["dry_run_create"] = len(actions["create"])
+        push_stats["dry_run_update"] = len(actions["update"])
+        push_stats["dry_run_delete"] = len(actions["delete"])
+        push_stats["dry_run_backfill"] = len(actions["backfill"])
+    else:
+        assert token is not None
+        api_url = config["api"]["base_url"]
+
+        # CREATE
+        for req, trace, mp_hash in actions["create"]:
+            ref = req["reference"]
+            try:
+                status, body = flux_api.create_job(api_url, token, req)
+                if status == 201 and body and "id" in body:
+                    db_mod.update_tracking(body["id"], mp_hash, changed_after_start=False)
+                    push_stats["created"] += 1
+                    detail["created"].append({"reference": ref})
+                else:
+                    push_stats["create_error"] += 1
+                    detail["errors"].append({"reference": ref, "phase": "create", "status": status, "body": body})
+            except Exception as e:
+                push_stats["create_exception"] += 1
+                detail["errors"].append({"reference": ref, "phase": "create", "error": str(e)})
+
+        # UPDATE
+        for req, trace, mp_hash, existing in actions["update"]:
+            ref = req["reference"]
+            try:
+                status, body = flux_api.update_job(api_url, token, existing.id, req)
+                if status in (200, 204):
+                    db_mod.update_tracking(existing.id, mp_hash, changed_after_start=existing.has_started)
+                    push_stats["updated"] += 1
+                    entry = {"reference": ref, "was_started": existing.has_started}
+                    detail["updated"].append(entry)
+                    if existing.has_started:
+                        detail["modified_after_start"].append(entry)
+                else:
+                    push_stats["update_error"] += 1
+                    detail["errors"].append({"reference": ref, "phase": "update", "status": status, "body": body})
+            except Exception as e:
+                push_stats["update_exception"] += 1
+                detail["errors"].append({"reference": ref, "phase": "update", "error": str(e)})
+
+        # BACKFILL (no PUT, just persist current hash)
+        for req, trace, mp_hash, existing in actions["backfill"]:
+            try:
+                db_mod.update_tracking(existing.id, mp_hash, changed_after_start=False)
+                push_stats["backfilled"] += 1
+            except Exception as e:
+                push_stats["backfill_exception"] += 1
+                detail["errors"].append({"reference": req["reference"], "phase": "backfill", "error": str(e)})
+
+        # DELETE
+        for info in actions["delete"]:
+            try:
+                status, body = flux_api.delete_job(api_url, token, info.id)
+                if status in (200, 204):
+                    push_stats["deleted"] += 1
+                    detail["deleted"].append({"reference": info.reference, "was_started": info.has_started})
+                else:
+                    push_stats["delete_error"] += 1
+                    detail["errors"].append({"reference": info.reference, "phase": "delete", "status": status, "body": body})
+            except Exception as e:
+                push_stats["delete_exception"] += 1
+                detail["errors"].append({"reference": info.reference, "phase": "delete", "error": str(e)})
+
+        push_stats["unchanged"] = len(actions["unchanged"])
+
+    # =============== Phase 5 — Report ===============
     report = {
         "ranAt": dt.datetime.now().isoformat(timespec="seconds"),
         "mode": "dry-run" if args.dry_run else "live",
         "input": {
-            "dossiers": len(db.dossiers),
-            "operations": sum(len(o) for o in db.ops_by_nodev.values()),
-            "tirages": sum(len(t) for t in db.tirages_by_nodev.values()),
+            "dossiers": len(csv_db.dossiers),
+            "operations": sum(len(o) for o in csv_db.ops_by_nodev.values()),
+            "tirages": sum(len(t) for t in csv_db.tirages_by_nodev.values()),
         },
         "transformed": {
-            "jobs_built": len(requests),
-            "dossiers_rejected": len(skipped_dossiers),
-            "internal_tasks": sum(
-                sum(1 for line in e["sequence"].split("\n") if not line.startswith("ST:"))
-                for req, _ in requests for e in req["elements"]
-            ),
-            "outsourced_tasks": sum(
-                sum(1 for line in e["sequence"].split("\n") if line.startswith("ST:"))
-                for req, _ in requests for e in req["elements"]
-            ),
+            "jobs_built": len(built),
+            "dossiers_rejected": len(rejected_dossiers),
         },
         "skipped_operations_by_reason": dict(skipped_ops_counter),
-        "skipped_dossiers": skipped_dossiers,
+        "rejected_dossiers": rejected_dossiers,
+        "diff": {
+            "new": len(actions["create"]),
+            "changed": len(actions["update"]),
+            "unchanged": len(actions["unchanged"]),
+            "backfill": len(actions["backfill"]),
+            "deleted": len(actions["delete"]),
+        },
         "posted": dict(push_stats),
-        "errors": errors[:50],  # limite pour ne pas exploser le fichier
-        "errors_total": len(errors),
+        "detail": {
+            "created": detail["created"],
+            "updated": detail["updated"],
+            "deleted": detail["deleted"],
+            "modified_after_start": detail["modified_after_start"],
+        },
+        "errors": detail["errors"][:50],
+        "errors_total": len(detail["errors"]),
     }
     write_report(report_path, report)
     log.info(f"Report written to {report_path}")
-    log.info(f"Stats: transformed={len(requests)} posted={dict(push_stats)} errors={len(errors)}")
+    log.info(f"Stats: {dict(push_stats)}")
     log.info("=== Run end ===")
     return 0
 

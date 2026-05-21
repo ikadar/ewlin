@@ -75,13 +75,27 @@ def list_existing_references(base_url: str, token: str) -> set[str]:
 
 def create_job(base_url: str, token: str, request: dict, *, retry_5xx: int = 1) -> tuple[int, dict | None]:
     """POST /jobs, renvoie (status, body). Retry 1× sur 5xx (configurable)."""
+    return _action_with_retry("POST", f"{base_url}/jobs", token, request, retry_5xx)
+
+
+def update_job(base_url: str, token: str, job_id: str, request: dict, *, retry_5xx: int = 1) -> tuple[int, dict | None]:
+    """PUT /jobs/{id}, renvoie (status, body). Retry 1× sur 5xx."""
+    return _action_with_retry("PUT", f"{base_url}/jobs/{job_id}", token, request, retry_5xx)
+
+
+def delete_job(base_url: str, token: str, job_id: str, *, retry_5xx: int = 1) -> tuple[int, dict | None]:
+    """DELETE /jobs/{id}, renvoie (status, body). Retry 1× sur 5xx."""
+    return _action_with_retry("DELETE", f"{base_url}/jobs/{job_id}", token, None, retry_5xx)
+
+
+def _action_with_retry(method: str, url: str, token: str, body: dict | None, retry_5xx: int) -> tuple[int, dict | None]:
     attempts = 1 + retry_5xx
-    last = None
+    last: tuple[int, dict | None] = (0, None)
     for i in range(attempts):
-        status, body = _request("POST", f"{base_url}/jobs", token=token, body=request)
-        last = (status, body)
+        status, response = _request(method, url, token=token, body=body)
+        last = (status, response)
         if status < 500:
             return last
         if i < attempts - 1:
             time.sleep(2)
-    return last  # type: ignore
+    return last
