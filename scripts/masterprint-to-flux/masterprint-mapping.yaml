@@ -1,0 +1,89 @@
+# Mapping de transformation des dossiers MasterPrint vers les jobs Flux.
+# Editable sans toucher au code Python. Rechargé à chaque exécution.
+
+api:
+  base_url: http://localhost/api/v1
+  auth:
+    email: julien.pichoff@wheel.digital
+    password_env: FLUX_API_PASSWORD
+
+# NUSEC à ignorer systématiquement (CTP = prepresse, TRANS = logistique,
+# *ENC = info comptable, PAO = prepresse design)
+skip_nusec: [CTP, TRANS, "*ENC", PAO]
+
+# Operations à transformer en tâches sous-traitées
+outsourcing:
+  trigger_nusec: ST
+  provider_name: Inconnu
+  default_days: 3
+  action_type: divers
+
+# Mapping NUSEC -> Station (avec règles)
+# rule types : fixed | duration_threshold | postes_threshold | format_threshold | composite
+mapping:
+  MASSI:
+    rule: duration_threshold
+    threshold_minutes: 20
+    le: P137
+    gt: P137N
+
+  CONDI:
+    rule: libop_keywords
+    default: Conditionnement      # fallback pour libellés non reconnus
+    patterns:
+      - keywords: [film, bande]
+        station: Filmeuse
+      - keywords: [carton, étui, etui]
+        station: Cartonnage
+      - keywords: [palette]
+        station: Palettisation
+
+  PLIAG:
+    rule: composite
+    branches:
+      - if: { pagination_eq: 16 }
+        choose: Stahl
+      - if: { grammage_gte: 150 }
+        choose: MBO
+      - default: Stahl
+
+  ASSDU:
+    rule: postes_threshold
+    threshold: 5
+    le: Duplo 10P
+    gt: Duplo 20P
+
+  ASSEM:
+    rule: postes_threshold
+    threshold: 5
+    le: Duplo 10P
+    gt: Duplo 20P
+
+  ENCA:
+    rule: fixed
+    station: Heidelberg
+
+  CYLIN:
+    rule: format_threshold
+    max_small_cm: [35, 49]
+    small: Typo Petit Format
+    large: Typo Grand Format
+
+  FACO:
+    rule: fixed
+    station: Table
+
+  TABLE:
+    rule: fixed
+    station: Table
+
+defaults:
+  deadline_relative_working_days_fallback: 10
+  element_global_name: GLOBAL
+  element_paper_name_template: "PAP{n}"
+  papier_template: "{LIBSO}:{GRAMM}"
+
+paths:
+  inbox: /opt/flux/inbox/masterprint
+  report: /opt/flux/inbox/masterprint/last_import_report.json
+  log: /var/log/flux-masterprint-import.log
