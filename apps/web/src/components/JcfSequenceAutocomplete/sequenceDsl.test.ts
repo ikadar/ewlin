@@ -211,6 +211,14 @@ describe('isValidSequenceLine', () => {
   it('returns false for ST line without description', () => {
     expect(isValidSequenceLine('ST:MCA(3j)')).toBe(false);
   });
+
+  it('returns true for poste name containing a space', () => {
+    expect(isValidSequenceLine('Duplo 10p(0+30)')).toBe(true);
+  });
+
+  it('returns true for poste name with accented characters', () => {
+    expect(isValidSequenceLine('Pliëuse(15)')).toBe(true);
+  });
 });
 
 describe('isSequenceLineInvalid', () => {

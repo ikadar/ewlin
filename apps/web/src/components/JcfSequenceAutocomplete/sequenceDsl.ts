@@ -11,8 +11,9 @@
 /** Duration token: bare minutes, minutes with m, hours, hours+minutes (e.g. 20, 20m, 3h, 3h30, 3h30m) */
 const DURATION = '(?:\\d+h\\d+m?|\\d+[hm]?|\\d+h)';
 
-/** Poste line validation regex: Name(duration) or Name(setup+run) with optional time units */
-const POSTE_REGEX = new RegExp(`^\\w+\\(${DURATION}(\\+${DURATION})?\\)$`);
+/** Poste line validation regex: Name(duration) or Name(setup+run) with optional time units.
+ *  Name accepts letters (incl. accented), digits, underscore and spaces (e.g. "Duplo 10p"). */
+const POSTE_REGEX = new RegExp(`^[\\w\\p{L} ]+\\(${DURATION}(\\+${DURATION})?\\)$`, 'u');
 
 /** ST line validation regex: ST:Name(duration):description — supports accented chars and spaces */
 const ST_REGEX = /^ST:[\w\p{L} ]+\(\d+[jh]?\):.+$/u;
@@ -129,9 +130,9 @@ export function parseLine(line: string): ParsedLine {
     return { step: 'st-prefix', prefix: '', search: line };
   }
 
-  // Poste with open paren (typing duration) — e.g., "G37(" or "G37(20"
+  // Poste with open paren (typing duration) — e.g., "G37(" or "G37(20" or "Duplo 10p("
   // No duration suggestions for postes (user types manually)
-  const posteParenMatch = line.match(/^(\w+)\((.*)$/);
+  const posteParenMatch = line.match(/^([\w\p{L} ]+)\((.*)$/u);
   if (posteParenMatch) {
     return {
       step: 'complete',
