@@ -38,7 +38,7 @@ interface JobTestRecipeEditorProps {
   onSaved: (msg: string) => void;
 }
 
-const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'];
+const PRIORITY_LABELS = ['Vital', 'Impératif', 'Important', 'Standard', 'Flexible'];
 const INPUT_CLASS =
   'w-full px-3 py-2 bg-flux-base border border-flux-border-light rounded text-flux-text-primary placeholder:text-flux-text-muted focus:outline-none focus:border-blue-500';
 

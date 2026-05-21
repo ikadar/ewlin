@@ -1193,7 +1193,7 @@ pub fn compute_stats(
     let mut late_jobs: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut weighted_lateness_minutes: u64 = 0;
     let mut weighted_late_job_count: u64 = 0;
-    let tier_weights: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
+    let tier_weights: [f64; 5] = [10_000_000.0, 4.0, 2.0, 1.0, 0.5];
 
     // Build job deadline map
     let job_deadlines: HashMap<String, u64> = jobs
@@ -1216,11 +1216,11 @@ pub fn compute_stats(
                     total_lateness_minutes += lateness;
 
                     // Deduplicated late job count + weighted lateness
-                    let w = tier_weights[action.deadline_priority.min(3) as usize];
+                    let w = tier_weights[action.deadline_priority.min(4) as usize];
                     if late_jobs.insert(action.job_id.clone()) {
                         // First time seeing this job late — accumulate weighted count
-                        // (imperative=4, important=2, standard=1, flexible=0.5)
-                        // Multiply by 10 to keep integer precision (40,20,10,5)
+                        // (vital=10M, imperative=4, important=2, standard=1, flexible=0.5)
+                        // Multiply by 10 to keep integer precision (100M,40,20,10,5)
                         weighted_late_job_count += (w * 10.0) as u64;
                     }
                     weighted_lateness_minutes += (lateness as f64 * w) as u64;
@@ -1327,7 +1327,7 @@ fn recompute_stats_from_assignments(
     _tick_minutes: u32,
     start_date: chrono::NaiveDate,
 ) -> ScheduleStats {
-    let tier_weights: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
+    let tier_weights: [f64; 5] = [10_000_000.0, 4.0, 2.0, 1.0, 0.5];
 
     // Build task_id → job_id map from jobs
     let mut task_to_job: HashMap<String, String> = HashMap::new();
@@ -1431,7 +1431,7 @@ fn recompute_stats_from_assignments(
                 late_jobs.insert(job_id.clone());
                 let lateness = max_end - deadline_mins;
                 let priority = *job_priority.get(job_id.as_str()).unwrap_or(&2);
-                let w = tier_weights[priority.min(3) as usize];
+                let w = tier_weights[priority.min(4) as usize];
                 weighted_lateness_minutes += (lateness as f64 * w) as u64;
                 weighted_late_job_count += (w * 10.0) as u64;
             }

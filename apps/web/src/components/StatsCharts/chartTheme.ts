@@ -1,5 +1,5 @@
-export const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'];
-export const PRIORITY_COLORS = ['#ef4444', '#f97316', '#fbbf24', '#22c55e'];
+export const PRIORITY_LABELS = ['Vital', 'Impératif', 'Important', 'Standard', 'Flexible'];
+export const PRIORITY_COLORS = ['#dc2626', '#ef4444', '#f97316', '#fbbf24', '#22c55e'];
 export const LATE_COLOR = '#ef4444';
 export const ONTIME_COLOR = '#22c55e';
 export const AXIS_COLOR = '#a1a1a1';

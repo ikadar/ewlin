@@ -3,10 +3,11 @@ import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
 const PRIORITY_OPTIONS = [
-  { value: 0, label: 'Impératif', color: 'text-red-400' },
-  { value: 1, label: 'Important', color: 'text-orange-400' },
-  { value: 2, label: 'Standard', color: 'text-zinc-100' },
-  { value: 3, label: 'Flexible', color: 'text-blue-400' },
+  { value: 0, label: 'Vital', color: 'text-red-500 font-bold' },
+  { value: 1, label: 'Impératif', color: 'text-red-400' },
+  { value: 2, label: 'Important', color: 'text-orange-400' },
+  { value: 3, label: 'Standard', color: 'text-zinc-100' },
+  { value: 4, label: 'Flexible', color: 'text-blue-400' },
 ];
 
 interface JcfPrioritySelectProps {
@@ -26,7 +27,7 @@ export const JcfPrioritySelect = memo(function JcfPrioritySelect({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState({ top: 0, left: 0, minWidth: 0 });
 
-  const selected = PRIORITY_OPTIONS.find((o) => o.value === value) ?? PRIORITY_OPTIONS[2];
+  const selected = PRIORITY_OPTIONS.find((o) => o.value === value) ?? PRIORITY_OPTIONS[3];
 
   const handleOpen = useCallback(() => {
     if (isOpen) {

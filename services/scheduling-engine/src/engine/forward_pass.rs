@@ -641,9 +641,11 @@ impl OperatorAvailability {
     }
 }
 
-/// Deadline priority tier weights: imperative jobs get 4x urgency, flexible get 0.5x.
-/// This ensures imperative jobs approaching their LAST beat flexible jobs past theirs.
-const TIER_WEIGHT: [f64; 4] = [4.0, 2.0, 1.0, 0.5];
+/// Deadline priority tier weights. Tier 0 = Vital is operator-only (never set by
+/// FBI/Moore/LNS) and weighted 10M× so it lexicographically dominates any pile-up
+/// of late lower-tier jobs. Tiers 1-4 follow the previous urgency hierarchy.
+/// Index → tier: 0=Vital, 1=Imperative, 2=Important, 3=Standard, 4=Flexible.
+const TIER_WEIGHT: [f64; 5] = [10_000_000.0, 4.0, 2.0, 1.0, 0.5];
 
 /// Scored action for priority sorting
 struct ScoredAction {
@@ -1463,7 +1465,7 @@ pub fn run_forward_pass(
                 let ratio = 1.0 - (slack as f64 / horizon_ticks as f64);
                 (ratio * 1000.0) as i64
             };
-            let tier_w = TIER_WEIGHT[action.deadline_priority.min(3) as usize];
+            let tier_w = TIER_WEIGHT[action.deadline_priority.min(4) as usize];
             let weighted_urgency = (raw_urgency as f64 * tier_w) as i64;
 
             // job_boost: reactive penalty when job is already past its deadline estimate.

@@ -76,7 +76,7 @@ export interface StatsData {
 
 // ── Constants ───────────────────────────────────────────────────
 
-const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'];
+const PRIORITY_LABELS = ['Vital', 'Impératif', 'Important', 'Standard', 'Flexible'];
 const WORKING_HOURS_PER_DAY = 8;
 
 // ── Main derivation (follows scheduleScoring.ts pattern) ────────

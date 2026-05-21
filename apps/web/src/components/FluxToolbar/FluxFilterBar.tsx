@@ -26,10 +26,11 @@ const STATUS_OPTIONS: ReadonlyArray<FluxMultiSelectOption<FluxJobStatusFilter>> 
 ];
 
 const PRIORITY_LABELS: Record<number, string> = {
-  0: 'Impératif',
-  1: 'Important',
-  2: 'Standard',
-  3: 'Flexible',
+  0: 'Vital',
+  1: 'Impératif',
+  2: 'Important',
+  3: 'Standard',
+  4: 'Flexible',
 };
 
 const PRIORITY_OPTIONS: ReadonlyArray<FluxMultiSelectOption<number>> = [
@@ -37,6 +38,7 @@ const PRIORITY_OPTIONS: ReadonlyArray<FluxMultiSelectOption<number>> = [
   { value: 1, label: PRIORITY_LABELS[1]! },
   { value: 2, label: PRIORITY_LABELS[2]! },
   { value: 3, label: PRIORITY_LABELS[3]! },
+  { value: 4, label: PRIORITY_LABELS[4]! },
 ];
 
 const YES_NO_OPTIONS: ReadonlyArray<FluxMultiSelectOption<YesNoFilter>> = [

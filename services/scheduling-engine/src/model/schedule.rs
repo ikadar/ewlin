@@ -290,7 +290,7 @@ pub struct ScheduleStats {
     pub late_job_count: u32,
     #[serde(default)]
     pub weighted_lateness_minutes: u64,
-    /// Priority-weighted late job count: imperative=4, important=2, standard=1, flexible=0.5.
+    /// Priority-weighted late job count: vital=10M, imperative=4, important=2, standard=1, flexible=0.5.
     /// Used by FBI to prefer solutions that protect high-priority jobs.
     #[serde(default)]
     pub weighted_late_job_count: u64,

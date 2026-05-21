@@ -93,8 +93,9 @@ function formatJobDate(dateStr: string): string {
   return `${day}/${month}/${year} a ${hours}h${minutes}`;
 }
 
-const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'] as const;
+const PRIORITY_LABELS = ['Vital', 'Impératif', 'Important', 'Standard', 'Flexible'] as const;
 const PRIORITY_CHIP_CLASSES = [
+  'bg-red-600/20 text-red-500 font-bold',
   'bg-red-500/15 text-red-400',
   'bg-amber-500/15 text-amber-400',
   '',

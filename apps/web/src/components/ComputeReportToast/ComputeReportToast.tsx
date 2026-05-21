@@ -29,8 +29,8 @@ interface Props {
   onDismiss: () => void;
 }
 
-const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'];
-const PRIORITY_COLORS = ['#ef4444', '#f97316', '#fbbf24', '#22c55e'];
+const PRIORITY_LABELS = ['Vital', 'Impératif', 'Important', 'Standard', 'Flexible'];
+const PRIORITY_COLORS = ['#dc2626', '#ef4444', '#f97316', '#fbbf24', '#22c55e'];
 
 const AUTO_DISMISS_NO_LATE_MS = 8000;
 

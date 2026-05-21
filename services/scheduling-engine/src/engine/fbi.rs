@@ -184,9 +184,10 @@ pub fn run_with_fbi(
     let effective_max = if max_iterations == 0 { 1 } else { max_iterations };
 
     // Mid-FBI re-prioritization: late jobs from the previous iteration get
-    // their deadline_priority boosted by one tier (clamped to 0 = imperative)
-    // so the next backward pass schedules them earlier. The boost only
-    // affects the backward pass (LAST computation), not the permanent job data.
+    // their deadline_priority boosted by one tier (clamped to 1 = imperative;
+    // tier 0 = Vital is operator-only and never produced automatically) so
+    // the next backward pass schedules them earlier. The boost only affects
+    // the backward pass (LAST computation), not the permanent job data.
     let mut boosted_jobs: Vec<JobInput> = Vec::new();
 
     for iteration in 0..effective_max {
@@ -383,7 +384,7 @@ pub fn run_with_fbi(
             boosted_jobs = jobs.iter().map(|j| {
                 let mut j2 = j.clone();
                 if late_set.contains(j.id.as_str()) {
-                    j2.deadline_priority = j.deadline_priority.saturating_sub(1);
+                    j2.deadline_priority = j.deadline_priority.saturating_sub(1).max(1);
                 }
                 j2
             }).collect();

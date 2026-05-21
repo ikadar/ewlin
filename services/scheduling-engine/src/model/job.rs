@@ -10,8 +10,9 @@ pub struct JobInput {
     pub description: Option<String>,
     #[serde(default)]
     pub deadline: Option<String>,
-    /// Deadline priority tier: 0=imperative, 1=important, 2=standard (default), 3=flexible.
+    /// Deadline priority tier: 0=vital, 1=imperative, 2=important, 3=standard (default), 4=flexible.
     /// Controls processing order in the backward pass (lower = placed first = reserves capacity).
+    /// Tier 0 (Vital) is operator-only and never produced by FBI/Moore/LNS.
     #[serde(default = "default_deadline_priority")]
     pub deadline_priority: u8,
     pub elements: Vec<ElementInput>,
@@ -29,7 +30,7 @@ pub struct JobInput {
 }
 
 fn default_deadline_priority() -> u8 {
-    2 // standard
+    3 // standard
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

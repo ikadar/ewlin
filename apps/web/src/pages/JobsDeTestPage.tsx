@@ -44,8 +44,8 @@ import { fluxApi } from '../store/api/fluxApi';
 import { JobTestRecipeEditor } from '../components/JobTestRecipeEditor/JobTestRecipeEditor';
 import { JobTestScenarioEditor } from '../components/JobTestScenarioEditor/JobTestScenarioEditor';
 
-const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'];
-const PRIORITY_COLORS = ['text-red-400 border-red-400/40', 'text-orange-400 border-orange-400/40', 'text-zinc-100 border-flux-border-light', 'text-blue-400 border-blue-400/40'];
+const PRIORITY_LABELS = ['Vital', 'Impératif', 'Important', 'Standard', 'Flexible'];
+const PRIORITY_COLORS = ['text-red-500 border-red-500/40 font-bold', 'text-red-400 border-red-400/40', 'text-orange-400 border-orange-400/40', 'text-zinc-100 border-flux-border-light', 'text-blue-400 border-blue-400/40'];
 
 interface ToastState {
   msg: string;

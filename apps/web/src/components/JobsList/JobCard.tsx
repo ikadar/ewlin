@@ -85,20 +85,22 @@ export const JobCard = memo(function JobCard({
   const prioritySymbol = (() => {
     if (isCompleted || deadlinePriority == null) return null;
     switch (deadlinePriority) {
-      case 0: return '!';
-      case 1: return '+';
-      case 2: return '=';
-      case 3: return '-';
+      case 0: return '!!!';
+      case 1: return '!';
+      case 2: return '+';
+      case 3: return '=';
+      case 4: return '-';
       default: return null;
     }
   })();
 
   const priorityColor = (() => {
     switch (deadlinePriority) {
-      case 0: return 'text-red-400';
-      case 1: return 'text-orange-400';
-      case 2: return 'text-yellow-300';
-      case 3: return 'text-zinc-400';
+      case 0: return 'text-red-500 font-bold';
+      case 1: return 'text-red-400';
+      case 2: return 'text-orange-400';
+      case 3: return 'text-yellow-300';
+      case 4: return 'text-zinc-400';
       default: return '';
     }
   })();

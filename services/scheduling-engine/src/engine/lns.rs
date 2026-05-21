@@ -215,9 +215,9 @@ pub fn lns_improve(
             .map(|j| {
                 let mut m = j.clone();
                 if destroyed.contains(j.id.as_str()) {
-                    m.deadline_priority = 0; // imperative
+                    m.deadline_priority = 1; // imperative (never vital — operator-only)
                 } else if sacrificed.contains(j.id.as_str()) {
-                    m.deadline_priority = 3; // flexible
+                    m.deadline_priority = 4; // flexible
                 }
                 if force_max_targets.contains(j.id.as_str()) {
                     m.force_max_staffing = true;

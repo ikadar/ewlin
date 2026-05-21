@@ -177,9 +177,9 @@ pub fn moore_escape(
             .map(|j| {
                 let mut modified = j.clone();
                 if j.id == late_job.job_id {
-                    modified.deadline_priority = 0; // imperative
+                    modified.deadline_priority = 1; // imperative (never vital — operator-only)
                 } else if blocker_jobs.contains(&j.id) {
-                    modified.deadline_priority = 3; // flexible
+                    modified.deadline_priority = 4; // flexible
                 }
                 modified
             })
