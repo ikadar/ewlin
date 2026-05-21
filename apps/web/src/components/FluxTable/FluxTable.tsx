@@ -186,7 +186,7 @@ function FluxTableHeader() {
         </th>
         {/* Client — frozen left */}
         <th
-          className={`${stickyHeaderCell} left-[9.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[10.5rem] ${sortableHeader}`}
           title="Client"
           onClick={() => onSortChange('client')}
         >
@@ -194,7 +194,7 @@ function FluxTableHeader() {
         </th>
         {/* Designation — frozen left + right shadow */}
         <th
-          className={`${stickyHeaderCell} left-[18.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[26.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
           title="Désignation"
           onClick={() => onSortChange('designation')}
@@ -437,24 +437,26 @@ const FluxTableRow = memo(function FluxTableRow({
       </td>
 
       {/* Client — frozen left */}
-      <td className={`${cellBase} left-[9.5rem] whitespace-nowrap`} style={stickyBg}>
-        {job.client}
+      <td className={`${cellBase} left-[10.5rem]`} style={stickyBg}>
+        <TruncatedCell fullText={job.client} />
       </td>
 
       {/* Designation — frozen left + right shadow */}
       <td
-        className={`${cellBase} left-[18.5rem]`}
+        className={`${cellBase} left-[26.5rem]`}
         style={tint ? { ...LEFT_SHADOW, background: tint.sticky } : LEFT_SHADOW}
         data-testid="flux-designation"
       >
-        <TruncatedCell fullText={job.designation}>
-          {job.designation}
+        <div className="flex items-center min-w-0">
+          <div className="flex-1 min-w-0">
+            <TruncatedCell fullText={job.designation} />
+          </div>
           {isMulti && (
-            <span className="ml-1 text-flux-text-muted" style={{ fontSize: '10px' }}>
+            <span className="ml-1 shrink-0 text-flux-text-muted" style={{ fontSize: '10px' }}>
               ({job.elements.length})
             </span>
           )}
-        </TruncatedCell>
+        </div>
       </td>
 
       {/* Référent */}
@@ -671,11 +673,11 @@ function FluxSubRow({
       <td className={`${subRowStickyCell} left-10`} />
 
       {/* Client — empty */}
-      <td className={`${subRowStickyCell} left-[9.5rem]`} />
+      <td className={`${subRowStickyCell} left-[10.5rem]`} />
 
       {/* Designation — label with arrow prefix */}
       <td
-        className={`${subRowStickyCell} left-[18.5rem] px-4 py-0 text-flux-text-tertiary`}
+        className={`${subRowStickyCell} left-[26.5rem] px-4 py-0 text-flux-text-tertiary`}
         style={LEFT_SHADOW}
         data-testid="flux-sub-designation"
       >
@@ -826,8 +828,8 @@ export const FluxTable = memo(function FluxTable({
           <colgroup>
             <col style={{ width: '1.5rem' }} />
             <col style={{ width: '1rem' }} />
-            <col style={{ width: '7rem' }} />
-            <col style={{ width: '9rem' }} />
+            <col style={{ width: '8rem' }} />
+            <col style={{ width: '16rem' }} />
             <col style={{ width: '16rem' }} />
             <col style={{ width: '7rem' }} />
             <col style={{ width: '6rem' }} />
