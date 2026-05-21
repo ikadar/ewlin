@@ -41,7 +41,10 @@ const JOB_COLORS = [
 const PAPER_TYPES = ['CB 135g', 'CB 300g', 'CB 350g', 'Couché mat 170g', 'Couché brillant 250g', 'Offset 80g', 'Kraft 120g'];
 const PAPER_FORMATS = ['45x64', '52x74', '63x88', '70x100', 'A4', 'A3', 'SRA3'];
 const PAPER_WEIGHTS = [80, 100, 120, 150, 170, 200, 250, 300, 350];
-const INKINGS = ['CMYK', '4C+0', '4C+4C', '2C+0', 'Pantone 485+Black', '1C+0'];
+// Inking DSL — recto/verso with comma-separated color tokens.
+// `Q` = quadri (CMJN, 4 colors), `N` = noir, anything else = named color (Pantone…).
+// See apps/web/src/utils/inkingDsl.ts for grammar + parser.
+const INKINGS = ['Q/Q', 'Q/', 'N/N', 'N/', 'Q, pantone 485/N', 'Q/N'];
 
 const CLIENT_NAMES = [
   'Autosphere',
