@@ -49,7 +49,7 @@ def _build_element(
         name = defaults.get("element_paper_name_template", "PAP{n}").format(n=n)
         label = f"Papier {n}"
 
-    # Spec (papier, format, pagination) — seulement pour les éléments papier
+    # Spec (papier, format, pagination, inkingSpec) — seulement pour les éléments papier
     spec: dict = {}
     tirage = None
     element_info = None
@@ -69,6 +69,12 @@ def _build_element(
             spec["pagination"] = element_info.pag
         if db.devis_by_nodev.get(dossier.nodev) and db.devis_by_nodev[dossier.nodev].nbfeu:
             spec["qteFeuilles"] = db.devis_by_nodev[dossier.nodev].nbfeu
+        # inkingSpec : metadata lecture seule depuis dv_cximp (couleurs/vernis/lavages).
+        # Aujourd'hui 1 ligne dv_cximp par (NODEV, NOPAP) → objet unique. Si on
+        # rencontre des NREPI multiples plus tard, basculer en liste sera trivial.
+        impressions = db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), [])
+        if impressions:
+            spec["inkingSpec"] = impressions[0].to_inking_spec_dict()
 
     # Résolution opération par opération
     ctx = ResolverContext(

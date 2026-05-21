@@ -142,6 +142,36 @@ class Impression:
     massi: bool
     mont: bool
 
+    def to_inking_spec_dict(self) -> dict:
+        """Serialize as a structured inking spec for element.spec.inkingSpec.
+
+        Read-only metadata sourced from MasterPrint — surfaced in the JCF
+        (and similarity scoring later) but not editable. Excludes nodev/nopap/nrepi
+        which are import-internal identifiers.
+        """
+        return {
+            "press": self.cdmac_1,
+            "pressAlternates": self.cdmac_alternates,
+            "recto": {
+                "colors": self.nbcr,
+                "quadri": self.quadr,
+                "black": self.noir_r,
+                "plateChanges": self.nbchr,
+                "washes": self.nblavr,
+                "varnish": self.vernir,
+            },
+            "verso": {
+                "colors": self.nbcv,
+                "quadri": self.quadv,
+                "black": self.noir_v,
+                "plateChanges": self.nbchv,
+                "washes": self.nblavv,
+                "varnish": self.verniv,
+            },
+            "perforations": self.nbper,
+            "numbering": self.nbnum,
+        }
+
 
 @dataclass
 class Launch:
