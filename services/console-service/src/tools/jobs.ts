@@ -95,3 +95,68 @@ export const updateJobDeadlineTool: ToolDefinition = {
     return { ok: true, preview, data: { job: updated } };
   },
 };
+
+// ============================================================
+// Catégorie D — Batch priority deadline (Imperative / Important / Standard / Flexible)
+// ============================================================
+
+const PRIORITY_LABEL: Record<number, string> = {
+  0: 'Imperative',
+  1: 'Important',
+  2: 'Standard',
+  3: 'Flexible',
+};
+
+export const setJobsDeadlinePriorityTool: ToolDefinition = {
+  name: 'set_jobs_deadline_priority',
+  description:
+    "Change le degré d'importance de la deadline (deadlinePriority) sur PLUSIEURS jobs d'un coup. Valeurs : 0=Imperative (critique), 1=Important, 2=Standard (défaut), 3=Flexible. Workflow type : appeler resolve_job autant de fois que nécessaire avec différents critères (client, range de deadline, etc.) pour collecter la liste d'IDs, puis appeler ce batch tool. Pour un seul job, fonctionne aussi (jobIds=[seul-id]).",
+  inputSchema: z.object({
+    jobIds: z
+      .array(uuidField('resolve_job'))
+      .min(1)
+      .describe('Liste des UUID jobs à modifier (obtenue via resolve_job).'),
+    jobsLabel: z
+      .string()
+      .min(1)
+      .describe("Description humaine du lot (ex 'tous les jobs MUTUELLE DE POITIERS')."),
+    priority: z
+      .number()
+      .int()
+      .min(0)
+      .max(3)
+      .describe('0=Imperative, 1=Important, 2=Standard, 3=Flexible.'),
+  }),
+  handler: async (input, ctx) => {
+    const label = PRIORITY_LABEL[input.priority];
+    const preview = `${input.jobIds.length} job(s) (${input.jobsLabel}) → priorité ${label}`;
+    if (ctx.dryRun) {
+      return {
+        ok: true,
+        preview,
+        data: { dryRun: true, count: input.jobIds.length, priority: input.priority },
+      };
+    }
+    const results = await Promise.allSettled(
+      input.jobIds.map((id: string) =>
+        ctx.php.put<JobRow>(`/api/v1/jobs/${id}`, { deadlinePriority: input.priority }),
+      ),
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results
+      .map((r, i) => ({ id: input.jobIds[i], r }))
+      .filter((x) => x.r.status === 'rejected')
+      .map((x) => ({
+        jobId: x.id,
+        error: (x.r as PromiseRejectedResult).reason instanceof Error
+          ? (x.r as PromiseRejectedResult).reason.message
+          : String((x.r as PromiseRejectedResult).reason),
+      }));
+    const fullPreview = `${preview} — ${ok}/${input.jobIds.length} OK${failed.length ? `, ${failed.length} échec(s)` : ''}`;
+    return {
+      ok: true,
+      preview: fullPreview,
+      data: { okCount: ok, failedCount: failed.length, failed },
+    };
+  },
+};

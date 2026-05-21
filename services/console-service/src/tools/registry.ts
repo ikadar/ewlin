@@ -24,7 +24,7 @@ import {
   cancelConstraintTool,
   listActiveConstraintsTool,
 } from './constraints.js';
-import { updateJobDeadlineTool } from './jobs.js';
+import { updateJobDeadlineTool, setJobsDeadlinePriorityTool } from './jobs.js';
 import {
   addOperatorOvertimeTool,
   updateTaskDurationTool,
@@ -35,7 +35,19 @@ import {
   listRunningTasksTool,
   checkStationOperatorAvailabilityTool,
   reportProgressTool,
+  recordTaskCompletionAtTool,
+  markJobProgressedPastTool,
 } from './tasks.js';
+import { resolveElementInJobTool, setElementGateStatusTool } from './gates.js';
+import {
+  setOperatorSkillTool,
+  addOperatorConcurrentPairTool,
+  removeOperatorConcurrentPairTool,
+  updateStationCapacityTool,
+  updateStationAttentionTool,
+  updateStationPeremptionThresholdTool,
+  updateStationOperatorRequirementsTool,
+} from './workshop.js';
 import { proposePlanTool, askUserTool } from './system.js';
 
 /**
@@ -51,6 +63,7 @@ export const allTools: readonly ToolDefinition[] = [
   resolveStationTool,
   resolveJobTool,
   resolveTaskInJobTool,
+  resolveElementInJobTool,
   // Constraints
   addOperatorAbsenceTool,
   addShopClosureTool,
@@ -59,6 +72,7 @@ export const allTools: readonly ToolDefinition[] = [
   listActiveConstraintsTool,
   // Jobs
   updateJobDeadlineTool,
+  setJobsDeadlinePriorityTool,
   // Tasks
   listRunningTasksTool,
   addOperatorOvertimeTool,
@@ -69,6 +83,18 @@ export const allTools: readonly ToolDefinition[] = [
   pinTaskAtTimeTool,
   unpinTaskTool,
   reportProgressTool,
+  recordTaskCompletionAtTool,
+  markJobProgressedPastTool,
+  // Gates (per-element status)
+  setElementGateStatusTool,
+  // Workshop (skills, pairs, station characteristics)
+  setOperatorSkillTool,
+  addOperatorConcurrentPairTool,
+  removeOperatorConcurrentPairTool,
+  updateStationCapacityTool,
+  updateStationAttentionTool,
+  updateStationPeremptionThresholdTool,
+  updateStationOperatorRequirementsTool,
   // System (internal — not exposed via MCP)
   proposePlanTool,
   askUserTool,

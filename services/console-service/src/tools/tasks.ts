@@ -576,3 +576,101 @@ export const extendRunningTaskTool: ToolDefinition = {
     return { ok: true, preview: fullPreview, data: result };
   },
 };
+
+// ============================================================
+// Catégorie B — Saisie rétroactive (déclaration de complétion à une heure passée)
+// ============================================================
+
+/**
+ * Use case typique : "j'ai fini la task G37 du dossier 12345 lundi à 15h au lieu de
+ * vendredi à 10h". L'opérateur déclare APRÈS COUP la vraie heure de fin. Réutilise
+ * l'endpoint /saisie existant (qui calcule le ratio + déclenche le recompute aval).
+ *
+ * Différence avec report_progress :
+ *   - report_progress = "je vais finir à HH:MM" (estimation, tâche encore en cours)
+ *   - record_task_completion_at = "j'ai fini à HH:MM le JJ/MM" (déclaration passée)
+ *
+ * Le backend gère la cascade aval naturellement via le recompute.
+ */
+interface MarkProgressedResult {
+  completedCount: number;
+  skippedCount: number;
+  results: Array<{ taskId: string; action: string; reason?: string }>;
+}
+
+/**
+ * Use case typique : "sur le job 12345 on a fini, on en est à l'assembleuse piqueuse".
+ * Marque comme Completed toutes les tasks logiquement avant la cible :
+ *   - les tasks du même élément avec sequenceOrder < target
+ *   - les tasks des éléments prérequis (récursif)
+ * SANS exiger qu'elles soient placées sur le planning.
+ */
+export const markJobProgressedPastTool: ToolDefinition = {
+  name: 'mark_job_progressed_past',
+  description:
+    "Marque comme TERMINÉES toutes les tâches qui logiquement précèdent une tâche cible dans un job, SANS exiger qu'elles soient placées sur le planning. Use case : 'sur le job 12345 on a fini on en est à l'assembleuse piqueuse' → marque tout ce qui devait être fait avant. Couvre les tâches du même élément (sequenceOrder < target) ET les tâches des éléments prérequis (récursif). Les tâches déjà Completed/Failed/Cancelled sont skipped. Utiliser resolve_task_in_job d'abord pour obtenir taskId.",
+  inputSchema: z.object({
+    jobId: uuidField('resolve_job').describe('UUID du job.'),
+    jobLabel: z.string().min(1).describe("Référence ou nom lisible du job (ex '12345')."),
+    targetTaskId: uuidField('resolve_task_in_job').describe(
+      "UUID de la tâche-repère (ex: l'assembleuse piqueuse qu'on commence ; tout AVANT sera marqué terminé).",
+    ),
+    targetTaskLabel: z
+      .string()
+      .min(1)
+      .describe("Nom lisible de la tâche-repère (ex 'Duplo 10P du job 12345')."),
+  }),
+  handler: async (input, ctx) => {
+    const preview = `Job ${input.jobLabel} : marque terminées toutes les tâches avant ${input.targetTaskLabel}`;
+    if (ctx.dryRun) {
+      return { ok: true, preview, data: { dryRun: true, ...input } };
+    }
+    const result = await ctx.php.post<MarkProgressedResult>(
+      `/api/v1/jobs/${input.jobId}/mark-progressed-past/${input.targetTaskId}`,
+      {},
+    );
+    return {
+      ok: true,
+      preview: `${preview} — ${result.completedCount} terminée(s)${result.skippedCount ? `, ${result.skippedCount} déjà terminale(s)` : ''}`,
+      data: result,
+    };
+  },
+};
+
+export const recordTaskCompletionAtTool: ToolDefinition = {
+  name: 'record_task_completion_at',
+  description:
+    "Saisie rétroactive : déclare qu'une tâche a EFFECTIVEMENT été terminée à une date/heure passée précise. À utiliser quand l'opérateur ou le chef rapporte une complétion APRÈS COUP, possiblement bien après l'heure de fin planifiée (ex: 'j'ai fini la task G37 du dossier 12345 lundi à 15h au lieu de vendredi à 10h'). Les tâches aval qui étaient planifiées entre l'ancienne fin et la nouvelle seront recalculées par le moteur. Si l'utilisateur déclare une fin FUTURE ou si la tâche est encore en cours, utiliser report_progress plutôt.",
+  inputSchema: z.object({
+    taskId: uuidField('resolve_task_in_job').describe('UUID de la tâche complétée.'),
+    taskLabel: z
+      .string()
+      .min(1)
+      .describe("Nom lisible (ex 'G37 du dossier 12345')."),
+    completedDate: z.string().describe("Date YYYY-MM-DD de complétion réelle."),
+    completedTime: z
+      .string()
+      .describe("Heure HH:MM de complétion réelle (ex '15:00' pour '15h')."),
+  }),
+  handler: async (input, ctx) => {
+    let completedAtIso: string;
+    try {
+      completedAtIso = toIsoWithLocalOffset(input.completedDate, input.completedTime);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+    const preview = `Saisie rétroactive : ${input.taskLabel} terminé le ${input.completedDate} à ${input.completedTime}`;
+    if (ctx.dryRun) {
+      return { ok: true, preview, data: { dryRun: true, completedAtIso, ...input } };
+    }
+    const result = await ctx.php.post<SaisieResult>(
+      `/api/v1/scenarios/prod/saisie/${input.taskId}`,
+      { estimatedEndTime: completedAtIso },
+    );
+    return {
+      ok: true,
+      preview: `${preview} — ratio ${result.productivityRatio.toFixed(2)}, progression ${Math.round(result.recordedProgressPct)}%`,
+      data: result,
+    };
+  },
+};
