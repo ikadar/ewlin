@@ -8,7 +8,6 @@
 
 import { Pin } from 'lucide-react';
 import { ProgressFill, computeProgressBgGradient } from './ProgressFill';
-import { TaskBadge } from './TaskBadge';
 import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
@@ -136,8 +135,6 @@ export function TileSegment({
   width,
   sawtoothTop,
   sawtoothBottom,
-  relayLabelBottom,
-  relayLabelTop,
   tileState = 'default',
   isMaskedTime,
   overrideLeft,
@@ -160,7 +157,6 @@ export function TileSegment({
   onToggleFrozenOverride,
   onContextMenu,
   progressFill,
-  taskBadgePct = 100,
 }: TileSegmentProps) {
   // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
   // selected-job segments only. Was a hover trigger; switched to dblclick
@@ -277,11 +273,6 @@ export function TileSegment({
           clipPath: buildCssClipPath(totalHeight, sawtoothTop, sawtoothBottom, teethCount),
         }}
       />
-
-      {/* Task badge (Q10 of 2026-05-04 mindmap) — share of the parent
-          task this segment represents. forceShow so 100% is visible on
-          unsplit tasks. */}
-      <TaskBadge pct={taskBadgePct} forceShow />
 
       {/* Marker for tests + dev tools. Visual carried by the bg + border
           divs above. */}
@@ -400,15 +391,6 @@ export function TileSegment({
           )}
           {label}
         </div>
-        {/* Relay-before label sits inline with the title in a flex row so
-            narrow tiles truncate the title rather than letting the absolute
-            label overlap the header text. The bottom relay label has no
-            equivalent collision risk and stays absolutely positioned. */}
-        {relayLabelTop && (
-          <span className="text-[10px] font-semibold text-zinc-400 shrink-0">
-            {relayLabelTop}
-          </span>
-        )}
         </div>
         {stationName && (
           <div className="text-[9px] text-zinc-400 truncate leading-tight mt-0.5">
@@ -416,16 +398,6 @@ export function TileSegment({
           </div>
         )}
       </div>
-
-      {/* Relay labels */}
-      {relayLabelBottom && (
-        <div
-          className="absolute right-1.5 text-[10px] font-semibold text-zinc-400 pointer-events-none"
-          style={{ bottom: `${(sawtoothBottom ? SAW_AMPLITUDE : 0) + 1}px` }}
-        >
-          {relayLabelBottom}
-        </div>
-      )}
 
     </div>
   );
