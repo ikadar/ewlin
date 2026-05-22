@@ -75,6 +75,14 @@ describe('computeChunkProgress (per-window wallclock)', () => {
     expect(stint1.pct).toBeLessThan(100);
     expect(stint2.pct).toBe(0);
   });
+
+  it('Préprod (allowWallclock=false) : a past chunk shows no invented green', () => {
+    const now = new Date(WINDOW_END).getTime() + 30 * 60_000; // well past end
+    expect(computeChunkProgress(WINDOW_START, WINDOW_END, now, false)).toEqual({
+      pct: 0,
+      isLate: false,
+    });
+  });
 });
 
 describe('computeOptimisticProgress (geometric fill, smooth across calage + run)', () => {
@@ -149,6 +157,33 @@ describe('computeOptimisticProgress (geometric fill, smooth across calage + run)
       now,
     );
     expect(out.pct).toBeCloseTo(70.83, 1);
+  });
+
+  describe('Préprod gating (allowWallclockFallback = false)', () => {
+    // A tile merely placed in the past in Préprod is a hypothesis, not real
+    // progress. Without a real wall anchor it must stay blue (0 %).
+    it('stays at 0 for a past tile with no anchor', () => {
+      const now = new Date('2026-05-05T11:30:00.000Z').getTime(); // past end
+      const out = computeOptimisticProgress(start, end, 15, 45, null, null, now, false);
+      expect(out).toEqual({ pct: 0, isLate: false });
+    });
+
+    it('does not flip to late from the clock alone', () => {
+      const now = new Date('2026-05-05T12:00:00.000Z').getTime();
+      const out = computeOptimisticProgress(start, end, 15, 45, null, null, now, false);
+      expect(out.isLate).toBe(false);
+      expect(out.pct).toBe(0);
+    });
+
+    it('still honours a REAL saisie anchor (shared wall)', () => {
+      // Same anchor case as the prod test above — a real saisie shows even
+      // in Préprod because it is reality, not invented from the schedule.
+      const now = new Date('2026-05-05T10:35:00.000Z').getTime();
+      const out = computeOptimisticProgress(
+        start, end, 15, 45, 50, '2026-05-05T10:30:00.000Z', now, false,
+      );
+      expect(out.pct).toBeCloseTo(70.83, 1);
+    });
   });
 });
 

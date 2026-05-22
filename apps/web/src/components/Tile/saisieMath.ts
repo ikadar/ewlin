@@ -100,7 +100,16 @@ export function computeOptimisticProgress(
   recordedProgressPct: number | null | undefined,
   recordedAt: string | null | undefined,
   nowMs: number,
+  allowWallclockFallback = true,
 ): { pct: number; isLate: boolean } {
+  // Préprod is a hypothetical plan : a tile merely placed in the past must
+  // NOT invent avancement from the clock ("silence is consent" is a Prod-
+  // only concept). Green only survives if a REAL saisie anchor exists on
+  // the shared wall ; otherwise the tile stays blue (0 %).
+  const hasAnchor = recordedProgressPct != null && recordedAt != null;
+  if (!allowWallclockFallback && !hasAnchor) {
+    return { pct: 0, isLate: false };
+  }
   const startMs = new Date(scheduledStart).getTime();
   const setupEndMs = startMs + setupMin * 60_000;
   const endMs = new Date(scheduledEnd).getTime();
@@ -234,7 +243,14 @@ export function computeChunkProgress(
   windowStartIso: string,
   windowEndIso: string,
   nowMs: number,
+  allowWallclock = true,
 ): { pct: number; isLate: boolean } {
+  // Préprod : a chunk carries no wall anchor, so a past hypothetical window
+  // must show no invented green. Blue (0 %) until reality (a Prod saisie /
+  // tick) says otherwise.
+  if (!allowWallclock) {
+    return { pct: 0, isLate: false };
+  }
   const startMs = new Date(windowStartIso).getTime();
   const endMs = new Date(windowEndIso).getTime();
   const windowMs = Math.max(0, endMs - startMs);

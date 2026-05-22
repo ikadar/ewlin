@@ -80,6 +80,15 @@ export function useScenarioMode(): ScenarioContextValue {
 }
 
 /**
+ * Non-throwing variant for leaf components (e.g. Tile) that may be rendered
+ * outside a ScenarioProvider in isolation tests. Returns null when no
+ * provider is mounted; callers default to Prod-equivalent behaviour.
+ */
+export function useScenarioModeOrNull(): ScenarioContextValue | null {
+  return useContext(ScenarioContext);
+}
+
+/**
  * Wraps `useNavigate` to preserve the `?env=` query param across in-app
  * navigation. Without it, clicking from /planning to /flux drops the
  * current env, which silently switches the entire app — and crucially

@@ -20,8 +20,12 @@ export function isCompletedEffective(
   isCompleted: boolean,
   scheduledEndIso: string,
   nowMs: number,
+  allowDerived = true,
 ): boolean {
   if (isCompleted) return true;
+  // Préprod (allowDerived=false) : a tile placed in the past is a
+  // hypothesis, not real completion. Only the explicit flag counts.
+  if (!allowDerived) return false;
   return new Date(scheduledEndIso).getTime() < nowMs;
 }
 

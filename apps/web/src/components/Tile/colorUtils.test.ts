@@ -23,4 +23,13 @@ describe('isCompletedEffective (V2 derived auto-completion)', () => {
   it('returns true when explicit isCompleted overrides a future scheduledEnd', () => {
     expect(isCompletedEffective(true, '2026-05-01T13:00:00Z', NOW)).toBe(true);
   });
+
+  it('Préprod (allowDerived=false) : a past scheduledEnd is NOT auto-completed', () => {
+    // Time-derived completion is a Prod-only "silence = consent" concept.
+    expect(isCompletedEffective(false, '2026-05-01T11:00:00Z', NOW, false)).toBe(false);
+  });
+
+  it('Préprod (allowDerived=false) : explicit flag still wins', () => {
+    expect(isCompletedEffective(true, '2026-05-01T13:00:00Z', NOW, false)).toBe(true);
+  });
 });

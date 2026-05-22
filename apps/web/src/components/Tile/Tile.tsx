@@ -11,6 +11,7 @@ import { computeOptimisticProgress, computeChunkProgress } from './saisieMath';
 import type { PrerequisiteBlockingInfo } from '../../utils';
 import { useHoverCrosslink } from '../../hooks';
 import { useNow } from '../../contexts/NowContext';
+import { useScenarioModeOrNull } from '../../contexts/ScenarioContext';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
 
@@ -162,6 +163,11 @@ export const Tile = memo(function Tile({
   const hasSetup = setupMinutes > 0;
 
   const now = useNow();
+  // Optimistic, clock-derived green/completion is a Prod-only concept
+  // (silence = consent). In Préprod a tile is a hypothesis ; its avancement
+  // must come only from a real wall saisie. No provider (isolation tests) =>
+  // Prod-equivalent default. Cf. computeOptimisticProgress / isCompletedEffective.
+  const optimisticAllowed = useScenarioModeOrNull()?.mode !== 'preprod';
 
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;
@@ -209,6 +215,7 @@ export const Tile = memo(function Tile({
     assignment.isCompleted,
     completionEndIso,
     now.getTime(),
+    optimisticAllowed,
   );
 
   // Compute progress BEFORE effectiveTileState so saisie-driven completion
@@ -218,7 +225,7 @@ export const Tile = memo(function Tile({
   const rawProgress = baseEffectivelyCompleted
     ? null
     : windowStart && windowEnd
-      ? computeChunkProgress(windowStart, windowEnd, now.getTime())
+      ? computeChunkProgress(windowStart, windowEnd, now.getTime(), optimisticAllowed)
       : computeOptimisticProgress(
           assignment.scheduledStart,
           assignment.scheduledEnd,
@@ -227,6 +234,7 @@ export const Tile = memo(function Tile({
           task.recordedProgressPct,
           task.recordedAt,
           now.getTime(),
+          optimisticAllowed,
         );
   const progressCompleted = rawProgress !== null && rawProgress.pct >= 100;
 
