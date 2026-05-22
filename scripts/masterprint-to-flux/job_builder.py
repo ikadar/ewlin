@@ -165,6 +165,9 @@ def _build_element(
         "needsPlates": needs_plates,
     }
     if not is_global:
+        # MasterPrint dossiers reach Ordo only after the upstream customer-approval
+        # workflow has signed off the proof — batStatus lands pre-approved.
+        element["batStatus"] = "bat_approved"
         element["prerequisiteNames"] = []
     element.update(spec)
     return element
