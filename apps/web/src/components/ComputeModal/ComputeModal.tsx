@@ -57,22 +57,26 @@ function findLateJobs(snapshot: ScheduleSnapshot, result: ComputeScheduleResult)
     if (o.scheduledEnd) endByTask.set(o.taskId, o.scheduledEnd);
   }
 
-  const jobMap = new Map(snapshot.jobs.map((j) => [j.id, j]));
+  // Resolve each task to its job via the element layer (Task only carries
+  // elementId; element.jobId is the real link). Walking task.jobId — which
+  // does not exist on the Task type — left latestEnd null for every job, so
+  // findLateJobs always returned [] and the recap claimed "0 en retard".
+  const latestEndByJob = new Map<string, Date>();
+  for (const task of snapshot.tasks) {
+    const endStr = endByTask.get(task.id);
+    if (!endStr) continue;
+    const jobId = getJobIdForTask(task, snapshot.elements);
+    if (!jobId) continue;
+    const end = new Date(endStr);
+    const current = latestEndByJob.get(jobId);
+    if (!current || end > current) latestEndByJob.set(jobId, end);
+  }
 
   const lateJobs: LateJob[] = [];
   for (const job of snapshot.jobs) {
     if (!job.workshopExitDate) continue;
     const deadline = new Date(job.workshopExitDate);
-    let latestEnd: Date | null = null;
-
-    for (const task of snapshot.tasks) {
-      if (task.jobId !== job.id) continue;
-      const endStr = endByTask.get(task.id);
-      if (endStr) {
-        const end = new Date(endStr);
-        if (!latestEnd || end > latestEnd) latestEnd = end;
-      }
-    }
+    const latestEnd = latestEndByJob.get(job.id) ?? null;
 
     if (latestEnd && latestEnd > deadline) {
       lateJobs.push({
