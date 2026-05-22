@@ -11,9 +11,33 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
         return;
     }
 
-    let mut new_actions: Vec<Action> = Vec::new();
-    // Map from original action index to the index of its last chunk in new_actions
-    let mut original_to_last_chunk: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    // ── PASS 1: build the COMPLETE original→last-chunk map upfront.
+    //
+    // The remap functions silently drop predecessors whose original idx
+    // isn't in the map. If we built the map incrementally (one entry per
+    // processed action), any consumer action declared earlier in `actions[]`
+    // than its cross-element/cross-job prerequisites would have its
+    // predecessor references silently dropped — defeating precedence.
+    //
+    // Trigger seen in prod (job 202601.0162): PHP sorts elements by
+    // sort_order. When a job's terminal element (GLOBAL, sort_order=0)
+    // lists later-order siblings as prerequisites, GLOBAL's action_idx is
+    // lower than its prereqs' — exactly the configuration where the old
+    // incremental remap dropped predecessors and the forward pass placed
+    // GLOBAL before PAP* finished.
+    let mut original_to_last_chunk: std::collections::HashMap<usize, usize> =
+        std::collections::HashMap::with_capacity(actions.len());
+    let mut new_idx_cursor: usize = 0;
+    for action in actions.iter() {
+        let num_chunks = predict_num_chunks(action, stations, tick_minutes);
+        let last_chunk_new_idx = new_idx_cursor + num_chunks - 1;
+        original_to_last_chunk.insert(action.idx, last_chunk_new_idx);
+        new_idx_cursor += num_chunks;
+    }
+
+    // ── PASS 2: emit actions, remapping predecessors against the
+    // already-complete map. No more inserts into the map here.
+    let mut new_actions: Vec<Action> = Vec::with_capacity(new_idx_cursor);
 
     for action in actions.iter() {
         let station_idx = action.station_idx;
@@ -24,7 +48,6 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             // Remap predecessor + additional predecessors
             cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
             cloned.additional_predecessors = remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk);
-            original_to_last_chunk.insert(action.idx, cloned.idx);
             new_actions.push(cloned);
             continue;
         }
@@ -37,7 +60,6 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             cloned.idx = new_actions.len();
             cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
             cloned.additional_predecessors = remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk);
-            original_to_last_chunk.insert(action.idx, cloned.idx);
             new_actions.push(cloned);
             continue;
         }
@@ -51,7 +73,6 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             cloned.idx = new_actions.len();
             cloned.predecessor_idx = remap_predecessor(action.predecessor_idx, &original_to_last_chunk);
             cloned.additional_predecessors = remap_additional_predecessors(&action.additional_predecessors, &original_to_last_chunk);
-            original_to_last_chunk.insert(action.idx, cloned.idx);
             new_actions.push(cloned);
             continue;
         }
@@ -190,13 +211,38 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             prev_chunk_idx = Some(idx);
         }
 
-        // Map original action to the LAST chunk (successors should wait for last chunk)
-        if let Some(last_idx) = prev_chunk_idx {
-            original_to_last_chunk.insert(action.idx, last_idx);
-        }
+        // Pass 1 already inserted the original→last-chunk mapping for
+        // every action; no per-loop insert needed here.
+        let _ = prev_chunk_idx;
     }
 
     *actions = new_actions;
+}
+
+/// Predict how many chunks an action will produce in [`pre_split`]. Must
+/// mirror the actual split logic. Used by pass 1 to size the
+/// original→last-chunk map BEFORE any remap happens, so consumer actions
+/// declared earlier than their prerequisites don't lose predecessor edges.
+fn predict_num_chunks(
+    action: &Action,
+    stations: &[StationInput],
+    tick_minutes: u32,
+) -> usize {
+    let station_idx = action.station_idx;
+    if station_idx >= stations.len() {
+        return 1;
+    }
+    if action.is_pinned {
+        return 1;
+    }
+    let max_chunk_minutes = stations[station_idx].effective_max_chunk();
+    let total_minutes = (action.setup_ticks + action.run_ticks) * tick_minutes;
+    if total_minutes <= max_chunk_minutes || max_chunk_minutes == 0 {
+        return 1;
+    }
+    let max_chunk_ticks = max_chunk_minutes / tick_minutes;
+    let total_ticks = action.setup_ticks + action.run_ticks;
+    ((total_ticks + max_chunk_ticks - 1) / max_chunk_ticks) as usize
 }
 
 /// Remap a predecessor index from the original action vec to the new action vec.

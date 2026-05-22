@@ -653,56 +653,11 @@ mod tests {
             }
         }
 
-        fn task_60min(id: &str, seq: u32, station: &str) -> TaskInput {
-            // Setup-heavy to keep place_backward in the setup phase where
-            // productivity = 1.0/tick (avoids the latent "productivity
-            // computed before op assignment" issue in the run phase).
-            TaskInput {
-                id: id.into(),
-                station_id: station.into(),
-                setup_minutes: 60,
-                run_minutes: 0,
-                sequence_order: seq,
-                is_pinned: false,
-                is_frozen_by_safety_zone: false,
-                pinned_start_tick: None,
-                pinned_end_tick: None,
-                outsourced: None,
-                earliest_start_tick: None,
-                realistic_run_minutes: None,
-                cumulative_position_pct: None,
-                slot_volume_pct: None,
-                is_in_progress: false,
-                task_elapsed_ticks: 0,
-                forced_start_tick: None,
-                already_eaten_ticks: 0,
-                inherited_setup: None,
-            }
-        }
-
-        fn task_with_setup(id: &str, seq: u32, station: &str, setup_minutes: u32) -> TaskInput {
-            TaskInput {
-                id: id.into(),
-                station_id: station.into(),
-                setup_minutes,
-                run_minutes: 0,
-                sequence_order: seq,
-                is_pinned: false,
-                is_frozen_by_safety_zone: false,
-                pinned_start_tick: None,
-                pinned_end_tick: None,
-                outsourced: None,
-                earliest_start_tick: None,
-                realistic_run_minutes: None,
-                cumulative_position_pct: None,
-                slot_volume_pct: None,
-                is_in_progress: false,
-                task_elapsed_ticks: 0,
-                forced_start_tick: None,
-                already_eaten_ticks: 0,
-                inherited_setup: None,
-            }
-        }
+        // NOTE: previous helpers `task_60min` and `task_with_setup` were
+        // removed — both set `run_minutes = 0` which triggers the zero-work
+        // fast path (mod.rs:898-900), causing tests built on them to pass
+        // vacuously (the engine emits zero assignments, the validator has
+        // nothing to check). Use `task_setup_and_run` with non-zero run.
 
         /// Produce a deadline string N days in the future at 17:00 local.
         fn deadline_in_days(n: i64) -> String {
@@ -711,17 +666,16 @@ mod tests {
             format!("{}T17:00:00", d)
         }
 
-        /// REPRODUCES B1 (cross-element ALAP inversion).
+        /// Regression guard for B1 (cross-element ALAP inversion).
         ///
         /// One tier-1 job with two elements E1 and E2 on different stations.
-        /// E2 depends on E1 (`prerequisite_element_ids=[E1]`). Both are tier-1
+        /// E2 depends on E1 (`prerequisite_element_ids=[E1]`). Both are tier-1,
         /// so both get ALAP-placed from the same deadline by the backward pass.
-        /// Since the backward pass doesn't wire cross-element successors,
-        /// E2's last task and E1's last task are placed at the SAME ALAP slot,
+        /// Without cross-element successor wiring (backward_pass.rs:178-211),
+        /// E2's last task and E1's last task would land at the SAME ALAP slot,
         /// producing a cross-element precedence violation.
         ///
-        /// This test is EXPECTED TO FAIL on the current (pre-fix) code.
-        /// After the B1 fix (Step 2), this test must pass with 0 violations.
+        /// Fixed; this test must keep returning 0 violations.
         #[test]
         fn b1_cross_element_alap_inversion() {
             // Two tier-1 jobs so the ALAP path is engaged (fbi.rs:154 gates
@@ -731,6 +685,9 @@ mod tests {
             // to 13:00). E2 runs 1 HOUR on S2 — ALAP will place it at 16:00-17:00,
             // overlapping E1's end. Without cross-element awareness, backward_pass
             // doesn't know E2 should start AFTER E1 ends.
+            // Non-zero run minutes are required; setup-only tasks collapse
+            // to art=0 (mod.rs:898-900) and are silently skipped by the
+            // forward pass, making this test pass vacuously.
             let tier1_job_under_test = JobInput {
                 id: "j1".into(),
                 reference: None,
@@ -741,14 +698,14 @@ mod tests {
                     ElementInput {
                         id: "E1".into(),
                         name: None,
-                        tasks: vec![task_with_setup("t_E1", 0, "S1", 240)],
+                        tasks: vec![task_setup_and_run("t_E1", 0, "S1", 60, 180)],
                         spec: None,
                         prerequisite_element_ids: vec![],
                     },
                     ElementInput {
                         id: "E2".into(),
                         name: None,
-                        tasks: vec![task_60min("t_E2", 0, "S2")],
+                        tasks: vec![task_setup_and_run("t_E2", 0, "S2", 15, 45)],
                         spec: None,
                         prerequisite_element_ids: vec!["E1".into()],
                     },
@@ -765,7 +722,7 @@ mod tests {
                 elements: vec![ElementInput {
                     id: "E_dummy".into(),
                     name: None,
-                    tasks: vec![task_60min("t_dummy", 0, "S1")],
+                    tasks: vec![task_setup_and_run("t_dummy", 0, "S1", 15, 45)],
                     spec: None,
                     prerequisite_element_ids: vec![],
                 }],
@@ -807,23 +764,16 @@ mod tests {
             );
         }
 
-        /// REPRODUCES B2+B3 (intra-element inversion when a chain partially
-        /// fails ALAP and falls through to forward pass).
+        /// Regression guard for B2+B3 (intra-element inversion when a chain
+        /// partially fails ALAP and falls through to forward pass).
         ///
-        /// Tier-1 job with one element, two sequential tasks on the same
-        /// station. We force the station to be saturated such that seq 0
-        /// cannot be placed by ALAP backward from seq 1's last_tick.
-        ///
-        /// Without fixes: seq 1 gets ALAP-placed, seq 0 fails place_backward
-        /// and falls through to forward_pass with no precedence info (seq 1's
-        /// end_tick is zeroed), producing an intra-element inversion.
-        ///
-        /// REPRODUCES B2+B3: ALAP places seq 1 successfully but seq 0 fails
-        /// (no operator available for its backward window). Without the fix,
-        /// seq 0 falls through to forward_pass with zeroed predecessor ALAP
-        /// → placed at an arbitrary tick, potentially AFTER seq 1. With the
-        /// B3 rollback, the whole element goes through forward_pass uniformly
-        /// so intra-element precedence via `predecessor_idx` is respected.
+        /// Tier-1 job with one element, two sequential tasks on different
+        /// stations. op_s1 is absent for a wide window so seq 0 cannot be
+        /// ALAP-placed; seq 1 places normally. Without the rollback fix,
+        /// seq 0 would fall through to forward_pass with a zeroed predecessor
+        /// ALAP and could land AFTER seq 1. With the fix, the whole element
+        /// goes through forward_pass uniformly and intra-element precedence
+        /// via `predecessor_idx` is respected.
         #[test]
         fn b2_b3_intra_element_after_alap_rollback() {
             use chrono::NaiveDateTime;
@@ -854,6 +804,8 @@ mod tests {
                 overtimes: vec![],
             };
 
+            // Non-zero run minutes — see B1 note: setup-only collapses to
+            // art=0 and produces no assignments to validate.
             let j1 = JobInput {
                 id: "j1".into(),
                 reference: None,
@@ -864,8 +816,8 @@ mod tests {
                     id: "E".into(),
                     name: None,
                     tasks: vec![
-                        task_60min("t_seq0", 0, "S1"),
-                        task_60min("t_seq1", 1, "S2"),
+                        task_setup_and_run("t_seq0", 0, "S1", 15, 45),
+                        task_setup_and_run("t_seq1", 1, "S2", 15, 45),
                     ],
                     spec: None,
                     prerequisite_element_ids: vec![],
@@ -882,7 +834,7 @@ mod tests {
                 elements: vec![ElementInput {
                     id: "E_dummy".into(),
                     name: None,
-                    tasks: vec![task_60min("t_dummy", 0, "S2")],
+                    tasks: vec![task_setup_and_run("t_dummy", 0, "S2", 15, 45)],
                     spec: None,
                     prerequisite_element_ids: vec![],
                 }],
@@ -915,6 +867,213 @@ mod tests {
                 "found violations: {:?} | assignments: {:?}",
                 violations,
                 result.assignments.iter().map(|a| format!("{}:{}->{}", a.task_id, a.scheduled_start, a.scheduled_end)).collect::<Vec<_>>(),
+            );
+        }
+
+        /// REPRODUCES the past-deadline cross-element ALAP collapse bug.
+        ///
+        /// Job 202601.0162 in production: deadline 2026-03-27 (≈56 days
+        /// in the past at run time), tier-2, 4 elements PAP1/PAP2/PAP3 and
+        /// GLOBAL which depends on all three. GLOBAL was placed BEFORE PAP2
+        /// finished, violating the cross-element precedence invariant.
+        ///
+        /// Root-cause hypothesis (to be confirmed by this test):
+        /// 1. `parse_deadline_minutes` clamps negative day diffs to 0
+        ///    (backward_pass.rs:811). All four elements get
+        ///    `deadline_ticks = 0`.
+        /// 2. `place_backward` starts with `t = deadline.min(horizon) = 0`,
+        ///    skips the `while t > 0` body and returns 0 (the
+        ///    `earliest_productive` is None).
+        /// 3. Forward pass receives `last = 0` for every action, so urgency
+        ///    explodes uniformly and every action becomes "infinitely late".
+        ///
+        /// The forward pass's `additional_predecessors` guard SHOULD still
+        /// block GLOBAL.first until PAP*.last all have `end_tick` set, so
+        /// this test will demonstrate whether the guard fires correctly or
+        /// whether a code path bypasses it under the LAST=0 degeneracy.
+        ///
+        /// Tier-2 (not 1) matches the prod data and engages the FBI's
+        /// `boosted_jobs` rewriting for late jobs (priority gets clamped to
+        /// 1 for iteration 2+), which may or may not be material to the
+        /// failure.
+        /// Build a task with both setup + run minutes. Required for the
+        /// past-deadline test because `build_actions` collapses
+        /// `setup_ticks → 0` when `run_ticks == 0` (mod.rs:898-900) — a
+        /// setup-only task ends up with `art = 0` and is silently dropped
+        /// by the forward pass, never exposing the precedence path under
+        /// test.
+        fn task_setup_and_run(
+            id: &str,
+            seq: u32,
+            station: &str,
+            setup_minutes: u32,
+            run_minutes: u32,
+        ) -> TaskInput {
+            TaskInput {
+                id: id.into(),
+                station_id: station.into(),
+                setup_minutes,
+                run_minutes,
+                sequence_order: seq,
+                is_pinned: false,
+                is_frozen_by_safety_zone: false,
+                pinned_start_tick: None,
+                pinned_end_tick: None,
+                outsourced: None,
+                earliest_start_tick: None,
+                realistic_run_minutes: None,
+                cumulative_position_pct: None,
+                slot_volume_pct: None,
+                is_in_progress: false,
+                task_elapsed_ticks: 0,
+                forced_start_tick: None,
+                already_eaten_ticks: 0,
+                inherited_setup: None,
+            }
+        }
+
+        /// REPRODUCES the cross-element ALAP-bypass bug seen on prod job
+        /// 202601.0162 (deadline 2026-03-27, 56 days in the past).
+        ///
+        /// Root cause: `pre_split` (engine/pre_split.rs) calls
+        /// `remap_additional_predecessors` action-by-action while building
+        /// `original_to_last_chunk` incrementally. When the consumer's
+        /// first action sits at a LOWER index than the prerequisite's last
+        /// action (which happens whenever the consumer element is declared
+        /// before the prerequisite in `JobInput.elements`), the prereq idx
+        /// hasn't been inserted into the map yet — `filter_map` silently
+        /// drops it. Same for `remap_predecessor`. Result: the consumer's
+        /// first action ships into the forward pass with no cross-element
+        /// constraint at all.
+        ///
+        /// Prod payload shape that triggers this: PHP orders elements by
+        /// `sort_order ASC`. For 202601.0162: GLOBAL=0, PAP1=1, PAP2=2,
+        /// PAP3=3 — GLOBAL is sent first. The engine builds GLOBAL's
+        /// actions first (lower idx), wires `additional_predecessors` to
+        /// PAP*'s higher idx values, then pre_split drops them.
+        ///
+        /// Mitigation MUST live in pre_split (the only point where the
+        /// remap fails); the wiring in mod.rs is correct.
+        #[test]
+        fn past_deadline_global_after_prereqs() {
+            let deadline_in_past = "2026-03-27T17:00:00".to_string(); // 56 days before 2026-05-22
+
+            // CRITICAL: GLOBAL is declared FIRST in the elements vec, then
+            // PAP1, PAP2, PAP3 — matching the prod payload where PHP orders
+            // elements by `sort_order ASC` and GLOBAL has sort_order=0 ≤
+            // PAP*. The action index of GLOBAL.first ends up LOWER than
+            // PAP*.last, which triggers the pre_split remap bug:
+            // `remap_additional_predecessors` walks `original_to_last_chunk`
+            // incrementally and silently drops every entry whose original
+            // idx hasn't been processed yet (i.e. higher idx).
+            let job = JobInput {
+                id: "j_late".into(),
+                reference: Some("202601.0162".into()),
+                description: None,
+                deadline: Some(deadline_in_past.clone()),
+                deadline_priority: 2,
+                elements: vec![
+                    ElementInput {
+                        id: "GLOBAL".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_GLOBAL", 0, "S1", 30, 360)],
+                        spec: None,
+                        prerequisite_element_ids: vec![
+                            "PAP1".into(),
+                            "PAP2".into(),
+                            "PAP3".into(),
+                        ],
+                    },
+                    ElementInput {
+                        id: "PAP1".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_PAP1", 0, "S1", 30, 115)],
+                        spec: None,
+                        prerequisite_element_ids: vec![],
+                    },
+                    ElementInput {
+                        id: "PAP2".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_PAP2", 0, "S1", 30, 540)],
+                        spec: None,
+                        prerequisite_element_ids: vec![],
+                    },
+                    ElementInput {
+                        id: "PAP3".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_PAP3", 0, "S1", 30, 115)],
+                        spec: None,
+                        prerequisite_element_ids: vec![],
+                    },
+                ],
+                required_job_ids: vec![],
+                force_max_staffing: false,
+            };
+
+            // A single sibling job on a different station so the multi-job
+            // ALAP path is engaged (single-job payloads short-circuit some
+            // branches that would mask the bug).
+            let j_dummy = JobInput {
+                id: "j_dummy".into(),
+                reference: None,
+                description: None,
+                deadline: Some(deadline_in_days(10)),
+                deadline_priority: 2,
+                elements: vec![ElementInput {
+                    id: "E_dummy".into(),
+                    name: None,
+                    tasks: vec![task_setup_and_run("t_dummy", 0, "S2", 15, 45)],
+                    spec: None,
+                    prerequisite_element_ids: vec![],
+                }],
+                required_job_ids: vec![],
+                force_max_staffing: false,
+            };
+
+            let req = ComputeRequest {
+                stations: vec![station("S1"), station("S2")],
+                operators: vec![
+                    operator("op_s1", &["S1"]),
+                    operator("op_s2", &["S2"]),
+                ],
+                jobs: vec![job, j_dummy],
+                options: Some(ComputeOptions {
+                    skip_lns: Some(true),
+                    multi_start: false,
+                    perturbed_starts: 0,
+                    ..ComputeOptions::default()
+                }),
+                occupied_slots: vec![],
+                setup_completion_log: vec![],
+                // Pin the engine's notion of "now" so the deadline math is
+                // reproducible regardless of when the test runs.
+                reference_time: Some("2026-05-22T11:53:54+02:00".into()),
+            };
+
+            let result = compute(&req);
+            let violations = validate_precedence(&req.jobs, &result.assignments, 15);
+            let (intra, cross_elem, cross_job) = violation_summary(&violations);
+
+            // Diagnostic dump — print regardless of pass/fail.
+            eprintln!("[PAST-DEADLINE-DIAG] assignments:");
+            for a in &result.assignments {
+                eprintln!(
+                    "  task={} start={} end={}",
+                    a.task_id, a.scheduled_start, a.scheduled_end
+                );
+            }
+            eprintln!(
+                "[PAST-DEADLINE-DIAG] violations: intra={} cross_elem={} cross_job={}",
+                intra, cross_elem, cross_job
+            );
+            for v in &violations {
+                eprintln!("  {:?}", v);
+            }
+
+            assert_eq!(
+                (intra, cross_elem, cross_job),
+                (0, 0, 0),
+                "GLOBAL must start AFTER all PAP*.end with past-deadline job",
             );
         }
     }
