@@ -415,6 +415,40 @@ fn compute_inner(
         start_date,
     );
 
+    // Defense-in-depth: runtime precedence audit. Several engine code
+    // paths (pre_place_pinned_actions for pins, in-progress emission)
+    // bypass the forward-pass precedence check, and the cross-element
+    // wiring depends on subtle invariants (action ordering, complete
+    // chunk-remap). If any of these silently emit a violating placement,
+    // we'd rather surface it as a Warning the user sees in the compute
+    // modal than ship it silently. Warnings are non-fatal — assignments
+    // are still returned so the user can investigate; downstream PHP /
+    // FE keep their own validator (`recalculatePrecedenceConflicts`).
+    let precedence_gap_minutes = options.precedence_min_gap_ticks * tick_minutes;
+    let violations = precedence_validator::validate_precedence(
+        &request.jobs,
+        &assignments,
+        precedence_gap_minutes,
+    );
+    for v in &violations {
+        let kind_label = match &v.kind {
+            precedence_validator::ViolationKind::IntraElement => "intra-element",
+            precedence_validator::ViolationKind::CrossElement { .. } => "cross-element",
+            precedence_validator::ViolationKind::CrossJob { .. } => "cross-job",
+        };
+        warnings.push(Warning {
+            task_id: Some(v.offender_task_id.clone()),
+            message: format!(
+                "Precedence violation ({}): task {} starts at {} before predecessor {} ends at {}",
+                kind_label,
+                v.offender_task_id,
+                v.offender_start,
+                v.predecessor_task_id,
+                v.predecessor_end,
+            ),
+        });
+    }
+
     let compute_time_ms = start_time.elapsed().as_millis() as u64;
 
     emit(progress, ProgressEvent::EngineDone { compute_time_ms });
