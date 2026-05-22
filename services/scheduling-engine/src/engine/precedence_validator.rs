@@ -1283,6 +1283,149 @@ mod tests {
                 required_floor.signed_duration_since(global_start),
             );
         }
+
+        /// REPRODUCES the art=0 cross-element wiring loss seen on prod job
+        /// 202604.0191 (deadline 2026-05-19, tier-2).
+        ///
+        /// Shape: GLOBAL (sort_order=0, prereqs=[PAP1, PAP2]) has as its
+        /// SEQ 0 a setup-only "calage" task (setup_minutes=30,
+        /// run_minutes=0). `build_actions` (mod.rs:932-934) collapses
+        /// setup_ticks to 0 when run_ticks==0, producing an action with
+        /// `art=0` and `end_tick=Some(0)`. The forward-pass scoring loop
+        /// skips art=0 actions; they exist only as bookkeeping.
+        ///
+        /// Pre-fix, `wire_cross_cutting_edges` anchored the cross-element
+        /// edge on "first internal by sequence_order" — that's seq 0, the
+        /// art=0 action. The edge was therefore wired onto a placeholder
+        /// pre-marked done at tick 0 and never scored. GLOBAL.seq 1 (the
+        /// actual first PLACED task) had no cross-element constraint and
+        /// landed days before PAP1/PAP2 finished.
+        ///
+        /// Post-fix the wiring walks past art=0 tasks to the first task
+        /// that produces a scoreable action, so the floor applies to
+        /// GLOBAL's real first placement.
+        ///
+        /// Pre-fix: this test fails (cross_elem violations > 0).
+        /// Post-fix: must return (0, 0, 0).
+        #[test]
+        fn art_zero_first_task_does_not_drop_cross_element_edge() {
+            let deadline_in_past = "2026-05-19T14:00:00".to_string();
+
+            let job = JobInput {
+                id: "j_0191".into(),
+                reference: Some("202604.0191".into()),
+                description: None,
+                deadline: Some(deadline_in_past),
+                deadline_priority: 2,
+                elements: vec![
+                    // GLOBAL declared FIRST (sort_order=0). Seq 0 is the
+                    // calage-only task that collapses to art=0; seq 1 is
+                    // the actual first placed task.
+                    ElementInput {
+                        id: "GLOBAL".into(),
+                        name: None,
+                        tasks: vec![
+                            // setup_minutes=30, run_minutes=0 → art=0
+                            task_setup_and_run("t_GLOBAL_seq0_calage", 0, "S1", 30, 0),
+                            // Real first placed task.
+                            task_setup_and_run("t_GLOBAL_seq1", 1, "S2", 0, 5),
+                        ],
+                        spec: None,
+                        prerequisite_element_ids: vec!["PAP1".into(), "PAP2".into()],
+                    },
+                    ElementInput {
+                        id: "PAP1".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_PAP1", 0, "S3", 0, 20)],
+                        spec: None,
+                        prerequisite_element_ids: vec![],
+                    },
+                    ElementInput {
+                        id: "PAP2".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_PAP2", 0, "S4", 0, 25)],
+                        spec: None,
+                        prerequisite_element_ids: vec![],
+                    },
+                ],
+                required_job_ids: vec![],
+                force_max_staffing: false,
+            };
+
+            // Sibling tier-2 dummy so multi-job ALAP path is engaged
+            // (mirrors the existing past_deadline_* fixtures).
+            let j_dummy = JobInput {
+                id: "j_dummy".into(),
+                reference: None,
+                description: None,
+                deadline: Some(deadline_in_days(10)),
+                deadline_priority: 2,
+                elements: vec![ElementInput {
+                    id: "E_dummy".into(),
+                    name: None,
+                    tasks: vec![task_setup_and_run("t_dummy", 0, "S5", 15, 45)],
+                    spec: None,
+                    prerequisite_element_ids: vec![],
+                }],
+                required_job_ids: vec![],
+                force_max_staffing: false,
+            };
+
+            let req = ComputeRequest {
+                stations: vec![
+                    station("S1"),
+                    station("S2"),
+                    station("S3"),
+                    station("S4"),
+                    station("S5"),
+                ],
+                operators: vec![
+                    operator("op_s1", &["S1"]),
+                    operator("op_s2", &["S2"]),
+                    operator("op_s3", &["S3"]),
+                    operator("op_s4", &["S4"]),
+                    operator("op_s5", &["S5"]),
+                ],
+                jobs: vec![job, j_dummy],
+                options: Some(ComputeOptions {
+                    skip_lns: Some(true),
+                    multi_start: false,
+                    perturbed_starts: 0,
+                    ..ComputeOptions::default()
+                }),
+                occupied_slots: vec![],
+                setup_completion_log: vec![],
+                // Pin the engine's "now" so the deadline-in-past math is
+                // reproducible.
+                reference_time: Some("2026-05-22T11:53:54+02:00".into()),
+            };
+
+            let result = compute(&req);
+            let violations = validate_precedence(&req.jobs, &result.assignments, 15);
+            let (intra, cross_elem, cross_job) = violation_summary(&violations);
+
+            eprintln!("[ART-ZERO-DIAG] assignments:");
+            for a in &result.assignments {
+                eprintln!(
+                    "  task={} start={} end={}",
+                    a.task_id, a.scheduled_start, a.scheduled_end,
+                );
+            }
+            eprintln!(
+                "[ART-ZERO-DIAG] violations: intra={} cross_elem={} cross_job={}",
+                intra, cross_elem, cross_job
+            );
+            for v in &violations {
+                eprintln!("  {:?}", v);
+            }
+
+            assert_eq!(
+                (intra, cross_elem, cross_job),
+                (0, 0, 0),
+                "GLOBAL.seq1 (real first placement) must start AFTER PAP1 + PAP2 \
+                 even when GLOBAL.seq0 is a setup-only calage (art=0 in the engine)",
+            );
+        }
     }
 
     #[test]

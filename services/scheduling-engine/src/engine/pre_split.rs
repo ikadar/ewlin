@@ -288,25 +288,71 @@ pub fn wire_cross_cutting_edges(
     // ST step; GLOBAL (consumer) was placed 11 days before its return.
     let mut element_last_action: HashMap<String, (usize, Vec<crate::model::job::OutsourcedParams>)> =
         HashMap::new();
+    // A task whose action collapsed to `art == 0` (setup-only tasks where
+    // run_minutes=0 → `build_actions` line 932-946 zeroes setup and emits
+    // a bookkeeping action pre-marked `end_tick = Some(0)`) is skipped by
+    // the forward-pass scoring loop. Wiring a cross-element edge onto
+    // such an action is silently lost: the action is "done at tick 0"
+    // before scoring even starts, so the edge contributes no floor.
+    //
+    // Real prod case (job 202604.0191): GLOBAL.seq 0 = setup-only calage
+    // (setup=30, run=0); its art=0 action ate the cross-element edges
+    // pointing to PAP1.last and PAP2.last. GLOBAL.seq 1 became the actual
+    // first placed task with no cross-element constraint, landing days
+    // before its prerequisites finished.
+    //
+    // Walk past art=0 tasks on BOTH anchors so the edge lands on an
+    // action that will actually be scored.
+    let has_real_action = |t: &crate::model::job::TaskInput,
+                           lookup: &HashMap<String, usize>|
+     -> bool {
+        t.outsourced.is_none()
+            && lookup
+                .get(t.id.as_str())
+                .map(|&idx| actions[idx].art > 0)
+                .unwrap_or(false)
+    };
+
     for job in jobs {
         for element in &job.elements {
             let mut sorted_tasks = element.tasks.clone();
             sorted_tasks.sort_by_key(|t| t.sequence_order);
 
-            // First internal (consumer-side): ST as first task means the
-            // chain is already captured on this internal action's own
+            // First internal that produces a real (art > 0) action — the
+            // consumer-side anchor. ST as first task means the chain is
+            // already captured on this internal action's own
             // outsourced_predecessor_chain (build_actions wired it).
-            if let Some(first_internal) = sorted_tasks.iter().find(|t| t.outsourced.is_none()) {
+            if let Some(first_internal) = sorted_tasks
+                .iter()
+                .find(|t| has_real_action(t, &task_id_to_first_chunk))
+            {
                 if let Some(&idx) = task_id_to_first_chunk.get(first_internal.id.as_str()) {
                     element_first_action.insert(element.id.clone(), idx);
                 }
             }
 
-            // Last internal (prereq-side) + tail-ST chain after it.
-            if let Some(last_internal_pos) = sorted_tasks.iter().rposition(|t| t.outsourced.is_none()) {
-                if let Some(&idx) = task_id_to_last_chunk.get(sorted_tasks[last_internal_pos].id.as_str()) {
+            // Last internal that produces a real action + tail-ST chain
+            // after it. Tail-ST chain is computed from the original
+            // last-internal position (whether or not its action is art=0)
+            // so any ST steps trailing the element are still attached.
+            if let Some(last_real_pos) = sorted_tasks
+                .iter()
+                .rposition(|t| has_real_action(t, &task_id_to_last_chunk))
+            {
+                if let Some(&idx) =
+                    task_id_to_last_chunk.get(sorted_tasks[last_real_pos].id.as_str())
+                {
+                    // Tail-ST chain anchors on the LAST internal by
+                    // sequence_order (real or art=0), not on the last
+                    // real-action position — otherwise an ST sitting
+                    // between an art=0 calage and the chain tail would
+                    // be missed.
+                    let tail_anchor_pos = sorted_tasks
+                        .iter()
+                        .rposition(|t| t.outsourced.is_none())
+                        .unwrap_or(last_real_pos);
                     let tail_chain: Vec<crate::model::job::OutsourcedParams> = sorted_tasks
-                        [last_internal_pos + 1..]
+                        [tail_anchor_pos + 1..]
                         .iter()
                         .filter_map(|t| t.outsourced.clone())
                         .collect();
