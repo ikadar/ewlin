@@ -51,6 +51,8 @@ export interface MarkNotCompletedResult {
 export interface ClearRecordedProgressResult {
   /** Number of tasks whose anchor was nulled (zero when nothing to do). */
   cleared: number;
+  /** Completed tiles unscheduled so the silence-is-consent tick can't re-anchor them. */
+  unassignedCompleted: number;
 }
 
 export const saisieApi = createApi({
@@ -140,6 +142,7 @@ export const saisieApi = createApi({
         try {
           await queryFulfilled;
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
         } catch {
           // No optimistic patch — the snapshot fetch will reflect the
           // backend rollback if the request failed.
