@@ -1072,90 +1072,17 @@ pub fn build_actions(
         }
     }
 
-    // Wire up cross-element dependencies (BR-ELEM-004: finish-to-start).
-    // For each element with prerequisite_element_ids, link its first action
-    // to the last action of each prerequisite element.
-    {
-        // Build element_id → (first_action_idx, last_action_idx) map
-        let mut element_first_action: HashMap<String, usize> = HashMap::new();
-        let mut element_last_action: HashMap<String, usize> = HashMap::new();
-        for job in jobs {
-            for element in &job.elements {
-                for task in &element.tasks {
-                    if let Some(&action_idx) = task_id_to_action_idx.get(&task.id) {
-                        element_last_action.insert(element.id.clone(), action_idx);
-                        element_first_action.entry(element.id.clone()).or_insert(action_idx);
-                    }
-                }
-            }
-        }
-
-        // Link dependencies
-        for job in jobs {
-            for element in &job.elements {
-                if element.prerequisite_element_ids.is_empty() {
-                    continue;
-                }
-                if let Some(&first_action_idx) = element_first_action.get(&element.id) {
-                    for prereq_id in &element.prerequisite_element_ids {
-                        if let Some(&last_action_idx) = element_last_action.get(prereq_id) {
-                            // Drying time: if the prerequisite's last task is on a press
-                            let pred_station = actions[last_action_idx].station_idx;
-                            let gap = if pred_station < stations.len() && stations[pred_station].is_press {
-                                minutes_to_ticks(stations[pred_station].drying_time_minutes, tick_minutes)
-                            } else {
-                                0
-                            };
-
-                            if actions[first_action_idx].predecessor_idx.is_none() {
-                                actions[first_action_idx].predecessor_idx = Some(last_action_idx);
-                                // Use max gap (cross-element gap or existing intra-element gap)
-                                actions[first_action_idx].predecessor_gap_ticks =
-                                    actions[first_action_idx].predecessor_gap_ticks.max(gap);
-                            } else {
-                                actions[first_action_idx].additional_predecessors.push((last_action_idx, gap));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Wire up cross-job dependencies (BR-JOB-006: finish-to-start).
-    // For each job with required_job_ids, find its first action and link it to
-    // the last actions of all required jobs.
-    let mut job_id_to_last_action: HashMap<String, usize> = HashMap::new();
-    let mut job_id_to_first_action: HashMap<String, usize> = HashMap::new();
-    for (i, action) in actions.iter().enumerate() {
-        job_id_to_last_action.insert(action.job_id.clone(), i); // last seen = last action
-        job_id_to_first_action.entry(action.job_id.clone()).or_insert(i); // first seen = first action
-    }
-
-    for job in jobs {
-        if job.required_job_ids.is_empty() {
-            continue;
-        }
-        if let Some(&first_action_idx) = job_id_to_first_action.get(&job.id) {
-            for req_job_id in &job.required_job_ids {
-                if let Some(&last_action_idx) = job_id_to_last_action.get(req_job_id) {
-                    // If the first action already has a predecessor (intra-element),
-                    // add as additional predecessor
-                    if actions[first_action_idx].predecessor_idx.is_some() {
-                        actions[first_action_idx].additional_predecessors.push((last_action_idx, 0));
-                    } else {
-                        // Use the primary predecessor slot
-                        actions[first_action_idx].predecessor_idx = Some(last_action_idx);
-                    }
-                }
-            }
-        }
-    }
-
+    // Cross-element (BR-ELEM-004) and cross-job (BR-JOB-006) wiring is no
+    // longer done here. It moved to `pre_split::wire_cross_cutting_edges`
+    // which runs AFTER pre_split so it sees stable post-chunk indices. The
+    // previous in-place remap of `additional_predecessors` inside pre_split
+    // silently dropped edges when a consumer's action_idx was lower than
+    // its prerequisite's — see commits 48a5633 (interim two-pass fix) and
+    // the follow-up Alternative-B refactor that obsoleted that map entirely.
     actions
 }
 
-fn minutes_to_ticks(minutes: u32, tick_minutes: u32) -> u32 {
+pub(crate) fn minutes_to_ticks(minutes: u32, tick_minutes: u32) -> u32 {
     if tick_minutes == 0 {
         return minutes;
     }

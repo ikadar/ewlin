@@ -235,8 +235,11 @@ pub fn run_with_fbi(
         // Station urgency boost is applied in the forward pass scoring,
         // not here — it doesn't change LAST values, just scoring weights.
 
-        // Pre-split
+        // Pre-split chunks long tasks, remapping ONLY intra-element
+        // predecessor_idx. Cross-element / cross-job edges are wired
+        // immediately after, against stable post-chunk indices.
         pre_split(&mut actions, stations, tick_minutes);
+        super::pre_split::wire_cross_cutting_edges(&mut actions, jobs, stations, tick_minutes);
 
 
         // Build grid. Size it so pre-block cells beyond the nominal
