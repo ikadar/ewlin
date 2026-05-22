@@ -798,60 +798,32 @@ fn place_backward(
     earliest_productive.map(|t| t as u64).unwrap_or(0)
 }
 
-/// Convert a deadline string to ticks for ALAP placement.
-///
-/// Returns `None` for past deadlines — callers must then fall back to
-/// `effective_horizon` so the backward pass treats the job like a
-/// no-deadline job (cascade preserved, no degenerate `last_tick=0`).
-///
-/// Why not clamp to 0 like the underlying parser does? `last_tick=0`
-/// collapses the entire ALAP cascade for the job: every action ends up
-/// with `last=0`, the `min(deadline, succ.last - gap)` tightening stays
-/// 0, prerequisite and consumer get the same target, and the forward
-/// pass loses the cross-element ordering signal entirely
-/// (see `project_alap_cascade.md`).
-///
-/// Lateness for past-deadline jobs is still computed downstream
-/// (PHP/FE `findLateJobs`, engine `compute_stats`) from the actual
-/// deadline timestamp — this function governs ALAP placement only.
 fn parse_deadline_to_ticks(deadline: &str, tick_minutes: u32, start_date: NaiveDate) -> Option<u64> {
-    let (minutes, is_past) = parse_deadline_minutes_with_sign(deadline, start_date)?;
-    if is_past {
-        return None;
-    }
+    let minutes = parse_deadline_minutes(deadline, start_date)?;
     Some(minutes / tick_minutes as u64)
 }
 
-/// Internal helper: parse a deadline string, returning `(minutes, is_past)`.
-/// `minutes` is clamped to 0 when `is_past=true` so the type stays `u64`;
-/// callers should branch on the boolean, not on `minutes == 0`.
-fn parse_deadline_minutes_with_sign(deadline: &str, start_date: NaiveDate) -> Option<(u64, bool)> {
+fn parse_deadline_minutes(deadline: &str, start_date: NaiveDate) -> Option<u64> {
     // Try parsing with timezone offset first (ATOM/RFC 3339: 2026-04-14T17:00:00+02:00)
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(deadline) {
         let naive = dt.naive_local();
         let days = (naive.date() - start_date).num_days();
-        if days < 0 { return Some((0, true)); }
+        if days < 0 { return Some(0); }
         use chrono::Timelike;
-        let minutes = days as u64 * 24 * 60
-            + naive.time().hour() as u64 * 60
-            + naive.time().minute() as u64;
-        return Some((minutes, false));
+        return Some(days as u64 * 24 * 60 + naive.time().hour() as u64 * 60 + naive.time().minute() as u64);
     }
     // Try without timezone (YYYY-MM-DDTHH:MM:SS)
     if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(deadline, "%Y-%m-%dT%H:%M:%S") {
         let days = (dt.date() - start_date).num_days();
-        if days < 0 { return Some((0, true)); }
+        if days < 0 { return Some(0); }
         use chrono::Timelike;
-        let minutes = days as u64 * 24 * 60
-            + dt.time().hour() as u64 * 60
-            + dt.time().minute() as u64;
-        return Some((minutes, false));
+        return Some(days as u64 * 24 * 60 + dt.time().hour() as u64 * 60 + dt.time().minute() as u64);
     }
     // Try date-only (YYYY-MM-DD)
     if let Ok(d) = chrono::NaiveDate::parse_from_str(deadline, "%Y-%m-%d") {
         let days = (d - start_date).num_days();
-        if days < 0 { return Some((0, true)); }
-        return Some((days as u64 * 24 * 60 + 17 * 60, false));
+        if days < 0 { return Some(0); }
+        return Some(days as u64 * 24 * 60 + 17 * 60);
     }
     None
 }
@@ -871,42 +843,6 @@ mod tests {
     use crate::model::station::StationInput;
     use crate::engine::forward_pass::{build_prepared_groups, StationAttrs};
     use std::collections::HashMap;
-
-    /// `parse_deadline_to_ticks` must return `None` for past deadlines so
-    /// the caller falls back to `effective_horizon`. Returning `Some(0)`
-    /// would force the entire job's ALAP cascade to collapse to tick 0,
-    /// breaking cross-element ordering (see `project_alap_cascade.md`).
-    #[test]
-    fn parse_deadline_to_ticks_returns_none_for_past_deadline() {
-        let start_date = chrono::NaiveDate::from_ymd_opt(2026, 5, 22).unwrap();
-
-        // ATOM with timezone — 56 days in the past (mirrors job 202601.0162)
-        assert_eq!(
-            parse_deadline_to_ticks("2026-03-27T17:00:00+02:00", 15, start_date),
-            None,
-            "past ATOM deadline must signal no-ALAP-target",
-        );
-        // NaiveDateTime without timezone
-        assert_eq!(
-            parse_deadline_to_ticks("2026-03-27T17:00:00", 15, start_date),
-            None,
-            "past naive deadline must signal no-ALAP-target",
-        );
-        // Date-only
-        assert_eq!(
-            parse_deadline_to_ticks("2026-03-27", 15, start_date),
-            None,
-            "past date-only deadline must signal no-ALAP-target",
-        );
-
-        // Future deadlines keep returning a positive tick value.
-        let future = parse_deadline_to_ticks("2026-06-15T17:00:00", 15, start_date).unwrap();
-        assert!(future > 0, "future deadline must produce a positive tick");
-
-        // Today's deadline is NOT past — must produce a positive tick.
-        let today = parse_deadline_to_ticks("2026-05-22T17:00:00", 15, start_date).unwrap();
-        assert!(today > 0, "today's deadline must produce a positive tick");
-    }
 
     fn station(id: &str) -> StationInput {
         StationInput {
