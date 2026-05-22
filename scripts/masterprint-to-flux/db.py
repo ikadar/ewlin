@@ -27,6 +27,7 @@ class ExistingJob:
     id: str
     reference: str
     masterprint_hash: str | None
+    masterprint_structure_hash: str | None
     has_started: bool
 
 
@@ -64,6 +65,7 @@ def load_existing_jobs() -> dict[str, ExistingJob]:
     # TaskWall is keyed by logical_task_id (shared across scenario forks).
     sql = """
     SELECT j.id, j.reference, IFNULL(j.masterprint_hash, ''),
+      IFNULL(j.masterprint_structure_hash, ''),
       IF(EXISTS(
         SELECT 1 FROM tasks t
         INNER JOIN elements e ON e.id = t.element_id
@@ -81,13 +83,14 @@ def load_existing_jobs() -> dict[str, ExistingJob]:
         if not line:
             continue
         parts = line.split("\t")
-        if len(parts) < 4:
+        if len(parts) < 5:
             continue
-        job_id, ref, hash_val, started = parts[0], parts[1], parts[2], parts[3]
+        job_id, ref, hash_val, struct_hash, started = parts[0], parts[1], parts[2], parts[3], parts[4]
         result[ref] = ExistingJob(
             id=job_id,
             reference=ref,
             masterprint_hash=hash_val if hash_val else None,
+            masterprint_structure_hash=struct_hash if struct_hash else None,
             has_started=started == "1",
         )
     return result
@@ -97,12 +100,13 @@ def _sql_escape(s: str) -> str:
     return s.replace("\\", "\\\\").replace("'", "''")
 
 
-def update_tracking(job_id: str, mp_hash: str, changed_after_start: bool) -> None:
-    """Set hash + synced_at + changed_after_start flag on a job."""
+def update_tracking(job_id: str, mp_hash: str, structure_hash: str, changed_after_start: bool) -> None:
+    """Set hashes + synced_at + changed_after_start flag on a job."""
     flag = 1 if changed_after_start else 0
     sql = (
         f"UPDATE jobs SET "
         f"masterprint_hash='{_sql_escape(mp_hash)}', "
+        f"masterprint_structure_hash='{_sql_escape(structure_hash)}', "
         f"masterprint_synced_at=NOW(), "
         f"masterprint_changed_after_start={flag} "
         f"WHERE id='{_sql_escape(job_id)}';"
@@ -142,6 +146,32 @@ def compute_mp_hash(request: dict) -> str:
                 "needsPaper": e["needsPaper"],
                 "needsForme": e["needsForme"],
                 "needsPlates": e["needsPlates"],
+            }
+            for e in sorted(request["elements"], key=lambda x: x["name"])
+        ],
+    }
+    payload = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def compute_mp_structure_hash(request: dict) -> str:
+    """SHA-256 of the structural subset only (elements DSL, names, specs, prereqs).
+
+    Excludes job metadata (client, dates, quantity) and gate fields
+    (needsBat/Paper/Forme/Plates, batStatus). Used to distinguish
+    'MasterPrint changed the structure' from 'MasterPrint changed metadata'.
+    """
+    canonical = {
+        "elements": [
+            {
+                "name": e["name"],
+                "label": e.get("label"),
+                "sequence": e["sequence"],
+                "papier": e.get("papier"),
+                "format": e.get("format"),
+                "pagination": e.get("pagination"),
+                "qteFeuilles": e.get("qteFeuilles"),
+                "prerequisiteNames": sorted(e.get("prerequisiteNames", [])),
             }
             for e in sorted(request["elements"], key=lambda x: x["name"])
         ],
