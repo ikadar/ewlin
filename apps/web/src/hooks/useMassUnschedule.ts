@@ -25,6 +25,13 @@ export interface MassUnscheduleState {
    * clear-recorded-progress endpoint after the mass unschedule resolves.
    */
   resetRecordedProgress: boolean;
+  /**
+   * Default **false** on every modal open (opt-IN). Completed tiles are real
+   * done work and are normally preserved ; ticking this makes CTRL+ALT+Z a
+   * true "table rase" that also removes them. Without it a board whose tiles
+   * are all completed (e.g. a Préprod copy) can never be cleared.
+   */
+  includeCompleted: boolean;
 }
 
 export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
@@ -36,6 +43,7 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
     includeInProgress = false,
     includePinned = false,
     includeFrozen = false,
+    includeCompleted = false,
   ) => {
     if (!snapshotData) return 0;
     const now = new Date();
@@ -51,7 +59,7 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
     }
     const tasksById = new Map(snapshotData.tasks.map((t) => [t.id, t]));
     return snapshotData.assignments.filter((a) => {
-      if (a.isCompleted) return false;
+      if (!includeCompleted && a.isCompleted) return false;
       if (!includePinned && a.isPinned) return false;
       if (!includeInProgress && a.scheduledStart <= nowStr && (!a.scheduledEnd || a.scheduledEnd > nowStr)) return false;
       // Safety-zone filter: skipped entirely when `includeFrozen` is on
@@ -74,22 +82,24 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
     // The user explicitly wants the entry point to be unconditional;
     // the dialog just shows "0 tuile(s) à effacer" in that case.
     setConfirmState({
-      count: getClearableCount(true, true, true),
+      count: getClearableCount(true, true, true, false),
       includeInProgress: true,
       includePinned: true,
       includeFrozen: true,
       resetRecordedProgress: false, // opt-in : never on by default.
+      includeCompleted: false, // opt-in : completed = real done work.
     });
   }, [getClearableCount]);
 
   const confirm = useCallback(async () => {
     if (!confirmState) return;
-    const { includeInProgress, includePinned, includeFrozen, resetRecordedProgress } = confirmState;
+    const { includeInProgress, includePinned, includeFrozen, resetRecordedProgress, includeCompleted } = confirmState;
     setConfirmState(null);
     await clearAllAssignments({
       includeInProgress,
       includePinned,
       includeFrozen,
+      includeCompleted,
     }).unwrap();
     if (resetRecordedProgress) {
       await clearRecordedProgress().unwrap();

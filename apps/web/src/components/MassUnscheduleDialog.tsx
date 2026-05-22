@@ -9,6 +9,7 @@ interface Props {
     includeInProgress?: boolean,
     includePinned?: boolean,
     includeFrozen?: boolean,
+    includeCompleted?: boolean,
   ) => number;
   onConfirm: () => void;
   onDismiss: () => void;
@@ -16,14 +17,21 @@ interface Props {
 }
 
 export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDismiss, onUpdate }: Props) {
-  const count = getClearableCount(state.includeInProgress, state.includePinned, state.includeFrozen);
+  const count = getClearableCount(
+    state.includeInProgress,
+    state.includePinned,
+    state.includeFrozen,
+    state.includeCompleted,
+  );
   return (
     <Modal open onClose={onDismiss} width="28rem" testId="mass-unschedule-dialog">
       <ModalHeader
         icon={<Trash2 size={14} />}
         iconTone="red"
         title="Effacer toutes les tuiles"
-        description="Les tuiles terminées sont toujours conservées."
+        description={state.includeCompleted
+          ? 'Table rase : les tuiles terminées seront aussi retirées.'
+          : 'Les tuiles terminées sont conservées (cocher pour les inclure).'}
       />
       <ModalBody gap={10}>
         <p className="text-zinc-100 text-sm font-mono tabular-nums">
@@ -55,6 +63,17 @@ export function MassUnscheduleDialog({ state, getClearableCount, onConfirm, onDi
             className="rounded-[3px] accent-red-500"
           />
           Inclure les tuiles avec flocon actif (safety zone)
+        </label>
+        {/* Opt-in : completed tiles are real done work, never default-on. */}
+        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 text-sm">
+          <input
+            type="checkbox"
+            checked={state.includeCompleted}
+            onChange={(e) => onUpdate((prev) => prev ? { ...prev, includeCompleted: e.target.checked } : prev)}
+            className="rounded-[3px] accent-red-500"
+            data-testid="mass-unschedule-include-completed"
+          />
+          Inclure les tuiles terminées
         </label>
         {/* Opt-in : saisies represent real recorded work, never default-on. */}
         <label className="flex items-center gap-2 cursor-pointer text-zinc-300 text-sm">

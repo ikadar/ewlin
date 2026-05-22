@@ -237,6 +237,7 @@ export interface UpdateElementSequenceArg {
   needsPaper?: boolean | null;
   needsForme?: boolean | null;
   needsPlates?: boolean | null;
+  prerequisiteElementIds?: string[] | null;
 }
 
 
@@ -413,7 +414,7 @@ export const scheduleApi = createApi({
      * page").
      */
     updateElementSequence: builder.mutation<{ elementId: string; auditCount: number }, UpdateElementSequenceArg>({
-      query: ({ elementId, dsl, commentaires, needsBat, needsPaper, needsForme, needsPlates }) => ({
+      query: ({ elementId, dsl, commentaires, needsBat, needsPaper, needsForme, needsPlates, prerequisiteElementIds }) => ({
         url: `/elements/${elementId}/sequence`,
         method: 'PUT',
         body: {
@@ -423,6 +424,7 @@ export const scheduleApi = createApi({
           ...(needsPaper !== undefined && needsPaper !== null ? { needsPaper } : {}),
           ...(needsForme !== undefined && needsForme !== null ? { needsForme } : {}),
           ...(needsPlates !== undefined && needsPlates !== null ? { needsPlates } : {}),
+          ...(prerequisiteElementIds !== undefined ? { prerequisiteElementIds } : {}),
         },
       }),
       invalidatesTags: ['Snapshot'],
@@ -506,6 +508,7 @@ export const scheduleApi = createApi({
         includeInProgress?: boolean;
         includePinned?: boolean;
         includeFrozen?: boolean;
+        includeCompleted?: boolean;
       } | void
     >({
       query: (opts) => {
@@ -513,6 +516,7 @@ export const scheduleApi = createApi({
         if (opts && opts.includeInProgress) params.set('includeInProgress', '1');
         if (opts && opts.includePinned) params.set('includePinned', '1');
         if (opts && opts.includeFrozen) params.set('includeFrozen', '1');
+        if (opts && opts.includeCompleted) params.set('includeCompleted', '1');
         const qs = params.toString();
         return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
       },
