@@ -142,7 +142,7 @@ pub fn pre_split(actions: &mut Vec<Action>, stations: &[StationInput], tick_minu
             // unit tests that pre-populate it should not rely on pre_split
             // to remap (it doesn't) — drive `wire_cross_cutting_edges`
             // explicitly to test cross-cutting edge handling.
-            let additional_predecessors: Vec<(usize, u32)> = Vec::new();
+            let additional_predecessors: Vec<(usize, u32, Vec<crate::model::job::OutsourcedParams>)> = Vec::new();
 
             let idx = new_actions.len();
             new_actions.push(Action {
@@ -275,28 +275,42 @@ pub fn wire_cross_cutting_edges(
         task_id_to_last_chunk.insert(original_id, i);
     }
 
-    // element_id → (first_action_idx, last_action_idx) using
-    // sequence_order to identify the first/last INTERNAL task per element
-    // (outsourced tasks aren't in `actions` at all).
+    // element_id → first INTERNAL action idx (consumer-side anchor).
     let mut element_first_action: HashMap<String, usize> = HashMap::new();
-    let mut element_last_action: HashMap<String, usize> = HashMap::new();
+    // element_id → (last INTERNAL action idx, tail-ST chain).
+    //
+    // Tail-ST chain = the `OutsourcedParams` for every ST step that sits
+    // AFTER the last internal task in `sequence_order`. When non-empty,
+    // the cross-element edge must wait for the chain's return (not the
+    // internal end), or the consumer will be placed too early — the FE
+    // validator reads the ST assignment's scheduledEnd and flags the
+    // violation. Real prod case: job 202601.0170, PAP1 ends with a 10-day
+    // ST step; GLOBAL (consumer) was placed 11 days before its return.
+    let mut element_last_action: HashMap<String, (usize, Vec<crate::model::job::OutsourcedParams>)> =
+        HashMap::new();
     for job in jobs {
         for element in &job.elements {
             let mut sorted_tasks = element.tasks.clone();
             sorted_tasks.sort_by_key(|t| t.sequence_order);
-            let internal_ids: Vec<&str> = sorted_tasks
-                .iter()
-                .filter(|t| t.outsourced.is_none())
-                .map(|t| t.id.as_str())
-                .collect();
-            if let Some(first_id) = internal_ids.first() {
-                if let Some(&idx) = task_id_to_first_chunk.get(*first_id) {
+
+            // First internal (consumer-side): ST as first task means the
+            // chain is already captured on this internal action's own
+            // outsourced_predecessor_chain (build_actions wired it).
+            if let Some(first_internal) = sorted_tasks.iter().find(|t| t.outsourced.is_none()) {
+                if let Some(&idx) = task_id_to_first_chunk.get(first_internal.id.as_str()) {
                     element_first_action.insert(element.id.clone(), idx);
                 }
             }
-            if let Some(last_id) = internal_ids.last() {
-                if let Some(&idx) = task_id_to_last_chunk.get(*last_id) {
-                    element_last_action.insert(element.id.clone(), idx);
+
+            // Last internal (prereq-side) + tail-ST chain after it.
+            if let Some(last_internal_pos) = sorted_tasks.iter().rposition(|t| t.outsourced.is_none()) {
+                if let Some(&idx) = task_id_to_last_chunk.get(sorted_tasks[last_internal_pos].id.as_str()) {
+                    let tail_chain: Vec<crate::model::job::OutsourcedParams> = sorted_tasks
+                        [last_internal_pos + 1..]
+                        .iter()
+                        .filter_map(|t| t.outsourced.clone())
+                        .collect();
+                    element_last_action.insert(element.id.clone(), (idx, tail_chain));
                 }
             }
         }
@@ -310,7 +324,7 @@ pub fn wire_cross_cutting_edges(
             }
             let Some(&first_action_idx) = element_first_action.get(&element.id) else { continue };
             for prereq_id in &element.prerequisite_element_ids {
-                let Some(&last_action_idx) = element_last_action.get(prereq_id) else { continue };
+                let Some((last_action_idx, tail_chain)) = element_last_action.get(prereq_id).cloned() else { continue };
                 let pred_station = actions[last_action_idx].station_idx;
                 let gap = if pred_station < stations.len() && stations[pred_station].is_press {
                     super::minutes_to_ticks(stations[pred_station].drying_time_minutes, tick_minutes)
@@ -318,25 +332,46 @@ pub fn wire_cross_cutting_edges(
                     0
                 };
                 if actions[first_action_idx].predecessor_idx.is_none() {
+                    // Promoted to primary edge. The consumer's
+                    // `outsourced_predecessor_chain` was set by build_actions
+                    // for its OWN element's leading ST (if any). Prepend the
+                    // prereq's tail chain so the full ST sequence runs first.
                     actions[first_action_idx].predecessor_idx = Some(last_action_idx);
                     actions[first_action_idx].predecessor_gap_ticks =
                         actions[first_action_idx].predecessor_gap_ticks.max(gap);
+                    if !tail_chain.is_empty() {
+                        let mut combined = tail_chain.clone();
+                        combined.extend(actions[first_action_idx].outsourced_predecessor_chain.clone());
+                        actions[first_action_idx].outsourced_predecessor_chain = combined;
+                    }
                 } else {
                     actions[first_action_idx]
                         .additional_predecessors
-                        .push((last_action_idx, gap));
+                        .push((last_action_idx, gap, tail_chain));
                 }
             }
         }
     }
 
     // Cross-job edges. Same pattern as cross-element, scoped to job rather
-    // than element.
+    // than element. The tail-ST chain is the ST tail of the prereq job's
+    // LAST element (the one whose last internal action ends the job).
     let mut job_id_to_first_action: HashMap<String, usize> = HashMap::new();
-    let mut job_id_to_last_action: HashMap<String, usize> = HashMap::new();
+    let mut job_id_to_last_action: HashMap<String, (usize, Vec<crate::model::job::OutsourcedParams>)> =
+        HashMap::new();
     for (i, a) in actions.iter().enumerate() {
         job_id_to_first_action.entry(a.job_id.clone()).or_insert(i);
-        job_id_to_last_action.insert(a.job_id.clone(), i);
+    }
+    // Map action_idx back to (job_id, element_id) so we can attach the
+    // right tail chain to "the job's last action". Done by walking jobs
+    // in declaration order — the LAST element with a registered last
+    // action wins the job-level slot.
+    for job in jobs {
+        for element in &job.elements {
+            if let Some((idx, tail_chain)) = element_last_action.get(&element.id) {
+                job_id_to_last_action.insert(job.id.clone(), (*idx, tail_chain.clone()));
+            }
+        }
     }
     for job in jobs {
         if job.required_job_ids.is_empty() {
@@ -344,13 +379,18 @@ pub fn wire_cross_cutting_edges(
         }
         let Some(&first_action_idx) = job_id_to_first_action.get(&job.id) else { continue };
         for req_job_id in &job.required_job_ids {
-            let Some(&last_action_idx) = job_id_to_last_action.get(req_job_id) else { continue };
+            let Some((last_action_idx, tail_chain)) = job_id_to_last_action.get(req_job_id).cloned() else { continue };
             if actions[first_action_idx].predecessor_idx.is_some() {
                 actions[first_action_idx]
                     .additional_predecessors
-                    .push((last_action_idx, 0));
+                    .push((last_action_idx, 0, tail_chain));
             } else {
                 actions[first_action_idx].predecessor_idx = Some(last_action_idx);
+                if !tail_chain.is_empty() {
+                    let mut combined = tail_chain.clone();
+                    combined.extend(actions[first_action_idx].outsourced_predecessor_chain.clone());
+                    actions[first_action_idx].outsourced_predecessor_chain = combined;
+                }
             }
         }
     }

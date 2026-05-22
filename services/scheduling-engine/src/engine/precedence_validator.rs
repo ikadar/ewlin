@@ -1076,6 +1076,213 @@ mod tests {
                 "GLOBAL must start AFTER all PAP*.end with past-deadline job",
             );
         }
+
+        /// REPRODUCES the cross-element outsourced-last-step bug observed
+        /// on local scenario `b515cc89-…` for job 202601.0170.
+        ///
+        /// Shape: GLOBAL depends on PAP1. PAP1 has two internal tasks
+        /// followed by an outsourced step as its LAST task (sequence_order
+        /// highest). With a long provider lead time (10 work-days), the
+        /// ST return lands well AFTER PAP1's last internal end.
+        ///
+        /// Two engine code paths conspire to drop the floor:
+        ///  1. `pre_split::wire_cross_cutting_edges` builds
+        ///     `element_last_action` from INTERNAL tasks only
+        ///     (line 287: `.filter(|t| t.outsourced.is_none())`). The
+        ///     `additional_predecessors` edge wired onto GLOBAL.first
+        ///     therefore points at PAP1's last *internal* task, not the
+        ///     ST step.
+        ///  2. The forward-pass floor for `additional_predecessors`
+        ///     (forward_pass.rs:1366-1379) is `pred_end + gap + strict_gap`.
+        ///     It does NOT walk an `outsourced_predecessor_chain` (that
+        ///     vector only exists for the intra-element edge via
+        ///     `predecessor_idx`). So even if the ST step exists in the
+        ///     same element as PAP1's last internal, the cross-element
+        ///     consumer never sees the inflated return tick.
+        ///
+        /// Result: GLOBAL.first starts after PAP1's last internal end +
+        /// strict gap, which can be DAYS earlier than the ST return —
+        /// violating the real cross-element precedence as the operator
+        /// would see it on the wall.
+        ///
+        /// The fix has not landed yet; this test must FAIL today and PASS
+        /// after the fix.
+        #[test]
+        fn cross_element_with_outsourced_last_step() {
+            use crate::model::job::OutsourcedParams;
+            use chrono::NaiveDateTime;
+
+            // Plenty of horizon so the 10-day ST lead can land within it.
+            // Pin reference_time so the deadline + ST date math is
+            // deterministic across runs.
+            let reference_time = "2026-05-22T08:00:00+02:00".to_string();
+            // Deadline far enough out that the ST return doesn't clip the
+            // horizon — the bug we're probing is about ordering, not lateness.
+            let deadline = "2026-08-15T17:00:00".to_string();
+
+            let outsourced_params = OutsourcedParams {
+                provider_id: "prov-papier".into(),
+                work_days: 10,
+                transit_days: 1,
+                latest_departure_minutes: 14 * 60,
+                reception_minutes: 9 * 60,
+                manual_departure_tick: None,
+                manual_return_tick: None,
+            };
+
+            let job_under_test = JobInput {
+                id: "j_0170".into(),
+                reference: Some("202601.0170".into()),
+                description: None,
+                deadline: Some(deadline.clone()),
+                deadline_priority: 2,
+                elements: vec![
+                    // GLOBAL declared FIRST (matches prod sort_order=0).
+                    ElementInput {
+                        id: "GLOBAL".into(),
+                        name: None,
+                        tasks: vec![task_setup_and_run("t_GLOBAL", 0, "S1", 30, 180)],
+                        spec: None,
+                        prerequisite_element_ids: vec!["PAP1".into()],
+                    },
+                    // PAP1: two internal tasks + one outsourced as LAST.
+                    ElementInput {
+                        id: "PAP1".into(),
+                        name: None,
+                        tasks: vec![
+                            task_setup_and_run("t_PAP1_a", 0, "S1", 30, 60),
+                            task_setup_and_run("t_PAP1_b", 1, "S1", 30, 60),
+                            // ST step (sequence_order highest) — engine
+                            // emits it into `outsourced_assignments`, not
+                            // `assignments`. station_id ignored.
+                            TaskInput {
+                                id: "t_PAP1_ST".into(),
+                                station_id: String::new(),
+                                setup_minutes: 0,
+                                run_minutes: 0,
+                                sequence_order: 2,
+                                is_pinned: false,
+                                is_frozen_by_safety_zone: false,
+                                pinned_start_tick: None,
+                                pinned_end_tick: None,
+                                outsourced: Some(outsourced_params.clone()),
+                                earliest_start_tick: None,
+                                realistic_run_minutes: None,
+                                cumulative_position_pct: None,
+                                slot_volume_pct: None,
+                                is_in_progress: false,
+                                task_elapsed_ticks: 0,
+                                forced_start_tick: None,
+                                already_eaten_ticks: 0,
+                                inherited_setup: None,
+                            },
+                        ],
+                        spec: None,
+                        prerequisite_element_ids: vec![],
+                    },
+                ],
+                required_job_ids: vec![],
+                force_max_staffing: false,
+            };
+
+            // Sibling tier-2 dummy job on a different station so the
+            // multi-job ALAP path is engaged (mirrors the prod payload
+            // and the past_deadline test's structure).
+            let j_dummy = JobInput {
+                id: "j_dummy".into(),
+                reference: None,
+                description: None,
+                deadline: Some(deadline_in_days(60)),
+                deadline_priority: 2,
+                elements: vec![ElementInput {
+                    id: "E_dummy".into(),
+                    name: None,
+                    tasks: vec![task_setup_and_run("t_dummy", 0, "S2", 15, 45)],
+                    spec: None,
+                    prerequisite_element_ids: vec![],
+                }],
+                required_job_ids: vec![],
+                force_max_staffing: false,
+            };
+
+            let req = ComputeRequest {
+                stations: vec![station("S1"), station("S2")],
+                operators: vec![
+                    operator("op_s1", &["S1"]),
+                    operator("op_s2", &["S2"]),
+                ],
+                jobs: vec![job_under_test, j_dummy],
+                options: Some(ComputeOptions {
+                    skip_lns: Some(true),
+                    multi_start: false,
+                    perturbed_starts: 0,
+                    ..ComputeOptions::default()
+                }),
+                occupied_slots: vec![],
+                setup_completion_log: vec![],
+                reference_time: Some(reference_time.clone()),
+            };
+
+            let result = compute(&req);
+
+            // Diagnostic dump for the failure message.
+            eprintln!("[ST-PRED-DIAG] internal assignments:");
+            for a in &result.assignments {
+                eprintln!(
+                    "  task={} station={} start={} end={}",
+                    a.task_id, a.station_id, a.scheduled_start, a.scheduled_end,
+                );
+            }
+            eprintln!("[ST-PRED-DIAG] outsourced assignments:");
+            for o in &result.outsourced_assignments {
+                eprintln!(
+                    "  task={} provider={} start={} end={}",
+                    o.task_id, o.provider_id, o.scheduled_start, o.scheduled_end,
+                );
+            }
+
+            let global_first = result
+                .assignments
+                .iter()
+                .find(|a| a.task_id == "t_GLOBAL")
+                .expect("GLOBAL.first must be placed");
+            let pap1_st = result
+                .outsourced_assignments
+                .iter()
+                .find(|o| o.task_id == "t_PAP1_ST")
+                .expect("PAP1's ST step must be emitted by build_outsourced_assignments");
+
+            // Parse both ends to NaiveDateTime — lexical compare would
+            // also work but parsing makes the assertion message clearer
+            // when the test fails.
+            let global_start = NaiveDateTime::parse_from_str(
+                &global_first.scheduled_start,
+                "%Y-%m-%dT%H:%M:%S",
+            )
+            .expect("engine emits parseable timestamps");
+            let st_return = NaiveDateTime::parse_from_str(
+                &pap1_st.scheduled_end,
+                "%Y-%m-%dT%H:%M:%S",
+            )
+            .expect("engine emits parseable timestamps");
+
+            // Minimum gap = 1 tick × 15 min (the station's tick_minutes).
+            // Matches what the engine itself enforces between any
+            // predecessor's end and its successor's start. Adding it to
+            // the floor keeps the assertion aligned with the engine's
+            // own precedence convention.
+            let min_gap = chrono::Duration::minutes(15);
+            let required_floor = st_return + min_gap;
+
+            assert!(
+                global_start >= required_floor,
+                "GLOBAL.first.scheduled_start ({}) must be ≥ PAP1.ST.scheduled_end ({}) + 1 tick. \
+                 Today it lands {} earlier, ignoring the outsourced return.",
+                global_first.scheduled_start,
+                pap1_st.scheduled_end,
+                required_floor.signed_duration_since(global_start),
+            );
+        }
     }
 
     #[test]

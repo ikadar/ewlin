@@ -301,8 +301,14 @@ pub struct Action {
     /// `pre_place_pinned_actions` degrades pins below this floor.
     pub earliest_start_tick: Option<usize>,
     /// Additional predecessor action indices for cross-element / cross-job dependencies.
-    /// Each entry is (action_idx, gap_ticks). All must have end_tick + gap <= current tick.
-    pub additional_predecessors: Vec<(usize, u32)>,
+    /// Each entry is `(action_idx, gap_ticks, outsourced_tail_chain)`. The
+    /// tail chain is the (possibly empty) sequence of `OutsourcedParams`
+    /// for the ST steps that sit AFTER the prereq's last internal action
+    /// in sequence order (i.e. the tail of the prereq element). When
+    /// non-empty, the forward pass walks the chain via
+    /// `outsourced::compute_chain_return_tick` to compute the effective
+    /// floor instead of using the raw `pred_end + gap` arithmetic.
+    pub additional_predecessors: Vec<(usize, u32, Vec<crate::model::job::OutsourcedParams>)>,
     // ============================================================
     // Persistent per-action state for the tick-major forward pass.
     // These were previously local variables in schedule_action_to_completion;
@@ -1365,13 +1371,34 @@ pub fn run_forward_pass(
             }
             if !action.additional_predecessors.is_empty() {
                 // additional_predecessors only carries cross-element /
-                // cross-job edges (set in mod.rs's element/job wiring).
-                // None of those are chunk-internal, so the strict gap
-                // applies unconditionally here.
+                // cross-job edges (set by `pre_split::wire_cross_cutting_edges`).
+                // None of those are chunk-internal, so the strict gap applies
+                // unconditionally here. The optional ST tail chain encodes
+                // the outsourced steps at the END of the prereq element —
+                // when non-empty, the effective floor is walked through
+                // `compute_chain_return_tick` (same primitive used by the
+                // intra-element pathway at line ~1346), so the consumer
+                // waits for the chain's actual return rather than the
+                // last-internal end alone.
                 let strict_gap = precedence_min_gap_ticks as usize;
-                let all_done = action.additional_predecessors.iter().all(|&(pred_idx, gap)| {
-                    match actions[pred_idx].end_tick {
-                        Some(pred_end) => pred_end + gap as usize + strict_gap <= t,
+                let today_midnight = start_date
+                    .and_hms_opt(0, 0, 0)
+                    .expect("midnight is always valid");
+                let all_done = action.additional_predecessors.iter().all(|(pred_idx, gap, chain)| {
+                    match actions[*pred_idx].end_tick {
+                        Some(pred_end) => {
+                            let effective_pred_end = if chain.is_empty() {
+                                pred_end + *gap as usize
+                            } else {
+                                super::outsourced::compute_chain_return_tick(
+                                    pred_end as u64,
+                                    chain,
+                                    today_midnight,
+                                    tick_minutes,
+                                ) as usize
+                            };
+                            effective_pred_end + strict_gap <= t
+                        }
                         None => false,
                     }
                 });
@@ -1974,7 +2001,7 @@ pub fn run_forward_pass(
                 let addl_pred_unplaced_count = action
                     .additional_predecessors
                     .iter()
-                    .filter(|&&(p, _)| actions[p].start_tick.is_none())
+                    .filter(|(p, _, _)| actions[*p].start_tick.is_none())
                     .count();
 
                 let mut samples = 0u32;
@@ -2017,10 +2044,23 @@ pub fn run_forward_pass(
                             }
                         }
                     }
-                    let addl_done = action.additional_predecessors.iter().all(|&(p, gap)| {
-                        actions[p]
-                            .end_tick
-                            .map_or(false, |e| e + gap as usize <= t)
+                    let today_midnight_d = start_date
+                        .and_hms_opt(0, 0, 0)
+                        .expect("midnight is always valid");
+                    let addl_done = action.additional_predecessors.iter().all(|(p, gap, chain)| {
+                        actions[*p].end_tick.map_or(false, |e| {
+                            let effective_end = if chain.is_empty() {
+                                e + *gap as usize
+                            } else {
+                                super::outsourced::compute_chain_return_tick(
+                                    e as u64,
+                                    chain,
+                                    today_midnight_d,
+                                    tick_minutes,
+                                ) as usize
+                            };
+                            effective_end <= t
+                        })
                     });
                     if !addl_done {
                         addl_pred_not_done += 1;
