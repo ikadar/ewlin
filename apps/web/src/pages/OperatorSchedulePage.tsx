@@ -998,18 +998,6 @@ export default function OperatorSchedulePage() {
               ))
         : undefined;
 
-      const sliceBadgePct = ((): number => {
-        if (!assignment?.operators?.length) return 100;
-        const opWindowMinutes = (op: { from?: string; to?: string }): number => {
-          if (!op.from || !op.to) return 0;
-          return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
-        };
-        const totalOpMin = assignment.operators.reduce((s, op) => s + opWindowMinutes(op), 0);
-        if (totalOpMin <= 0) return 100;
-        const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
-        return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
-      })();
-
       return (
         <TileSegment
           key={`lens-${slice.assignmentId}-${slice.from.getTime()}-${slice.position}`}
@@ -1021,8 +1009,6 @@ export default function OperatorSchedulePage() {
           width={svgWidth}
           sawtoothTop={slice.sawtoothTop}
           sawtoothBottom={slice.sawtoothBottom}
-          relayLabelBottom={slice.relayLabelBottom}
-          relayLabelTop={slice.relayLabelTop}
           tileState={tileState}
           isMaskedTime={slice.isMasked}
           onClick={noop}
@@ -1037,7 +1023,6 @@ export default function OperatorSchedulePage() {
           onTogglePin={scenarioMode !== 'prod' ? handleTogglePin : undefined}
           isSelected={selectedJobId === job.id}
           progressFill={progressFill}
-          taskBadgePct={sliceBadgePct}
           {...positionProps}
         />
       );
@@ -1228,25 +1213,6 @@ export default function OperatorSchedulePage() {
             ))
       : undefined;
 
-    // Per-slice badge breakdown : each slice's share of the operator-time
-    // invested on this assignment. Denominator is the sum of every
-    // `assignment.operators[].(to - from)` window so badges sum to 100%
-    // across every slice of every operator on the task. Earlier this
-    // used `realisticDurationMinutes` (single-stint figure) and produced
-    // values like 100% / 50% on a task whose two stints together totalled
-    // 45 min — JDP's 67% / 33% (sum-normalised) is the correct shape.
-    const sliceBadgePct = ((): number => {
-      if (!assignment?.operators?.length) return 100;
-      const opWindowMinutes = (op: { from?: string; to?: string }): number => {
-        if (!op.from || !op.to) return 0;
-        return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
-      };
-      const totalOpMin = assignment.operators.reduce((s, op) => s + opWindowMinutes(op), 0);
-      if (totalOpMin <= 0) return 100;
-      const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
-      return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
-    })();
-
     const op = operators.find((o) => o.id === operatorId);
     const handleOpenSaisie = assignment
       ? () =>
@@ -1293,8 +1259,6 @@ export default function OperatorSchedulePage() {
         width={svgWidth}
         sawtoothTop={slice.sawtoothTop}
         sawtoothBottom={slice.sawtoothBottom}
-        relayLabelBottom={slice.relayLabelBottom}
-        relayLabelTop={slice.relayLabelTop}
         tileState={tileState}
         isMaskedTime={slice.isMasked}
         onClick={() => setSelectedJobId(job.id)}

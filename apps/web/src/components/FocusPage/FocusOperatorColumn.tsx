@@ -269,27 +269,6 @@ export function FocusOperatorColumn({
                 ))
           : undefined;
 
-        // Per-slice badge breakdown : each slice's share of the
-        // operator-time invested on this assignment. Denominator is the
-        // sum of every operator stint window (assignment.operators[]) so
-        // the badges sum to 100% across all slices regardless of how
-        // many operators worked the task. Earlier this used
-        // `realisticDurationMinutes` (a single-stint figure) which made
-        // a 30-min slice show 100% and a 15-min slice show 50% on a task
-        // whose two stints together totalled 45 min — the chef expected
-        // 67% / 33% (matching the JDP per-operator badges, same model).
-        const sliceBadgePct = ((): number => {
-          if (!assignment?.operators?.length) return 100;
-          const opWindowMinutes = (op: { from?: string; to?: string }): number => {
-            if (!op.from || !op.to) return 0;
-            return Math.max(0, (new Date(op.to).getTime() - new Date(op.from).getTime()) / 60_000);
-          };
-          const totalOpMin = assignment.operators.reduce((s, op) => s + opWindowMinutes(op), 0);
-          if (totalOpMin <= 0) return 100;
-          const sliceMin = (slice.to.getTime() - slice.from.getTime()) / 60_000;
-          return Math.max(0, Math.min(100, (sliceMin / totalOpMin) * 100));
-        })();
-
         const handleOpenSaisie = assignment && isInternalTask(task)
           ? () =>
               saisieModal.open({
@@ -337,8 +316,6 @@ export function FocusOperatorColumn({
             width={width}
             sawtoothTop={slice.sawtoothTop}
             sawtoothBottom={slice.sawtoothBottom}
-            relayLabelBottom={slice.relayLabelBottom}
-            relayLabelTop={slice.relayLabelTop}
             tileState={tileState}
             isMaskedTime={slice.isMasked}
             overrideLeft={overrideLeft}
@@ -346,7 +323,6 @@ export function FocusOperatorColumn({
             onClick={handleOpenSaisie}
             onContextMenu={handleContextMenu}
             progressFill={progressFill}
-            taskBadgePct={sliceBadgePct}
           />
         );
       })}

@@ -30,10 +30,6 @@ interface TileSegmentProps {
   sawtoothTop: boolean;
   /** Zigzag on bottom edge */
   sawtoothBottom: boolean;
-  /** Relay label at bottom (e.g., "→ pause") */
-  relayLabelBottom?: string;
-  /** Relay label at top (e.g., "reprise →") */
-  relayLabelTop?: string;
   /** Tile color state */
   tileState: TileState;
   /** Whether this segment is masked time */
@@ -90,13 +86,6 @@ interface TileSegmentProps {
    * and on read-only callsites that don't surface progress.
    */
   progressFill?: { pct: number; isLate: boolean };
-  /**
-   * Task-scale badge percent (Q10 of 2026-05-04 mindmap). Geometric,
-   * static between replans : what share of the parent task this
-   * segment represents. 100 by default (unsplit task) ; chunk-split
-   * derivations should be supplied by the parent.
-   */
-  taskBadgePct?: number;
 }
 
 /**

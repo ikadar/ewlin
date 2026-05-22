@@ -51,8 +51,6 @@ export interface MarkNotCompletedResult {
 export interface ClearRecordedProgressResult {
   /** Number of tasks whose anchor was nulled (zero when nothing to do). */
   cleared: number;
-  /** Completed tiles unscheduled so the silence-is-consent tick can't re-anchor them. */
-  unassignedCompleted: number;
 }
 
 export const saisieApi = createApi({
