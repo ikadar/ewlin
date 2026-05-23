@@ -604,7 +604,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                               type="number"
                               min={0}
                               max={totalQuantity}
-                              step={500}
+                              step={1}
                               value={task.copiesDone}
                               onChange={(e) =>
                                 setTaskCopiesDone(activeGroupIdx, taskIdx, Number.parseInt(e.target.value, 10) || 0)
@@ -619,11 +619,21 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
+                              {/* step=1 (not 500) — when the job quantity isn't
+                                  a multiple of the slider step, HTML5 normalises
+                                  values that aren't on a step boundary by clamping
+                                  to the nearest reachable step. A 3 800 ex. job
+                                  with step=500 caps the slider at 3 500 (= 92 %)
+                                  even when state holds 3 800 — the thumb is stuck
+                                  mid-track and a fresh drag can't reach the max.
+                                  step=1 makes every integer reachable ; the drag
+                                  feel stays smooth (mouse pixel resolution is the
+                                  real granularity, not the step). */}
                               <input
                                 type="range"
                                 min={0}
                                 max={totalQuantity}
-                                step={500}
+                                step={1}
                                 value={task.copiesDone}
                                 onChange={(e) =>
                                   setTaskCopiesDone(activeGroupIdx, taskIdx, Number.parseInt(e.target.value, 10) || 0)
@@ -636,73 +646,55 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                               {Math.round(pct)} %
                             </span>
                           </div>
-                          {/* Cascade segments — only meaningful for multi-acompte
-                              jobs and only « validated-green » on the LAST task of
-                              each element.
-                                - N = 1 : the single « Livraison complète » segment
-                                  would just mirror the slider. Hide entirely.
-                                - N ≥ 2, non-last task : show the per-acompte breakdown
-                                  as a diagnostic (« combien de cette tâche contribue
-                                  à chaque acompte ») but in zinc tones, no green.
-                                  Intermediate task saturation does NOT mean the
-                                  acompte is shippable — downstream tasks still gate.
-                                - N ≥ 2, last task : full green-when-saturated signal,
-                                  authoritative on « what would ship now ». Matches
-                                  the per-card « Prêt » bottleneck. */}
-                          {!isSingleDelivery && (() => {
-                            const isLastTaskOfElement = taskIdx === activeElement.tasks.length - 1;
-                            return (
-                              <div className="flex gap-1 h-[44px] mt-2">
-                                {cascade.map((c, ci) => {
-                                  const showAsSaturated = isLastTaskOfElement && c.saturated;
-                                  return (
-                                    <div
-                                      key={c.acompteId}
-                                      className={`relative border px-2 py-1.5 min-w-[80px] flex flex-col justify-between overflow-hidden ${
-                                        showAsSaturated ? 'border-[rgba(34,197,94,0.45)]' : 'border-zinc-800'
-                                      } bg-zinc-800/40`}
-                                      style={{ flexGrow: Math.max(1, c.capacity), flexBasis: 0 }}
-                                    >
-                                      <div
-                                        className={`absolute left-0 top-0 bottom-0 transition-[width] ${
-                                          isLastTaskOfElement
-                                            ? showAsSaturated
-                                              ? 'bg-[rgba(34,197,94,0.55)]'
-                                              : c.empty
-                                                ? 'bg-transparent'
-                                                : 'bg-[rgba(34,197,94,0.30)]'
-                                            : c.empty
-                                              ? 'bg-transparent'
-                                              : 'bg-zinc-700/40'
-                                        }`}
-                                        style={{ width: `${c.progressPct}%` }}
-                                      />
-                                      <div className="relative z-10 flex items-center justify-between text-[10px] tabular-nums leading-tight">
-                                        <span
-                                          className={`font-semibold text-[11px] flex items-center gap-1 ${
-                                            c.empty ? 'text-zinc-500' : 'text-zinc-100'
-                                          }`}
-                                        >
-                                          {acompteShortLabel(ci, cascade.length)}
-                                          {showAsSaturated && <Check className="w-2.5 h-2.5 text-[#86efac]" />}
-                                        </span>
-                                        <span className={showAsSaturated ? 'text-[#86efac]' : 'text-zinc-500'}>
-                                          {Math.round(c.progressPct)}%
-                                        </span>
-                                      </div>
-                                      <div
-                                        className={`relative z-10 text-[10px] tabular-nums leading-tight ${
-                                          c.empty ? 'text-zinc-600' : 'text-zinc-400'
-                                        }`}
-                                      >
-                                        {fmt(c.copiesTaken)} / {fmt(c.capacity)}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                          {/* Cascade segments */}
+                          {/* Cascade segments use the canonical tile-completed palette
+                              (rgb 34,197,94 == #22c55e, text #86efac) so they read as
+                              the same « validated » signal as the .full acompte card +
+                              the planning-board tuile completed. Previously these used
+                              Tailwind emerald-500 (#10b981) which drifted just enough
+                              to look like a separate green from the rest. */}
+                          <div className="flex gap-1 h-[44px] mt-2">
+                            {cascade.map((c, ci) => (
+                              <div
+                                key={c.acompteId}
+                                className={`relative border px-2 py-1.5 min-w-[80px] flex flex-col justify-between overflow-hidden ${
+                                  c.saturated ? 'border-[rgba(34,197,94,0.45)]' : 'border-zinc-800'
+                                } bg-zinc-800/40`}
+                                style={{ flexGrow: Math.max(1, c.capacity), flexBasis: 0 }}
+                              >
+                                <div
+                                  className={`absolute left-0 top-0 bottom-0 transition-[width] ${
+                                    c.saturated
+                                      ? 'bg-[rgba(34,197,94,0.55)]'
+                                      : c.empty
+                                        ? 'bg-transparent'
+                                        : 'bg-[rgba(34,197,94,0.30)]'
+                                  }`}
+                                  style={{ width: `${c.progressPct}%` }}
+                                />
+                                <div className="relative z-10 flex items-center justify-between text-[10px] tabular-nums leading-tight">
+                                  <span
+                                    className={`font-semibold text-[11px] flex items-center gap-1 ${
+                                      c.empty ? 'text-zinc-500' : 'text-zinc-100'
+                                    }`}
+                                  >
+                                    {acompteShortLabel(ci, cascade.length)}
+                                    {c.saturated && <Check className="w-2.5 h-2.5 text-[#86efac]" />}
+                                  </span>
+                                  <span className={c.saturated ? 'text-[#86efac]' : 'text-zinc-500'}>
+                                    {Math.round(c.progressPct)}%
+                                  </span>
+                                </div>
+                                <div
+                                  className={`relative z-10 text-[10px] tabular-nums leading-tight ${
+                                    c.empty ? 'text-zinc-600' : 'text-zinc-400'
+                                  }`}
+                                >
+                                  {fmt(c.copiesTaken)} / {fmt(c.capacity)}
+                                </div>
                               </div>
-                            );
-                          })()}
+                            ))}
+                          </div>
                           {warning && (
                             <div className="mt-2 px-2.5 py-1.5 bg-amber-500/[0.08] border border-amber-500/25 text-[11px] text-amber-300 flex items-center gap-1.5">
                               <AlertTriangle className="w-3 h-3 shrink-0" />
