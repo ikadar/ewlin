@@ -61,10 +61,17 @@ RUN addgroup -g 1000 appgroup && \
 # Set permissions
 RUN chown -R appuser:appgroup /var/www/html
 
+# Custom entrypoint: clears the Symfony container cache on dev start so
+# newly added MessageHandlers / DoctrineListeners / EventSubscribers
+# always register. See docker-entrypoint.sh comment for context.
+COPY docker-entrypoint.sh /usr/local/bin/flux-php-entrypoint.sh
+RUN chmod +x /usr/local/bin/flux-php-entrypoint.sh
+
 # Switch to non-root user for running the app
 # Note: We keep root for initial setup, composer install runs as appuser
 USER appuser
 
 EXPOSE 9000
 
+ENTRYPOINT ["/usr/local/bin/flux-php-entrypoint.sh"]
 CMD ["php-fpm"]
