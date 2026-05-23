@@ -47,9 +47,9 @@ describe('QuickActionsRow', () => {
     expect(onSelect).toHaveBeenCalledWith(750);
   });
 
-  it('clamps below lowerBoundMin (cannot report a past finish time)', () => {
+  it('clamps below lowerBoundMin (cannot finish before starting)', () => {
     const onSelect = vi.fn();
-    // planned 12h00, lower 11h45 — clicking −1h would resolve to 11h00 → clamp to 11h45
+    // planned 12h00, lower 11h45 (= task start) — clicking −1h would resolve to 11h00 → clamp to 11h45
     render(<QuickActionsRow plannedEndMin={720} currentTimeMin={720} lowerBoundMin={705} onSelect={onSelect} />);
     fireEvent.click(screen.getByTestId('pm-quick-minus60'));
     expect(onSelect).toHaveBeenCalledWith(705);

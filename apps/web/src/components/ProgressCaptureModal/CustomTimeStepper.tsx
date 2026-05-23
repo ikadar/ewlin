@@ -2,7 +2,9 @@
  * CustomTimeStepper — escape hatch from the QuickActions row. Lets the
  * operator type or step a custom finish time when none of the presets fit.
  *
- * Granularity: 15 min (snaps on commit). Lower bound: typically `now`.
+ * Granularity: 15 min (snaps on commit). Lower bound: the task start
+ * (you cannot finish before starting). Past times are legitimate when
+ * reporting a completion after the fact.
  *
  * UX:
  *   - Local controlled `text` state so the user can type freely

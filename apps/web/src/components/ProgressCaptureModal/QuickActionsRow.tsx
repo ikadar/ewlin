@@ -20,7 +20,9 @@ export interface QuickActionsRowProps {
   plannedEndMin: number;
   /** Currently selected time (minutes from midnight) — drives active highlights. */
   currentTimeMin: number;
-  /** Lower bound (typically `now`) — prevents reporting a finish time in the past. */
+  /** Lower bound — typically the task start (you cannot finish before
+   *  starting). NOT `now`: past times are legitimate when reporting a
+   *  completion after the fact. */
   lowerBoundMin: number;
   /** Upper bound (typically end of day or planned + N hours). */
   upperBoundMin?: number;
