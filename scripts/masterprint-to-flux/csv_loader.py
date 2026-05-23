@@ -144,6 +144,28 @@ class Impression:
     massi: bool
     mont: bool
 
+    @staticmethod
+    def _side_tokens(nb_colors: int, quadri: bool, noir: bool) -> list[str]:
+        tokens: list[str] = []
+        accounted = 0
+        if quadri:
+            tokens.append("Q")
+            accounted += 4
+        elif noir:
+            tokens.append("N")
+            accounted += 1
+        extra = max(0, nb_colors - accounted)
+        tokens.extend(["Pantone"] * extra)
+        return tokens
+
+    def to_impression_dsl(self) -> str | None:
+        """Derive the InkingDSL string (e.g. "Q/Q", "N, Pantone/") from MasterPrint fields."""
+        if self.nbcr == 0 and self.nbcv == 0:
+            return None
+        recto = ", ".join(self._side_tokens(self.nbcr, self.quadr, self.noir_r))
+        verso = ", ".join(self._side_tokens(self.nbcv, self.quadv, self.noir_v))
+        return f"{recto}/{verso}"
+
     def to_inking_spec_dict(self) -> dict:
         """Serialize as a structured inking spec for element.spec.inkingSpec.
 

@@ -75,6 +75,9 @@ def _build_element(
         impressions = db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), [])
         if impressions:
             spec["inkingSpec"] = impressions[0].to_inking_spec_dict()
+            impression_dsl = impressions[0].to_impression_dsl()
+            if impression_dsl:
+                spec["impression"] = impression_dsl
 
     # Résolution opération par opération
     ctx = ResolverContext(
