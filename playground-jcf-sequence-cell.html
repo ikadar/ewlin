@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Sequence cell · création vs modification</title>
+<style>
+  /*
+   * Palette + tokens alignés sur le code production
+   * (apps/web/tailwind config + JcfElementsTable inputBaseClass).
+   *
+   *   13px base, font-mono pour les inputs/textarea
+   *   bg transparent, bordures fines transparentes au repos,
+   *   border-zinc-700 au hover, border-zinc-600 au focus
+   *   rounded-[3px], px-[5px] py-[2px]
+   */
+  :root {
+    --bg:           rgb(9 9 11);     /* zinc-950 — fond modale */
+    --bg-elev-1:    rgb(24 24 27);   /* zinc-900 — header / row label bg */
+    --bg-elev-2:    rgb(39 39 42);   /* zinc-800 */
+    --border:       rgb(39 39 42);   /* zinc-800 */
+    --border-soft:  rgb(63 63 70);   /* zinc-700 — hover */
+    --border-focus: rgb(82 82 91);   /* zinc-600 — focus */
+
+    --text-1:       rgb(244 244 245); /* zinc-100 */
+    --text-2:       rgb(212 212 216); /* zinc-300 */
+    --text-3:       rgb(161 161 170); /* zinc-400 */
+    --text-4:       rgb(113 113 122); /* zinc-500 — placeholder */
+    --text-5:       rgb(82 82 91);    /* zinc-600 */
+
+    --accent-amber:   rgb(245 158 11);  /* amber-500 */
+    --accent-emerald: rgb(16 185 129);  /* emerald-500 */
+    --accent-blue:    rgb(96 165 250);  /* blue-400 */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 13px; }
+  body {
+    background: rgb(20 20 22);
+    color: var(--text-2);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.4;
+    padding: 32px 24px 64px;
+    min-height: 100vh;
+  }
+
+  .page-header { max-width: 1200px; margin: 0 auto 28px; }
+  .page-title  { color: var(--text-1); font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .page-subtitle { color: var(--text-4); font-size: 13px; }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  .label {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .label.ref {
+    background: rgba(82, 82, 91, 0.2);
+    color: var(--text-3);
+    border: 1px solid var(--border-soft);
+  }
+  .label.modif {
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--accent-blue);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+  }
+
+  .group-title { color: var(--text-1); font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .group-note { color: var(--text-4); font-size: 12px; margin-bottom: 12px; max-width: 800px; }
+
+  /* ── Elements table fragment ───────────────────────────────── */
+
+  .table-fragment {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .table-header {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    background: var(--bg-elev-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .table-header > div {
+    padding: 6px 10px;
+    color: var(--text-3);
+    font-size: 12px;
+    font-weight: 500;
+    border-right: 1px solid var(--border);
+  }
+  .table-header > div:last-child { border-right: none; }
+  .table-header > div:first-child { color: var(--text-4); font-size: 11px; text-transform: uppercase; }
+
+  .table-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-row:last-child { border-bottom: none; }
+  .table-row > div {
+    border-right: 1px solid var(--border);
+  }
+  .table-row > div:last-child { border-right: none; }
+
+  .row-label {
+    background: var(--bg-elev-1);
+    color: var(--text-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 8px 10px;
+  }
+
+  .row-cell {
+    padding: 6px 10px;
+  }
+
+  /* Sequence textarea — strictement reproduit du code prod */
+  .seq-textarea {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 2px 5px;
+    color: var(--text-1);
+    font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Mono', monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    resize: none;
+    min-height: 28px;
+    overflow: hidden;
+    transition: border-color 0.1s;
+  }
+  .seq-textarea::placeholder { color: var(--text-5); }
+  .seq-textarea:hover { border-color: var(--border-soft); }
+  .seq-textarea:focus { border-color: var(--border-focus); outline: none; }
+
+  /* ── Modification cell : "Déjà fait" header ─────────────────── */
+
+  .done-panel {
+    background: rgba(24, 24, 27, 0.55);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 6px 8px 6px 8px;
+    margin-bottom: 8px;
+  }
+
+  .done-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-4);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed rgba(63, 63, 70, 0.6);
+  }
+
+  .done-line {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .done-line + .done-line {
+    border-top: 1px dotted rgba(63, 63, 70, 0.4);
+    padding-top: 3px;
+    margin-top: 1px;
+  }
+
+  .done-icon {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  .done-icon.done    { background: rgba(82, 82, 91, 0.4); color: var(--text-3); }
+  .done-icon.running { background: var(--accent-amber); color: rgb(24 24 27); }
+
+  .done-name {
+    font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+    color: var(--text-2);
+  }
+  .done-line.done .done-name { color: var(--text-3); }
+  .done-line.running .done-name { color: var(--text-1); font-weight: 500; }
+
+  .done-meta {
+    color: var(--text-4);
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .done-meta .progress { color: var(--accent-amber); font-weight: 600; }
+  .done-meta .remain   { color: var(--text-2); }
+
+  .done-hint {
+    color: var(--text-5);
+    font-size: 10px;
+    font-style: italic;
+    padding: 4px 0 0 26px;
+    line-height: 1.4;
+  }
+
+  /* ── Annotation block ──────────────────────────────────────── */
+
+  .annotation {
+    position: relative;
+    padding: 10px 12px;
+    background: rgba(96, 165, 250, 0.05);
+    border-left: 3px solid rgba(96, 165, 250, 0.5);
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 8px 0 24px;
+    border-radius: 0 3px 3px 0;
+  }
+  .annotation::before {
+    content: 'NOTE';
+    display: block;
+    color: var(--accent-blue);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .annotation strong { color: var(--text-1); }
+  .annotation code {
+    background: var(--bg-elev-2);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title">Cellule Sequence — création vs modification</div>
+  <div class="page-subtitle">
+    Mini-playground centré sur la seule cellule qui change. Reste du JCF inchangé (header,
+    lignes Précédences/Quantité/Format/etc., footer).
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ─── REF : cellule Sequence en création ─────────────── -->
+
+  <span class="label ref">Référence</span>
+  <div class="group-title">Sequence — création (état actuel)</div>
+  <div class="group-note">
+    Strictement reproduit : <code>w-full bg-transparent border border-transparent
+    hover:border-zinc-700 focus:border-zinc-600 rounded-[3px] px-[5px] py-[2px] font-mono</code>,
+    <code>resize-none min-h-[28px]</code>, font-size 13px.
+  </div>
+
+  <div class="table-fragment">
+    <div class="table-header">
+      <div>Élément</div>
+      <div>Couverture</div>
+    </div>
+    <div class="table-row">
+      <div class="row-label">Sequence</div>
+      <div class="row-cell">
+        <textarea class="seq-textarea" rows="5">Komori(20+40)
+Massicot(15)
+G37(20+40)
+Pelliculage mat(10)
+Découpe(8)</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── DESIGN : cellule Sequence en modification ──────── -->
+
+  <span class="label modif">Design — modification</span>
+  <div class="group-title">Sequence — modification d'un Job en cours</div>
+  <div class="group-note">
+    Même cellule, même textarea, même grammaire DSL. Au-dessus, un panneau "Déjà fait" en
+    lecture seule rappelle ce qui est gravé. Le textarea ne contient que le reste à faire,
+    avec la durée de run réduite proportionnellement à l'avancement mesuré ; le setup reste
+    inchangé (l'engine arbitre l'héritage de calage au moment du placement).
+  </div>
+
+  <div class="table-fragment">
+    <div class="table-header">
+      <div>Élément</div>
+      <div>Couverture</div>
+    </div>
+    <div class="table-row">
+      <div class="row-label">Sequence</div>
+      <div class="row-cell">
+
+        <div class="done-panel">
+          <div class="done-panel-title">Déjà fait</div>
+
+          <div class="done-line done">
+            <span class="done-icon done">✓</span>
+            <span class="done-name">Komori(20+40)</span>
+            <span class="done-meta">terminée 06/05 09:42</span>
+          </div>
+          <div class="done-line done">
+            <span class="done-icon done">✓</span>
+            <span class="done-name">Massicot(15)</span>
+            <span class="done-meta">terminée 06/05 10:12</span>
+          </div>
+          <div class="done-line running">
+            <span class="done-icon running">⏳</span>
+            <span class="done-name">G37(20+40)</span>
+            <span class="done-meta">
+              calage 11:08 sur G37 ·
+              <span class="progress">40 %</span> ·
+              <span class="remain">24 / 40 min</span>
+            </span>
+          </div>
+          <div class="done-hint">
+            ↳ Run réduit ci-dessous ; setup conservé (l'engine décide s'il honore le calage selon le placement).
+          </div>
+        </div>
+
+        <textarea class="seq-textarea" rows="3">G37(20+24)
+Pelliculage mat(10)
+Découpe(8)</textarea>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <strong>Ce qu'il faut sentir au playground</strong> :
+    <ul style="margin-left: 18px; margin-top: 4px;">
+      <li>La densité du panneau "Déjà fait" — pas trop verbeux, scannable d'un coup d'œil.</li>
+      <li>Le mix de tasks <em>terminées</em> grisées + <em>in-progress</em> ambre — la hiérarchie visuelle marche-t-elle ?</li>
+      <li>Le hint italique "Run réduit ci-dessous ; setup conservé" — clair ou trop verbeux ?</li>
+      <li>La continuité visuelle avec le textarea juste en-dessous (même police, même indentation).</li>
+      <li>La séparation par tirets pointillés entre lignes — discrète mais lisible.</li>
+    </ul>
+  </div>
+
+  <!-- ─── DESIGN : variante deuxième élément (rien démarré) ─ -->
+
+  <span class="label modif">Design — variante</span>
+  <div class="group-title">Élément non commencé en mode modification</div>
+  <div class="group-note">
+    Si aucune task n'a démarré sur cet élément, pas de panneau "Déjà fait" — la cellule
+    redevient identique à la cellule de création, le chef édite le DSL librement comme à
+    la création.
+  </div>
+
+  <div class="table-fragment">
+    <div class="table-header">
+      <div>Élément</div>
+      <div>Intérieur</div>
+    </div>
+    <div class="table-row">
+      <div class="row-label">Sequence</div>
+      <div class="row-cell">
+        <textarea class="seq-textarea" rows="4">Heidelberg(30+90)
+Massicot(20)
+Pliage(15)
+Encarteuse(25+40)</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <strong>Pas de "Déjà fait" ici</strong>, donc la cellule est strictement la cellule de
+    création JCF. Cohérence : le panneau apparaît uniquement quand il a quelque chose à dire.
+  </div>
+
+</div>
+
+</body>
+</html>

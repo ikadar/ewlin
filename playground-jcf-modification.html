@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — JCF Modification (référence + design)</title>
+<style>
+  :root {
+    /* Flux palette — aligned on apps/web Tailwind zinc-* mapping */
+    --bg:           rgb(9 9 11);    /* zinc-950 */
+    --bg-elev-1:    rgb(24 24 27);  /* zinc-900 */
+    --bg-elev-2:    rgb(39 39 42);  /* zinc-800 */
+    --bg-elev-3:    rgb(63 63 70);  /* zinc-700 */
+    --border:       rgb(39 39 42);
+    --border-soft:  rgb(63 63 70);
+    --text-1:       rgb(244 244 245);
+    --text-2:       rgb(212 212 216);
+    --text-3:       rgb(161 161 170);
+    --text-4:       rgb(113 113 122);
+    --text-5:       rgb(82 82 91);
+
+    --accent-blue:    rgb(37 99 235);
+    --accent-blue-h:  rgb(59 130 246);
+    --accent-amber:   rgb(245 158 11);
+    --accent-emerald: rgb(16 185 129);
+    --accent-red:     rgb(239 68 68);
+
+    --radius-sm: 3px;
+    --radius-md: 5px;
+    --radius-lg: 7px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 13px; }
+
+  body {
+    background: rgb(20 20 22);
+    color: var(--text-2);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.4;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+
+  .page-header { max-width: 1800px; margin: 0 auto 32px; }
+  .page-title  { color: var(--text-1); font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .page-subtitle { color: var(--text-4); font-size: 13px; }
+
+  .section { max-width: 1800px; margin: 0 auto 48px; }
+
+  .section-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .section-tag.reference {
+    background: rgba(82, 82, 91, 0.2);
+    color: var(--text-3);
+    border: 1px solid var(--border-soft);
+  }
+  .section-tag.design {
+    background: rgba(37, 99, 235, 0.15);
+    color: rgb(96 165 250);
+    border: 1px solid rgba(37, 99, 235, 0.4);
+  }
+
+  .section-title { color: var(--text-1); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .section-note  { color: var(--text-4); font-size: 12px; margin-bottom: 16px; max-width: 900px; }
+
+  /* ── Modal frame (commun ref + design) ──────────────────── */
+
+  .jcf-modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  }
+
+  .jcf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 13px;
+    background: var(--bg-elev-1);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .jcf-title { color: var(--text-1); font-size: 15px; line-height: 23px; font-weight: 500; }
+  .jcf-title .ref { color: var(--text-4); margin-left: 8px; font-weight: 400; }
+
+  .jcf-close {
+    background: transparent; border: none;
+    color: var(--text-3);
+    padding: 3px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .jcf-close:hover { background: var(--bg-elev-2); color: var(--text-1); }
+
+  .jcf-content {
+    padding: 13px 20px;
+    background: var(--bg);
+    max-height: 800px;
+    overflow-y: auto;
+  }
+
+  .jcf-footer { background: var(--bg-elev-1); border-top: 1px solid var(--border); }
+
+  .jcf-shortcuts {
+    padding: 5px 13px;
+    border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+    display: flex; gap: 20px; align-items: center;
+  }
+  .jcf-shortcut { display: flex; align-items: center; gap: 6px; color: var(--text-4); font-size: 11px; }
+  .kbd {
+    display: inline-flex; align-items: center;
+    padding: 2px 6px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    font-family: 'SF Mono', Monaco, monospace; font-size: 10px; line-height: 1;
+  }
+
+  .jcf-actions { padding: 8px 13px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+
+  .btn {
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 6px 13px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-secondary { background: var(--bg-elev-2); color: var(--text-2); }
+  .btn-secondary:hover { background: var(--bg-elev-3); }
+  .btn-primary { background: var(--accent-blue); color: white; }
+  .btn-primary:hover { background: var(--accent-blue-h); }
+  .btn-tertiary { background: transparent; color: var(--text-2); padding: 5px 10px; }
+  .btn-tertiary:hover { background: var(--bg-elev-2); color: var(--text-1); }
+
+  /* ── Job header (forme commune ref + design) ────────────── */
+
+  .jcf-job-header {
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .jcf-field { display: flex; flex-direction: column; gap: 3px; position: relative; }
+  .jcf-field-label { color: var(--text-4); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .jcf-field-input {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    color: var(--text-1);
+    font-size: 13px;
+    font-family: 'SF Mono', Monaco, monospace;
+    width: 100%;
+  }
+  .jcf-field-input.muted { color: var(--text-4); }
+  .jcf-field-input:disabled,
+  .jcf-field-input[disabled] {
+    background: rgba(39, 39, 42, 0.4);
+    color: var(--text-4);
+    border-color: var(--border);
+    cursor: not-allowed;
+  }
+  .required-dot {
+    position: absolute; top: 2px; right: 4px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-amber);
+  }
+
+  /* ── Elements table (forme commune ref + design) ────────── */
+
+  .jcf-elements-table {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .jcf-table-header {
+    display: grid;
+    grid-template-columns: 140px repeat(2, 1fr);
+    background: var(--bg-elev-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .jcf-table-header > div {
+    padding: 6px 10px;
+    color: var(--text-3);
+    font-size: 12px; font-weight: 500;
+    border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .jcf-table-header > div:last-child { border-right: none; }
+  .jcf-table-header > div:first-child {
+    color: var(--text-4); font-size: 11px; text-transform: uppercase;
+  }
+
+  .col-actions { display: flex; gap: 2px; opacity: 0.7; }
+  .col-actions .icon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-4);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .col-actions .icon-btn:hover { background: var(--bg-elev-2); color: var(--text-1); }
+  .col-actions .icon-btn.danger:hover { color: var(--accent-red); }
+
+  .jcf-table-row {
+    display: grid;
+    grid-template-columns: 140px repeat(2, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+  .jcf-table-row:last-child { border-bottom: none; }
+  .jcf-table-row > div {
+    padding: 4px 10px;
+    border-right: 1px solid var(--border);
+    font-size: 12px;
+    font-family: 'SF Mono', Monaco, monospace;
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+  }
+  .jcf-table-row > div:last-child { border-right: none; }
+  .jcf-table-label {
+    background: var(--bg-elev-1);
+    color: var(--text-3) !important;
+    font-family: -apple-system, sans-serif !important;
+    font-size: 11px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .jcf-table-cell.filled { color: var(--text-1); }
+  .jcf-table-cell.empty  { color: var(--text-5); }
+  .jcf-table-cell.disabled {
+    color: var(--text-4);
+    background: rgba(39, 39, 42, 0.3);
+    cursor: not-allowed;
+  }
+
+  .jcf-table-row.sequence > div {
+    min-height: 100px;
+    align-items: stretch;
+    padding: 6px 10px;
+  }
+  .jcf-table-row.sequence > .jcf-table-label { align-items: flex-start; padding-top: 8px; }
+
+  .jcf-sequence-textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-1);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 12px;
+    resize: none;
+    min-height: 80px;
+    line-height: 1.6;
+  }
+  .jcf-sequence-textarea::placeholder { color: var(--text-5); }
+  .jcf-sequence-textarea:focus { outline: none; }
+
+  /* ── Design-only: per-line status before the textarea ──── */
+
+  .seq-cell { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+  .seq-status-list {
+    display: flex; flex-direction: column;
+    background: rgba(24, 24, 27, 0.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 0;
+  }
+
+  .seq-status-line {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  .seq-status-line + .seq-status-line { border-top: 1px solid rgba(63, 63, 70, 0.4); }
+
+  .seq-status-icon {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: bold;
+  }
+  .seq-status-icon.done    { background: rgba(82, 82, 91, 0.3); color: var(--text-4); }
+  .seq-status-icon.running { background: var(--accent-amber); color: rgb(24 24 27); }
+  .seq-status-icon.future  { background: var(--bg-elev-2); color: var(--text-4); border: 1px solid var(--border-soft); }
+
+  .seq-status-text { color: var(--text-3); font-family: 'SF Mono', Monaco, monospace; }
+  .seq-status-text.done    { color: var(--text-4); }
+  .seq-status-text.running { color: var(--text-1); }
+  .seq-status-text.future  { color: var(--text-3); }
+
+  .seq-status-meta { color: var(--text-4); font-size: 10px; }
+  .seq-status-meta .progress  { color: var(--accent-amber); font-weight: 600; }
+  .seq-status-meta .remaining { color: var(--text-3); }
+
+  /* Annotation block */
+  .annotation {
+    position: relative;
+    padding: 10px 12px;
+    background: rgba(37, 99, 235, 0.06);
+    border-left: 3px solid var(--accent-blue);
+    color: var(--text-2);
+    font-size: 12px;
+    margin: 16px 0 24px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .annotation::before {
+    content: 'NOTE';
+    display: block;
+    color: rgb(96 165 250);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .annotation strong { color: var(--text-1); }
+  .annotation ul { margin-left: 18px; margin-top: 4px; }
+  .annotation code {
+    background: var(--bg-elev-2);
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title">JCF — Modale de modification (post-création / Préprod)</div>
+  <div class="page-subtitle">
+    Référence visuelle de la JCF actuelle (création) en haut, version "modification" en bas.
+    Stricte continuité visuelle : même cadre, même header, même tableau Élément × Champ.
+    Les champs non-modifiables sont juste <code>disabled</code>. Le seul ajout est l'affichage
+    du statut + temps restant par étape de séquence.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ░░  REFERENCE — JCF actuelle (création)  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <span class="section-tag reference">Référence</span>
+  <div class="section-title">JCF actuelle — Création d'un nouveau Job</div>
+  <div class="section-note">
+    Reproduction fidèle de la modale `JcfModal` + `JcfJobHeader` + `JcfElementsTable`.
+  </div>
+
+  <div class="jcf-modal">
+    <header class="jcf-header">
+      <h1 class="jcf-title">Nouveau Job</h1>
+      <button class="jcf-close" aria-label="Fermer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </header>
+
+    <main class="jcf-content">
+      <div class="jcf-job-header">
+        <div class="jcf-field">
+          <span class="jcf-field-label">ID Job</span>
+          <input class="jcf-field-input muted" value="00042" readonly>
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Client</span>
+          <span class="required-dot"></span>
+          <input class="jcf-field-input" value="Ducros SA">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Référent</span>
+          <input class="jcf-field-input" value="A. Bernard">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Template</span>
+          <input class="jcf-field-input muted" placeholder="—">
+        </div>
+        <div class="jcf-field" style="grid-column: span 2">
+          <span class="jcf-field-label">Intitulé</span>
+          <span class="required-dot"></span>
+          <input class="jcf-field-input" value="Cartes de visite recto/verso 500ex">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Quantité</span>
+          <span class="required-dot"></span>
+          <input class="jcf-field-input" value="500">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Transporteur</span>
+          <input class="jcf-field-input muted" value="—">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Deadline</span>
+          <input class="jcf-field-input" value="22/05/2026">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">BAT</span>
+          <input class="jcf-field-input muted" placeholder="—">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Priorité</span>
+          <input class="jcf-field-input" value="Standard">
+        </div>
+      </div>
+
+      <div class="jcf-elements-table">
+        <div class="jcf-table-header">
+          <div>Élément</div>
+          <div>Couverture</div>
+          <div>Intérieur</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Précédences</div>
+          <div class="jcf-table-cell empty">—</div>
+          <div class="jcf-table-cell filled">Couverture</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Quantité</div>
+          <div class="jcf-table-cell filled">500</div>
+          <div class="jcf-table-cell filled">500</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Pagination</div>
+          <div class="jcf-table-cell filled">2</div>
+          <div class="jcf-table-cell filled">16</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Format</div>
+          <div class="jcf-table-cell filled">SRA3</div>
+          <div class="jcf-table-cell filled">SRA3</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Papier</div>
+          <div class="jcf-table-cell filled">Couché 350g</div>
+          <div class="jcf-table-cell filled">Offset 90g</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Impression</div>
+          <div class="jcf-table-cell filled">Quadri R/V</div>
+          <div class="jcf-table-cell filled">Quadri R/V</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Surfaçage</div>
+          <div class="jcf-table-cell filled">Pelliculage mat</div>
+          <div class="jcf-table-cell empty">—</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Autres</div>
+          <div class="jcf-table-cell empty">—</div>
+          <div class="jcf-table-cell empty">—</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Imposition</div>
+          <div class="jcf-table-cell filled">8 poses</div>
+          <div class="jcf-table-cell filled">4 poses</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Qté feuilles</div>
+          <div class="jcf-table-cell filled">63</div>
+          <div class="jcf-table-cell filled">125</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Commentaires</div>
+          <div class="jcf-table-cell empty">—</div>
+          <div class="jcf-table-cell empty">—</div>
+        </div>
+        <div class="jcf-table-row sequence">
+          <div class="jcf-table-label">Sequence</div>
+          <div class="jcf-table-cell">
+            <textarea class="jcf-sequence-textarea">Komori(20+40)
+Massicot(15)
+G37(20+40)
+Pelliculage mat(10)
+Découpe(8)</textarea>
+          </div>
+          <div class="jcf-table-cell">
+            <textarea class="jcf-sequence-textarea">Heidelberg(30+90)
+Massicot(20)
+Pliage(15)
+Encarteuse(25+40)</textarea>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="jcf-footer">
+      <div class="jcf-shortcuts">
+        <span class="jcf-shortcut"><span class="kbd">Tab</span><span>Champ suivant</span></span>
+        <span class="jcf-shortcut"><span class="kbd">⌥</span>+<span class="kbd">←↑↓→</span><span>Naviguer tableau</span></span>
+        <span class="jcf-shortcut"><span class="kbd">↑↓</span><span>Liste</span></span>
+        <span class="jcf-shortcut"><span class="kbd">⌘S</span><span>Sauvegarder</span></span>
+      </div>
+      <div class="jcf-actions">
+        <button class="btn btn-tertiary">Sauvegarder comme template</button>
+        <button class="btn btn-secondary">Annuler</button>
+        <button class="btn btn-primary">Enregistrer</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ░░  DESIGN — JCF Modification (à concevoir)  ░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<div class="section">
+  <span class="section-tag design">Design</span>
+  <div class="section-title">JCF — Modification d'un Job déjà créé / promu</div>
+  <div class="section-note">
+    Stricte continuité avec la création. Mêmes champs, même tableau. Différences :
+    titre adapté, champs verrouillés en <code>disabled</code>, et la cellule Sequence
+    affiche le statut/temps restant de chaque étape au-dessus du textarea éditable.
+  </div>
+
+  <div class="jcf-modal">
+    <header class="jcf-header">
+      <h1 class="jcf-title">Modifier le Job <span class="ref">00042 · Ducros SA</span></h1>
+      <button class="jcf-close" aria-label="Fermer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </header>
+
+    <main class="jcf-content">
+      <!-- Job header — même 11 colonnes, certaines disabled -->
+      <div class="jcf-job-header">
+        <div class="jcf-field">
+          <span class="jcf-field-label">ID Job</span>
+          <input class="jcf-field-input" value="00042" disabled>
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Client</span>
+          <input class="jcf-field-input" value="Ducros SA" disabled>
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Référent</span>
+          <input class="jcf-field-input" value="A. Bernard">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Template</span>
+          <input class="jcf-field-input" value="—" disabled>
+        </div>
+        <div class="jcf-field" style="grid-column: span 2">
+          <span class="jcf-field-label">Intitulé</span>
+          <input class="jcf-field-input" value="Cartes de visite recto/verso 500ex" disabled>
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Quantité</span>
+          <input class="jcf-field-input" value="500" disabled>
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Transporteur</span>
+          <input class="jcf-field-input muted" value="—">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Deadline</span>
+          <input class="jcf-field-input" value="22/05/2026">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">BAT</span>
+          <input class="jcf-field-input muted" placeholder="—">
+        </div>
+        <div class="jcf-field">
+          <span class="jcf-field-label">Priorité</span>
+          <input class="jcf-field-input" value="Standard">
+        </div>
+      </div>
+
+      <!-- Elements table — même structure, cellules disabled où il faut -->
+      <div class="jcf-elements-table">
+        <div class="jcf-table-header">
+          <div>Élément</div>
+          <div>
+            <span>Couverture</span>
+            <span class="col-actions">
+              <button class="icon-btn" title="Ajouter avant">+</button>
+              <button class="icon-btn danger" title="Supprimer l'élément">×</button>
+            </span>
+          </div>
+          <div>
+            <span>Intérieur</span>
+            <span class="col-actions">
+              <button class="icon-btn" title="Ajouter avant">+</button>
+              <button class="icon-btn danger" title="Supprimer l'élément">×</button>
+            </span>
+          </div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Précédences</div>
+          <div class="jcf-table-cell empty">—</div>
+          <div class="jcf-table-cell filled">Couverture</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Quantité</div>
+          <div class="jcf-table-cell disabled">500</div>
+          <div class="jcf-table-cell disabled">500</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Pagination</div>
+          <div class="jcf-table-cell disabled">2</div>
+          <div class="jcf-table-cell disabled">16</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Format</div>
+          <div class="jcf-table-cell disabled">SRA3</div>
+          <div class="jcf-table-cell disabled">SRA3</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Papier</div>
+          <div class="jcf-table-cell disabled">Couché 350g</div>
+          <div class="jcf-table-cell disabled">Offset 90g</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Impression</div>
+          <div class="jcf-table-cell disabled">Quadri R/V</div>
+          <div class="jcf-table-cell disabled">Quadri R/V</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Surfaçage</div>
+          <div class="jcf-table-cell disabled">Pelliculage mat</div>
+          <div class="jcf-table-cell disabled">—</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Autres</div>
+          <div class="jcf-table-cell empty">—</div>
+          <div class="jcf-table-cell empty">—</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Imposition</div>
+          <div class="jcf-table-cell disabled">8 poses</div>
+          <div class="jcf-table-cell disabled">4 poses</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Qté feuilles</div>
+          <div class="jcf-table-cell disabled">63</div>
+          <div class="jcf-table-cell disabled">125</div>
+        </div>
+        <div class="jcf-table-row">
+          <div class="jcf-table-label">Commentaires</div>
+          <div class="jcf-table-cell empty">—</div>
+          <div class="jcf-table-cell empty">—</div>
+        </div>
+        <div class="jcf-table-row sequence">
+          <div class="jcf-table-label">Sequence</div>
+          <!-- Cellule Couverture : statuts + textarea -->
+          <div class="jcf-table-cell">
+            <div class="seq-cell">
+              <div class="seq-status-list">
+                <div class="seq-status-line">
+                  <span class="seq-status-icon done">✓</span>
+                  <span class="seq-status-text done">Komori(20+40)</span>
+                  <span class="seq-status-meta">terminée 06/05 09:42</span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon done">✓</span>
+                  <span class="seq-status-text done">Massicot(15)</span>
+                  <span class="seq-status-meta">terminée 06/05 10:12</span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon running">⏳</span>
+                  <span class="seq-status-text running">G37(20+40)</span>
+                  <span class="seq-status-meta">
+                    <span class="progress">40%</span> ·
+                    <span class="remaining">24 min restantes</span> ·
+                    calage 11:08
+                  </span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon future">◯</span>
+                  <span class="seq-status-text future">Pelliculage mat(10)</span>
+                  <span class="seq-status-meta">non commencée</span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon future">◯</span>
+                  <span class="seq-status-text future">Découpe(8)</span>
+                  <span class="seq-status-meta">non commencée</span>
+                </div>
+              </div>
+              <textarea class="jcf-sequence-textarea">Komori(20+40)
+Massicot(15)
+G37(20+40)
+Pelliculage mat(10)
+Découpe(8)</textarea>
+            </div>
+          </div>
+          <!-- Cellule Intérieur : pas commencée, pas de statut affiché -->
+          <div class="jcf-table-cell">
+            <div class="seq-cell">
+              <div class="seq-status-list">
+                <div class="seq-status-line">
+                  <span class="seq-status-icon future">◯</span>
+                  <span class="seq-status-text future">Heidelberg(30+90)</span>
+                  <span class="seq-status-meta">non commencée</span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon future">◯</span>
+                  <span class="seq-status-text future">Massicot(20)</span>
+                  <span class="seq-status-meta">non commencée</span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon future">◯</span>
+                  <span class="seq-status-text future">Pliage(15)</span>
+                  <span class="seq-status-meta">non commencée</span>
+                </div>
+                <div class="seq-status-line">
+                  <span class="seq-status-icon future">◯</span>
+                  <span class="seq-status-text future">Encarteuse(25+40)</span>
+                  <span class="seq-status-meta">non commencée</span>
+                </div>
+              </div>
+              <textarea class="jcf-sequence-textarea">Heidelberg(30+90)
+Massicot(20)
+Pliage(15)
+Encarteuse(25+40)</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="jcf-footer">
+      <div class="jcf-shortcuts">
+        <span class="jcf-shortcut"><span class="kbd">Tab</span><span>Champ suivant</span></span>
+        <span class="jcf-shortcut"><span class="kbd">⌥</span>+<span class="kbd">←↑↓→</span><span>Naviguer tableau</span></span>
+        <span class="jcf-shortcut"><span class="kbd">↑↓</span><span>Liste</span></span>
+        <span class="jcf-shortcut"><span class="kbd">⌘S</span><span>Sauvegarder</span></span>
+      </div>
+      <div class="jcf-actions">
+        <button class="btn btn-secondary">Annuler</button>
+        <button class="btn btn-primary">Enregistrer</button>
+      </div>
+    </footer>
+  </div>
+
+  <div class="annotation">
+    <strong>Différences avec la création (réduites au minimum)</strong> :
+    <ul>
+      <li>Titre : "Modifier le Job 00042 · Ducros SA" au lieu de "Nouveau Job".</li>
+      <li>Champs job-header verrouillés en <code>disabled</code> : ID, Client, Template, Intitulé, Quantité.
+          Restent éditables : Référent, Transporteur, Deadline, BAT, Priorité.</li>
+      <li>Cellules <em>spec</em> du tableau verrouillées : Quantité, Pagination, Format, Papier, Impression,
+          Surfaçage, Imposition, Qté feuilles. Restent éditables : Précédences, Autres, Commentaires, Sequence.</li>
+      <li>Cellule Sequence : un récap de statut par étape s'affiche au-dessus du textarea.
+          Le textarea reste totalement éditable — le chef lit le statut, juge, modifie.</li>
+      <li>Bouton "Sauvegarder comme template" retiré (n'a pas de sens en mode modification).</li>
+      <li>Petites actions <code>+</code> et <code>×</code> à droite du nom de chaque colonne pour ajouter/supprimer un élément.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

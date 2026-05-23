@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — BAT États & Apparences</title>
+<style>
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --amber-bg:    rgba(251, 191, 36, 0.10);
+    --red-400:     #f87171;
+    --red-bg:      rgba(248, 113, 113, 0.10);
+    --blue-400:    #60a5fa;
+    --blue-bg:     rgba(96, 165, 250, 0.10);
+    --slate-400:   #94a3b8;
+    --slate-bg:    rgba(148, 163, 184, 0.10);
+
+    --backdrop:    rgba(0, 0, 0, 0.6);
+    --col-width: 280px;
+    --coupon-gap: 3px;
+    --card-pad-y: 10px;
+    --late-r: 248; --late-g: 113; --late-b: 113;
+    --late-intensity: 0.16;
+    --late-intensity-hover: 0.24;
+  }
+
+  html.light {
+    --flux-base:           #ecddf0;
+    --flux-surface:        #e3d2e8;
+    --flux-elevated:       #dac8e0;
+    --flux-hover:          #d0bdd7;
+    --flux-border:         #c9b3d0;
+    --flux-border-light:   #baa5c4;
+    --flux-text-primary:   #1e0e2a;
+    --flux-text-secondary: #412c52;
+    --flux-text-tertiary:  #5c4568;
+    --flux-text-muted:     #7a6888;
+    --emerald-400: #15803d;
+    --amber-400:   #a16207;
+    --amber-bg:    rgba(202, 138, 4, 0.12);
+    --red-400:     #b91c1c;
+    --red-bg:      rgba(220, 38, 38, 0.12);
+    --blue-400:    #4338ca;
+    --blue-bg:     rgba(67, 56, 202, 0.10);
+    --slate-400:   #475569;
+    --slate-bg:    rgba(71, 85, 105, 0.12);
+    --backdrop: rgba(30, 14, 42, 0.30);
+    --late-r: 220; --late-g: 38; --late-b: 38;
+    --late-intensity: 0.13;
+    --late-intensity-hover: 0.20;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* Coins droits sur le board / panneau / coupons / job-cards seulement.
+     La modale et le toast suivent le design system production (rounded-[7px], rounded-[3px]). */
+  aside.controls *, main.preview *, footer.prompt-bar *, .toast {
+    border-radius: 0 !important;
+  }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    overflow: hidden;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  /* Sidebar */
+  aside.controls {
+    grid-row: 1 / 3;
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    overflow-y: auto;
+    padding: 14px;
+  }
+  .controls h1 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .controls h1 small {
+    font-weight: 400;
+    color: var(--flux-text-muted);
+    margin-left: 6px;
+  }
+  .controls-intro {
+    font-size: 11.5px;
+    color: var(--flux-text-tertiary);
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .preset-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-bottom: 14px;
+  }
+  .preset-btn {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    padding: 7px 9px;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+  }
+  .preset-btn:hover { background: var(--flux-hover); }
+  .preset-btn.active {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+  .preset-btn small {
+    display: block;
+    font-size: 9.5px;
+    color: var(--flux-text-muted);
+    margin-top: 2px;
+  }
+  .preset-btn.active small { color: var(--blue-400); opacity: 0.8; }
+
+  .ctrl-section {
+    border-top: 1px solid var(--flux-border);
+    padding: 10px 0;
+  }
+  .ctrl-section:first-of-type { border-top: none; padding-top: 0; }
+  .ctrl-section-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--flux-text-muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .ctrl-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 7px;
+    gap: 6px;
+  }
+  .ctrl-label {
+    font-size: 11.5px;
+    color: var(--flux-text-secondary);
+    flex: 1;
+  }
+  .ctrl-label-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  /* Toggle */
+  .toggle {
+    width: 32px; height: 18px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    position: relative; cursor: pointer; flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 1px; left: 1px;
+    width: 14px; height: 14px;
+    background: var(--flux-text-tertiary);
+    transition: 0.15s;
+  }
+  .toggle.on { background: var(--blue-bg); border-color: var(--blue-400); }
+  .toggle.on::after { left: 15px; background: var(--blue-400); }
+
+  /* Segmented */
+  .seg {
+    display: flex;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    overflow: hidden;
+  }
+  .seg button {
+    flex: 1;
+    background: transparent; border: none;
+    color: var(--flux-text-secondary);
+    padding: 4px 5px;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: inherit;
+    border-right: 1px solid var(--flux-border);
+    line-height: 1.2;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--blue-bg); color: var(--blue-400); }
+  .seg-stack { display: flex; flex-direction: column; gap: 4px; margin-bottom: 7px; }
+  .seg-stack > .ctrl-label { margin-bottom: 1px; }
+
+  /* Per-coupon row: name + status seg */
+  .coupon-row {
+    display: flex; flex-direction: column; gap: 3px;
+    margin-bottom: 8px;
+  }
+  .coupon-row-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-size: 11px;
+  }
+  .coupon-row-name {
+    font-weight: 600; color: var(--flux-text-primary);
+    font-size: 11.5px;
+  }
+  .coupon-row-iter {
+    display: flex; gap: 0; align-items: center;
+  }
+  .iter-stepper {
+    display: flex; background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    align-items: center;
+  }
+  .iter-stepper button {
+    background: transparent; border: none;
+    color: var(--flux-text-secondary);
+    padding: 1px 7px;
+    cursor: pointer; font-family: inherit;
+    font-size: 10.5px; line-height: 1.4;
+  }
+  .iter-stepper .iter-val {
+    padding: 1px 8px; font-size: 10.5px;
+    font-family: 'JetBrains Mono', monospace;
+    border-left: 1px solid var(--flux-border);
+    border-right: 1px solid var(--flux-border);
+    min-width: 22px; text-align: center;
+  }
+
+  .ctrl-help {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    line-height: 1.4;
+    margin-top: 3px;
+  }
+
+  /* Preview */
+  main.preview {
+    grid-row: 1 / 2;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--flux-base);
+  }
+  .preview-header {
+    height: 44px;
+    border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 12px;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--flux-text-muted);
+  }
+  .preview-header strong {
+    color: var(--flux-text-secondary);
+    font-weight: 500;
+  }
+  .lucide {
+    display: inline-block;
+    vertical-align: -2px;
+    flex-shrink: 0;
+  }
+  .badge .lucide, .coupon .lucide { vertical-align: -1px; }
+
+  .board {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 14px;
+    gap: 8px;
+  }
+
+  /* Column */
+  .column {
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    width: var(--col-width);
+    min-width: var(--col-width);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    transition: width 0.15s ease, min-width 0.15s ease;
+  }
+  .col-header {
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--flux-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .col-header-text { display: flex; align-items: center; gap: 6px; }
+  .col-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .col-arrow { color: var(--flux-text-tertiary); font-size: 11px; display: inline-flex; }
+  .col-count {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    background: var(--flux-elevated);
+    padding: 1px 6px;
+    min-width: 20px;
+    text-align: center;
+  }
+  .col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ── Heartbeat crosslink (matches JDP ↔ Grid pattern) ─────── */
+  @keyframes flux-hover-heartbeat {
+    0%   { opacity: 0; }
+    12%  { opacity: 0.45; }
+    22%  { opacity: 0.08; }
+    34%  { opacity: 0.45; }
+    56%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  .card.job-card,
+  .detached-unit {
+    position: relative;
+    z-index: 15;
+  }
+  .flux-hover-linked::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: rgba(255, 255, 255, 0.58);
+    z-index: 10;
+    animation: flux-hover-heartbeat 1050ms ease-in-out 1 forwards;
+  }
+  html.light .flux-hover-linked::before {
+    background-color: rgba(30, 14, 42, 0.45);
+  }
+
+  /* Card (job-card) */
+  .card {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    padding: var(--card-pad-y, 10px) 12px;
+    cursor: default;
+    user-select: none;
+  }
+  .card.late {
+    background: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-intensity));
+  }
+  .card-id-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 4px;
+    line-height: 1.2;
+    min-width: 0;
+  }
+  .card-jcf {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .card-sep {
+    color: var(--flux-text-muted);
+    flex-shrink: 0;
+    font-size: 10.5px;
+  }
+  .card-client {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .card-job-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--flux-text-primary);
+    line-height: 1.25;
+    letter-spacing: -0.005em;
+  }
+
+  .coupon-strip {
+    margin-top: 8px;
+    margin-bottom: 1px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--coupon-gap, 3px);
+  }
+
+  .coupon {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 4px 8px;
+    font-size: 10.5px;
+    color: var(--flux-text-secondary);
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  html.light .coupon {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  .coupon.size-compact { padding: 3px 7px; font-size: 9.5px; }
+  .coupon.size-detailed { padding: 5px 9px; font-size: 11px; }
+  .coupon .iter-suffix {
+    opacity: 0.65; font-size: 90%;
+    margin-left: auto;
+  }
+
+  /* Hole */
+  .coupon.hole {
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--flux-border-light);
+    color: var(--flux-text-muted);
+    font-style: italic;
+  }
+  .coupon.hole .hole-arrow {
+    color: var(--flux-text-tertiary);
+    font-style: normal;
+    display: inline-flex;
+    margin-left: 2px;
+  }
+  .coupon.hole .hole-indicator {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9.5px;
+    font-style: normal;
+    color: var(--flux-text-tertiary);
+    font-weight: 500;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .hole-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--flux-text-tertiary);
+    flex-shrink: 0;
+  }
+  .hole-dot.s-waiting_files       { background: var(--slate-400); }
+  .hole-dot.s-files_received      { background: var(--blue-400); opacity: 0.65; }
+  .hole-dot.s-revisions_requested { background: var(--amber-400); }
+  .hole-dot.s-bat_sent            { background: var(--blue-400); }
+  .hole-dot.s-bat_approved        { background: var(--emerald-400); }
+  .coupon.hole .hole-pill {
+    margin-left: auto;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--flux-text-tertiary);
+    font-style: normal;
+  }
+  html.light .coupon.hole .hole-pill { background: rgba(0, 0, 0, 0.06); }
+
+  /* Drag-and-drop feedback */
+  .coupon[draggable="true"], .detached-unit[draggable="true"] { cursor: grab; }
+  .coupon.dragging, .detached-unit.dragging { opacity: 0.35; }
+  .col-body.drop-forward {
+    background: rgba(96, 165, 250, 0.08);
+    outline: 2px dashed var(--blue-400);
+    outline-offset: -4px;
+  }
+  .col-body.drop-backward {
+    background: rgba(251, 191, 36, 0.08);
+    outline: 2px dashed var(--amber-400);
+    outline-offset: -4px;
+  }
+  .col-body.drop-noop {
+    outline: 2px dashed var(--flux-border-light);
+    outline-offset: -4px;
+  }
+
+  /* ── Modal (aligned on production design system) ──────────── */
+  /* Tokens : rounded-[7px] container, rounded-[3px] sub-elements,
+     bg-zinc-950 / zinc-900 bands, exact pixel paddings 13/10 et 20/13 */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.80);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 100;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    border-radius: 7px;
+    border: 1px solid #27272a; /* zinc-800 */
+    background: #09090b; /* zinc-950 */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.50);
+    display: flex;
+    flex-direction: column;
+    width: 22rem; /* 352px — ConfirmDialog default */
+    max-width: 90vw;
+    color: #d4d4d8; /* zinc-300 */
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .modal-header {
+    background: #18181b; /* zinc-900 */
+    border-bottom: 1px solid #27272a;
+    padding: 10px 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .modal-icon-box {
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .modal-icon-box.tone-amber {
+    background: rgba(217, 119, 6, 0.15);
+    border-color: rgba(217, 119, 6, 0.30);
+    color: #fcd34d; /* amber-300 */
+  }
+  .modal-icon-box.tone-red {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.30);
+    color: #fca5a5; /* red-300 */
+  }
+  .modal-icon-box.tone-zinc {
+    background: #27272a;
+    border-color: #3f3f46;
+    color: #d4d4d8;
+  }
+  .modal-title-block { min-width: 0; }
+  .modal-title {
+    font-size: 15px;
+    line-height: 23px;
+    font-weight: 500;
+    color: #f4f4f5; /* zinc-100 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .modal-description {
+    font-size: 11px;
+    color: #71717a; /* zinc-500 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .modal-body {
+    padding: 13px 20px;
+  }
+  .modal-body p {
+    color: #d4d4d8; /* zinc-300 */
+    font-size: 14px;
+    line-height: 1.625;
+  }
+  .modal-body p strong {
+    color: #f4f4f5;
+    font-weight: 600;
+  }
+  .modal-footer {
+    background: #18181b;
+    border-top: 1px solid #27272a;
+  }
+  .modal-footer-actions {
+    padding: 8px 13px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .modal-footer-hint {
+    padding: 5px 13px;
+    font-size: 11px;
+    color: #71717a;
+    border-bottom: 1px solid rgba(39, 39, 42, 0.50);
+  }
+  .modal-btn {
+    padding: 6px 13px;
+    font-size: 14px;
+    border-radius: 3px;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.1s;
+  }
+  .modal-btn-cancel {
+    background: #27272a; /* zinc-800 */
+    color: #d4d4d8;
+  }
+  .modal-btn-cancel:hover { background: #3f3f46; /* zinc-700 */ }
+  .modal-btn-primary {
+    background: #2563eb; /* blue-600 */
+    color: #ffffff;
+    font-weight: 500;
+  }
+  .modal-btn-primary:hover { background: #3b82f6; /* blue-500 */ }
+  .modal-btn-destructive {
+    background: #dc2626; /* red-600 */
+    color: #ffffff;
+    font-weight: 500;
+  }
+  .modal-btn-destructive:hover { background: #ef4444; /* red-500 */ }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border-light);
+    color: var(--flux-text-primary);
+    padding: 9px 13px;
+    font-size: 11.5px;
+    z-index: 110;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    max-width: 360px;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: var(--emerald-400); }
+  .toast.warn { border-color: var(--amber-400); }
+
+  /* Footer badges */
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    margin-top: 6px;
+  }
+  .badge {
+    padding: 1px 5px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 1.4;
+  }
+  .badge-deadline      { background: var(--blue-bg); color: var(--blue-400); }
+  .badge-deadline.urg  { background: var(--amber-bg); color: var(--amber-400); }
+  .badge-deadline.late { background: var(--red-bg); color: var(--red-400); }
+  .badge-iter          { background: var(--amber-bg); color: var(--amber-400); }
+  .badge-comments      { background: var(--slate-bg); color: var(--slate-400); }
+  .badge-age           {
+    color: var(--flux-text-muted);
+    font-style: italic;
+    font-size: 9.5px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  /* Detached coupon = mini-header + standalone coupon */
+  .detached-unit {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0;
+    cursor: default;
+  }
+  .detached-mini-header {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--flux-text-tertiary);
+    padding-left: 1px;
+    min-width: 0;
+  }
+  .detach-prefix {
+    color: var(--flux-text-tertiary);
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .header-jcf {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--flux-text-tertiary);
+    flex-shrink: 0;
+  }
+  .header-name {
+    font-weight: 500;
+    color: var(--flux-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .header-client {
+    color: var(--flux-text-tertiary);
+    flex-shrink: 0;
+  }
+  .header-sep { color: var(--flux-text-muted); flex-shrink: 0; }
+  .coupon.standalone { width: 100%; }
+
+  /* Prompt bar */
+  footer.prompt-bar {
+    grid-row: 2 / 3;
+    background: var(--flux-surface);
+    border-top: 1px solid var(--flux-border);
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .prompt-text {
+    flex: 1;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border);
+    padding: 10px 12px;
+    color: var(--flux-text-primary);
+    font-size: 11.5px;
+    line-height: 1.55;
+    font-family: 'Inter', system-ui, sans-serif;
+    white-space: pre-wrap;
+    max-height: 130px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-400);
+    color: var(--blue-400);
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .copy-btn:hover { background: rgba(96, 165, 250, 0.20); }
+  .copy-btn.copied {
+    background: var(--emerald-400);
+    border-color: var(--emerald-400);
+    color: var(--flux-base);
+  }
+</style>
+</head>
+<body>
+
+<aside class="controls">
+  <h1>BAT — États & Apparences <small>1 job · 4 coupons</small></h1>
+  <div class="controls-intro">
+    Un seul job (Catalogue printemps), 4 éléments. La job-card vit dans la colonne du <strong style="color:var(--flux-text-secondary)">pire statut</strong> de ses coupons (le bottleneck) ; les coupons détachés s'affichent toujours à droite, en avance.
+  </div>
+
+  <div class="preset-row" id="presets">
+    <button class="preset-btn" data-preset="all-synced">Tous alignés<small>4 coupons même statut</small></button>
+    <button class="preset-btn active" data-preset="one-late">Un retardataire<small>3 alignés, 1 dévie</small></button>
+    <button class="preset-btn" data-preset="mosaic">Mosaïque<small>chaque coupon différent</small></button>
+    <button class="preset-btn" data-preset="all-revised">Tout révisé<small>itérations sur tous</small></button>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Statut de chaque coupon</div>
+    <div class="coupon-row">
+      <div class="coupon-row-header">
+        <span class="coupon-row-name">Recto</span>
+        <div class="coupon-row-iter">
+          <div class="iter-stepper" data-key="iter1">
+            <button data-act="dec">−</button>
+            <span class="iter-val" id="iter1-val">0</span>
+            <button data-act="inc">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="seg" data-key="status1">
+        <button data-val="waiting_files">Attente</button>
+        <button data-val="files_received">Reçus</button>
+        <button data-val="revisions_requested">Modifs</button>
+        <button data-val="bat_sent">Envoyé</button>
+        <button data-val="bat_approved">Validé</button>
+      </div>
+    </div>
+    <div class="coupon-row">
+      <div class="coupon-row-header">
+        <span class="coupon-row-name">Verso</span>
+        <div class="coupon-row-iter">
+          <div class="iter-stepper" data-key="iter2">
+            <button data-act="dec">−</button>
+            <span class="iter-val" id="iter2-val">0</span>
+            <button data-act="inc">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="seg" data-key="status2">
+        <button data-val="waiting_files">Attente</button>
+        <button data-val="files_received">Reçus</button>
+        <button data-val="revisions_requested">Modifs</button>
+        <button data-val="bat_sent">Envoyé</button>
+        <button data-val="bat_approved">Validé</button>
+      </div>
+    </div>
+    <div class="coupon-row">
+      <div class="coupon-row-header">
+        <span class="coupon-row-name">Couverture</span>
+        <div class="coupon-row-iter">
+          <div class="iter-stepper" data-key="iter3">
+            <button data-act="dec">−</button>
+            <span class="iter-val" id="iter3-val">0</span>
+            <button data-act="inc">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="seg" data-key="status3">
+        <button data-val="waiting_files">Attente</button>
+        <button data-val="files_received">Reçus</button>
+        <button data-val="revisions_requested">Modifs</button>
+        <button data-val="bat_sent">Envoyé</button>
+        <button data-val="bat_approved">Validé</button>
+      </div>
+    </div>
+    <div class="coupon-row">
+      <div class="coupon-row-header">
+        <span class="coupon-row-name">4ème de couv</span>
+        <div class="coupon-row-iter">
+          <div class="iter-stepper" data-key="iter4">
+            <button data-act="dec">−</button>
+            <span class="iter-val" id="iter4-val">0</span>
+            <button data-act="inc">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="seg" data-key="status4">
+        <button data-val="waiting_files">Attente</button>
+        <button data-val="files_received">Reçus</button>
+        <button data-val="revisions_requested">Modifs</button>
+        <button data-val="bat_sent">Envoyé</button>
+        <button data-val="bat_approved">Validé</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">État de la deadline</div>
+    <div class="seg" data-key="deadline">
+      <button data-val="ok" class="active">OK (J+10)</button>
+      <button data-val="urgent">Urgent (J-2)</button>
+      <button data-val="late">En retard (J-3)</button>
+    </div>
+    <div class="ctrl-help">Affecte le badge deadline et le fond de la job-card si en retard.</div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Dimensions</div>
+    <div class="seg-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Largeur des colonnes</span>
+        <span class="ctrl-value" id="columnWidth-val">280px</span>
+      </div>
+      <input type="range" min="180" max="380" step="10" value="280" data-key="columnWidth">
+    </div>
+    <div class="seg-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Espacement coupons (gap)</span>
+        <span class="ctrl-value" id="couponGap-val">3px</span>
+      </div>
+      <input type="range" min="0" max="10" step="1" value="3" data-key="couponGap">
+    </div>
+    <div class="seg-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Padding job-card (vert.)</span>
+        <span class="ctrl-value" id="cardPadY-val">10px</span>
+      </div>
+      <input type="range" min="6" max="18" step="1" value="10" data-key="cardPadY">
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Footer du job-card</div>
+    <div class="ctrl-help" style="margin-top:0;margin-bottom:6px">
+      Choisis quels badges figurent dans le footer. Le footer disparaît si tout est désactivé.
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Deadline (J-N / EN RETARD)</span>
+      <div class="toggle on" data-key="footerDeadline"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Itérations totales</span>
+      <div class="toggle on" data-key="footerIterTotal"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Compteur commentaires</span>
+      <div class="toggle on" data-key="footerComments"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Âge du dossier</span>
+      <div class="toggle" data-key="footerJobAge"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Indicateur de position des trous</div>
+    <div class="ctrl-help" style="margin-top:0;margin-bottom:7px">
+      Le trou indique <strong style="color:var(--flux-text-secondary)">où</strong> le coupon est parti. Choisis la nature de cet indicateur.
+    </div>
+    <div class="seg" data-key="holeIndicator">
+      <button data-val="arrow">→</button>
+      <button data-val="text">Texte</button>
+      <button data-val="short" class="active">Abr.</button>
+      <button data-val="dot">●</button>
+      <button data-val="dot-text">●+Abr</button>
+      <button data-val="pill">Pill</button>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Mini-en-tête détaché</div>
+    <div class="ctrl-help" style="margin-top:0;margin-bottom:6px">
+      Format : <strong style="color:var(--flux-text-secondary)">↳ JCF · client · dossier</strong>. Les autres aspects sont figés.
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Deadline dans le mini-en-tête</span>
+      <div class="toggle" data-key="headerShowDeadline"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Thème</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Mode</span>
+      <div class="seg" data-key="theme">
+        <button data-val="dark" class="active">Sombre</button>
+        <button data-val="light">Clair</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="preview">
+  <div class="preview-header">
+    <span><strong>Aperçu</strong></span>
+    <span id="preview-meta" style="color:var(--flux-text-muted)"></span>
+  </div>
+  <div class="board" id="board"></div>
+</main>
+
+<div class="modal-backdrop" id="warn-backdrop" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <header class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-icon-box tone-amber" id="warn-icon"></div>
+        <div class="modal-title-block">
+          <div class="modal-title" id="warn-title">Retour-arrière dans le workflow</div>
+        </div>
+      </div>
+    </header>
+    <div class="modal-body">
+      <p id="warn-text"></p>
+    </div>
+    <footer class="modal-footer">
+      <div class="modal-footer-actions">
+        <button class="modal-btn modal-btn-cancel" id="warn-cancel">Annuler</button>
+        <button class="modal-btn modal-btn-primary" id="warn-confirm">Confirmer</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer class="prompt-bar">
+  <pre class="prompt-text" id="prompt"></pre>
+  <button class="copy-btn" id="copy"><span data-lucide="copy" data-size="13"></span> Copier le prompt</button>
+</footer>
+
+<script>
+// Lucide
+const ICONS = {
+  clock:        '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'rotate-cw':  '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  'message-square':'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  calendar:     '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  'arrow-right':'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  'corner-down-left':'<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>',
+  'corner-down-right':'<polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
+  check:        '<path d="M20 6 9 17l-5-5"/>',
+  copy:         '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  'alert-triangle':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+};
+function lucideHTML(name, size = 14) {
+  const path = ICONS[name];
+  if (!path) return '';
+  return `<svg class="lucide" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+function replaceIcons(root = document) {
+  root.querySelectorAll('[data-lucide]').forEach(el => {
+    const size = parseInt(el.dataset.size, 10) || 14;
+    el.innerHTML = lucideHTML(el.dataset.lucide, size);
+  });
+}
+
+// Statuses (5 — no 'none', JCF level)
+const STATUSES = [
+  { key:'waiting_files',       title:'En attente fichiers' },
+  { key:'files_received',      title:'Fichiers reçus' },
+  { key:'revisions_requested', title:'Modifs demandées', iconBefore:'corner-down-left' },
+  { key:'bat_sent',            title:'BAT envoyé' },
+  { key:'bat_approved',        title:'BAT validé', iconAfter:'check' },
+];
+const STATUS_ORDER = STATUSES.reduce((acc, s, i) => (acc[s.key] = i, acc), {});
+const SHORT_TITLES = {
+  waiting_files: 'Attente',
+  files_received: 'Reçus',
+  revisions_requested: 'Modifs',
+  bat_sent: 'Envoyé',
+  bat_approved: 'Validé',
+};
+function renderHoleIndicator(targetStatus) {
+  const fullTitle = STATUSES.find(s => s.key === targetStatus).title;
+  const shortTitle = SHORT_TITLES[targetStatus] || targetStatus;
+  switch (state.holeIndicator) {
+    case 'arrow':    return `<span class="hole-arrow">${lucideHTML('arrow-right', 9)}</span>`;
+    case 'text':     return `<span class="hole-indicator">${fullTitle}</span>`;
+    case 'short':    return `<span class="hole-indicator">${shortTitle}</span>`;
+    case 'dot':      return `<span class="hole-indicator"><span class="hole-dot s-${targetStatus}"></span></span>`;
+    case 'dot-text': return `<span class="hole-indicator"><span class="hole-dot s-${targetStatus}"></span>${shortTitle}</span>`;
+    case 'pill':     return `<span class="hole-pill">${shortTitle}</span>`;
+    default: return '';
+  }
+}
+
+// Fixed job (with extra mock fields for footer demo)
+const NOW_TS = new Date('2026-05-04T10:00:00').getTime();
+const JOB = {
+  id: 'J01',
+  jcf: 'JCF-2026001',
+  name: 'Catalogue printemps',
+  client: "L'Oréal",
+  commercial: 'Sophie Mercier',
+  commentsCount: 7,
+  createdAt: NOW_TS - 21 * 86400000, // 21 days ago
+};
+const ELEMENT_NAMES = ['Recto', 'Verso', 'Couverture', '4ème de couv'];
+
+// Decided/locked visual choices (no longer in controls)
+const LOCKED = {
+  couponSize: 'standard',
+  showCouponIter: true,
+  holeDashed: true,
+  holeItalic: true,
+  holeStrikethrough: false,
+  holeArrow: true,
+  detachPrefix: true,
+};
+
+// Defaults & state
+const DEFAULTS = {
+  status1: 'bat_sent',
+  status2: 'bat_sent',
+  status3: 'bat_sent',
+  status4: 'revisions_requested',
+  iter1: 0,
+  iter2: 0,
+  iter3: 0,
+  iter4: 1,
+  deadline: 'ok',
+  // Dimensions
+  columnWidth: 280,
+  couponGap: 3,
+  cardPadY: 10,
+  // Footer content
+  footerDeadline: true,
+  footerIterTotal: true,
+  footerComments: true,
+  footerJobAge: false,
+  // Mini-header
+  headerShowDeadline: false,
+  // Indicateur sur les trous
+  holeIndicator: 'short',
+  theme: 'dark',
+};
+let state = { ...DEFAULTS };
+
+const PRESETS = {
+  'all-synced':  { ...DEFAULTS, status1:'bat_sent', status2:'bat_sent', status3:'bat_sent', status4:'bat_sent', iter1:0, iter2:0, iter3:0, iter4:0 },
+  'one-late':    { ...DEFAULTS },
+  'mosaic':      { ...DEFAULTS, status1:'waiting_files', status2:'files_received', status3:'bat_sent', status4:'bat_approved', iter1:0, iter2:0, iter3:1, iter4:0 },
+  'all-revised': { ...DEFAULTS, status1:'bat_sent', status2:'bat_sent', status3:'revisions_requested', status4:'bat_sent', iter1:1, iter2:2, iter3:1, iter4:1 },
+};
+
+// Compute deadline timestamp
+const NOW = new Date('2026-05-04T10:00:00').getTime();
+function computeDeadline() {
+  if (state.deadline === 'ok') return NOW + 10*86400000;
+  if (state.deadline === 'urgent') return NOW + 2*86400000;
+  return NOW - 3*86400000; // late
+}
+
+function buildElements() {
+  return ELEMENT_NAMES.map((name, i) => ({
+    id: 'E' + (i+1),
+    idx: i + 1,
+    name,
+    batStatus: state['status' + (i+1)],
+    revisionRound: state['iter' + (i+1)],
+  }));
+}
+
+/**
+ * Place la job-card dans la colonne du PIRE statut parmi ses coupons.
+ * « Pire » = le plus en amont du workflow (= le bottleneck du job).
+ * Conséquence : tous les coupons détachés sont visuellement à droite
+ * de la job-card, et les trous représentent les éléments partis devant.
+ */
+function jobAnchor(elements) {
+  let worst = null;
+  for (const el of elements) {
+    if (worst === null || STATUS_ORDER[el.batStatus] < STATUS_ORDER[worst]) {
+      worst = el.batStatus;
+    }
+  }
+  return worst;
+}
+
+function isLate() { return state.deadline === 'late'; }
+function deadlineLabel() {
+  const ts = computeDeadline();
+  const days = Math.round((ts - NOW) / 86400000);
+  if (days < 0) return { text: 'EN RETARD ' + Math.abs(days) + 'j', cls: 'late' };
+  if (days <= 3) return { text: 'J-' + days, cls: 'urg' };
+  return { text: 'J-' + days, cls: '' };
+}
+
+// ── Heartbeat crosslink (JDP↔Grid pattern, 500ms delay) ─────────
+const HOVER_DELAY = 500;
+let hoverTimer = null;
+function clearLinkedHeartbeat() {
+  document.querySelectorAll('.flux-hover-linked').forEach(el => el.classList.remove('flux-hover-linked'));
+}
+function fireLinkedHeartbeat(jobId, sourceEl) {
+  document.querySelectorAll(`[data-flux-job-id="${jobId}"]`).forEach(el => {
+    if (el === sourceEl) return;
+    el.classList.remove('flux-hover-linked');
+    void el.offsetWidth; // force reflow so animation re-triggers
+    el.classList.add('flux-hover-linked');
+  });
+}
+function attachHoverLink(el, jobId) {
+  el.dataset.fluxJobId = jobId;
+  el.addEventListener('mouseenter', () => {
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => fireLinkedHeartbeat(jobId, el), HOVER_DELAY);
+  });
+  el.addEventListener('mouseleave', () => {
+    clearTimeout(hoverTimer);
+    clearLinkedHeartbeat();
+  });
+}
+
+function renderJobCard(elements, anchor) {
+  const card = document.createElement('div');
+  card.className = 'card job-card' + (isLate() ? ' late' : '');
+  const dl = deadlineLabel();
+  const totalRev = elements.reduce((s, e) => s + e.revisionRound, 0);
+  const sizeClass = `size-${LOCKED.couponSize}`;
+
+  let couponsHTML = `<div class="coupon-strip">`;
+  for (const el of elements) {
+    const isAttached = el.batStatus === anchor;
+    const iterSuffix = el.revisionRound > 0 && LOCKED.showCouponIter ? `<span class="iter-suffix">×${el.revisionRound}</span>` : '';
+    if (isAttached) {
+      couponsHTML += `<div class="coupon ${sizeClass}" draggable="true" data-element-idx="${el.idx}" data-source-status="${el.batStatus}">${el.name}${iterSuffix}</div>`;
+    } else {
+      let holeCls = 'coupon hole ' + sizeClass;
+      const holeStyles = [];
+      if (!LOCKED.holeDashed) holeStyles.push('border-style: solid');
+      if (!LOCKED.holeItalic) holeStyles.push('font-style: normal');
+      if (LOCKED.holeStrikethrough) holeStyles.push('text-decoration: line-through');
+      const styleAttr = holeStyles.length > 0 ? `style="${holeStyles.join('; ')}"` : '';
+      couponsHTML += `<div class="${holeCls}" ${styleAttr}>${el.name}${renderHoleIndicator(el.batStatus)}</div>`;
+    }
+  }
+  couponsHTML += '</div>';
+
+  // Footer badges (composable)
+  const footerBadges = [];
+  if (state.footerDeadline && dl) {
+    footerBadges.push(`<span class="badge badge-deadline ${dl.cls}">${lucideHTML('clock', 10)} ${dl.text}</span>`);
+  }
+  if (state.footerIterTotal && totalRev > 0) {
+    footerBadges.push(`<span class="badge badge-iter">${lucideHTML('rotate-cw', 10)} ${totalRev}</span>`);
+  }
+  if (state.footerComments && JOB.commentsCount > 0) {
+    footerBadges.push(`<span class="badge badge-comments">${lucideHTML('message-square', 10)} ${JOB.commentsCount}</span>`);
+  }
+  if (state.footerJobAge) {
+    const days = Math.max(0, Math.floor((NOW_TS - JOB.createdAt) / 86400000));
+    footerBadges.push(`<span class="badge-age">${lucideHTML('calendar', 10)} ${days}j sur le board</span>`);
+  }
+  const footerHTML = footerBadges.length > 0 ? `<div class="card-footer">${footerBadges.join('')}</div>` : '';
+
+  card.innerHTML = `
+    <div class="card-id-line">
+      <span class="card-jcf">${JOB.jcf}</span>
+      <span class="card-sep">·</span>
+      <span class="card-client">${JOB.client}</span>
+    </div>
+    <div class="card-job-name">${JOB.name}</div>
+    ${couponsHTML}
+    ${footerHTML}
+  `;
+  attachHoverLink(card, JOB.id);
+  // Attach drag handlers on attached coupons
+  card.querySelectorAll('.coupon[draggable="true"]').forEach(c => attachDragHandlers(c));
+  return card;
+}
+
+function renderDetachedCoupon(el) {
+  const unit = document.createElement('div');
+  unit.className = 'detached-unit';
+  unit.draggable = true;
+  unit.dataset.elementIdx = el.idx;
+  unit.dataset.sourceStatus = el.batStatus;
+  const dl = deadlineLabel();
+  const prefix = LOCKED.detachPrefix ? `<span class="detach-prefix">${lucideHTML('corner-down-right', 10)}</span>` : '';
+  const headerContent = `<span class="header-jcf">${JOB.jcf}</span><span class="header-sep">·</span><span class="header-client">${JOB.client}</span><span class="header-sep">·</span><span class="header-name">${JOB.name}</span>`;
+  let headerDeadline = '';
+  if (state.headerShowDeadline && dl) {
+    headerDeadline = `<span class="header-sep">·</span><span class="badge badge-deadline ${dl.cls}">${lucideHTML('clock', 10)} ${dl.text}</span>`;
+  }
+  const sizeClass = `size-${LOCKED.couponSize}`;
+  const iterSuffix = el.revisionRound > 0 && LOCKED.showCouponIter ? `<span class="iter-suffix">×${el.revisionRound}</span>` : '';
+  unit.innerHTML = `
+    <div class="detached-mini-header">${prefix}${headerContent}${headerDeadline}</div>
+    <div class="coupon standalone ${sizeClass}">${el.name}${iterSuffix}</div>
+  `;
+  attachHoverLink(unit, JOB.id);
+  attachDragHandlers(unit);
+  return unit;
+}
+
+// ── Drag & Drop ─────────────────────────────────────────────────
+function attachDragHandlers(el) {
+  el.addEventListener('dragstart', e => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', el.dataset.elementIdx);
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    document.querySelectorAll('.col-body').forEach(b => {
+      b.classList.remove('drop-forward', 'drop-backward', 'drop-noop');
+    });
+  });
+}
+function attachDropHandlers(body, targetStatus) {
+  body.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const dragging = document.querySelector('.dragging');
+    if (!dragging) return;
+    const sourceStatus = dragging.dataset.sourceStatus;
+    body.classList.remove('drop-forward', 'drop-backward', 'drop-noop');
+    const dir = STATUS_ORDER[targetStatus] - STATUS_ORDER[sourceStatus];
+    if (dir > 0) body.classList.add('drop-forward');
+    else if (dir < 0) body.classList.add('drop-backward');
+    else body.classList.add('drop-noop');
+  });
+  body.addEventListener('dragleave', e => {
+    if (!body.contains(e.relatedTarget)) {
+      body.classList.remove('drop-forward', 'drop-backward', 'drop-noop');
+    }
+  });
+  body.addEventListener('drop', e => {
+    e.preventDefault();
+    body.classList.remove('drop-forward', 'drop-backward', 'drop-noop');
+    const idx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    if (!idx) return;
+    const dragging = document.querySelector('.dragging');
+    const sourceStatus = dragging ? dragging.dataset.sourceStatus : null;
+    if (sourceStatus === targetStatus) return; // no-op
+    const dir = STATUS_ORDER[targetStatus] - STATUS_ORDER[sourceStatus];
+    const elName = ELEMENT_NAMES[idx - 1];
+    const sourceTitle = STATUSES.find(s => s.key === sourceStatus).title;
+    const targetTitle = STATUSES.find(s => s.key === targetStatus).title;
+    if (dir < 0) {
+      // Backward — confirmation modal
+      openWarn({
+        title: 'Retour-arrière dans le workflow',
+        text: `Tu vas ramener <strong>${elName}</strong> de <strong>${sourceTitle}</strong> vers <strong>${targetTitle}</strong>. Cette action remet en cause une étape déjà franchie.`,
+        onConfirm: () => {
+          state['status' + idx] = targetStatus;
+          state.preset = 'custom';
+          updateAll();
+          showToast(`${elName} ramené à « ${targetTitle} »`, 'warn');
+        },
+      });
+    } else {
+      // Forward — apply directly
+      state['status' + idx] = targetStatus;
+      state.preset = 'custom';
+      updateAll();
+      showToast(`${elName} avancé à « ${targetTitle} »`, 'success');
+    }
+  });
+}
+
+// ── Modal & toast ───────────────────────────────────────────────
+let warnAction = null;
+function openWarn({ title, text, onConfirm }) {
+  document.getElementById('warn-title').textContent = title;
+  document.getElementById('warn-text').innerHTML = text;
+  warnAction = onConfirm;
+  document.getElementById('warn-backdrop').classList.add('open');
+}
+function closeWarn() {
+  document.getElementById('warn-backdrop').classList.remove('open');
+  warnAction = null;
+}
+let toastTimer = null;
+function showToast(text, kind = '') {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.className = 'toast show ' + kind;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  const elements = buildElements();
+  const anchor = jobAnchor(elements);
+
+  const buckets = {};
+  STATUSES.forEach(s => buckets[s.key] = []);
+  buckets[anchor].push(renderJobCard(elements, anchor));
+  for (const el of elements) {
+    if (el.batStatus !== anchor) {
+      buckets[el.batStatus].push(renderDetachedCoupon(el));
+    }
+  }
+
+  STATUSES.forEach(s => {
+    const col = document.createElement('div');
+    col.className = 'column';
+    const colCards = buckets[s.key] || [];
+    col.innerHTML = `
+      <div class="col-header">
+        <div class="col-header-text">
+          ${s.iconBefore ? `<span class="col-arrow">${lucideHTML(s.iconBefore, 12)}</span>` : ''}
+          <span class="col-title">${s.title}${s.iconAfter ? ' ' + lucideHTML(s.iconAfter, 12) : ''}</span>
+        </div>
+        <span class="col-count">${colCards.length}</span>
+      </div>
+      <div class="col-body"></div>
+    `;
+    const body = col.querySelector('.col-body');
+    colCards.forEach(c => body.appendChild(c));
+    attachDropHandlers(body, s.key);
+    board.appendChild(col);
+  });
+
+  const detachedCount = elements.filter(e => e.batStatus !== anchor).length;
+  document.getElementById('preview-meta').textContent =
+    `${elements.length} coupons · ${4 - detachedCount} attaché${(4-detachedCount) > 1 ? 's' : ''} · ${detachedCount} détaché${detachedCount > 1 ? 's' : ''}`;
+}
+
+// Prompt
+function updatePrompt() {
+  const elements = buildElements();
+  const anchor = jobAnchor(elements);
+  const detached = elements.filter(e => e.batStatus !== anchor);
+  const lines = [];
+  lines.push(`État du job ${JOB.jcf} (${JOB.name}, ${JOB.client}) :`);
+  lines.push(`- Deadline BAT : ${state.deadline === 'ok' ? 'J+10 (OK)' : state.deadline === 'urgent' ? 'J-2 (urgent)' : 'J-3 (en retard)'}`);
+  lines.push(`- Job-card placée dans la colonne « ${STATUSES.find(s => s.key === anchor).title} » (PIRE statut = bottleneck du job)`);
+  for (const el of elements) {
+    const inOut = el.batStatus === anchor ? 'attaché' : 'détaché';
+    const iter = el.revisionRound > 0 ? ` ×${el.revisionRound}` : '';
+    lines.push(`  · ${el.name}${iter} : ${STATUSES.find(s => s.key === el.batStatus).title} (${inOut})`);
+  }
+  if (detached.length > 0) {
+    lines.push(`- ${detached.length} coupon(s) détaché(s) → trou(s) visible(s) dans la job-card.`);
+  }
+  lines.push('');
+  lines.push('Dimensions :');
+  lines.push(`- Largeur de colonne : ${state.columnWidth}px`);
+  lines.push(`- Espacement coupons : ${state.couponGap}px`);
+  lines.push(`- Padding job-card vertical : ${state.cardPadY}px`);
+  lines.push('');
+  lines.push('Footer job-card :');
+  const footerItems = [];
+  if (state.footerDeadline) footerItems.push('deadline');
+  if (state.footerIterTotal) footerItems.push('itérations totales');
+  if (state.footerComments) footerItems.push('compteur commentaires');
+  if (state.footerJobAge) footerItems.push('âge du dossier');
+  lines.push(`- Badges affichés : ${footerItems.length > 0 ? footerItems.join(', ') : '(footer masqué)'}`);
+  lines.push('');
+  lines.push('Aspects figés (cohérents avec décisions précédentes) :');
+  lines.push(`- Coupons en pleine largeur, taille standard, suffixe « ×N » sur révisés`);
+  const indicatorLabels = { arrow: 'flèche →', text: 'texte complet', short: 'abréviation', dot: 'pastille colorée', 'dot-text': 'pastille + abréviation', pill: 'pill background' };
+  lines.push(`- Trous : bordure pointillée + italique + indicateur « ${indicatorLabels[state.holeIndicator]} » de la colonne destination, aligné à droite`);
+  lines.push(`- Mini-en-tête détaché : ↳ JCF · client · dossier${state.headerShowDeadline ? ' · ⏱ deadline' : ''}`);
+  lines.push(`- Aucun border-radius`);
+  lines.push(`- Couleurs sémantiques strictes (rouge=late, ambre=warning, bleu=info)`);
+  lines.push('');
+  lines.push('Drag-and-drop :');
+  lines.push(`- Drag avant (workflow forward) : application directe + toast vert`);
+  lines.push(`- Drag arrière (rollback dans le workflow) : modale de confirmation bloquante avant application + toast ambre`);
+  lines.push(`- Indicateur visuel sur la colonne cible pendant le drag : bleu pour avant, ambre pour arrière`);
+  if (state.theme === 'light') lines.push('- Thème : clair');
+  document.getElementById('prompt').textContent = lines.join('\n');
+}
+
+// Bindings
+function applyState() {
+  document.documentElement.classList.toggle('light', state.theme === 'light');
+  // CSS vars driven by sliders
+  document.documentElement.style.setProperty('--col-width', state.columnWidth + 'px');
+  document.documentElement.style.setProperty('--coupon-gap', state.couponGap + 'px');
+  document.documentElement.style.setProperty('--card-pad-y', state.cardPadY + 'px');
+  // Slider value displays
+  const cw = document.getElementById('columnWidth-val'); if (cw) cw.textContent = state.columnWidth + 'px';
+  const cg = document.getElementById('couponGap-val'); if (cg) cg.textContent = state.couponGap + 'px';
+  const cp = document.getElementById('cardPadY-val'); if (cp) cp.textContent = state.cardPadY + 'px';
+  // Sliders to state
+  document.querySelectorAll('input[type=range]').forEach(input => {
+    const k = input.dataset.key;
+    if (k && state[k] !== undefined) input.value = state[k];
+  });
+  document.querySelectorAll('.toggle').forEach(t => t.classList.toggle('on', state[t.dataset.key] === true));
+  document.querySelectorAll('.seg').forEach(seg => {
+    const k = seg.dataset.key;
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === state[k]));
+  });
+  document.querySelectorAll('.iter-stepper').forEach(stp => {
+    const k = stp.dataset.key;
+    document.getElementById(k + '-val').textContent = state[k];
+  });
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === state.preset));
+}
+function updateAll() {
+  applyState();
+  renderBoard();
+  updatePrompt();
+}
+
+// Toggles
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => {
+    state[t.dataset.key] = !state[t.dataset.key];
+    state.preset = 'custom';
+    updateAll();
+  });
+});
+// Segmented
+document.querySelectorAll('.seg').forEach(seg => {
+  seg.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      state[seg.dataset.key] = b.dataset.val;
+      state.preset = 'custom';
+      updateAll();
+    });
+  });
+});
+// Range sliders
+document.querySelectorAll('input[type=range]').forEach(input => {
+  input.addEventListener('input', () => {
+    const k = input.dataset.key;
+    if (k) {
+      state[k] = parseInt(input.value, 10);
+      state.preset = 'custom';
+      updateAll();
+    }
+  });
+});
+// Iter steppers
+document.querySelectorAll('.iter-stepper').forEach(stp => {
+  const k = stp.dataset.key;
+  stp.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const delta = btn.dataset.act === 'inc' ? 1 : -1;
+      state[k] = Math.max(0, Math.min(5, state[k] + delta));
+      state.preset = 'custom';
+      updateAll();
+    });
+  });
+});
+// Presets
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    state = { ...PRESETS[b.dataset.preset], preset: b.dataset.preset };
+    updateAll();
+  });
+});
+
+// Copy
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = document.getElementById('prompt').textContent;
+  await navigator.clipboard.writeText(text);
+  const btn = document.getElementById('copy');
+  btn.innerHTML = lucideHTML('check', 13) + ' Copié !';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = lucideHTML('copy', 13) + ' Copier le prompt'; btn.classList.remove('copied'); }, 1400);
+});
+
+// Warn modal listeners
+document.getElementById('warn-confirm').addEventListener('click', () => {
+  if (warnAction) warnAction();
+  closeWarn();
+});
+document.getElementById('warn-cancel').addEventListener('click', closeWarn);
+document.getElementById('warn-backdrop').addEventListener('click', e => {
+  if (e.target.id === 'warn-backdrop') closeWarn();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeWarn();
+});
+
+// Boot
+replaceIcons();
+// Inject warn-icon SVG (after replaceIcons because it's not a data-lucide attribute)
+document.getElementById('warn-icon').innerHTML = lucideHTML('alert-triangle', 14);
+state.preset = 'one-late';
+updateAll();
+</script>
+</body>
+</html>

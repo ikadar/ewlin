@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planning Toggle — Playground</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  /* ── Base: exact match of apps/web/src/index.css ── */
+  html { font-size: 13px; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    font-weight: 500;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    background: #09090b; /* zinc-950 */
+    color: #e4e4e7;      /* zinc-200 */
+    display: flex;
+    gap: 48px;
+    padding: 32px;
+    min-height: 100vh;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  /* ── Tone control (top left) ── */
+  .tone-control {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .tone-btn {
+    padding: 5px 12px;
+    border: none;
+    background: none;
+    color: #71717a;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.15s;
+  }
+  .tone-btn.active { background: rgba(255,255,255,0.1); color: #e4e4e7; }
+  .tone-btn:hover:not(.active) { color: #a1a1aa; }
+
+  /* ── Variant wrapper ── */
+  .variant {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .variant-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #71717a;
+  }
+  .variant-note {
+    font-size: 11px;
+    color: #52525b;
+    max-width: 320px;
+    line-height: 1.5;
+  }
+
+  /* ── Mock: Sidebar (w-14 = 3.5rem = 45.5px @ 13px) ── */
+  .mock-sidebar {
+    width: 45.5px; /* w-14 */
+    background: rgba(24,24,27,0.5); /* bg-zinc-900/50 */
+    border-right: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0; /* py-3 = 0.75rem */
+    gap: 8px; /* gap-2 = 0.5rem */
+    height: 480px;
+    flex-shrink: 0;
+  }
+  .mock-sidebar .spacer { flex: 1; }
+
+  /* SidebarButton: w-10 h-10 rounded-xl */
+  .sb {
+    width: 32.5px; /* w-10 = 2.5rem */
+    height: 32.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px; /* rounded-xl */
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .sb svg { width: 16px; height: 16px; }
+
+  /* SidebarButton states */
+  .sb.inactive { color: #71717a; }
+  .sb.inactive:hover { background: rgba(255,255,255,0.1); color: #d4d4d8; }
+
+  /* Tone-aware active states (exact from SidebarButton.tsx) */
+  .sb.active-neutral  { background: rgba(255,255,255,0.1);  color: #d4d4d8; }
+  .sb.active-preprod  { background: rgba(16,185,129,0.2);   color: #d1fae5; }
+  .sb.active-prod     { background: rgba(245,158,11,0.2);   color: #fef3c7; }
+
+  /* ── Mock: JobsList (w-[270px] bg-zinc-900) ── */
+  .mock-jobslist {
+    width: 270px;
+    background: #18181b; /* zinc-900 */
+    border-right: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    height: 480px;
+    flex-shrink: 0;
+  }
+
+  /* JobsListHeader: shrink-0 px-3 pt-3 pb-2 flex flex-col gap-2 */
+  .mock-header {
+    flex-shrink: 0;
+    padding: 12px 12px 8px; /* px-3 pt-3 pb-2 (0.75rem, 0.75rem, 0.5rem) */
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* gap-2 */
+  }
+
+  /* Search input: exact match */
+  .mock-search {
+    position: relative;
+  }
+  .mock-search svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: #71717a;
+  }
+  .mock-search input {
+    width: 100%;
+    padding: 6px 10px 6px 30px;
+    font-size: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #e4e4e7;
+    font-family: inherit;
+    font-weight: 500;
+    outline: none;
+  }
+  .mock-search input::placeholder { color: #71717a; }
+  .mock-search input:focus { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); }
+
+  /* Existing tab bar: flex bg-white/[0.04] rounded-md */
+  .mock-tabs {
+    display: flex;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px; /* rounded-md */
+    overflow: hidden;
+  }
+  .mock-tab {
+    flex: 1;
+    font-size: 11px;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    font-weight: 500;
+    font-family: inherit;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mock-tab.active { background: rgba(255,255,255,0.1); color: white; }
+  .mock-tab:not(.active) { color: #a1a1aa; }
+  .mock-tab .count {
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    opacity: 0.7;
+  }
+  .mock-tab.active .count { opacity: 1; }
+
+  /* Chips row */
+  .mock-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .mock-chip {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid;
+    font-weight: 500;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    background: none;
+    transition: all 0.15s;
+  }
+  .mock-chip.chip-active-blue {
+    background: rgba(59,130,246,0.18);
+    border-color: rgba(59,130,246,0.4);
+    color: #93c5fd;
+  }
+  .mock-chip.chip-inactive {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.06);
+    color: #a1a1aa;
+  }
+  .mock-chip .count {
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+  }
+
+  /* Mock job cards */
+  .mock-jobs {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .mock-job {
+    margin: 0 8px 6px;
+    padding: 3px 12px 3px 9px;
+    border-left: 3px solid;
+    text-align: left;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .mock-job:hover { background: rgba(255,255,255,0.05); }
+  .mock-job.selected { background: rgba(255,255,255,0.1); }
+  .mock-job .job-ref { color: #d4d4d8; font-weight: 600; font-size: 11px; }
+  .mock-job .job-name { color: #a1a1aa; font-size: 11px; }
+  .mock-job.blue { border-color: #3b82f6; }
+  .mock-job.green { border-color: #22c55e; }
+  .mock-job.red { border-color: #ef4444; }
+
+  /* ── Assembled mock (sidebar + jobslist) ── */
+  .mock-frame {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* ==================================================================
+     PISTE A — Sidebar: grouped vertical pill
+     ================================================================== */
+  .sb-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 2px;
+  }
+  .sb-group .sb {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+  }
+  .sb-group .sb svg { width: 14px; height: 14px; }
+
+  /* ==================================================================
+     PISTE B — JobsListHeader: segment above search
+     Same visual grammar as Planifiées/Non planifiées tabs
+     ================================================================== */
+  .view-seg {
+    display: flex;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .view-seg-btn {
+    flex: 1;
+    font-size: 11px;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    font-weight: 500;
+    font-family: inherit;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #a1a1aa;
+  }
+  .view-seg-btn svg { width: 13px; height: 13px; }
+  .view-seg-btn.active { color: white; }
+  /* Tone-aware active bg */
+  .view-seg-btn.active.tone-neutral { background: rgba(255,255,255,0.1); }
+  .view-seg-btn.active.tone-preprod { background: rgba(16,185,129,0.2); color: #d1fae5; }
+  .view-seg-btn.active.tone-prod    { background: rgba(245,158,11,0.2); color: #fef3c7; }
+
+  /* ==================================================================
+     PISTE C — JobsListHeader: icon toggle inline with search
+     ================================================================== */
+  .search-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .search-row .mock-search { flex: 1; }
+  .view-icon-toggle {
+    display: flex;
+    gap: 1px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 2px;
+    flex-shrink: 0;
+  }
+  .view-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    border: none;
+    background: none;
+    color: #71717a;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .view-icon-btn svg { width: 14px; height: 14px; }
+  .view-icon-btn:hover:not(.active) { color: #a1a1aa; background: rgba(255,255,255,0.06); }
+  /* Tone-aware */
+  .view-icon-btn.active.tone-neutral { background: rgba(255,255,255,0.12); color: #d4d4d8; }
+  .view-icon-btn.active.tone-preprod { background: rgba(16,185,129,0.22); color: #a7f3d0; }
+  .view-icon-btn.active.tone-prod    { background: rgba(245,158,11,0.22); color: #fde68a; }
+
+  /* ==================================================================
+     PISTE D — Breadcrumb title: active view as heading, alt as link
+     ================================================================== */
+  .view-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 0 2px;
+  }
+  .vb-active {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e4e4e7;
+  }
+  .vb-active svg { width: 13px; height: 13px; }
+  .vb-active.tone-neutral svg { color: #d4d4d8; }
+  .vb-active.tone-preprod svg { color: #6ee7b7; }
+  .vb-active.tone-prod    svg { color: #fbbf24; }
+  .vb-sep {
+    color: #3f3f46;
+    font-size: 11px;
+  }
+  .vb-alt {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #52525b;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .vb-alt svg { width: 12px; height: 12px; }
+  .vb-alt:hover { color: #a1a1aa; background: rgba(255,255,255,0.06); }
+</style>
+</head>
+<body>
+
+<!-- Tone control -->
+<div class="tone-control" id="toneCtrl">
+  <button class="tone-btn active" data-tone="neutral" onclick="setTone('neutral')">Neutral</button>
+  <button class="tone-btn" data-tone="preprod" onclick="setTone('preprod')">Préprod</button>
+  <button class="tone-btn" data-tone="prod" onclick="setTone('prod')">Prod</button>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     PISTE A — Sidebar: grouped vertical pill
+     ════════════════════════════════════════════════ -->
+<div class="variant">
+  <div class="variant-label">A — Sidebar pill groupé</div>
+  <div class="mock-frame" data-variant="a">
+    <div class="mock-sidebar">
+      <div class="sb-group" id="groupA">
+        <button class="sb active-neutral" data-v="operators" onclick="toggleA(this)">
+          <i data-lucide="users"></i>
+        </button>
+        <button class="sb inactive" data-v="stations" onclick="toggleA(this)">
+          <i data-lucide="calendar-days"></i>
+        </button>
+      </div>
+      <button class="sb inactive"><i data-lucide="tower-control"></i></button>
+      <button class="sb inactive"><i data-lucide="list-checks"></i></button>
+      <div class="spacer"></div>
+      <button class="sb inactive"><i data-lucide="settings"></i></button>
+    </div>
+    <div class="mock-jobslist">
+      <div class="mock-header">
+        <div class="mock-search"><i data-lucide="search"></i><input placeholder="Rechercher..."></div>
+        <div class="mock-tabs">
+          <button class="mock-tab active">Planifiées <span class="count">42</span></button>
+          <button class="mock-tab">Non planifiées <span class="count">7</span></button>
+        </div>
+        <div class="mock-chips">
+          <button class="mock-chip chip-active-blue">Toutes <span class="count">49</span></button>
+          <button class="mock-chip chip-inactive">En retard <span class="count">3</span></button>
+          <button class="mock-chip chip-inactive">Conflits <span class="count">1</span></button>
+        </div>
+      </div>
+      <div class="mock-jobs">
+        <div class="mock-job blue selected"><span class="job-ref">24-1847</span> <span class="job-name">Catalogue Printemps</span></div>
+        <div class="mock-job red"><span class="job-ref">24-1902</span> <span class="job-name">Flyer promo été</span></div>
+        <div class="mock-job blue"><span class="job-ref">24-1915</span> <span class="job-name">Brochure annuelle</span></div>
+        <div class="mock-job green"><span class="job-ref">24-1920</span> <span class="job-name">Dépliant gamme</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="variant-note">Les deux boutons sidebar fusionnent en un seul groupe. Économise de la place, mais casse le rythme visuel des icônes indépendantes.</div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     PISTE B — Segment au-dessus de la recherche
+     ════════════════════════════════════════════════ -->
+<div class="variant">
+  <div class="variant-label">B — Segment au-dessus du search</div>
+  <div class="mock-frame" data-variant="b">
+    <div class="mock-sidebar">
+      <button class="sb active-neutral"><i data-lucide="users"></i></button>
+      <button class="sb inactive"><i data-lucide="calendar-days"></i></button>
+      <button class="sb inactive"><i data-lucide="tower-control"></i></button>
+      <button class="sb inactive"><i data-lucide="list-checks"></i></button>
+      <div class="spacer"></div>
+      <button class="sb inactive"><i data-lucide="settings"></i></button>
+    </div>
+    <div class="mock-jobslist">
+      <div class="mock-header">
+        <div class="view-seg" id="segB">
+          <button class="view-seg-btn active tone-neutral" data-v="operators" onclick="toggleSeg(this)">
+            <i data-lucide="users"></i> Opérateurs
+          </button>
+          <button class="view-seg-btn" data-v="stations" onclick="toggleSeg(this)">
+            <i data-lucide="calendar-days"></i> Machines
+          </button>
+        </div>
+        <div class="mock-search"><i data-lucide="search"></i><input placeholder="Rechercher..."></div>
+        <div class="mock-tabs">
+          <button class="mock-tab active">Planifiées <span class="count">42</span></button>
+          <button class="mock-tab">Non planifiées <span class="count">7</span></button>
+        </div>
+        <div class="mock-chips">
+          <button class="mock-chip chip-active-blue">Toutes <span class="count">49</span></button>
+          <button class="mock-chip chip-inactive">En retard <span class="count">3</span></button>
+          <button class="mock-chip chip-inactive">Conflits <span class="count">1</span></button>
+        </div>
+      </div>
+      <div class="mock-jobs">
+        <div class="mock-job blue selected"><span class="job-ref">24-1847</span> <span class="job-name">Catalogue Printemps</span></div>
+        <div class="mock-job red"><span class="job-ref">24-1902</span> <span class="job-name">Flyer promo été</span></div>
+        <div class="mock-job blue"><span class="job-ref">24-1915</span> <span class="job-name">Brochure annuelle</span></div>
+        <div class="mock-job green"><span class="job-ref">24-1920</span> <span class="job-name">Dépliant gamme</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="variant-note">Même grammaire visuelle que Planifiées / Non planifiées. Ajoute une rangée, mais cohérence totale. Le tone (neutre/préprod/prod) colore le segment actif.</div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     PISTE C — Icônes inline avec le search
+     ════════════════════════════════════════════════ -->
+<div class="variant">
+  <div class="variant-label">C — Icônes inline avec search</div>
+  <div class="mock-frame" data-variant="c">
+    <div class="mock-sidebar">
+      <button class="sb active-neutral"><i data-lucide="users"></i></button>
+      <button class="sb inactive"><i data-lucide="calendar-days"></i></button>
+      <button class="sb inactive"><i data-lucide="tower-control"></i></button>
+      <button class="sb inactive"><i data-lucide="list-checks"></i></button>
+      <div class="spacer"></div>
+      <button class="sb inactive"><i data-lucide="settings"></i></button>
+    </div>
+    <div class="mock-jobslist">
+      <div class="mock-header">
+        <div class="search-row">
+          <div class="view-icon-toggle" id="iconC">
+            <button class="view-icon-btn active tone-neutral" data-v="operators" onclick="toggleIcon(this)">
+              <i data-lucide="users"></i>
+            </button>
+            <button class="view-icon-btn" data-v="stations" onclick="toggleIcon(this)">
+              <i data-lucide="calendar-days"></i>
+            </button>
+          </div>
+          <div class="mock-search"><i data-lucide="search"></i><input placeholder="Rechercher..."></div>
+        </div>
+        <div class="mock-tabs">
+          <button class="mock-tab active">Planifiées <span class="count">42</span></button>
+          <button class="mock-tab">Non planifiées <span class="count">7</span></button>
+        </div>
+        <div class="mock-chips">
+          <button class="mock-chip chip-active-blue">Toutes <span class="count">49</span></button>
+          <button class="mock-chip chip-inactive">En retard <span class="count">3</span></button>
+          <button class="mock-chip chip-inactive">Conflits <span class="count">1</span></button>
+        </div>
+      </div>
+      <div class="mock-jobs">
+        <div class="mock-job blue selected"><span class="job-ref">24-1847</span> <span class="job-name">Catalogue Printemps</span></div>
+        <div class="mock-job red"><span class="job-ref">24-1902</span> <span class="job-name">Flyer promo été</span></div>
+        <div class="mock-job blue"><span class="job-ref">24-1915</span> <span class="job-name">Brochure annuelle</span></div>
+        <div class="mock-job green"><span class="job-ref">24-1920</span> <span class="job-name">Dépliant gamme</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="variant-note">Zéro rangée ajoutée, même hauteur. Compacité maximale. Les icônes reprennent exactement le border/bg du search. Nécessite que l'utilisateur connaisse les deux icônes.</div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     PISTE D — Titre breadcrumb
+     ════════════════════════════════════════════════ -->
+<div class="variant">
+  <div class="variant-label">D — Breadcrumb titre</div>
+  <div class="mock-frame" data-variant="d">
+    <div class="mock-sidebar">
+      <button class="sb active-neutral"><i data-lucide="users"></i></button>
+      <button class="sb inactive"><i data-lucide="calendar-days"></i></button>
+      <button class="sb inactive"><i data-lucide="tower-control"></i></button>
+      <button class="sb inactive"><i data-lucide="list-checks"></i></button>
+      <div class="spacer"></div>
+      <button class="sb inactive"><i data-lucide="settings"></i></button>
+    </div>
+    <div class="mock-jobslist">
+      <div class="mock-header">
+        <div class="view-breadcrumb" id="breadD">
+          <span class="vb-active tone-neutral"><i data-lucide="users"></i> Opérateurs</span>
+          <span class="vb-sep">/</span>
+          <button class="vb-alt" onclick="toggleBread(this)"><i data-lucide="calendar-days"></i> Machines</button>
+        </div>
+        <div class="mock-search"><i data-lucide="search"></i><input placeholder="Rechercher..."></div>
+        <div class="mock-tabs">
+          <button class="mock-tab active">Planifiées <span class="count">42</span></button>
+          <button class="mock-tab">Non planifiées <span class="count">7</span></button>
+        </div>
+        <div class="mock-chips">
+          <button class="mock-chip chip-active-blue">Toutes <span class="count">49</span></button>
+          <button class="mock-chip chip-inactive">En retard <span class="count">3</span></button>
+          <button class="mock-chip chip-inactive">Conflits <span class="count">1</span></button>
+        </div>
+      </div>
+      <div class="mock-jobs">
+        <div class="mock-job blue selected"><span class="job-ref">24-1847</span> <span class="job-name">Catalogue Printemps</span></div>
+        <div class="mock-job red"><span class="job-ref">24-1902</span> <span class="job-name">Flyer promo été</span></div>
+        <div class="mock-job blue"><span class="job-ref">24-1915</span> <span class="job-name">Brochure annuelle</span></div>
+        <div class="mock-job green"><span class="job-ref">24-1920</span> <span class="job-name">Dépliant gamme</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="variant-note">Le titre IS la vue active. L'alternative est un lien discret. Ajoute une rangée mais donne un ancrage visuel fort — on sait toujours où on est.</div>
+</div>
+
+<script>
+  lucide.createIcons();
+
+  let currentTone = 'neutral';
+
+  function setTone(tone) {
+    currentTone = tone;
+    document.querySelectorAll('.tone-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tone === tone)
+    );
+    // Update all active SidebarButtons
+    document.querySelectorAll('.sb[class*="active-"]').forEach(b => {
+      b.className = b.className.replace(/active-\w+/, 'active-' + tone);
+    });
+    // Update all tone-aware toggle buttons
+    document.querySelectorAll('[class*="tone-"]').forEach(el => {
+      el.className = el.className.replace(/tone-\w+/, 'tone-' + tone);
+    });
+  }
+
+  // A: Sidebar grouped pill
+  function toggleA(btn) {
+    const group = btn.closest('.sb-group');
+    group.querySelectorAll('.sb').forEach(b => {
+      if (b === btn) {
+        b.className = `sb active-${currentTone}`;
+      } else {
+        b.className = 'sb inactive';
+      }
+    });
+  }
+
+  // B: Segment control
+  function toggleSeg(btn) {
+    const parent = btn.closest('.view-seg');
+    parent.querySelectorAll('.view-seg-btn').forEach(b => {
+      if (b === btn) {
+        b.className = `view-seg-btn active tone-${currentTone}`;
+      } else {
+        b.className = 'view-seg-btn';
+      }
+    });
+  }
+
+  // C: Icon toggle
+  function toggleIcon(btn) {
+    const parent = btn.closest('.view-icon-toggle');
+    parent.querySelectorAll('.view-icon-btn').forEach(b => {
+      if (b === btn) {
+        b.className = `view-icon-btn active tone-${currentTone}`;
+      } else {
+        b.className = 'view-icon-btn';
+      }
+    });
+  }
+
+  // D: Breadcrumb
+  function toggleBread(btn) {
+    const parent = btn.closest('.view-breadcrumb');
+    const activeSpan = parent.querySelector('.vb-active');
+    const isOperators = activeSpan.textContent.trim() === 'Opérateurs';
+
+    if (isOperators) {
+      activeSpan.innerHTML = `<i data-lucide="calendar-days"></i> Machines`;
+      btn.innerHTML = `<i data-lucide="users"></i> Opérateurs`;
+    } else {
+      activeSpan.innerHTML = `<i data-lucide="users"></i> Opérateurs`;
+      btn.innerHTML = `<i data-lucide="calendar-days"></i> Machines`;
+    }
+    activeSpan.className = `vb-active tone-${currentTone}`;
+    lucide.createIcons();
+  }
+
+  // Global keyboard shortcut
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey && e.key === 't') {
+      e.preventDefault();
+      document.querySelector('#groupA .sb.inactive')?.click();
+      document.querySelector('#segB .view-seg-btn:not(.active)')?.click();
+      document.querySelector('#iconC .view-icon-btn:not(.active)')?.click();
+      document.querySelector('#breadD .vb-alt')?.click();
+    }
+  });
+</script>
+
+</body>
+</html>

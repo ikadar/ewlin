@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — BAT Kanban (job-card à coupons)</title>
+<style>
+  /* ── Palette Flux ─────────────────────────────────────────── */
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --amber-bg:    rgba(251, 191, 36, 0.10);
+    --red-400:     #f87171;
+    --red-bg:      rgba(248, 113, 113, 0.10);
+    --blue-400:    #60a5fa;
+    --blue-bg:     rgba(96, 165, 250, 0.10);
+    --slate-400:   #94a3b8;
+    --slate-bg:    rgba(148, 163, 184, 0.10);
+
+    --backdrop:    rgba(0, 0, 0, 0.6);
+
+    --col-width: 280px;
+    --late-r: 248; --late-g: 113; --late-b: 113;
+    --late-intensity: 0.16;
+    --late-intensity-hover: 0.24;
+  }
+
+  html.light {
+    --flux-base:           #ecddf0;
+    --flux-surface:        #e3d2e8;
+    --flux-elevated:       #dac8e0;
+    --flux-hover:          #d0bdd7;
+    --flux-border:         #c9b3d0;
+    --flux-border-light:   #baa5c4;
+    --flux-text-primary:   #1e0e2a;
+    --flux-text-secondary: #412c52;
+    --flux-text-tertiary:  #5c4568;
+    --flux-text-muted:     #7a6888;
+
+    --emerald-400: #15803d;
+    --amber-400:   #a16207;
+    --amber-bg:    rgba(202, 138, 4, 0.12);
+    --red-400:     #b91c1c;
+    --red-bg:      rgba(220, 38, 38, 0.12);
+    --blue-400:    #4338ca;
+    --blue-bg:     rgba(67, 56, 202, 0.10);
+    --slate-400:   #475569;
+    --slate-bg:    rgba(71, 85, 105, 0.12);
+
+    --backdrop: rgba(30, 14, 42, 0.30);
+    --late-r: 220; --late-g: 38; --late-b: 38;
+    --late-intensity: 0.13;
+    --late-intensity-hover: 0.20;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { border-radius: 0 !important; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    overflow: hidden;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+  aside.controls {
+    grid-row: 1 / 3;
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .controls h1 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .controls h1 small { font-weight: 400; color: var(--flux-text-muted); margin-left: 6px; }
+  .controls-intro {
+    font-size: 11.5px;
+    color: var(--flux-text-tertiary);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .preset-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .preset-btn {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+  }
+  .preset-btn:hover { background: var(--flux-hover); }
+  .preset-btn.active {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+  .preset-btn small {
+    display: block;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    margin-top: 2px;
+  }
+  .preset-btn.active small { color: var(--blue-400); opacity: 0.8; }
+
+  .ctrl-section {
+    border-top: 1px solid var(--flux-border);
+    padding: 12px 0;
+  }
+  .ctrl-section:first-of-type { border-top: none; padding-top: 0; }
+  .ctrl-section-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--flux-text-muted);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .ctrl-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 9px;
+    gap: 8px;
+  }
+  .ctrl-label {
+    font-size: 11.5px;
+    color: var(--flux-text-secondary);
+    flex: 1;
+  }
+  .ctrl-label-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 9px;
+  }
+  .ctrl-value {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  .toggle {
+    width: 32px;
+    height: 18px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 14px;
+    height: 14px;
+    background: var(--flux-text-tertiary);
+    border-radius: 50%;
+    transition: 0.15s;
+  }
+  .toggle.on {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+  }
+  .toggle.on::after { left: 15px; background: var(--blue-400); }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--blue-400);
+    margin-top: 4px;
+  }
+  .seg {
+    display: flex;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .seg button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--flux-text-secondary);
+    padding: 5px 6px;
+    cursor: pointer;
+    font-size: 10.5px;
+    font-family: inherit;
+    border-right: 1px solid var(--flux-border);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--blue-bg); color: var(--blue-400); }
+  .seg-stack { display: flex; flex-direction: column; gap: 2px; }
+  .ctrl-help {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    line-height: 1.4;
+    margin-top: 4px;
+  }
+  .regen-btn {
+    width: 100%;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    padding: 7px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .regen-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+
+  /* ── Preview ──────────────────────────────────────────────── */
+  main.preview {
+    grid-row: 1 / 2;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--flux-base);
+  }
+  .preview-header {
+    height: 48px;
+    border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .search-wrap { position: relative; flex: 0 0 280px; }
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--flux-text-muted);
+    pointer-events: none;
+    display: flex;
+  }
+  .lucide {
+    display: inline-block;
+    vertical-align: -2px;
+    flex-shrink: 0;
+  }
+  .badge .lucide, .coupon .lucide { vertical-align: -1px; }
+  .search-input {
+    width: 100%;
+    height: 30px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    color: var(--flux-text-primary);
+    padding: 0 30px 0 26px;
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--blue-400); background: var(--flux-base); }
+  .search-input::placeholder { color: var(--flux-text-muted); }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--flux-hover);
+    border: none;
+    color: var(--flux-text-tertiary);
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .search-wrap.has-value .search-clear { display: flex; }
+  .preview-meta {
+    color: var(--flux-text-muted);
+    font-size: 11px;
+    margin-left: auto;
+  }
+
+  .board {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  /* ── Column ───────────────────────────────────────────────── */
+  .column {
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    width: var(--col-width);
+    min-width: var(--col-width);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
+  .col-header {
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--flux-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .col-header-text { display: flex; align-items: center; gap: 6px; }
+  .col-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .col-arrow { color: var(--flux-text-tertiary); font-size: 11px; display: inline-flex; }
+  .col-count {
+    font-size: 10.5px;
+    color: var(--flux-text-muted);
+    background: var(--flux-elevated);
+    padding: 1px 6px;
+    border-radius: 3px;
+    min-width: 20px;
+    text-align: center;
+  }
+  .col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* ── Card base ────────────────────────────────────────────── */
+  .card {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 4px;
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: transform 0.06s ease, background 0.1s ease, opacity 0.15s ease;
+    user-select: none;
+  }
+  .card:hover { background: var(--flux-hover); transform: translateY(-1px); }
+  .card.dimmed { opacity: 0.30; }
+  .card.highlighted { box-shadow: 0 0 0 2px var(--blue-400); }
+  .card.late {
+    background: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-intensity));
+  }
+  .card.late:hover {
+    background: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-intensity-hover));
+  }
+  .card-id-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 4px;
+    line-height: 1.2;
+    min-width: 0;
+  }
+  .card-jcf {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .card-id-element {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--flux-text-secondary);
+    flex-shrink: 0;
+  }
+  .card-sep {
+    color: var(--flux-text-muted);
+    flex-shrink: 0;
+    font-size: 10.5px;
+  }
+  .card-client {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .card-job-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--flux-text-primary);
+    line-height: 1.25;
+    letter-spacing: -0.005em;
+  }
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    margin-top: 6px;
+  }
+  .badge {
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 1.4;
+  }
+  .badge-deadline      { background: var(--blue-bg); color: var(--blue-400); }
+  .badge-deadline.urg  { background: var(--amber-bg); color: var(--amber-400); }
+  .badge-deadline.late { background: var(--red-bg); color: var(--red-400); }
+  .badge-iter          { background: var(--amber-bg); color: var(--amber-400); }
+  .badge-comments      { background: var(--slate-bg); color: var(--slate-400); }
+
+  /* ── Coupon strip dans la job-card ────────────────────────── */
+  .coupon-strip {
+    margin-top: 7px;
+    margin-bottom: 1px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .coupon-strip.layout-grid { gap: 4px; }
+  .coupon-strip.layout-list {
+    flex-direction: column;
+    gap: 3px;
+  }
+  .coupon {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    padding: 3px 7px;
+    font-size: 10.5px;
+    color: var(--flux-text-secondary);
+    white-space: nowrap;
+    line-height: 1.3;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  html.light .coupon {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  .coupon-strip.layout-list .coupon {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .coupon.size-compact { padding: 2px 5px; font-size: 9.5px; }
+  .coupon.size-detailed { padding: 4px 8px; font-size: 11px; }
+
+  /* Hole = empty slot where a coupon used to be */
+  .coupon.hole {
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--flux-border-light);
+    color: var(--flux-text-muted);
+    font-style: italic;
+    text-decoration: var(--hole-text-deco, none);
+  }
+  .coupon.hole .hole-arrow {
+    color: var(--flux-text-tertiary);
+    font-style: normal;
+    display: inline-flex;
+    margin-left: 2px;
+  }
+
+  /* ── Detached coupon = mini-header + standard coupon ──────── */
+  .detached-unit {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 0.15s ease;
+  }
+  .detached-unit.dimmed { opacity: 0.30; }
+  .detached-unit.highlighted .coupon {
+    box-shadow: 0 0 0 2px var(--blue-400);
+  }
+  .detached-unit:hover .coupon {
+    background: rgba(255, 255, 255, 0.10);
+  }
+  html.light .detached-unit:hover .coupon {
+    background: rgba(0, 0, 0, 0.07);
+  }
+  .detached-mini-header {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--flux-text-tertiary);
+    padding-left: 1px;
+    min-width: 0;
+  }
+  .detach-prefix {
+    color: var(--flux-text-tertiary);
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .header-jcf {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--flux-text-tertiary);
+    flex-shrink: 0;
+  }
+  .header-name {
+    font-weight: 500;
+    color: var(--flux-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .header-client {
+    color: var(--flux-text-tertiary);
+    flex-shrink: 0;
+  }
+  .header-sep { color: var(--flux-text-muted); flex-shrink: 0; }
+  .header-deadline {
+    flex-shrink: 0;
+  }
+  .coupon.standalone { align-self: flex-start; max-width: 100%; }
+  .coupon.late-tint {
+    background: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-intensity));
+    border-color: rgba(var(--late-r), var(--late-g), var(--late-b), 0.40);
+    color: var(--red-400);
+  }
+
+  /* ── Modal ────────────────────────────────────────────────── */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--backdrop);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    backdrop-filter: blur(4px);
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 12px;
+    width: min(680px, 92vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--flux-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .modal-jcf { font-size: 10.5px; color: var(--flux-text-tertiary); font-family: 'JetBrains Mono', monospace; margin-bottom: 3px; }
+  .modal-job-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .modal-job-sub { font-size: 12px; color: var(--flux-text-secondary); }
+  .modal-close {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-close:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .modal-content { flex: 1; overflow-y: auto; padding: 14px 18px; }
+  .modal-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--flux-text-muted);
+    margin-bottom: 7px;
+    margin-top: 14px;
+  }
+  .modal-section-title:first-child { margin-top: 0; }
+  .element-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 9px;
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    margin-bottom: 5px;
+    background: var(--flux-elevated);
+  }
+  .element-row.detached { border-color: var(--flux-border-light); }
+  .element-row .element-name { flex: 1; font-size: 11.5px; color: var(--flux-text-primary); }
+  .element-row .element-status {
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: var(--flux-hover);
+    color: var(--flux-text-secondary);
+    font-weight: 600;
+  }
+  .element-row.detached .element-status {
+    background: var(--amber-bg);
+    color: var(--amber-400);
+  }
+
+  /* ── Prompt bar ───────────────────────────────────────────── */
+  footer.prompt-bar {
+    grid-row: 2 / 3;
+    background: var(--flux-surface);
+    border-top: 1px solid var(--flux-border);
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .prompt-text {
+    flex: 1;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--flux-text-primary);
+    font-size: 11.5px;
+    line-height: 1.55;
+    font-family: 'Inter', system-ui, sans-serif;
+    white-space: pre-wrap;
+    max-height: 130px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-400);
+    color: var(--blue-400);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .copy-btn:hover { background: rgba(96, 165, 250, 0.20); }
+  .copy-btn.copied {
+    background: var(--emerald-400);
+    border-color: var(--emerald-400);
+    color: var(--flux-base);
+  }
+</style>
+</head>
+<body>
+
+<aside class="controls">
+  <h1>BAT Kanban — Coupons <small>playground</small></h1>
+  <div class="controls-intro">
+    Une carte = un job avec ses coupons (un par élément). Glisser un coupon laisse un trou dans la job-card et le coupon part seul dans sa colonne avec une référence à son parent. Pas de mode duel, pas de bandeau spécial.
+  </div>
+
+  <div class="preset-row" id="presets">
+    <button class="preset-btn" data-preset="discreet">Discret<small>signaux subtils</small></button>
+    <button class="preset-btn active" data-preset="default">Default<small>équilibré</small></button>
+    <button class="preset-btn" data-preset="verbose">Verbose<small>info maximale</small></button>
+    <button class="preset-btn" data-preset="compact">Compact<small>haute densité</small></button>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Données mock</div>
+    <div class="ctrl-label-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">% jobs synchronisés</span>
+        <span class="ctrl-value" id="syncPct-val">85%</span>
+      </div>
+      <input type="range" min="40" max="100" step="5" value="85" data-key="syncPct">
+      <div class="ctrl-help">Le quotidien réel ≈ 95%. Baisse pour stresser le pattern.</div>
+    </div>
+    <div class="ctrl-label-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Nombre de jobs</span>
+        <span class="ctrl-value" id="jobCount-val">15</span>
+      </div>
+      <input type="range" min="6" max="30" step="1" value="15" data-key="jobCount">
+    </div>
+    <button class="regen-btn" id="regen"><span data-lucide="refresh-cw" data-size="11"></span> Régénérer la distribution</button>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Coupons dans la job-card</div>
+    <div class="seg-stack">
+      <span class="ctrl-label" style="margin-bottom:5px">Disposition</span>
+      <div class="seg" data-key="couponLayout">
+        <button data-val="grid" class="active">Grille</button>
+        <button data-val="list">Liste vert.</button>
+      </div>
+    </div>
+    <div class="seg-stack" style="margin-top:8px">
+      <span class="ctrl-label" style="margin-bottom:5px">Taille</span>
+      <div class="seg" data-key="couponSize">
+        <button data-val="compact">Compacte</button>
+        <button data-val="standard" class="active">Standard</button>
+        <button data-val="detailed">Détaillée</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Trous (emplacement vide)</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Bordure pointillée</span>
+      <div class="toggle on" data-key="holeDashed"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Nom élément en italique</span>
+      <div class="toggle on" data-key="holeItalic"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Nom élément barré</span>
+      <div class="toggle" data-key="holeStrikethrough"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Flèche « → ailleurs »</span>
+      <div class="toggle on" data-key="holeArrow"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Mini-en-tête du coupon détaché</div>
+    <div class="ctrl-help" style="margin-bottom:8px;margin-top:0">
+      Le coupon lui-même reste identique à son équivalent attaché. Le mini-en-tête au-dessus rappelle son contexte parent.
+    </div>
+    <div class="seg-stack">
+      <span class="ctrl-label" style="margin-bottom:5px">Contenu</span>
+      <div class="seg" data-key="headerContent">
+        <button data-val="name-client" class="active">Nom·Cli.</button>
+        <button data-val="name-only">Nom seul</button>
+        <button data-val="jcf-name">JCF·Nom</button>
+        <button data-val="jcf-only">JCF seul</button>
+      </div>
+    </div>
+    <div class="ctrl-row" style="margin-top:9px">
+      <span class="ctrl-label">Préfixe « ↳ »</span>
+      <div class="toggle on" data-key="detachPrefix"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Deadline dans l'en-tête</span>
+      <div class="toggle" data-key="headerShowDeadline"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Coupon (attaché ou détaché)</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Suffixe itérations « ×N »</span>
+      <div class="toggle on" data-key="showCouponIter"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Hover & navigation</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Hover-link parent ↔ détachés</span>
+      <div class="toggle on" data-key="hoverHighlight"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">DnD (sémantique attendue)</div>
+    <div class="seg-stack">
+      <span class="ctrl-label" style="margin-bottom:5px">Drag job-card → ses détachés</span>
+      <div class="seg" data-key="dndMode">
+        <button data-val="stay" class="active">Restent</button>
+        <button data-val="follow">Suivent</button>
+        <button data-val="confirm">Confirmer</button>
+      </div>
+    </div>
+    <div class="ctrl-help">
+      <strong style="color:var(--flux-text-secondary)">Restent</strong> : la job-card emporte les coupons attachés à l'instant T, pas les détachés.<br>
+      <strong style="color:var(--flux-text-secondary)">Suivent</strong> : tous les coupons (attachés + détachés) suivent le drag.<br>
+      <strong style="color:var(--flux-text-secondary)">Confirmer</strong> : modale qui demande à l'utilisateur.
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Thème</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Mode</span>
+      <div class="seg" data-key="theme">
+        <button data-val="dark" class="active">Sombre</button>
+        <button data-val="light">Clair</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="preview">
+  <div class="preview-header">
+    <div class="search-wrap" id="search-wrap">
+      <span class="search-icon" data-lucide="search" data-size="14"></span>
+      <input type="text" class="search-input" id="search-input" placeholder="Rechercher un job…">
+      <button class="search-clear" id="search-clear" title="Effacer" data-lucide="x" data-size="11"></button>
+    </div>
+    <span class="preview-meta" id="preview-meta"></span>
+  </div>
+  <div class="board" id="board"></div>
+</main>
+
+<footer class="prompt-bar">
+  <pre class="prompt-text" id="prompt"></pre>
+  <button class="copy-btn" id="copy"><span data-lucide="copy" data-size="13"></span> Copier le prompt</button>
+</footer>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-jcf" id="modal-jcf"></div>
+        <div class="modal-job-name" id="modal-job-name"></div>
+        <div class="modal-job-sub" id="modal-job-sub"></div>
+      </div>
+      <button class="modal-close" id="modal-close" data-lucide="x" data-size="14"></button>
+    </div>
+    <div class="modal-content" id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────────────
+// Lucide icons
+// ────────────────────────────────────────────────────────────────
+const ICONS = {
+  search:           '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  x:                '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  clock:            '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'rotate-cw':      '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  'refresh-cw':     '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  'message-square': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  check:            '<path d="M20 6 9 17l-5-5"/>',
+  'corner-down-left':'<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>',
+  'corner-down-right':'<polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
+  'arrow-right':    '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  copy:             '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+};
+function lucideHTML(name, size = 14) {
+  const path = ICONS[name];
+  if (!path) return '';
+  return `<svg class="lucide" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+function replaceIcons(root = document) {
+  root.querySelectorAll('[data-lucide]').forEach(el => {
+    const size = parseInt(el.dataset.size, 10) || 14;
+    el.innerHTML = lucideHTML(el.dataset.lucide, size);
+  });
+}
+
+// ────────────────────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────────────────────
+const DEFAULTS = {
+  syncPct: 85,
+  jobCount: 15,
+  couponLayout: 'grid',
+  couponSize: 'standard',
+  showCouponIter: true,
+  holeDashed: true,
+  holeItalic: true,
+  holeStrikethrough: false,
+  holeArrow: true,
+  headerContent: 'name-client',
+  detachPrefix: true,
+  headerShowDeadline: false,
+  hoverHighlight: true,
+  dndMode: 'stay',
+  theme: 'dark',
+};
+let state = { ...DEFAULTS, search: '' };
+
+const PRESETS = {
+  discreet: { ...DEFAULTS, holeArrow:false, headerContent:'name-only', headerShowDeadline:false, showCouponIter:false },
+  default:  { ...DEFAULTS },
+  verbose:  { ...DEFAULTS, couponSize:'detailed', headerContent:'jcf-name', headerShowDeadline:true, couponLayout:'list' },
+  compact:  { ...DEFAULTS, couponSize:'compact', holeArrow:false, headerContent:'name-only', headerShowDeadline:false },
+};
+
+// ────────────────────────────────────────────────────────────────
+// Mock data
+// ────────────────────────────────────────────────────────────────
+const STATUSES = [
+  { key:'waiting_files',       title:'En attente fichiers' },
+  { key:'files_received',      title:'Fichiers reçus' },
+  { key:'revisions_requested', title:'Modifs demandées', iconBefore:'corner-down-left' },
+  { key:'bat_sent',            title:'BAT envoyé' },
+  { key:'bat_approved',        title:'BAT validé', iconAfter:'check' },
+];
+const STATUS_ORDER = STATUSES.reduce((acc, s, i) => (acc[s.key] = i, acc), {});
+const NOW = new Date('2026-05-03T10:00:00').getTime();
+const COMMERCIALS = ['Sophie Mercier', 'Nicolas Dubois', 'Camille Roux', 'Antoine Leroy', 'Élodie Vincent'];
+const CLIENTS = ["L'Oréal", 'Décathlon', 'Renault SAS', 'Pernod Ricard', 'Le Monde Médias', 'Air France', 'BNF Éditions', 'Citroën DS', 'Galerie Lafayette', 'Lacoste'];
+const ELEMENT_NAMES = ['Recto', 'Verso', 'Couv.', '4ème couv', 'Page int.', 'Étiquette', 'Bandeau', 'Mention'];
+const JOB_TYPES = ['Catalogue printemps', 'Plaquette commerciale', 'Affiche A2', 'Étiquettes vin', 'Magazine n°47', 'Brochure produit', 'Carte de vœux', 'Notice technique', 'Dépliant promo', 'PLV présentoir'];
+
+let JOBS = [];
+let ELEMENTS = [];
+
+let mockSeed = 17;
+function seedReset(s) { mockSeed = s; }
+function rng() { mockSeed = (mockSeed*9301 + 49297) % 233280; return mockSeed/233280; }
+function randInt(a,b) { return Math.floor(rng()*(b-a+1))+a; }
+function pick(arr) { return arr[Math.floor(rng()*arr.length)]; }
+
+function generateMock() {
+  seedReset(17);
+  JOBS = [];
+  ELEMENTS = [];
+  for (let i = 0; i < state.jobCount; i++) {
+    const jobId = 'J' + String(i+1).padStart(2, '0');
+    const elementCount = randInt(2, 5);
+    const synced = rng() * 100 < state.syncPct;
+    const baseStatus = pick(['waiting_files', 'files_received', 'bat_sent', 'bat_approved', 'waiting_files', 'bat_sent', 'bat_approved']);
+    JOBS.push({
+      id: jobId,
+      jcf: 'JCF-' + String(2026000 + i + 1),
+      name: pick(JOB_TYPES) + ' #' + (i+1),
+      client: pick(CLIENTS),
+      commercial: pick(COMMERCIALS),
+      batDeadline: NOW + randInt(-8, 25)*86400000,
+    });
+    if (synced) {
+      for (let j = 0; j < elementCount; j++) {
+        ELEMENTS.push({
+          id: jobId + '-E' + (j+1),
+          jobId,
+          name: pick(ELEMENT_NAMES),
+          batStatus: baseStatus,
+          revisionRound: 0,
+        });
+      }
+    } else {
+      const pattern = rng() < 0.7 ? 'one-outlier' : 'fully-dispersed';
+      if (pattern === 'one-outlier') {
+        const otherStatus = pick(['waiting_files', 'files_received', 'revisions_requested', 'bat_sent', 'bat_approved'].filter(s => s !== baseStatus));
+        for (let j = 0; j < elementCount; j++) {
+          ELEMENTS.push({
+            id: jobId + '-E' + (j+1),
+            jobId,
+            name: pick(ELEMENT_NAMES),
+            batStatus: j === 0 ? otherStatus : baseStatus,
+            revisionRound: (j === 0 && otherStatus === 'revisions_requested') ? randInt(1,2) : 0,
+          });
+        }
+      } else {
+        const pool = ['waiting_files', 'files_received', 'revisions_requested', 'bat_sent', 'bat_approved'].sort(() => rng() - 0.5);
+        for (let j = 0; j < elementCount; j++) {
+          ELEMENTS.push({
+            id: jobId + '-E' + (j+1),
+            jobId,
+            name: pick(ELEMENT_NAMES),
+            batStatus: pool[j % pool.length],
+            revisionRound: pool[j % pool.length] === 'revisions_requested' ? 1 : 0,
+          });
+        }
+      }
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Anchor placement: most-numerous status, tiebreak = most upstream
+// ────────────────────────────────────────────────────────────────
+function jobAnchor(elements) {
+  const counts = {};
+  for (const el of elements) counts[el.batStatus] = (counts[el.batStatus] || 0) + 1;
+  const sorted = Object.entries(counts).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return STATUS_ORDER[a[0]] - STATUS_ORDER[b[0]];
+  });
+  return sorted[0][0];
+}
+
+// ────────────────────────────────────────────────────────────────
+// Render
+// ────────────────────────────────────────────────────────────────
+function isLate(job) {
+  return job.batDeadline !== null && job.batDeadline < NOW;
+}
+function deadlineLabel(job) {
+  if (job.batDeadline === null) return null;
+  const days = Math.round((job.batDeadline - NOW) / 86400000);
+  if (days < 0) return { text: 'EN RETARD ' + Math.abs(days) + 'j', cls: 'late' };
+  if (days <= 3) return { text: 'J-' + days, cls: 'urg' };
+  return { text: 'J-' + days, cls: '' };
+}
+function matchesSearch(job, q) {
+  if (!q) return true;
+  const ql = q.toLowerCase();
+  return job.jcf.toLowerCase().includes(ql)
+      || job.name.toLowerCase().includes(ql)
+      || job.client.toLowerCase().includes(ql)
+      || job.commercial.toLowerCase().includes(ql);
+}
+
+function renderJobCard(job, elements, anchor) {
+  const card = document.createElement('div');
+  card.className = 'card job-card' + (isLate(job) ? ' late' : '');
+  card.dataset.jobId = job.id;
+
+  const dl = deadlineLabel(job);
+  const totalRevisions = elements.reduce((s, e) => s + (e.revisionRound || 0), 0);
+
+  // Coupon strip
+  let couponsHTML = `<div class="coupon-strip layout-${state.couponLayout}">`;
+  for (const el of elements) {
+    const isAttached = el.batStatus === anchor;
+    const sizeClass = `size-${state.couponSize}`;
+    const iterSuffix = el.revisionRound > 0 && state.showCouponIter ? ` <span style="opacity:0.65;font-size:90%">×${el.revisionRound}</span>` : '';
+    if (isAttached) {
+      couponsHTML += `<div class="coupon ${sizeClass}">${el.name}${iterSuffix}</div>`;
+    } else {
+      let holeCls = 'coupon hole ' + sizeClass;
+      const holeStyles = [];
+      if (!state.holeDashed) holeStyles.push('border-style: solid');
+      if (!state.holeItalic) holeStyles.push('font-style: normal');
+      if (state.holeStrikethrough) holeStyles.push('text-decoration: line-through');
+      const styleAttr = holeStyles.length > 0 ? `style="${holeStyles.join('; ')}"` : '';
+      couponsHTML += `<div class="${holeCls}" ${styleAttr}>${el.name}${state.holeArrow ? ` <span class="hole-arrow">${lucideHTML('arrow-right', 9)}</span>` : ''}</div>`;
+    }
+  }
+  couponsHTML += '</div>';
+
+  card.innerHTML = `
+    <div class="card-id-line">
+      <span class="card-jcf">${job.jcf}</span>
+      <span class="card-sep">·</span>
+      <span class="card-client">${job.client}</span>
+    </div>
+    <div class="card-job-name">${job.name}</div>
+    ${couponsHTML}
+    ${(dl || totalRevisions > 0) ? `<div class="card-footer">
+      ${dl ? `<span class="badge badge-deadline ${dl.cls}">${lucideHTML('clock', 10)} ${dl.text}</span>` : ''}
+      ${totalRevisions > 0 ? `<span class="badge badge-iter">${lucideHTML('rotate-cw', 10)} ${totalRevisions}</span>` : ''}
+    </div>` : ''}
+  `;
+  card.addEventListener('click', () => openModal(job.id));
+  if (state.hoverHighlight) {
+    card.addEventListener('mouseenter', () => highlightJob(job.id));
+    card.addEventListener('mouseleave', () => highlightJob(null));
+  }
+  return card;
+}
+
+function renderDetachedCoupon(el, parentJob) {
+  const unit = document.createElement('div');
+  unit.className = 'detached-unit';
+  unit.dataset.jobId = parentJob.id;
+  unit.dataset.elementId = el.id;
+
+  const dl = deadlineLabel(parentJob);
+  const prefix = state.detachPrefix ? `<span class="detach-prefix">${lucideHTML('corner-down-right', 10)}</span>` : '';
+
+  // Mini-header content variants
+  let headerContent = '';
+  if (state.headerContent === 'jcf-only') {
+    headerContent = `<span class="header-jcf">${parentJob.jcf}</span>`;
+  } else if (state.headerContent === 'name-only') {
+    headerContent = `<span class="header-name">${parentJob.name}</span>`;
+  } else if (state.headerContent === 'jcf-name') {
+    headerContent = `<span class="header-jcf">${parentJob.jcf}</span><span class="header-sep">·</span><span class="header-name">${parentJob.name}</span>`;
+  } else { // 'name-client' default
+    headerContent = `<span class="header-name">${parentJob.name}</span><span class="header-sep">·</span><span class="header-client">${parentJob.client}</span>`;
+  }
+
+  // Deadline in header (optional)
+  let headerDeadline = '';
+  if (state.headerShowDeadline && dl) {
+    headerDeadline = `<span class="header-sep">·</span><span class="header-deadline"><span class="badge badge-deadline ${dl.cls}">${lucideHTML('clock', 10)} ${dl.text}</span></span>`;
+  }
+
+  // Coupon (same as in-card coupon)
+  const sizeClass = `size-${state.couponSize}`;
+  const lateClass = isLate(parentJob) && state.couponLateTint ? ' late-tint' : '';
+  const iterSuffix = el.revisionRound > 0 && state.showCouponIter ? ` <span style="opacity:0.6;font-size:90%">×${el.revisionRound}</span>` : '';
+  const couponHTML = `<div class="coupon standalone ${sizeClass}${lateClass}">${el.name}${iterSuffix}</div>`;
+
+  unit.innerHTML = `
+    <div class="detached-mini-header">${prefix}${headerContent}${headerDeadline}</div>
+    ${couponHTML}
+  `;
+
+  unit.addEventListener('click', () => openModal(parentJob.id));
+  if (state.hoverHighlight) {
+    unit.addEventListener('mouseenter', () => highlightJob(parentJob.id));
+    unit.addEventListener('mouseleave', () => highlightJob(null));
+  }
+  return unit;
+}
+
+function highlightJob(jobId) {
+  document.querySelectorAll('.card, .detached-unit').forEach(c => {
+    if (jobId === null) {
+      c.classList.remove('dimmed', 'highlighted');
+    } else if (c.dataset.jobId === jobId) {
+      c.classList.add('highlighted');
+      c.classList.remove('dimmed');
+    } else {
+      c.classList.add('dimmed');
+      c.classList.remove('highlighted');
+    }
+  });
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  const buckets = {};
+  STATUSES.forEach(s => buckets[s.key] = []);
+
+  let jobCount = 0;
+  let cardCount = 0;
+  let detachedCount = 0;
+  const matchingJobs = JOBS.filter(j => matchesSearch(j, state.search));
+  jobCount = matchingJobs.length;
+
+  for (const job of matchingJobs) {
+    const elements = ELEMENTS.filter(e => e.jobId === job.id);
+    const anchor = jobAnchor(elements);
+    buckets[anchor].push(renderJobCard(job, elements, anchor));
+    cardCount++;
+    for (const el of elements) {
+      if (el.batStatus !== anchor) {
+        buckets[el.batStatus].push(renderDetachedCoupon(el, job));
+        cardCount++;
+        detachedCount++;
+      }
+    }
+  }
+
+  STATUSES.forEach(s => {
+    const col = document.createElement('div');
+    col.className = 'column';
+    col.dataset.status = s.key;
+    const colCards = buckets[s.key] || [];
+    col.innerHTML = `
+      <div class="col-header">
+        <div class="col-header-text">
+          ${s.iconBefore ? `<span class="col-arrow">${lucideHTML(s.iconBefore, 12)}</span>` : ''}
+          <span class="col-title">${s.title}${s.iconAfter ? ' ' + lucideHTML(s.iconAfter, 12) : ''}</span>
+        </div>
+        <span class="col-count">${colCards.length}</span>
+      </div>
+      <div class="col-body"></div>
+    `;
+    const body = col.querySelector('.col-body');
+    colCards.forEach(c => body.appendChild(c));
+    board.appendChild(col);
+  });
+
+  document.getElementById('preview-meta').innerHTML =
+    `${jobCount} jobs · ${cardCount} cartes <span style="color:var(--flux-text-muted)">·</span> ${detachedCount} coupon${detachedCount > 1 ? 's' : ''} détaché${detachedCount > 1 ? 's' : ''}`;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Modal
+// ────────────────────────────────────────────────────────────────
+function openModal(jobId) {
+  const job = JOBS.find(j => j.id === jobId);
+  if (!job) return;
+  const elements = ELEMENTS.filter(e => e.jobId === jobId);
+  const anchor = jobAnchor(elements);
+  document.getElementById('modal-jcf').textContent = job.jcf;
+  document.getElementById('modal-job-name').textContent = job.name;
+  document.getElementById('modal-job-sub').textContent = job.client + ' · ' + job.commercial;
+  let html = `<div class="modal-section-title">Éléments (${elements.length})</div>`;
+  for (const el of elements) {
+    const isDetached = el.batStatus !== anchor;
+    const statusInfo = STATUSES.find(s => s.key === el.batStatus);
+    html += `<div class="element-row ${isDetached ? 'detached' : ''}">
+      <div class="element-name">${el.name}${isDetached ? ' ' + lucideHTML('corner-down-right', 11) : ''}</div>
+      <div class="element-status">${statusInfo ? statusInfo.title : el.batStatus}</div>
+    </div>`;
+  }
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+document.getElementById('modal-close').addEventListener('click', () => document.getElementById('modal-backdrop').classList.remove('open'));
+document.getElementById('modal-backdrop').addEventListener('click', e => {
+  if (e.target.id === 'modal-backdrop') document.getElementById('modal-backdrop').classList.remove('open');
+});
+
+// ────────────────────────────────────────────────────────────────
+// Prompt
+// ────────────────────────────────────────────────────────────────
+function updatePrompt() {
+  const parts = [];
+
+  if (state.couponLayout !== DEFAULTS.couponLayout) {
+    parts.push(state.couponLayout === 'list' ? 'coupons en liste verticale dans la job-card' : 'coupons en grille horizontale dans la job-card');
+  }
+  if (state.couponSize !== DEFAULTS.couponSize) {
+    const labels = { compact: 'coupons en taille compacte', detailed: 'coupons en taille détaillée' };
+    parts.push(labels[state.couponSize]);
+  }
+
+  const holeStyle = [];
+  if (state.holeDashed !== DEFAULTS.holeDashed) holeStyle.push(state.holeDashed ? 'bordure pointillée' : 'bordure pleine');
+  if (state.holeItalic !== DEFAULTS.holeItalic) holeStyle.push(state.holeItalic ? 'nom élément en italique' : 'nom élément non-italique');
+  if (state.holeStrikethrough !== DEFAULTS.holeStrikethrough) holeStyle.push(state.holeStrikethrough ? 'nom élément barré' : 'nom élément non-barré');
+  if (state.holeArrow !== DEFAULTS.holeArrow) holeStyle.push(state.holeArrow ? 'flèche → vers la colonne où le coupon a migré' : 'sans flèche directionnelle');
+  if (holeStyle.length > 0) parts.push('représentation des trous : ' + holeStyle.join(', '));
+
+  if (state.headerContent !== DEFAULTS.headerContent) {
+    const labels = { 'name-client': 'mini-en-tête = nom du job · client (parent)', 'name-only': 'mini-en-tête = nom du job uniquement', 'jcf-name': 'mini-en-tête = JCF · nom du job', 'jcf-only': 'mini-en-tête = JCF uniquement' };
+    parts.push(labels[state.headerContent]);
+  }
+  if (state.detachPrefix !== DEFAULTS.detachPrefix) parts.push(state.detachPrefix ? 'préfixe « ↳ » dans le mini-en-tête' : 'sans préfixe « ↳ »');
+  if (state.headerShowDeadline !== DEFAULTS.headerShowDeadline) parts.push(state.headerShowDeadline ? 'deadline du parent affichée dans le mini-en-tête' : 'pas de deadline dans le mini-en-tête');
+  if (state.showCouponIter !== DEFAULTS.showCouponIter) parts.push(state.showCouponIter ? 'suffixe « ×N » sur les coupons révisés' : 'sans suffixe d\'itérations sur les coupons');
+
+  if (state.hoverHighlight !== DEFAULTS.hoverHighlight) parts.push(state.hoverHighlight ? 'hover-highlight bidirectionnel job-card ↔ coupons détachés' : 'sans hover-highlight');
+
+  const dndLabels = {
+    stay: 'le drag d\'une job-card emporte les coupons attachés (les détachés restent dans leurs colonnes)',
+    follow: 'le drag d\'une job-card entraîne TOUS ses coupons (attachés + détachés) — alignement forcé',
+    confirm: 'le drag d\'une job-card ouvre une modale demandant si on aligne aussi les coupons détachés',
+  };
+  if (state.dndMode !== DEFAULTS.dndMode) parts.push(dndLabels[state.dndMode]);
+
+  if (state.theme !== DEFAULTS.theme) parts.push('thème clair par défaut');
+
+  let prompt;
+  if (parts.length === 0) {
+    prompt = "Implémente le Kanban BAT avec une carte par job qui sert de support à coupons : chaque élément est un coupon. Le coupon a un aspect identique qu'il soit attaché à sa job-card ou détaché ailleurs sur le board — c'est la même unité visuelle. Structure de la job-card : ligne 1 = JCF (mono) · client, ligne 2 = nom du job en plus gros (désignation), suivi de la bande de coupons et des badges footer (deadline, itérations totales). Un coupon détaché vit dans sa colonne sous la forme [mini-en-tête + coupon] : le mini-en-tête (en gris muted, ↳ + nom du job parent · client) rappelle le contexte ; le coupon en dessous est strictement le même qu'à l'intérieur d'une job-card. Quand un coupon migre vers une autre colonne, il laisse un trou à son emplacement dans la job-card (bordure pointillée, nom de l'élément en italique muted, flèche « → ailleurs » muted). La job-card est placée dans la colonne du statut le plus fréquent parmi ses coupons attachés (tiebreaker = statut le plus en amont). Pas de mode duel agrégée/élément, pas de bandeau séparé pour les jobs dispersés. Si un élément a été révisé, son coupon affiche un suffixe « ×N » (même affichage attaché ou détaché). La décision « BAT requis ? » se gère au niveau JCF, pas ici — seuls les éléments qui requièrent un BAT apparaissent. Hover-highlight bidirectionnel job-card ↔ coupons détachés. Drag d'une job-card emporte les coupons attachés à l'instant T, pas les détachés. Aucun border-radius (coins droits partout). Couleurs sémantiques strictes : rouge = late, ambre = warning (itérations), bleu = info (deadline future). Aucune couleur décorative. Thème dark.";
+  } else {
+    prompt = "Implémente le Kanban BAT avec le pattern « job-card à coupons » (chaque élément est un coupon dans sa job-card ; un coupon dragué laisse un trou et part seul dans sa colonne) avec ces ajustements par rapport aux choix par défaut :\n\n• " + parts.join('\n• ');
+    prompt += "\n\nLe reste suit le défaut : coupon identique attaché ou détaché (mini-en-tête au-dessus pour le contexte parent), structure job-card = ligne 1 (JCF · client) / ligne 2 (job name plus gros), coupons en grille standard avec suffixe « ×N » sur les révisés, trous en bordure pointillée + italique + flèche « → » muted, mini-en-tête détaché = ↳ nom · client, hover-highlight bidirectionnel, drag job-card = synced-only, aucun border-radius, couleurs sémantiques strictes (rouge late, ambre warning, bleu info).";
+  }
+  document.getElementById('prompt').textContent = prompt;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bindings
+// ────────────────────────────────────────────────────────────────
+function applyState() {
+  document.documentElement.classList.toggle('light', state.theme === 'light');
+  document.getElementById('syncPct-val').textContent = state.syncPct + '%';
+  document.getElementById('jobCount-val').textContent = state.jobCount;
+  document.querySelectorAll('.toggle').forEach(t => t.classList.toggle('on', state[t.dataset.key] === true));
+  document.querySelectorAll('.seg').forEach(seg => {
+    const k = seg.dataset.key;
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === state[k]));
+  });
+  document.querySelectorAll('input[type=range]').forEach(input => {
+    const k = input.dataset.key;
+    input.value = state[k];
+  });
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === state.preset));
+}
+function updateAll(regenMock = false) {
+  if (regenMock) generateMock();
+  applyState();
+  renderBoard();
+  updatePrompt();
+}
+
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => {
+    state[t.dataset.key] = !state[t.dataset.key];
+    state.preset = 'custom';
+    updateAll();
+  });
+});
+document.querySelectorAll('.seg').forEach(seg => {
+  seg.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      state[seg.dataset.key] = b.dataset.val;
+      state.preset = 'custom';
+      updateAll();
+    });
+  });
+});
+document.querySelectorAll('input[type=range]').forEach(input => {
+  input.addEventListener('input', () => {
+    const k = input.dataset.key;
+    state[k] = input.step.includes('.') ? parseFloat(input.value) : parseInt(input.value, 10);
+    state.preset = 'custom';
+    const isMockKey = (k === 'syncPct' || k === 'jobCount');
+    updateAll(isMockKey);
+  });
+});
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    state = { ...PRESETS[b.dataset.preset], preset: b.dataset.preset, search: state.search };
+    updateAll();
+  });
+});
+document.getElementById('regen').addEventListener('click', () => {
+  mockSeed = randInt(1, 99999);
+  updateAll(true);
+});
+
+document.getElementById('search-input').addEventListener('input', e => {
+  state.search = e.target.value;
+  document.getElementById('search-wrap').classList.toggle('has-value', !!state.search);
+  renderBoard();
+});
+document.getElementById('search-clear').addEventListener('click', () => {
+  state.search = '';
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-wrap').classList.remove('has-value');
+  renderBoard();
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = document.getElementById('prompt').textContent;
+  await navigator.clipboard.writeText(text);
+  const btn = document.getElementById('copy');
+  btn.innerHTML = lucideHTML('check', 13) + ' Copié !';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = lucideHTML('copy', 13) + ' Copier le prompt'; btn.classList.remove('copied'); }, 1400);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modal-backdrop').classList.remove('open');
+});
+
+// Boot
+replaceIcons();
+state.preset = 'default';
+generateMock();
+updateAll();
+</script>
+</body>
+</html>

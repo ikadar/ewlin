@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground · Prérequis DnD UX</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --drag-opacity: 0.5;
+    --drop-bg: rgba(255,255,255, 0.03);
+    --drop-outline-color: rgba(255,255,255, 0.12);
+    --drop-outline-width: 2px;
+    --drop-outline-style: dashed;
+    --drop-glow: none;
+    --column-width: 320px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    height: 100vh; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  *::-webkit-scrollbar { width: 5px; }
+  *::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); border-radius: 999px; }
+
+  .app { display: grid; grid-template-columns: 1fr 260px; height: 100vh; }
+
+  /* ── Board ─────────────────────────────────────── */
+  .board {
+    display: flex; gap: 20px; padding: 20px; overflow-x: auto;
+  }
+  .column {
+    flex: 0 0 var(--column-width);
+    display: flex; flex-direction: column;
+    background: var(--flux-surface);
+    border-radius: 10px; border: 1px solid var(--flux-border);
+    min-height: 0;
+  }
+  .column-header {
+    padding: 12px 14px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .column-title {
+    font-size: 0.875rem; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .column-count {
+    font-size: 0.75rem; color: var(--flux-text-muted);
+    background: var(--flux-elevated); padding: 1px 7px; border-radius: 999px;
+  }
+  .column-body {
+    padding: 8px; padding-bottom: 24px;
+    overflow-y: auto; flex: 1;
+    display: flex; flex-direction: column; gap: 6px;
+    min-height: 80px;
+    transition: all 0.2s;
+    border-radius: 0 0 10px 10px;
+  }
+  .column-body.drag-over {
+    background: var(--drop-bg);
+    outline: var(--drop-outline-width) var(--drop-outline-style) var(--drop-outline-color);
+    outline-offset: -4px;
+    box-shadow: var(--drop-glow);
+  }
+
+  /* ── Job card ──────────────────────────────────── */
+  .job-card {
+    background: rgba(255,255,255, 0.015);
+    border: 1px solid rgba(255,255,255, 0.05);
+    padding: 10px; cursor: grab;
+    transition: border-color 0.15s, opacity 0.2s;
+  }
+  .job-card:hover { border-color: rgba(255,255,255, 0.1); }
+  .job-card.dragging { opacity: var(--drag-opacity); }
+  .job-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 500; color: rgb(212 212 216);
+    margin-bottom: 8px; overflow: hidden;
+  }
+  .job-id { font-weight: 700; color: var(--flux-text-primary); flex-shrink: 0; }
+  .job-client { flex-shrink: 0; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Element sub-card ──────────────────────────── */
+  .el-card {
+    background: rgba(255,255,255, 0.04);
+    border-left: 4px solid rgb(113 113 122);
+    padding: 7px 10px 7px 11px; min-height: 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    cursor: grab; transition: filter 0.15s, opacity 0.2s;
+  }
+  .el-card:hover { filter: brightness(1.25); }
+  .el-card.dragging { opacity: var(--drag-opacity); }
+  .el-name { font-size: 12.5px; font-weight: 500; color: rgb(228 228 231); }
+  .el-qty { font-size: 11px; color: rgb(161 161 170); font-family: 'JetBrains Mono', monospace; }
+  .el-badge {
+    font-size: 9px; font-weight: 700; color: rgb(161 161 170);
+    background: rgba(255,255,255, 0.05); border: 1px solid rgba(255,255,255, 0.08);
+    border-radius: 3px; padding: 0 4px;
+  }
+
+  /* ── Controls ──────────────────────────────────── */
+  .controls {
+    border-left: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    padding: 16px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .ctrl-section h3 {
+    font-size: 0.75rem; font-weight: 600; color: var(--flux-text-muted);
+    text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+  }
+  .ctrl-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0;
+  }
+  .ctrl-row label { font-size: 0.875rem; color: var(--flux-text-secondary); }
+  .ctrl-row input[type="range"] { width: 90px; accent-color: #60a5fa; }
+  .ctrl-row .val {
+    font-size: 0.75rem; color: var(--flux-text-muted); min-width: 36px;
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .ctrl-row select {
+    background: var(--flux-elevated); color: var(--flux-text-primary);
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    padding: 3px 6px; font-size: 0.875rem; font-family: inherit; cursor: pointer;
+  }
+  .color-swatch {
+    width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(255,255,255,.1);
+    cursor: pointer;
+  }
+  .preset-row {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
+  }
+  .preset-btn {
+    background: var(--flux-elevated); color: var(--flux-text-secondary);
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    padding: 4px 10px; font-size: 0.75rem; font-family: inherit; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .preset-btn.active { background: rgba(96,165,250,.15); color: #60a5fa; border-color: rgba(96,165,250,.3); }
+
+  .preview-box {
+    margin-top: 8px; padding: 12px;
+    background: var(--flux-surface); border: 1px solid var(--flux-border);
+    border-radius: 8px;
+  }
+  .preview-box h4 {
+    font-size: 0.75rem; color: var(--flux-text-muted); margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .preview-drop-zone {
+    min-height: 60px; border-radius: 0 0 10px 10px;
+    padding: 8px;
+    transition: all 0.2s;
+  }
+  .preview-drop-zone.active {
+    background: var(--drop-bg);
+    outline: var(--drop-outline-width) var(--drop-outline-style) var(--drop-outline-color);
+    outline-offset: -4px;
+    box-shadow: var(--drop-glow);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="board" id="board"></div>
+
+  <div class="controls">
+    <div class="ctrl-section">
+      <h3>Élément dragged</h3>
+      <div class="ctrl-row">
+        <label>Opacité</label>
+        <input type="range" id="dragOpacity" min="0.1" max="1" step="0.05" value="0.5">
+        <span class="val" id="dragOpacityVal">0.50</span>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <h3>Zone de drop</h3>
+      <div class="ctrl-row">
+        <label>Fond</label>
+        <input type="range" id="dropBgAlpha" min="0" max="0.1" step="0.005" value="0.03">
+        <span class="val" id="dropBgAlphaVal">0.030</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Contour style</label>
+        <select id="dropOutlineStyle">
+          <option value="dashed" selected>Dashed</option>
+          <option value="solid">Solid</option>
+          <option value="dotted">Dotted</option>
+          <option value="none">Aucun</option>
+        </select>
+      </div>
+      <div class="ctrl-row">
+        <label>Contour épaisseur</label>
+        <input type="range" id="dropOutlineWidth" min="1" max="4" step="0.5" value="2">
+        <span class="val" id="dropOutlineWidthVal">2px</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Contour opacité</label>
+        <input type="range" id="dropOutlineAlpha" min="0.02" max="0.4" step="0.01" value="0.12">
+        <span class="val" id="dropOutlineAlphaVal">0.12</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Glow</label>
+        <select id="dropGlow">
+          <option value="none" selected>Aucun</option>
+          <option value="inset 0 0 30px rgba(96,165,250,0.06)">Bleu subtil</option>
+          <option value="inset 0 0 40px rgba(52,211,153,0.08)">Vert subtil</option>
+          <option value="inset 0 0 20px rgba(255,255,255,0.04)">Blanc subtil</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <h3>Presets</h3>
+      <div class="preset-row">
+        <button class="preset-btn active" data-preset="subtle">Subtil</button>
+        <button class="preset-btn" data-preset="outlined">Contour net</button>
+        <button class="preset-btn" data-preset="glow">Glow</button>
+        <button class="preset-btn" data-preset="minimal">Minimal</button>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <h3>Aperçu drop zone</h3>
+      <div class="preview-box">
+        <h4>Simuler hover</h4>
+        <div class="preview-drop-zone" id="previewZone"
+             onmouseenter="this.classList.add('active')"
+             onmouseleave="this.classList.remove('active')">
+          <div class="el-card" style="opacity:0.4; pointer-events:none">
+            <span class="el-name">Couché mat 135g 50×70</span>
+            <span class="el-qty">4 500 f.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const JOBS = [
+  { id: 1, num: 4404, client: "L'Oréal", label: 'Brochure 32p catalogue', elements: [
+    { name: 'Couché mat 135g 50×70', qty: '4 500 f.', badge: null },
+    { name: 'Couché brillant 170g 65×92', qty: '1 200 f.', badge: null },
+    { name: 'Offset 80g 65×90', qty: '12 000 f.', badge: '×3 élt' },
+  ]},
+  { id: 2, num: 4405, client: 'Bouygues', label: 'Dépliant 3 volets tarifs', elements: [
+    { name: 'Chromocard 300g 52×72', qty: '2 000 f.', badge: null },
+  ]},
+  { id: 3, num: 4406, client: 'Capgemini', label: 'Brochure assemblée 48p', elements: [
+    { name: 'Tintoretto 300g 70×100', qty: '800 f.', badge: null },
+    { name: 'Offset 80g 65×90', qty: '8 500 f.', badge: '×4 élt' },
+  ]},
+  { id: 4, num: 4407, client: 'BNP Paribas', label: 'Dépliant 2 volets RH', elements: [
+    { name: 'Splendorgel 170g 70×100', qty: '3 000 f.', badge: null },
+  ]},
+];
+
+const COLUMNS = [
+  { id: 'to_order', label: 'A commander', dot: '#ef4444', jobs: [0, 1] },
+  { id: 'ordered',  label: 'Commandé',    dot: '#f59e0b', jobs: [2] },
+  { id: 'available',label: 'Disponible',  dot: '#22c55e', jobs: [3] },
+];
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  for (const col of COLUMNS) {
+    const colEl = document.createElement('div');
+    colEl.className = 'column';
+    const jobs = col.jobs.map(i => JOBS[i]);
+    colEl.innerHTML = `
+      <div class="column-header">
+        <div class="column-title"><span class="dot" style="background:${col.dot}"></span>${col.label}</div>
+        <span class="column-count">${jobs.length}</span>
+      </div>`;
+    const body = document.createElement('div');
+    body.className = 'column-body';
+    body.dataset.column = col.id;
+    for (const job of jobs) {
+      body.innerHTML += renderJob(job);
+    }
+    colEl.appendChild(body);
+    board.appendChild(colEl);
+  }
+  bindDnD();
+}
+
+function renderJob(job) {
+  const single = job.elements.length === 1;
+  let els = '';
+  if (single) {
+    const e = job.elements[0];
+    els = `<div class="el-card">
+      <span class="el-name">${e.name}</span>
+      <span class="el-qty">${e.qty}</span>
+    </div>`;
+  } else {
+    els = '<div style="display:flex;flex-direction:column;gap:4px">';
+    for (const e of job.elements) {
+      els += `<div class="el-card" draggable="true" data-type="element">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+          <span class="el-name">${e.name}</span>
+          ${e.badge ? `<span class="el-badge">${e.badge}</span>` : ''}
+        </div>
+        <span class="el-qty">${e.qty}</span>
+      </div>`;
+    }
+    els += '</div>';
+  }
+  return `<div class="job-card" draggable="true" data-type="job">
+    <div class="job-header">
+      <span class="job-id">${job.num}</span>
+      <span class="job-client">${job.client}</span>
+      <span class="job-label">${job.label}</span>
+    </div>
+    ${els}
+  </div>`;
+}
+
+function bindDnD() {
+  document.querySelectorAll('[draggable="true"]').forEach(el => {
+    el.addEventListener('dragstart', function(e) {
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      if (this.dataset.type === 'element') e.stopPropagation();
+    });
+    el.addEventListener('dragend', function() {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.column-body').forEach(b => b.classList.remove('drag-over'));
+    });
+  });
+  document.querySelectorAll('.column-body').forEach(body => {
+    body.addEventListener('dragover', function(e) {
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      this.classList.add('drag-over');
+    });
+    body.addEventListener('dragleave', function(e) {
+      if (!this.contains(e.relatedTarget)) this.classList.remove('drag-over');
+    });
+    body.addEventListener('drop', function(e) {
+      e.preventDefault(); this.classList.remove('drag-over');
+    });
+  });
+}
+
+// ── Controls ────────────────────────────────────
+function updateCSS() {
+  const r = document.documentElement.style;
+  const dragOp = document.getElementById('dragOpacity').value;
+  const dropBg = document.getElementById('dropBgAlpha').value;
+  const outStyle = document.getElementById('dropOutlineStyle').value;
+  const outWidth = document.getElementById('dropOutlineWidth').value;
+  const outAlpha = document.getElementById('dropOutlineAlpha').value;
+  const glow = document.getElementById('dropGlow').value;
+
+  r.setProperty('--drag-opacity', dragOp);
+  r.setProperty('--drop-bg', `rgba(255,255,255, ${dropBg})`);
+  r.setProperty('--drop-outline-style', outStyle === 'none' ? 'solid' : outStyle);
+  r.setProperty('--drop-outline-width', outStyle === 'none' ? '0px' : outWidth + 'px');
+  r.setProperty('--drop-outline-color', `rgba(255,255,255, ${outAlpha})`);
+  r.setProperty('--drop-glow', glow);
+
+  document.getElementById('dragOpacityVal').textContent = parseFloat(dragOp).toFixed(2);
+  document.getElementById('dropBgAlphaVal').textContent = parseFloat(dropBg).toFixed(3);
+  document.getElementById('dropOutlineWidthVal').textContent = outWidth + 'px';
+  document.getElementById('dropOutlineAlphaVal').textContent = parseFloat(outAlpha).toFixed(2);
+}
+
+document.querySelectorAll('.controls input, .controls select').forEach(el => {
+  el.addEventListener('input', updateCSS);
+});
+
+const PRESETS = {
+  subtle:   { dragOpacity: 0.5, dropBgAlpha: 0.03, dropOutlineStyle: 'dashed', dropOutlineWidth: 2, dropOutlineAlpha: 0.12, dropGlow: 'none' },
+  outlined: { dragOpacity: 0.4, dropBgAlpha: 0.01, dropOutlineStyle: 'solid',  dropOutlineWidth: 2, dropOutlineAlpha: 0.2,  dropGlow: 'none' },
+  glow:     { dragOpacity: 0.5, dropBgAlpha: 0.02, dropOutlineStyle: 'none',   dropOutlineWidth: 0, dropOutlineAlpha: 0,    dropGlow: 'inset 0 0 30px rgba(96,165,250,0.06)' },
+  minimal:  { dragOpacity: 0.6, dropBgAlpha: 0.015,dropOutlineStyle: 'dashed', dropOutlineWidth: 1, dropOutlineAlpha: 0.08, dropGlow: 'none' },
+};
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = PRESETS[btn.dataset.preset];
+    if (!p) return;
+    document.getElementById('dragOpacity').value = p.dragOpacity;
+    document.getElementById('dropBgAlpha').value = p.dropBgAlpha;
+    document.getElementById('dropOutlineStyle').value = p.dropOutlineStyle;
+    document.getElementById('dropOutlineWidth').value = p.dropOutlineWidth;
+    document.getElementById('dropOutlineAlpha').value = p.dropOutlineAlpha;
+    document.getElementById('dropGlow').value = p.dropGlow;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateCSS();
+  });
+});
+
+renderBoard();
+updateCSS();
+</script>
+</body>
+</html>

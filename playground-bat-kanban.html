@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground BAT Kanban</title>
+<style>
+  /* ── Palette Flux ─────────────────────────────────────────── */
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --amber-bg:    rgba(251, 191, 36, 0.10);
+    --red-400:     #f87171;
+    --red-bg:      rgba(248, 113, 113, 0.10);
+    --blue-400:    #60a5fa;
+    --blue-bg:     rgba(96, 165, 250, 0.10);
+    --slate-400:   #94a3b8;
+    --slate-bg:    rgba(148, 163, 184, 0.10);
+
+    --backdrop:    rgba(0, 0, 0, 0.6);
+
+    /* Configurable via controls */
+    --col-width:           280px;
+    --late-r:              248;
+    --late-g:              113;
+    --late-b:              113;
+    --late-intensity:      0.16;
+    --late-intensity-hover:0.24;
+    --late-border-alpha:   0.45;
+    --job-stripe-width:    3px;
+  }
+
+  html.light {
+    --flux-base:           #ecddf0;
+    --flux-surface:        #e3d2e8;
+    --flux-elevated:       #dac8e0;
+    --flux-hover:          #d0bdd7;
+    --flux-border:         #c9b3d0;
+    --flux-border-light:   #baa5c4;
+    --flux-text-primary:   #1e0e2a;
+    --flux-text-secondary: #412c52;
+    --flux-text-tertiary:  #5c4568;
+    --flux-text-muted:     #7a6888;
+
+    --emerald-400: #15803d;
+    --amber-400:   #a16207;
+    --amber-bg:    rgba(202, 138, 4, 0.12);
+    --red-400:     #b91c1c;
+    --red-bg:      rgba(220, 38, 38, 0.12);
+    --blue-400:    #4338ca;
+    --blue-bg:     rgba(67, 56, 202, 0.10);
+    --slate-400:   #475569;
+    --slate-bg:    rgba(71, 85, 105, 0.12);
+
+    --backdrop: rgba(30, 14, 42, 0.30);
+    --late-r:           220;
+    --late-g:           38;
+    --late-b:           38;
+    --late-intensity:   0.13;
+    --late-intensity-hover: 0.20;
+    --late-border-alpha: 0.55;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { border-radius: 0 !important; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    overflow: hidden;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  /* ── Sidebar (controls) ───────────────────────────────────── */
+  aside.controls {
+    grid-row: 1 / 3;
+    background: var(--flux-surface);
+    border-right: 1px solid var(--flux-border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .controls h1 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .controls h1 small {
+    font-weight: 400;
+    color: var(--flux-text-muted);
+    margin-left: 6px;
+  }
+  .controls-intro {
+    font-size: 11.5px;
+    color: var(--flux-text-tertiary);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .preset-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .preset-btn {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+  }
+  .preset-btn:hover { background: var(--flux-hover); }
+  .preset-btn.active {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+  .preset-btn small {
+    display: block;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    margin-top: 2px;
+  }
+  .preset-btn.active small { color: var(--blue-400); opacity: 0.8; }
+
+  .ctrl-section {
+    border-top: 1px solid var(--flux-border);
+    padding: 12px 0;
+  }
+  .ctrl-section:first-of-type { border-top: none; padding-top: 0; }
+  .ctrl-section-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--flux-text-muted);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .ctrl-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 9px;
+    gap: 8px;
+  }
+  .ctrl-label {
+    font-size: 11.5px;
+    color: var(--flux-text-secondary);
+    flex: 1;
+  }
+  .ctrl-label-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
+  }
+  .ctrl-value {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  /* Toggle */
+  .toggle {
+    width: 32px;
+    height: 18px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 14px;
+    height: 14px;
+    background: var(--flux-text-tertiary);
+    border-radius: 50%;
+    transition: 0.15s;
+  }
+  .toggle.on {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+  }
+  .toggle.on::after {
+    left: 15px;
+    background: var(--blue-400);
+  }
+  /* Slider */
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--blue-400);
+    margin-top: 4px;
+  }
+  /* Segmented */
+  .seg {
+    display: flex;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .seg button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--flux-text-secondary);
+    padding: 5px 6px;
+    cursor: pointer;
+    font-size: 10.5px;
+    font-family: inherit;
+    border-right: 1px solid var(--flux-border);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active {
+    background: var(--blue-bg);
+    color: var(--blue-400);
+  }
+  .demo-btn-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .demo-btn {
+    flex: 1;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    padding: 6px;
+    font-size: 10.5px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+  .demo-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+
+  /* ── Preview area ─────────────────────────────────────────── */
+  main.preview {
+    grid-row: 1 / 2;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--flux-base);
+  }
+  .preview-header {
+    height: 48px;
+    border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--flux-text-muted);
+    flex-shrink: 0;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 0 0 280px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--flux-text-muted);
+    pointer-events: none;
+    display: flex;
+  }
+  .lucide {
+    display: inline-block;
+    vertical-align: -2px;
+    flex-shrink: 0;
+  }
+  .badge .lucide { vertical-align: -1px; }
+  .search-input {
+    width: 100%;
+    height: 30px;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    color: var(--flux-text-primary);
+    padding: 0 30px 0 26px;
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+  }
+  .search-input:focus {
+    border-color: var(--blue-400);
+    background: var(--flux-base);
+  }
+  .search-input::placeholder { color: var(--flux-text-muted); }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--flux-hover);
+    border: none;
+    color: var(--flux-text-tertiary);
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .search-wrap.has-value .search-clear { display: flex; }
+  .filter-pill {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .filter-pill:hover { background: var(--flux-hover); }
+  .filter-pill.active {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+  .preview-meta {
+    margin-left: auto;
+    color: var(--flux-text-muted);
+    font-size: 11px;
+  }
+  .board {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  /* ── Column ───────────────────────────────────────────────── */
+  .column {
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    width: var(--col-width);
+    min-width: var(--col-width);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
+  .column.collapsed {
+    width: 44px;
+    min-width: 44px;
+  }
+  .column.collapsed .col-body,
+  .column.collapsed .col-header-text { display: none; }
+  .column.collapsed .col-header {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    height: 100%;
+    border-bottom: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .col-header {
+    padding: 9px 11px;
+    border-bottom: 1px solid var(--flux-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .col-header-text { display: flex; align-items: center; gap: 6px; }
+  .col-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .col-arrow { color: var(--flux-text-tertiary); font-size: 11px; }
+  .col-count {
+    font-size: 10.5px;
+    color: var(--flux-text-muted);
+    background: var(--flux-elevated);
+    padding: 1px 6px;
+    border-radius: 3px;
+    min-width: 20px;
+    text-align: center;
+  }
+  .col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  /* ── Card ─────────────────────────────────────────────────── */
+  .card {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 4px;
+    padding: var(--card-padding, 8px 10px);
+    cursor: pointer;
+    transition: transform 0.06s ease, background 0.1s ease;
+    user-select: none;
+    position: relative;
+  }
+  .card.stripe-left {
+    border-left: var(--job-stripe-width) solid var(--card-job-color, var(--slate-400));
+  }
+  .card.stripe-top {
+    border-top: var(--job-stripe-width) solid var(--card-job-color, var(--slate-400));
+  }
+  .card:hover {
+    background: var(--flux-hover);
+    transform: translateY(-1px);
+  }
+  .card.dimmed { opacity: 0.28; }
+  .card.highlighted {
+    box-shadow: 0 0 0 2px var(--blue-400);
+  }
+  .card.late.bg,
+  .card.late.bg-badge {
+    background: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-intensity));
+  }
+  .card.late.bg:hover,
+  .card.late.bg-badge:hover {
+    background: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-intensity-hover));
+  }
+  .card.late.border,
+  .card.late.bg-badge,
+  .card.late.bg.border {
+    border-color: rgba(var(--late-r), var(--late-g), var(--late-b), var(--late-border-alpha));
+  }
+  .card-id-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 3px;
+    line-height: 1.3;
+    min-width: 0;
+  }
+  .card-id-element {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--flux-text-primary);
+    flex-shrink: 0;
+  }
+  .card-sep { color: var(--flux-text-muted); flex-shrink: 0; }
+  .card-client {
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .card-job-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--flux-text-primary);
+    line-height: 1.3;
+  }
+  .card-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    margin-top: 3px;
+  }
+  .badge {
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 1.4;
+  }
+  .badge-deadline      { background: var(--blue-bg);    color: var(--blue-400); }
+  .badge-deadline.urg  { background: var(--amber-bg);   color: var(--amber-400); }
+  .badge-deadline.late { background: var(--red-bg);     color: var(--red-400); }
+  .badge-iter          { background: var(--amber-bg);   color: var(--amber-400); }
+  .badge-comments      { background: var(--slate-bg);   color: var(--slate-400); }
+  .badge-age           { color: var(--flux-text-muted); font-style: italic; }
+  .badge-age.stale     { color: var(--amber-400); }
+
+  /* ── Density variants applied via state ───────────────────── */
+  .card.density-compact { padding: 5px 8px; }
+  .card.density-compact .card-job-name { display: none; }
+  .card.density-compact .card-footer { font-size: 9.5px; }
+
+  .card.density-detailed { padding: 10px 12px; }
+  .card.density-detailed .card-job-name { font-size: 12.5px; }
+  .card.density-detailed .card-id-element { font-size: 12px; }
+
+  /* ── Modal ────────────────────────────────────────────────── */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--backdrop);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    backdrop-filter: blur(4px);
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 12px;
+    width: min(900px, 92vw);
+    max-height: 88vh;
+    display: flex;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .modal.layout-sidebar-left { flex-direction: row-reverse; }
+  .modal.layout-sidebar-left .modal-main { border-right: none; border-left: 1px solid var(--flux-border); }
+  .modal-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--flux-border);
+    min-width: 0;
+  }
+  .modal.layout-no-sidebar .modal-aside { display: none; }
+  .modal.layout-no-sidebar .modal-main { border-right: none; }
+  .modal.layout-tabs .modal-aside { display: none; }
+  .modal.layout-tabs .modal-tabs { display: flex; }
+  .modal-tabs {
+    display: none;
+    border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-base);
+  }
+  .modal-tab {
+    padding: 9px 16px;
+    font-size: 11.5px;
+    color: var(--flux-text-tertiary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    border-bottom: 2px solid transparent;
+  }
+  .modal-tab.active {
+    color: var(--blue-400);
+    border-bottom-color: var(--blue-400);
+  }
+  .modal-aside {
+    width: 240px;
+    padding: 14px;
+    background: var(--flux-base);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--flux-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .modal-jcf {
+    font-size: 10.5px;
+    color: var(--flux-text-tertiary);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 3px;
+  }
+  .modal-job-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .modal-element-name { font-size: 12px; color: var(--flux-text-secondary); }
+  .modal-close {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .modal-close:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .modal-content { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .modal-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--flux-text-muted);
+    margin-bottom: 4px;
+  }
+  .comment {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+  }
+  .comment-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--flux-elevated);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; color: var(--flux-text-secondary);
+    font-weight: 600; flex-shrink: 0;
+  }
+  .comment-meta { font-size: 10px; color: var(--flux-text-tertiary); margin-bottom: 1px; }
+  .comment-meta strong { color: var(--flux-text-secondary); font-weight: 600; }
+  .comment-text {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--flux-text-primary);
+    background: var(--flux-elevated);
+    padding: 5px 9px;
+    border-radius: 5px;
+  }
+  .comment.system .comment-text {
+    background: transparent;
+    color: var(--flux-text-tertiary);
+    font-style: italic;
+    border-left: 2px solid var(--flux-border);
+    padding: 3px 0 3px 7px;
+    border-radius: 0;
+  }
+  .modal-aside-actions {
+    display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px;
+  }
+  .aside-action {
+    text-align: left;
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary);
+    padding: 5px 9px;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    justify-content: space-between;
+  }
+  .aside-action.current {
+    background: var(--blue-bg);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+  .aside-info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .aside-info-row:last-child { border-bottom: none; }
+  .aside-info-row span:first-child { color: var(--flux-text-muted); }
+  .aside-info-row span:last-child { color: var(--flux-text-primary); }
+
+  /* ── Confirm modal (hold-to-confirm + alternates) ─────────── */
+  .confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--backdrop);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    backdrop-filter: blur(8px);
+  }
+  .confirm-backdrop.open { display: flex; }
+  .confirm-modal {
+    background: var(--flux-surface);
+    border: 1px solid var(--amber-400);
+    border-radius: 10px;
+    padding: 22px;
+    width: min(420px, 90vw);
+    text-align: center;
+  }
+  .confirm-icon {
+    color: var(--amber-400);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: center;
+  }
+  .confirm-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .confirm-text { font-size: 12px; color: var(--flux-text-secondary); line-height: 1.5; margin-bottom: 18px; }
+  .confirm-text strong { color: var(--flux-text-primary); }
+  .confirm-hold {
+    background: var(--amber-bg);
+    border: 2px solid var(--amber-400);
+    color: var(--amber-400);
+    padding: 11px 18px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    font-family: inherit;
+  }
+  .confirm-hold::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; height: 100%;
+    width: var(--hold-progress, 0%);
+    background: var(--amber-400);
+    transition: width 0.05s linear;
+    z-index: 0;
+  }
+  .confirm-hold span { position: relative; z-index: 1; }
+  .confirm-hold.holding span { color: var(--flux-base); }
+  .confirm-hold.holding::before {
+    transition: width var(--hold-duration, 1.4s) linear;
+    width: 100%;
+  }
+  .confirm-typed-input {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--flux-elevated);
+    border: 2px solid var(--amber-400);
+    border-radius: 7px;
+    color: var(--flux-text-primary);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    outline: none;
+    text-align: center;
+  }
+  .confirm-dbl {
+    background: var(--amber-bg);
+    border: 2px solid var(--amber-400);
+    color: var(--amber-400);
+    padding: 11px;
+    width: 100%;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .confirm-dbl.armed {
+    background: var(--amber-400);
+    color: var(--flux-base);
+  }
+  .confirm-cancel {
+    background: transparent;
+    border: none;
+    color: var(--flux-text-muted);
+    padding: 7px;
+    margin-top: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .confirm-cancel:hover { color: var(--flux-text-secondary); }
+
+  /* ── Prompt bar (footer) ──────────────────────────────────── */
+  footer.prompt-bar {
+    grid-row: 2 / 3;
+    background: var(--flux-surface);
+    border-top: 1px solid var(--flux-border);
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .prompt-text {
+    flex: 1;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--flux-text-primary);
+    font-size: 11.5px;
+    line-height: 1.55;
+    font-family: 'Inter', system-ui, sans-serif;
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  .copy-btn {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-400);
+    color: var(--blue-400);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { background: rgba(96, 165, 250, 0.20); }
+  .copy-btn.copied {
+    background: var(--emerald-400);
+    border-color: var(--emerald-400);
+    color: var(--flux-base);
+  }
+</style>
+</head>
+<body>
+
+<aside class="controls">
+  <h1>BAT Kanban <small>playground</small></h1>
+  <div class="controls-intro">
+    Manipule les contrôles ; la preview se met à jour en direct.
+    Le prompt en bas reflète tes choix — copie-le pour l'envoyer à Claude.
+  </div>
+
+  <div class="preset-row" id="presets">
+    <button class="preset-btn" data-preset="spartan">Spartan<small>minimal, juste l'essentiel</small></button>
+    <button class="preset-btn active" data-preset="default">Default<small>équilibré, info utile</small></button>
+    <button class="preset-btn" data-preset="dense">Compact<small>haute densité</small></button>
+    <button class="preset-btn" data-preset="rich">Detail-rich<small>tout affiché</small></button>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Densité de carte</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Densité</span>
+      <div class="seg" data-key="density">
+        <button data-val="compact">Compact</button>
+        <button data-val="medium" class="active">Moyen</button>
+        <button data-val="detailed">Détaillé</button>
+      </div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Afficher client</span>
+      <div class="toggle on" data-key="showClient"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Afficher commercial</span>
+      <div class="toggle on" data-key="showCommercial"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Badge itération</span>
+      <div class="toggle on" data-key="showIteration"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Badge commentaires</span>
+      <div class="toggle on" data-key="showComments"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Âge en colonne</span>
+      <div class="toggle on" data-key="showAge"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Signal de retard</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Style</span>
+      <div class="seg" data-key="latenessStyle">
+        <button data-val="bg" class="active">BG</button>
+        <button data-val="border">Border</button>
+        <button data-val="badge">Badge</button>
+        <button data-val="bg-badge">BG+Bdg</button>
+      </div>
+    </div>
+    <div class="ctrl-label-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Intensité fond</span>
+        <span class="ctrl-value" id="lateIntensity-val">0.16</span>
+      </div>
+      <input type="range" min="0.05" max="0.40" step="0.01" value="0.16" data-key="latenessIntensity">
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Texte « EN RETARD »</span>
+      <div class="toggle on" data-key="showLateText"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Identification du job</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Bandeau couleur</span>
+      <div class="seg" data-key="jobStripe">
+        <button data-val="off">Off</button>
+        <button data-val="left" class="active">Gauche</button>
+        <button data-val="top">Haut</button>
+      </div>
+    </div>
+    <div class="ctrl-label-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Épaisseur</span>
+        <span class="ctrl-value" id="jobStripeWidth-val">3px</span>
+      </div>
+      <input type="range" min="1" max="6" step="1" value="3" data-key="jobStripeWidth">
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Hover-highlight job</span>
+      <div class="toggle on" data-key="hoverHighlight"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Colonnes</div>
+    <div class="ctrl-label-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Largeur</span>
+        <span class="ctrl-value" id="columnWidth-val">280px</span>
+      </div>
+      <input type="range" min="220" max="360" step="10" value="280" data-key="columnWidth">
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Compteurs sur en-têtes</span>
+      <div class="toggle on" data-key="showColumnCount"></div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Colonne « Revisions »</span>
+      <div class="toggle on" data-key="showRevisionsCol"></div>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Modale détail</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Disposition</span>
+      <div class="seg" data-key="modalLayout">
+        <button data-val="sidebar-right" class="active">Panneau D</button>
+        <button data-val="sidebar-left">Panneau G</button>
+        <button data-val="tabs">Onglets</button>
+        <button data-val="no-sidebar">Aucun</button>
+      </div>
+    </div>
+    <div class="demo-btn-row">
+      <button class="demo-btn" id="demo-modal"><span data-lucide="play" data-size="11"></span> Voir la modale</button>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Confirmation transitions</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Type</span>
+      <div class="seg" data-key="confirmStyle">
+        <button data-val="hold" class="active">Maintien</button>
+        <button data-val="type">Saisie mot</button>
+        <button data-val="dblclick">Dbl-clic</button>
+      </div>
+    </div>
+    <div class="ctrl-label-stack">
+      <div style="display:flex;justify-content:space-between;">
+        <span class="ctrl-label">Durée hold</span>
+        <span class="ctrl-value" id="holdDuration-val">1400ms</span>
+      </div>
+      <input type="range" min="600" max="3000" step="100" value="1400" data-key="holdDuration">
+    </div>
+    <div class="demo-btn-row">
+      <button class="demo-btn" id="demo-confirm"><span data-lucide="play" data-size="11"></span> Voir la confirmation</button>
+    </div>
+  </div>
+
+  <div class="ctrl-section">
+    <div class="ctrl-section-title">Thème</div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Mode</span>
+      <div class="seg" data-key="theme">
+        <button data-val="dark" class="active">Sombre</button>
+        <button data-val="light">Clair</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="preview">
+  <div class="preview-header">
+    <div class="search-wrap" id="search-wrap">
+      <span class="search-icon" data-lucide="search" data-size="14"></span>
+      <input type="text" class="search-input" id="search-input" placeholder="Rechercher un job (JCF, nom, client, commercial)…">
+      <button class="search-clear" id="search-clear" title="Effacer" data-lucide="x" data-size="11"></button>
+    </div>
+    <button class="filter-pill" data-filter="all">Toutes</button>
+    <button class="filter-pill" data-filter="late">En retard</button>
+    <button class="filter-pill" data-filter="urgent">≤ J-3</button>
+    <span class="preview-meta" id="preview-meta">24 cartes</span>
+  </div>
+  <div class="board" id="board"></div>
+</main>
+
+<footer class="prompt-bar">
+  <pre class="prompt-text" id="prompt"></pre>
+  <button class="copy-btn" id="copy">Copier le prompt</button>
+</footer>
+
+<!-- Modal détail -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal">
+    <div class="modal-main">
+      <div class="modal-header">
+        <div>
+          <div class="modal-jcf" id="modal-jcf"></div>
+          <div class="modal-job-name" id="modal-job-name"></div>
+          <div class="modal-element-name" id="modal-element-name"></div>
+        </div>
+        <button class="modal-close" id="modal-close" data-lucide="x" data-size="14"></button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="thread">Discussion</button>
+        <button class="modal-tab" data-tab="actions">Actions</button>
+        <button class="modal-tab" data-tab="info">Détails</button>
+      </div>
+      <div class="modal-content" id="modal-content"></div>
+    </div>
+    <div class="modal-aside" id="modal-aside"></div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="confirm-backdrop" id="confirm-backdrop">
+  <div class="confirm-modal" id="confirm-modal">
+    <div class="confirm-icon" data-lucide="alert-triangle" data-size="28"></div>
+    <div class="confirm-title">Action sensible</div>
+    <div class="confirm-text">
+      Tu vas <strong>dé-valider</strong> un BAT déjà approuvé.<br>
+      Cette action peut décaler des tâches déjà planifiées en aval.
+    </div>
+    <div id="confirm-input-area"></div>
+    <button class="confirm-cancel" id="confirm-cancel">Annuler</button>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────────────
+// Lucide icons (paths from lucide.dev, embedded inline)
+// ────────────────────────────────────────────────────────────────
+const ICONS = {
+  search:           '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  x:                '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  clock:            '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'rotate-cw':      '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  'message-square': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  history:          '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  play:             '<polygon points="6 3 20 12 6 21 6 3"/>',
+  check:            '<path d="M20 6 9 17l-5-5"/>',
+  'corner-down-left':'<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>',
+  'circle-dot':     '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/>',
+  copy:             '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+};
+function lucideHTML(name, size = 14) {
+  const path = ICONS[name];
+  if (!path) return '';
+  return `<svg class="lucide" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+function replaceIcons(root = document) {
+  root.querySelectorAll('[data-lucide]').forEach(el => {
+    const size = parseInt(el.dataset.size, 10) || 14;
+    el.innerHTML = lucideHTML(el.dataset.lucide, size);
+  });
+}
+
+// ────────────────────────────────────────────────────────────────
+// Defaults & State
+// ────────────────────────────────────────────────────────────────
+const DEFAULTS = {
+  density: 'medium',
+  showClient: true,
+  showCommercial: true,
+  showIteration: true,
+  showComments: true,
+  showAge: true,
+  latenessStyle: 'bg',
+  latenessIntensity: 0.16,
+  showLateText: true,
+  jobStripe: 'left',
+  jobStripeWidth: 3,
+  hoverHighlight: true,
+  columnWidth: 280,
+  showColumnCount: true,
+  showRevisionsCol: true,
+  modalLayout: 'sidebar-right',
+  confirmStyle: 'hold',
+  holdDuration: 1400,
+  theme: 'dark',
+};
+let state = { ...DEFAULTS, search: '', filter: 'all' };
+
+const PRESETS = {
+  spartan:  { density:'compact',  showClient:false, showCommercial:false, showIteration:true, showComments:false, showAge:false, latenessStyle:'bg', latenessIntensity:0.16, showLateText:false, jobStripe:'left', jobStripeWidth:3, hoverHighlight:true, columnWidth:240, showColumnCount:false, showRevisionsCol:true, modalLayout:'no-sidebar', confirmStyle:'hold', holdDuration:1200, theme:'dark' },
+  default:  { ...DEFAULTS },
+  dense:    { density:'compact',  showClient:true,  showCommercial:false, showIteration:true, showComments:true,  showAge:false, latenessStyle:'bg', latenessIntensity:0.20, showLateText:true,  jobStripe:'left', jobStripeWidth:2, hoverHighlight:true, columnWidth:240, showColumnCount:true, showRevisionsCol:true, modalLayout:'sidebar-right', confirmStyle:'hold', holdDuration:1400, theme:'dark' },
+  rich:     { density:'detailed', showClient:true,  showCommercial:true,  showIteration:true, showComments:true,  showAge:true,  latenessStyle:'bg-badge', latenessIntensity:0.20, showLateText:true,  jobStripe:'left', jobStripeWidth:4, hoverHighlight:true, columnWidth:320, showColumnCount:true, showRevisionsCol:true, modalLayout:'sidebar-right', confirmStyle:'hold', holdDuration:1400, theme:'dark' },
+};
+
+// ────────────────────────────────────────────────────────────────
+// Mock data — small (8 jobs × 3 elements)
+// ────────────────────────────────────────────────────────────────
+const STATUSES = [
+  { key:'waiting_files',       title:'En attente fichiers' },
+  { key:'files_received',      title:'Fichiers reçus' },
+  { key:'revisions_requested', title:'Modifs demandées', iconBefore:'corner-down-left' },
+  { key:'bat_sent',            title:'BAT envoyé' },
+  { key:'bat_approved',        title:'BAT validé', iconAfter:'check' },
+];
+const NOW = new Date('2026-05-03T10:00:00').getTime();
+const JOBS = [
+  { id:'J01', jcf:'JCF-2026001', name:'Catalogue printemps', client:"L'Oréal", commercial:'Sophie Mercier', batDeadline: NOW + 5*86400000 },
+  { id:'J02', jcf:'JCF-2026002', name:'Plaquette commerciale', client:'Décathlon', commercial:'Nicolas Dubois', batDeadline: NOW - 3*86400000 },
+  { id:'J03', jcf:'JCF-2026003', name:'Affiche A2 lancement', client:'Renault SAS', commercial:'Camille Roux', batDeadline: NOW + 2*86400000 },
+  { id:'J04', jcf:'JCF-2026004', name:'Étiquettes vin', client:'Pernod Ricard', commercial:'Sophie Mercier', batDeadline: NOW + 12*86400000 },
+  { id:'J05', jcf:'JCF-2026005', name:'Magazine n°47', client:'Le Monde Médias', commercial:'Antoine Leroy', batDeadline: NOW - 1*86400000 },
+  { id:'J06', jcf:'JCF-2026006', name:'Brochure produit', client:'Air France', commercial:'Élodie Vincent', batDeadline: NOW + 18*86400000 },
+  { id:'J07', jcf:'JCF-2026007', name:'Carte de vœux', client:'BNF Éditions', commercial:'Camille Roux', batDeadline: null },
+  { id:'J08', jcf:'JCF-2026008', name:'Notice technique', client:'Citroën DS', commercial:'Nicolas Dubois', batDeadline: NOW + 8*86400000 },
+];
+const ELEMENT_NAMES = ['Recto', 'Verso', 'Couverture', '4ème de couv', 'Page intérieure', 'Étiquette principale', 'Bandeau promo'];
+const ELEMENTS = [];
+const COMMENTS = [];
+
+let seed = 17;
+const rng = () => { seed = (seed*9301 + 49297) % 233280; return seed/233280; };
+const randInt = (a,b) => Math.floor(rng()*(b-a+1))+a;
+const pick = (arr) => arr[Math.floor(rng()*arr.length)];
+
+JOBS.forEach((job, ji) => {
+  for (let i = 0; i < 3; i++) {
+    const elId = job.id + '-E' + (i+1);
+    const status = pick(['waiting_files','files_received','bat_sent','bat_approved','waiting_files','bat_sent','revisions_requested']);
+    const ageDays = randInt(0, 7);
+    ELEMENTS.push({
+      id: elId,
+      jobId: job.id,
+      name: pick(ELEMENT_NAMES),
+      batStatus: status,
+      revisionRound: status === 'revisions_requested' ? randInt(1,3) : (status === 'bat_sent' && rng() < 0.3 ? 1 : 0),
+      lastTransitionAt: NOW - ageDays*86400000,
+    });
+    const cmtCount = randInt(0,4);
+    for (let k = 0; k < cmtCount; k++) {
+      const isSystem = rng() < 0.4;
+      COMMENTS.push({
+        elementId: elId,
+        author: isSystem ? null : pick(['Sophie Mercier', 'Marc (PAO)', 'Léa (PAO)', 'Yann (ADV)', 'Nicolas Dubois']),
+        isSystem,
+        text: isSystem
+          ? pick([`Sophie a marqué les fichiers reçus`, `Marc a déplacé en BAT envoyé`, `Yann a passé en révisions demandées`])
+          : pick([
+              "Le client veut le logo agrandi de 20%",
+              "OK pour l'envoi, je relance demain",
+              "@marc tu peux vérifier les Pantone ?",
+              "Modif validée par téléphone, je passe en validé",
+              "Reçu les fichiers, manque le logo HD",
+            ]),
+        createdAt: NOW - randInt(0,10)*86400000 - randInt(0,12)*3600000,
+      });
+    }
+  }
+});
+COMMENTS.sort((a,b)=>a.createdAt-b.createdAt);
+
+// ────────────────────────────────────────────────────────────────
+// Render preview
+// ────────────────────────────────────────────────────────────────
+function isLate(el, job) {
+  if (el.batStatus === 'bat_approved') return false;
+  return job.batDeadline !== null && job.batDeadline < NOW;
+}
+function deadlineLabel(job, el) {
+  if (el.batStatus === 'bat_approved' || job.batDeadline === null) return null;
+  const days = Math.round((job.batDeadline - NOW) / 86400000);
+  if (days < 0) return { text: state.showLateText ? 'EN RETARD ' + Math.abs(days) + 'j' : '+' + Math.abs(days) + 'j', cls: 'late' };
+  if (days <= 3) return { text: 'J-' + days, cls: 'urg' };
+  return { text: 'J-' + days, cls: '' };
+}
+function ageInColumn(el) {
+  const d = Math.max(0, Math.round((NOW - el.lastTransitionAt) / 86400000));
+  return d === 0 ? "auj." : d + 'j';
+}
+
+function renderCard(el) {
+  const job = JOBS.find(j => j.id === el.jobId);
+  const late = isLate(el, job);
+  const dl = deadlineLabel(job, el);
+  const ageDays = (NOW - el.lastTransitionAt) / 86400000;
+  const stale = ageDays > 4;
+  const cmtCount = COMMENTS.filter(c => c.elementId === el.id).length;
+  const card = document.createElement('div');
+  let cls = 'card density-' + state.density;
+  if (state.jobStripe === 'left') cls += ' stripe-left';
+  if (state.jobStripe === 'top')  cls += ' stripe-top';
+  if (late) {
+    cls += ' late';
+    if (state.latenessStyle === 'bg')        cls += ' bg';
+    if (state.latenessStyle === 'border')    cls += ' border';
+    if (state.latenessStyle === 'bg-badge')  cls += ' bg-badge';
+  }
+  card.className = cls;
+  card.dataset.elementId = el.id;
+  card.dataset.jobId = el.jobId;
+
+  const showBadge = late && (state.latenessStyle === 'badge' || state.latenessStyle === 'bg-badge');
+
+  let html = '';
+  // Line 1: element name · client (compact mode keeps only this)
+  html += `<div class="card-id-line">
+    <span class="card-id-element">${el.name}</span>
+    ${state.showClient ? `<span class="card-sep">·</span><span class="card-client">${job.client}</span>` : ''}
+  </div>`;
+  // Line 2: job name
+  if (state.density !== 'compact') {
+    html += `<div class="card-job-name">${job.name}</div>`;
+  }
+
+  const badges = [];
+  if (dl && (state.latenessStyle === 'badge' || state.latenessStyle === 'bg-badge' || dl.cls !== 'late')) {
+    badges.push(`<span class="badge badge-deadline ${dl.cls}">${lucideHTML('clock', 10)} ${dl.text}</span>`);
+  } else if (dl && dl.cls !== 'late' && !late) {
+    badges.push(`<span class="badge badge-deadline ${dl.cls}">${lucideHTML('clock', 10)} ${dl.text}</span>`);
+  }
+  if (state.showIteration && el.revisionRound > 0) {
+    badges.push(`<span class="badge badge-iter">${lucideHTML('rotate-cw', 10)} ${el.revisionRound}</span>`);
+  }
+  if (state.showComments && cmtCount > 0) {
+    badges.push(`<span class="badge badge-comments">${lucideHTML('message-square', 10)} ${cmtCount}</span>`);
+  }
+  if (state.showAge) {
+    badges.push(`<span class="badge-age ${stale ? 'stale' : ''}">${ageInColumn(el)}</span>`);
+  }
+  if (badges.length > 0) html += `<div class="card-footer">${badges.join('')}</div>`;
+  card.innerHTML = html;
+  card.addEventListener('click', () => openModal(el.id));
+  if (state.hoverHighlight) {
+    card.addEventListener('mouseenter', () => highlightJob(el.jobId));
+    card.addEventListener('mouseleave', () => highlightJob(null));
+  }
+  return card;
+}
+
+function highlightJob(jobId) {
+  document.querySelectorAll('.card').forEach(c => {
+    if (jobId === null) {
+      c.classList.remove('dimmed','highlighted');
+    } else if (c.dataset.jobId === jobId) {
+      c.classList.add('highlighted'); c.classList.remove('dimmed');
+    } else {
+      c.classList.add('dimmed'); c.classList.remove('highlighted');
+    }
+  });
+}
+
+function matchesSearch(el, job, q) {
+  if (!q) return true;
+  const ql = q.toLowerCase();
+  return job.jcf.toLowerCase().includes(ql)
+      || job.name.toLowerCase().includes(ql)
+      || job.client.toLowerCase().includes(ql)
+      || job.commercial.toLowerCase().includes(ql)
+      || el.name.toLowerCase().includes(ql);
+}
+function matchesFilter(el, job, f) {
+  if (f === 'all' || !f) return true;
+  if (el.batStatus === 'bat_approved' || job.batDeadline === null) return false;
+  const days = (job.batDeadline - NOW) / 86400000;
+  if (f === 'late') return days < 0;
+  if (f === 'urgent') return days <= 3;
+  return true;
+}
+function filteredElements() {
+  return ELEMENTS.filter(el => {
+    const job = JOBS.find(j => j.id === el.jobId);
+    return matchesSearch(el, job, state.search) && matchesFilter(el, job, state.filter);
+  });
+}
+
+function renderBoard() {
+  document.documentElement.style.setProperty('--col-width', state.columnWidth + 'px');
+  document.documentElement.style.setProperty('--late-intensity', state.latenessIntensity);
+  document.documentElement.style.setProperty('--late-intensity-hover', Math.min(state.latenessIntensity + 0.08, 0.55));
+  document.documentElement.style.setProperty('--job-stripe-width', state.jobStripeWidth + 'px');
+
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  const visible = filteredElements();
+  document.getElementById('preview-meta').textContent = visible.length + ' / ' + ELEMENTS.length + ' cartes';
+
+  STATUSES.forEach(s => {
+    if (s.key === 'revisions_requested' && !state.showRevisionsCol) return;
+    const col = document.createElement('div');
+    col.className = 'column';
+    col.dataset.status = s.key;
+    const cards = visible.filter(e => e.batStatus === s.key);
+    col.innerHTML = `
+      <div class="col-header">
+        <div class="col-header-text">
+          ${s.iconBefore ? `<span class="col-arrow">${lucideHTML(s.iconBefore, 12)}</span>` : ''}
+          <span class="col-title">${s.title}${s.iconAfter ? ' ' + lucideHTML(s.iconAfter, 12) : ''}</span>
+        </div>
+        ${state.showColumnCount ? `<span class="col-count">${cards.length}</span>` : ''}
+      </div>
+      <div class="col-body"></div>
+    `;
+    const body = col.querySelector('.col-body');
+    cards.forEach(el => body.appendChild(renderCard(el)));
+    board.appendChild(col);
+  });
+}
+
+// ────────────────────────────────────────────────────────────────
+// Modal
+// ────────────────────────────────────────────────────────────────
+let activeTab = 'thread';
+function openModal(elementId) {
+  const el = ELEMENTS.find(e => e.id === elementId);
+  if (!el) return;
+  const job = JOBS.find(j => j.id === el.jobId);
+  document.getElementById('modal').className = 'modal layout-' + state.modalLayout;
+  document.getElementById('modal-jcf').textContent = job.jcf;
+  document.getElementById('modal-job-name').textContent = job.name + ' — ' + job.client;
+  document.getElementById('modal-element-name').textContent = 'Élément : ' + el.name;
+  activeTab = 'thread';
+  renderModalBody(el, job);
+  renderModalAside(el, job);
+  document.getElementById('modal-backdrop').classList.add('open');
+}
+function renderModalBody(el, job) {
+  const content = document.getElementById('modal-content');
+  let html = '';
+  if (state.modalLayout === 'tabs') {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+    if (activeTab === 'thread') html += renderThreadHTML(el);
+    if (activeTab === 'actions') html += renderAsideHTML(el, job, true);
+    if (activeTab === 'info') html += renderInfoHTML(el, job);
+  } else if (state.modalLayout === 'no-sidebar') {
+    html += renderThreadHTML(el);
+    html += '<hr style="border:none;border-top:1px solid var(--flux-border);margin:8px 0">';
+    html += renderAsideHTML(el, job, true);
+  } else {
+    html += renderThreadHTML(el);
+  }
+  content.innerHTML = html;
+}
+function renderThreadHTML(el) {
+  const cmts = COMMENTS.filter(c => c.elementId === el.id);
+  let html = `<div class="modal-section-title">Activité (${cmts.length})</div>`;
+  if (cmts.length === 0) {
+    html += '<div style="color:var(--flux-text-muted);padding:18px;text-align:center;font-size:11.5px">Aucun commentaire pour le moment.</div>';
+  }
+  cmts.forEach(c => {
+    const initials = c.isSystem ? lucideHTML('history', 12) : (c.author || '?').split(' ').map(s => s[0]).slice(0,2).join('');
+    const date = new Date(c.createdAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    html += `<div class="comment ${c.isSystem ? 'system' : ''}">
+      <div class="comment-avatar">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div class="comment-meta">${c.isSystem ? '<em>Système</em>' : '<strong>' + c.author + '</strong>'} · ${date}</div>
+        <div class="comment-text">${c.text}</div>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+function renderAsideHTML(el, job, includeTitle = false) {
+  let html = '';
+  if (includeTitle) html += '<div class="modal-section-title">Transitions</div>';
+  html += '<div class="modal-aside-actions">';
+  STATUSES.forEach(s => {
+    const isCurrent = s.key === el.batStatus;
+    html += `<button class="aside-action ${isCurrent ? 'current' : ''}"><span>${s.title}</span>${isCurrent ? lucideHTML('circle-dot', 11) : ''}</button>`;
+  });
+  html += '</div>';
+  return html;
+}
+function renderInfoHTML(el, job) {
+  const dl = deadlineLabel(job, el);
+  return `<div class="modal-section-title">Détails</div>
+    <div class="aside-info-row"><span>Statut</span><span>${el.batStatus}</span></div>
+    <div class="aside-info-row"><span>Deadline</span><span>${dl ? dl.text : '—'}</span></div>
+    <div class="aside-info-row"><span>Itérations</span><span>${el.revisionRound || 0}</span></div>
+    <div class="aside-info-row"><span>Commercial</span><span>${job.commercial}</span></div>
+    <div class="aside-info-row"><span>Âge en col.</span><span>${ageInColumn(el)}</span></div>`;
+}
+function renderModalAside(el, job) {
+  const aside = document.getElementById('modal-aside');
+  if (state.modalLayout === 'no-sidebar' || state.modalLayout === 'tabs') { aside.innerHTML = ''; return; }
+  aside.innerHTML = renderAsideHTML(el, job, true) + renderInfoHTML(el, job);
+}
+document.getElementById('modal-close').addEventListener('click', () => document.getElementById('modal-backdrop').classList.remove('open'));
+document.getElementById('modal-backdrop').addEventListener('click', e => { if (e.target.id === 'modal-backdrop') document.getElementById('modal-backdrop').classList.remove('open'); });
+document.querySelectorAll('.modal-tab').forEach(t => t.addEventListener('click', () => {
+  activeTab = t.dataset.tab;
+  const el = ELEMENTS[0]; const job = JOBS[0]; renderModalBody(el, job);
+}));
+
+// ────────────────────────────────────────────────────────────────
+// Confirm modal (3 styles)
+// ────────────────────────────────────────────────────────────────
+function openConfirm() {
+  const inputArea = document.getElementById('confirm-input-area');
+  document.getElementById('confirm-modal').style.setProperty('--hold-duration', (state.holdDuration / 1000) + 's');
+  if (state.confirmStyle === 'hold') {
+    inputArea.innerHTML = '<button class="confirm-hold" id="confirm-hold-btn"><span>Maintenir pour confirmer</span></button>';
+    setupHold();
+  } else if (state.confirmStyle === 'type') {
+    inputArea.innerHTML = `<input class="confirm-typed-input" id="confirm-typed" placeholder='Tape "DÉVALIDER"'>`;
+    setTimeout(() => document.getElementById('confirm-typed').focus(), 50);
+    document.getElementById('confirm-typed').addEventListener('input', e => {
+      if (e.target.value.trim().toUpperCase() === 'DÉVALIDER' || e.target.value.trim().toUpperCase() === 'DEVALIDER') {
+        flashSuccess(); document.getElementById('confirm-backdrop').classList.remove('open');
+      }
+    });
+  } else if (state.confirmStyle === 'dblclick') {
+    inputArea.innerHTML = '<button class="confirm-dbl" id="confirm-dbl"><span>Double-cliquer pour confirmer</span></button>';
+    let armed = false; let armTimer;
+    document.getElementById('confirm-dbl').addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        document.getElementById('confirm-dbl').classList.add('armed');
+        document.getElementById('confirm-dbl').querySelector('span').textContent = 'Re-cliquer pour valider';
+        armTimer = setTimeout(() => { armed = false; document.getElementById('confirm-dbl').classList.remove('armed'); document.getElementById('confirm-dbl').querySelector('span').textContent = 'Double-cliquer pour confirmer'; }, 1500);
+      } else {
+        clearTimeout(armTimer); flashSuccess(); document.getElementById('confirm-backdrop').classList.remove('open');
+      }
+    });
+  }
+  document.getElementById('confirm-backdrop').classList.add('open');
+}
+function setupHold() {
+  const btn = document.getElementById('confirm-hold-btn');
+  const span = btn.querySelector('span');
+  let timer; let holding = false;
+  const start = e => {
+    e.preventDefault(); holding = true;
+    btn.classList.add('holding'); span.textContent = 'Maintien…';
+    timer = setTimeout(() => { if (holding) { flashSuccess(); document.getElementById('confirm-backdrop').classList.remove('open'); } }, state.holdDuration);
+  };
+  const cancel = () => { holding = false; clearTimeout(timer); btn.classList.remove('holding'); span.textContent = 'Maintenir pour confirmer'; };
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', cancel);
+  btn.addEventListener('mouseleave', cancel);
+}
+function flashSuccess() {
+  // visual confirmation
+}
+document.getElementById('confirm-cancel').addEventListener('click', () => document.getElementById('confirm-backdrop').classList.remove('open'));
+document.getElementById('confirm-backdrop').addEventListener('click', e => { if (e.target.id === 'confirm-backdrop') document.getElementById('confirm-backdrop').classList.remove('open'); });
+document.getElementById('demo-modal').addEventListener('click', () => openModal(ELEMENTS[0].id));
+document.getElementById('demo-confirm').addEventListener('click', openConfirm);
+
+// ────────────────────────────────────────────────────────────────
+// Prompt generation
+// ────────────────────────────────────────────────────────────────
+function updatePrompt() {
+  const parts = [];
+
+  // Density
+  if (state.density !== DEFAULTS.density) parts.push(`cartes en densité **${state.density}**`);
+  const hidden = [];
+  if (!state.showClient) hidden.push('client');
+  if (!state.showCommercial) hidden.push('commercial');
+  if (!state.showIteration) hidden.push('badge itération');
+  if (!state.showComments) hidden.push('badge commentaires');
+  if (!state.showAge) hidden.push('âge en colonne');
+  if (hidden.length > 0) parts.push(`masquer ${hidden.join(', ')} sur les cartes`);
+
+  // Lateness
+  const styleLabels = { 'bg': 'fond coloré rouge', 'border': 'bordure rouge', 'badge': 'badge rouge dédié', 'bg-badge': 'fond rouge + badge' };
+  if (state.latenessStyle !== DEFAULTS.latenessStyle) parts.push(`signaler le retard par **${styleLabels[state.latenessStyle]}**`);
+  if (Math.abs(state.latenessIntensity - DEFAULTS.latenessIntensity) > 0.01) parts.push(`intensité du fond retard à ${(state.latenessIntensity*100).toFixed(0)}%`);
+  if (!state.showLateText) parts.push('badge sans le texte « EN RETARD » (juste le compte de jours)');
+
+  // Job stripe
+  if (state.jobStripe !== DEFAULTS.jobStripe) {
+    if (state.jobStripe === 'off') parts.push('pas de bandeau couleur par job');
+    else if (state.jobStripe === 'top') parts.push('bandeau couleur par job en haut de la carte');
+  }
+  if (state.jobStripeWidth !== DEFAULTS.jobStripeWidth) parts.push(`bandeau de ${state.jobStripeWidth}px`);
+  if (!state.hoverHighlight) parts.push('pas de hover-highlight des cartes du même job');
+
+  // Columns
+  if (state.columnWidth !== DEFAULTS.columnWidth) parts.push(`colonnes de ${state.columnWidth}px`);
+  if (!state.showColumnCount) parts.push('sans compteurs sur les en-têtes de colonne');
+  if (!state.showRevisionsCol) parts.push('pas de colonne « Revisions requested » dédiée — back-edge silencieuse vers `files_received`');
+
+  // Modal
+  if (state.modalLayout !== DEFAULTS.modalLayout) {
+    const labels = { 'sidebar-right': 'modale plein écran avec sidebar de transitions à droite', 'sidebar-left': 'modale plein écran avec sidebar à gauche', 'tabs': 'modale plein écran avec onglets (Discussion / Actions / Détails)', 'no-sidebar': 'modale plein écran sans sidebar (actions inline en bas)' };
+    parts.push(labels[state.modalLayout]);
+  }
+
+  // Confirm
+  if (state.confirmStyle !== DEFAULTS.confirmStyle) {
+    const labels = { 'hold': 'hold-to-confirm pour les transitions sensibles', 'type': 'taper un mot de confirmation pour les transitions sensibles', 'dblclick': 'double-clic armé (1.5s) pour les transitions sensibles' };
+    parts.push(labels[state.confirmStyle]);
+  }
+  if (state.holdDuration !== DEFAULTS.holdDuration && state.confirmStyle === 'hold') parts.push(`durée du hold de ${state.holdDuration}ms`);
+
+  // Theme
+  if (state.theme !== DEFAULTS.theme) parts.push('en thème clair par défaut');
+
+  let prompt;
+  if (parts.length === 0) {
+    prompt = "Implémente le Kanban BAT avec les choix par défaut : structure carte = ligne 1 (élément · client) / ligne 2 (job name plus gros), retard signalé par un fond rouge à 16% d'opacité, hover-highlight des cartes du même job, 5 colonnes de 280px (« En attente fichiers » → « Fichiers reçus » → « Modifs demandées » avec flèche de retour → « BAT envoyé » → « BAT validé »). La décision « BAT requis ? » se gère au niveau JCF, pas ici — seuls les éléments qui requièrent un BAT apparaissent. Modale plein écran avec sidebar de transitions à droite, hold-to-confirm de 1.4s pour les transitions sensibles (bat_approved → bat_sent). Aucun border-radius. Couleurs sémantiques strictes : rouge = late, ambre = warning (itérations), bleu = info (deadline future). Thème dark.";
+  } else {
+    prompt = "Implémente le Kanban BAT avec les ajustements suivants par rapport aux choix par défaut :\n\n• " + parts.join('\n• ');
+    prompt += "\n\nLe reste suit le design par défaut (carte de densité moyenne, fond rouge à 16% pour le retard, bandeau couleur par job à gauche, 6 colonnes, modale plein écran avec sidebar à droite, hold-to-confirm 1.4s, thème dark).";
+  }
+  document.getElementById('prompt').textContent = prompt;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bindings
+// ────────────────────────────────────────────────────────────────
+function applyState() {
+  document.documentElement.classList.toggle('light', state.theme === 'light');
+  // Update displayed values
+  document.getElementById('lateIntensity-val').textContent = state.latenessIntensity.toFixed(2);
+  document.getElementById('jobStripeWidth-val').textContent = state.jobStripeWidth + 'px';
+  document.getElementById('columnWidth-val').textContent = state.columnWidth + 'px';
+  document.getElementById('holdDuration-val').textContent = state.holdDuration + 'ms';
+  // Sync UI controls to state
+  document.querySelectorAll('.toggle').forEach(t => t.classList.toggle('on', state[t.dataset.key] === true));
+  document.querySelectorAll('.seg').forEach(seg => {
+    const k = seg.dataset.key;
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === state[k]));
+  });
+  document.querySelectorAll('input[type=range]').forEach(input => {
+    const k = input.dataset.key;
+    input.value = state[k];
+  });
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === state.preset));
+}
+function updateAll() {
+  applyState();
+  renderBoard();
+  updatePrompt();
+}
+
+// Toggles
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => {
+    state[t.dataset.key] = !state[t.dataset.key];
+    state.preset = 'custom';
+    updateAll();
+  });
+});
+// Segmented
+document.querySelectorAll('.seg').forEach(seg => {
+  seg.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      state[seg.dataset.key] = b.dataset.val;
+      state.preset = 'custom';
+      updateAll();
+    });
+  });
+});
+// Sliders
+document.querySelectorAll('input[type=range]').forEach(input => {
+  input.addEventListener('input', () => {
+    const k = input.dataset.key;
+    state[k] = input.step.includes('.') ? parseFloat(input.value) : parseInt(input.value, 10);
+    state.preset = 'custom';
+    updateAll();
+  });
+});
+// Presets
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    state = { ...PRESETS[b.dataset.preset], preset: b.dataset.preset, search: state.search, filter: state.filter };
+    updateAll();
+  });
+});
+
+// Search & filter pills (preview-level filtering, not control state)
+document.getElementById('search-input').addEventListener('input', e => {
+  state.search = e.target.value;
+  document.getElementById('search-wrap').classList.toggle('has-value', !!state.search);
+  renderBoard();
+});
+document.getElementById('search-clear').addEventListener('click', () => {
+  state.search = '';
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-wrap').classList.remove('has-value');
+  renderBoard();
+});
+document.querySelectorAll('.filter-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    state.filter = pill.dataset.filter;
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p === pill));
+    renderBoard();
+  });
+});
+// Default active pill
+document.querySelector('.filter-pill[data-filter="all"]').classList.add('active');
+
+// Copy
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = document.getElementById('prompt').textContent;
+  await navigator.clipboard.writeText(text);
+  const btn = document.getElementById('copy');
+  btn.innerHTML = lucideHTML('check', 14) + ' Copié !';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = 'Copier le prompt'; btn.classList.remove('copied'); }, 1400);
+});
+
+// Esc
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('confirm-backdrop').classList.remove('open');
+    document.getElementById('modal-backdrop').classList.remove('open');
+  }
+});
+
+// Boot
+replaceIcons();
+state.preset = 'default';
+updateAll();
+</script>
+</body>
+</html>

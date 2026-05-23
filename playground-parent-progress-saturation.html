@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground : JCF avec onglet Acomptes &amp; avancement</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+    --emerald-400: #34d399;
+    --amber-300:   #fcd34d;
+    --red-400:     #f87171;
+    --indigo-400:  #818cf8;
+    --indigo-500:  #6366f1;
+    --sky-400:     #38bdf8;
+    --zinc-800:    #27272a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--flux-base); color: var(--flux-text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  .page { max-width: 1080px; margin: 0 auto; padding: 32px 24px 48px; }
+  header.page-header { margin-bottom: 16px; }
+  header.page-header h1 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  header.page-header p { color: var(--flux-text-tertiary); font-size: 12px; max-width: 820px; }
+  header.page-header p + p { margin-top: 4px; color: var(--flux-text-muted); }
+
+  /* Scenario switch */
+  .scenario-switch { display: flex; gap: 8px; margin: 16px 0 20px; flex-wrap: wrap; }
+  .scenario-btn { border: 1px solid var(--flux-border); background: var(--flux-elevated); color: var(--flux-text-tertiary); padding: 8px 14px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .scenario-btn:hover { background: var(--flux-hover); color: var(--flux-text-secondary); }
+  .scenario-btn.active { border-color: var(--indigo-500); background: rgba(99,102,241,0.12); color: var(--flux-text-primary); }
+  .scenario-btn small { color: var(--flux-text-muted); font-size: 11px; }
+
+  /* Modal */
+  .modal { background: var(--flux-surface); border: 1px solid var(--flux-border); width: 880px; margin: 0 auto; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+  .modal-header { padding: 14px 20px; border-bottom: 1px solid var(--flux-border); display: flex; align-items: center; gap: 12px; }
+  .modal-title { font-size: 14px; font-weight: 600; flex: 1; }
+  .modal-title small { color: var(--flux-text-tertiary); font-weight: 400; margin-left: 4px; }
+  .modal-close { background: transparent; border: 0; color: var(--flux-text-tertiary); cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; }
+  .modal-close:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--flux-border); padding: 0 20px; background: var(--flux-base); }
+  .tab { padding: 11px 14px; font-size: 12px; color: var(--flux-text-tertiary); cursor: pointer; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .tab:hover { color: var(--flux-text-secondary); }
+  .tab.active { color: var(--flux-text-primary); border-bottom-color: var(--indigo-500); background: var(--flux-surface); }
+  .tab-badge { background: var(--flux-elevated); color: var(--flux-text-secondary); padding: 1px 7px; font-size: 10px; font-weight: 600; border-radius: 8px; min-width: 18px; text-align: center; }
+  .tab.active .tab-badge { background: var(--indigo-500); color: white; }
+
+  .tab-pane { padding: 18px 20px; display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Footer */
+  .modal-footer { padding: 12px 20px; border-top: 1px solid var(--flux-border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .footer-hint { font-size: 11px; color: var(--flux-text-muted); }
+  .footer-actions { display: flex; gap: 8px; }
+  .btn { border: 1px solid var(--flux-border); background: var(--flux-elevated); color: var(--flux-text-secondary); padding: 6px 14px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; }
+  .btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .btn-primary { background: var(--indigo-500); border-color: var(--indigo-500); color: white; }
+  .btn-primary:hover { background: var(--indigo-400); border-color: var(--indigo-400); }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--flux-text-tertiary); padding: 4px 8px; }
+  .btn-ghost:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+
+  /* ── Dossier tab content (JCF stub) ─────── */
+  .jcf-section { margin-bottom: 22px; }
+  .jcf-section:last-child { margin-bottom: 0; }
+  .jcf-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--flux-text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .jcf-form-grid { display: grid; grid-template-columns: 160px 1fr; gap: 10px 14px; }
+  .jcf-form-label { font-size: 12px; color: var(--flux-text-tertiary); display: flex; align-items: center; }
+  .jcf-form-value input, .jcf-form-value select { width: 100%; background: var(--flux-elevated); border: 1px solid var(--flux-border); color: var(--flux-text-primary); padding: 6px 10px; font: inherit; font-size: 13px; border-radius: 6px; }
+  .jcf-form-value input:focus, .jcf-form-value select:focus { outline: 0; border-color: var(--indigo-400); }
+  .jcf-form-value input[readonly] { background: var(--flux-base); color: var(--flux-text-tertiary); cursor: default; }
+  .jcf-form-value-inline { display: flex; align-items: center; gap: 6px; }
+  .jcf-form-value-inline .unit { font-size: 11px; color: var(--flux-text-muted); }
+
+  .jcf-placeholder { display: flex; align-items: flex-start; gap: 14px; padding: 18px 16px; background: var(--flux-base); border: 1px dashed var(--flux-border-light); color: var(--flux-text-tertiary); font-size: 12px; line-height: 1.6; }
+  .jcf-placeholder > .lucide { width: 24px; height: 24px; color: var(--flux-text-muted); flex-shrink: 0; margin-top: 2px; }
+  .jcf-placeholder strong { color: var(--flux-text-secondary); font-weight: 600; }
+  .jcf-placeholder code { background: var(--flux-elevated); padding: 1px 5px; font-family: 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--flux-text-secondary); }
+  .jcf-placeholder small { display: block; margin-top: 8px; color: var(--flux-text-muted); font-size: 11px; font-style: italic; }
+  .jcf-section-hint { margin-top: 8px; font-size: 11px; color: var(--flux-text-muted); }
+
+  /* ── Acomptes tab content ────────────────── */
+  .acomptes-tab-total {
+    display: flex; align-items: baseline; gap: 8px; padding: 8px 12px;
+    background: var(--flux-base); border: 1px dashed var(--flux-border-light);
+    margin-bottom: 18px; font-size: 12px;
+    border-radius: 6px;
+  }
+  .acomptes-tab-total label { color: var(--flux-text-tertiary); }
+  .acomptes-tab-total .val { font-weight: 600; font-size: 15px; color: var(--flux-text-primary); }
+  .acomptes-tab-total .unit { color: var(--flux-text-muted); font-size: 11px; }
+  .acomptes-tab-total .edit-hint { margin-left: auto; font-size: 11px; color: var(--flux-text-muted); cursor: pointer; }
+  .acomptes-tab-total .edit-hint:hover { color: var(--indigo-400); text-decoration: underline; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 48px 20px; background: var(--flux-base); border: 1px dashed var(--flux-border-light); border-radius: 8px; }
+  .empty-state-icon { color: var(--flux-text-muted); margin-bottom: 12px; }
+  .empty-state-icon .lucide { width: 32px; height: 32px; }
+  .empty-state-text { color: var(--flux-text-tertiary); margin-bottom: 16px; font-size: 13px; }
+  .empty-state-text strong { color: var(--flux-text-primary); font-weight: 600; }
+
+  /* Acomptes grid */
+  .section { margin-bottom: 22px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--flux-text-muted); display: flex; align-items: center; gap: 6px; }
+  .acomptes-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+  .acompte-card { flex: 1; min-width: 168px; padding: 10px; position: relative; background: var(--flux-elevated); border: 1px solid var(--flux-border); border-radius: 8px; }
+  .acompte-card-label { font-size: 10px; color: var(--flux-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .acompte-field { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .acompte-field:last-child { margin-bottom: 0; }
+  .acompte-field .lucide { color: var(--flux-text-muted); flex-shrink: 0; }
+  .acompte-card input[type=number] { background: var(--flux-surface); border: 1px solid var(--flux-border); color: var(--flux-text-primary); font: inherit; font-size: 13px; font-weight: 600; width: 100%; padding: 4px 8px; border-radius: 5px; text-align: right; font-variant-numeric: tabular-nums; }
+  .acompte-card input[type=datetime-local] { background: var(--flux-surface); border: 1px solid var(--flux-border); color: var(--flux-text-secondary); font: inherit; font-size: 11px; width: 100%; padding: 4px 6px; border-radius: 5px; color-scheme: dark; cursor: pointer; }
+  .acompte-card input:focus { outline: 0; border-color: var(--indigo-400); }
+  .acompte-remove { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border: 0; background: transparent; color: var(--flux-text-muted); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .acompte-remove:hover { background: rgba(248,113,113,0.12); color: var(--red-400); }
+  .acompte-remove:disabled { opacity: 0.25; cursor: not-allowed; }
+  .acompte-remove .lucide { width: 12px; height: 12px; }
+  .validator { margin-top: 10px; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--flux-text-muted); }
+  .validator.ok   { color: var(--emerald-400); }
+  .validator.warn { color: var(--amber-300); }
+
+  /* Element groups + task rows */
+  .element-group { margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--flux-border); border-left: 3px solid var(--indigo-500); background: rgba(255,255,255,0.012); }
+  .element-group:last-child { margin-bottom: 0; }
+  .element-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .element-group-name { font-size: 13px; font-weight: 600; }
+  .element-group-name .lucide { color: var(--indigo-400); }
+  .element-group-meta { font-size: 11px; color: var(--flux-text-muted); margin-left: auto; }
+  .task-row { margin-bottom: 14px; }
+  .task-row:last-child { margin-bottom: 0; }
+  .task-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .task-name { font-size: 12px; font-weight: 600; color: var(--flux-text-secondary); }
+  .task-name small { color: var(--flux-text-muted); font-weight: 400; margin-left: 6px; }
+  .task-cumul { font-size: 11px; color: var(--flux-text-tertiary); font-variant-numeric: tabular-nums; }
+  .task-cumul strong { color: var(--flux-text-secondary); font-weight: 600; }
+  .task-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .sheets-input { background: var(--flux-elevated); border: 1px solid var(--flux-border); color: var(--flux-text-primary); padding: 5px 9px; border-radius: 6px; font: inherit; font-size: 13px; width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+  .sheets-input:focus { outline: 0; border-color: var(--indigo-400); }
+  .sheets-label { font-size: 11px; color: var(--flux-text-muted); }
+  .pct-bar-wrap { flex: 1; height: 9px; background: var(--zinc-800); border-radius: 5px; overflow: hidden; cursor: pointer; position: relative; }
+  .pct-bar-fill { height: 100%; background: var(--indigo-500); width: 0%; transition: width 80ms linear; }
+  .pct-value { font-size: 11px; color: var(--flux-text-secondary); width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+  .cascade-segments { display: flex; gap: 4px; height: 38px; }
+  .cascade-segment { border: 1px solid var(--flux-border); border-radius: 5px; background: var(--zinc-800); padding: 5px 9px; position: relative; overflow: hidden; min-width: 64px; display: flex; flex-direction: column; justify-content: space-between; }
+  .cascade-segment-fill { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(16,185,129,0.30); width: 0%; transition: width 80ms linear; }
+  .cascade-segment.saturated { border-color: rgba(52,211,153,0.45); }
+  .cascade-segment.saturated .cascade-segment-fill { background: rgba(16,185,129,0.55); }
+  .cascade-segment.empty .cascade-segment-fill { background: transparent; }
+  .cascade-segment-row { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--flux-text-secondary); font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .cascade-segment-pos { font-weight: 600; color: var(--flux-text-primary); display: flex; align-items: center; gap: 4px; font-size: 11px; }
+  .cascade-segment-pos .lucide { color: var(--emerald-400); }
+  .cascade-segment.empty .cascade-segment-pos, .cascade-segment.empty .cascade-segment-row { color: var(--flux-text-muted); }
+  .cascade-segment-pct { font-size: 10px; color: var(--flux-text-tertiary); }
+  .cascade-segment.saturated .cascade-segment-pct { color: var(--emerald-400); }
+  .cross-warning { margin-top: 6px; padding: 5px 9px; background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.25); border-radius: 5px; font-size: 11px; color: var(--amber-300); display: flex; align-items: center; gap: 6px; }
+
+  /* Debug */
+  .debug-panel { margin-top: 28px; max-width: 880px; margin-left: auto; margin-right: auto; padding: 16px; background: var(--flux-surface); border: 1px dashed var(--flux-border-light); border-radius: 8px; }
+  .debug-panel-title { font-size: 10px; color: var(--flux-text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .debug-panel pre { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; color: var(--flux-text-tertiary); white-space: pre; overflow-x: auto; line-height: 1.55; }
+
+  .lucide { width: 14px; height: 14px; stroke-width: 1.6; }
+  .modal-header .lucide { width: 16px; height: 16px; }
+  .cascade-segment .lucide, .acompte-field .lucide { width: 12px; height: 12px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <h1>JCF avec onglet « Acomptes &amp; avancement »</h1>
+    <p>Le découpage en acomptes et la saisie d'avancement vivent dans un <strong>onglet du JCF</strong>, pas dans une modale séparée. Le JCF reste le hub d'édition du dossier ; les acomptes en sont une dimension parmi les autres (papier, BAT, total, etc.).</p>
+    <p>Bascule entre 3 scénarios : sans acompte (mono, état vide avec CTA de découpage), mono-élément découpé en 3, multi-élément découpé en 2.</p>
+  </header>
+
+  <div class="scenario-switch">
+    <button class="scenario-btn" data-scenario="empty"><i data-lucide="file"></i> Sans acompte <small>Plaquette A4 · 50k</small></button>
+    <button class="scenario-btn" data-scenario="mono"><i data-lucide="layers"></i> Mono-élément <small>Cartes visite · 100k · 3 acomptes</small></button>
+    <button class="scenario-btn" data-scenario="multi"><i data-lucide="book-open"></i> Multi-élément <small>Livret 32p · 100k · 2 acomptes</small></button>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <i data-lucide="layers"></i>
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-close" aria-label="Fermer"><i data-lucide="x"></i></button>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-tab="dossier"><i data-lucide="file-text"></i> Dossier</div>
+      <div class="tab" data-tab="acomptes"><i data-lucide="split"></i> Acomptes &amp; avancement <span class="tab-badge" id="tab-badge">—</span></div>
+    </div>
+
+    <!-- Tab: Dossier (JCF canonical fields, stubbed) -->
+    <div class="tab-pane active" data-tab="dossier" id="pane-dossier"></div>
+
+    <!-- Tab: Acomptes & avancement -->
+    <div class="tab-pane" data-tab="acomptes" id="pane-acomptes"></div>
+
+    <div class="modal-footer">
+      <span class="footer-hint" id="footer-hint">À l'enregistrement : applique les modifications du JCF + crée/met à jour les acomptes + seed l'avancement + relance le calcul.</span>
+      <div class="footer-actions">
+        <button class="btn">Annuler</button>
+        <button class="btn btn-primary"><i data-lucide="check"></i> Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="debug-panel">
+    <div class="debug-panel-title">État dérivé envoyé à l'engine (snapshot fan-out)</div>
+    <pre id="debug-output"></pre>
+  </div>
+</div>
+
+<script>
+  const scenarios = {
+    empty: {
+      title: 'JCF — Job 12350 <small>· ACME · Plaquette A4 promo été</small>',
+      jobId: '12350', client: 'ACME', designation: 'Plaquette A4 promo été', priority: 2, baseDeadline: '2026-07-15T17:00',
+      quantity: 50000,
+      acomptes: [],
+      elements: [
+        { id: 'el1', name: 'Plaquette 170g', paper: '170g couché brillant · 21×29.7', bat: 'Validé 11/06 par Julien', forme: 'Plate 4 couleurs', tasks: [
+          { id: 't1', name: 'G37',   machine: 'Impression offset', setup: 30, run: 280, done: 0 },
+          { id: 't2', name: 'P137',  machine: 'Massicot',          setup: 0,  run: 25,  done: 0 },
+        ]},
+      ],
+    },
+    mono: {
+      title: 'JCF — Job 12347 <small>· ACME · Cartes de visite</small>',
+      jobId: '12347', client: 'ACME', designation: 'Cartes de visite (premium 350g)', priority: 1, baseDeadline: '2026-07-02T12:00',
+      quantity: 100000,
+      acomptes: [
+        { id: 'a1', quantity_share: 20000, deadline: '2026-06-15T17:00' },
+        { id: 'a2', quantity_share: 40000, deadline: '2026-06-22T17:00' },
+        { id: 'a3', quantity_share: 40000, deadline: '2026-07-02T12:00' },
+      ],
+      elements: [
+        { id: 'el1', name: 'Carte 350g', paper: '350g couché brillant · 70×100', bat: 'Validé 12/06 par Julien', forme: 'Plate offset 4 couleurs', tasks: [
+          { id: 'g37',   name: 'G37',   machine: 'Impression offset', setup: 30, run: 600,  done: 80000 },
+          { id: 'p137',  name: 'P137',  machine: 'Massicot',          setup: 0,  run: 60,   done: 50000 },
+          { id: 'duplo', name: 'Duplo', machine: 'Plieuse',           setup: 30, run: 1800, done: 30000 },
+        ]},
+      ],
+    },
+    multi: {
+      title: 'JCF — Job 12348 <small>· Cap Horn · Livret 32 pages</small>',
+      jobId: '12348', client: 'Cap Horn', designation: 'Livret 32 pages programmes', priority: 2, baseDeadline: '2026-07-02T12:00',
+      quantity: 100000,
+      acomptes: [
+        { id: 'a1', quantity_share: 30000, deadline: '2026-06-15T17:00' },
+        { id: 'a2', quantity_share: 70000, deadline: '2026-07-02T12:00' },
+      ],
+      elements: [
+        { id: 'cover', name: 'Couverture 300g', paper: '300g mat · 50×70', bat: 'Validé 09/06 par Julien', forme: 'Plate offset 4 couleurs', tasks: [
+          { id: 'c-g37',  name: 'G37',  machine: 'Impression offset', setup: 30, run: 300, done: 70000 },
+          { id: 'c-p137', name: 'P137', machine: 'Massicot',          setup: 0,  run: 40,  done: 45000 },
+        ]},
+        { id: 'inside', name: 'Intérieur 90g', paper: '90g offset · 50×70', bat: 'Validé 10/06 par Julien', forme: 'Plate offset 1 couleur', tasks: [
+          { id: 'i-g37',   name: 'G37',   machine: 'Impression offset', setup: 30, run: 900,  done: 55000 },
+          { id: 'i-duplo', name: 'Duplo', machine: 'Plieuse-piqueuse',  setup: 30, run: 1200, done: 25000 },
+        ]},
+      ],
+    },
+  };
+
+  let active = 'mono';
+  let activeTab = 'dossier';
+  let acompteSeq = 100;
+  const S = () => scenarios[active];
+
+  const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+  const icons = () => { if (window.lucide) window.lucide.createIcons(); };
+  const allTasks = () => S().elements.flatMap(el => el.tasks.map(t => ({ ...t, _el: el })));
+
+  function cascadeFifo(totalDone, acomptes) {
+    let remaining = Math.max(0, totalDone);
+    return acomptes.map((a, i) => {
+      const cap = Math.max(0, a.quantity_share);
+      const taken = Math.min(remaining, cap);
+      remaining -= taken;
+      const pct = cap > 0 ? (taken / cap) * 100 : 0;
+      return { acompteId: a.id, position: i + 1, taken, cap, pct, saturated: cap > 0 && taken >= cap, empty: taken === 0 };
+    });
+  }
+
+  /* ── Dossier tab (placeholder for the existing JcfModal content) ── */
+  function renderDossierTab() {
+    const s = S();
+    document.getElementById('pane-dossier').innerHTML = `
+      <div class="jcf-section">
+        <div class="jcf-section-title"><i data-lucide="file-text"></i> Contenu du JCF (existant)</div>
+        <div class="jcf-placeholder">
+          <i data-lucide="layers"></i>
+          <div>
+            Cet onglet <strong>contient le JCF tel qu'il existe aujourd'hui</strong> : <code>JcfJobHeader</code> (jobId, client, référent, template, intitulé, quantité, transporteur, deadline, BAT deadline, priorité) + <code>JcfElementsTable</code> (éléments avec papier, forme, tâches et toute la batterie d'autocomplete spécialisés).
+            <small>Hors scope de ce playground : on visualise uniquement l'ajout de l'onglet « Acomptes &amp; avancement ». Le seul champ exposé ci-dessous est le total — c'est lui qui démontre la réactivité cross-onglet (quand le total change ici, la répartition se recasque dans l'onglet d'à côté).</small>
+          </div>
+        </div>
+      </div>
+      <div class="jcf-section">
+        <div class="jcf-section-title"><i data-lucide="package"></i> Total exemplaires <span style="text-transform: none; letter-spacing: 0; color: var(--flux-text-muted); font-weight: 400;">— le seul champ pertinent ici pour notre exploration</span></div>
+        <div class="jcf-form-grid">
+          <div class="jcf-form-label">Quantité totale</div>
+          <div class="jcf-form-value jcf-form-value-inline">
+            <input type="number" id="dossier-total" value="${s.quantity}" min="0" step="1000" />
+            <span class="unit">exemplaires</span>
+          </div>
+        </div>
+        <div class="jcf-section-hint">Modifie le total ci-dessus, puis bascule sur l'onglet « Acomptes &amp; avancement » : la cascade se recalque, le validateur passe en ambre si la somme des acomptes ne correspond plus.</div>
+      </div>
+    `;
+    const totalInput = document.getElementById('dossier-total');
+    if (totalInput) {
+      totalInput.addEventListener('input', (e) => {
+        s.quantity = parseInt(e.target.value, 10) || 0;
+        renderAcomptesTab();
+      });
+    }
+  }
+
+  /* ── Acomptes tab ── */
+  function renderAcomptesTab() {
+    const s = S();
+    const pane = document.getElementById('pane-acomptes');
+    const badge = document.getElementById('tab-badge');
+    badge.textContent = s.acomptes.length === 0 ? '—' : String(s.acomptes.length);
+
+    if (s.acomptes.length === 0) {
+      pane.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon"><i data-lucide="package"></i></div>
+          <div class="empty-state-text">Cette commande est prévue en <strong>livraison unique</strong> de ${fmt(s.quantity)} ex.<br>Découpe-la en acomptes si tu dois libérer des étapes en amont, étaler la production ou négocier des livraisons partielles.</div>
+          <button class="btn btn-primary" id="empty-cta"><i data-lucide="split"></i> Découper en acomptes</button>
+        </div>
+      `;
+      document.getElementById('empty-cta').addEventListener('click', () => {
+        const half = Math.round(s.quantity / 2);
+        const d = new Date(s.baseDeadline);
+        const pad = (x) => String(x).padStart(2, '0');
+        const earlier = new Date(d); earlier.setDate(d.getDate() - 14);
+        const fmtDt = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+        s.acomptes = [
+          { id: 'a' + (acompteSeq++), quantity_share: half,       deadline: fmtDt(earlier) },
+          { id: 'a' + (acompteSeq++), quantity_share: s.quantity - half, deadline: fmtDt(d) },
+        ];
+        renderAcomptesTab();
+        refreshDebug();
+      });
+      icons();
+      return;
+    }
+
+    pane.innerHTML = `
+      <div class="acomptes-tab-total">
+        <label>Total commande :</label>
+        <span class="val">${fmt(s.quantity)}</span>
+        <span class="unit">ex.</span>
+        <span class="edit-hint" id="goto-dossier">→ modifier dans l'onglet Dossier</span>
+      </div>
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title"><i data-lucide="split"></i> Acomptes</div>
+          <button class="btn btn-ghost" id="add-acompte"><i data-lucide="plus"></i> Ajouter</button>
+        </div>
+        <div class="acomptes-grid" id="acomptes-grid"></div>
+        <div class="validator" id="validator"></div>
+      </div>
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title"><i data-lucide="gauge"></i> Avancement — exemplaires produits par tâche</div>
+        </div>
+        <div id="elements-list"></div>
+      </div>
+    `;
+
+    document.getElementById('goto-dossier').addEventListener('click', () => selectTab('dossier'));
+    document.getElementById('add-acompte').addEventListener('click', () => {
+      const last = s.acomptes[s.acomptes.length - 1];
+      const pad = (x) => String(x).padStart(2, '0');
+      const next = last ? (() => { const d = new Date(last.deadline); d.setDate(d.getDate() + 7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; })() : '2026-06-15T17:00';
+      s.acomptes.push({ id: 'a' + (acompteSeq++), quantity_share: 0, deadline: next });
+      buildAcomptesGrid(); refreshValidator(); refreshAllTasks(); refreshDebug(); icons();
+    });
+
+    buildAcomptesGrid();
+    buildElementsList();
+    refreshValidator();
+    refreshAllTasks();
+    icons();
+  }
+
+  function buildAcomptesGrid() {
+    const grid = document.getElementById('acomptes-grid');
+    if (!grid) return;
+    const s = S(); const n = s.acomptes.length;
+    grid.innerHTML = s.acomptes.map((a, i) => `
+      <div class="acompte-card">
+        <button class="acompte-remove" data-id="${a.id}" ${n <= 1 ? 'disabled' : ''} aria-label="Supprimer"><i data-lucide="x"></i></button>
+        <div class="acompte-card-label">Acompte ${i + 1}/${n}</div>
+        <div class="acompte-field"><i data-lucide="package"></i><input type="number" min="0" step="1000" value="${a.quantity_share}" data-id="${a.id}" data-field="qty" /></div>
+        <div class="acompte-field"><i data-lucide="calendar-clock"></i><input type="datetime-local" value="${a.deadline}" data-id="${a.id}" data-field="deadline" /></div>
+      </div>
+    `).join('');
+    grid.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const a = S().acomptes.find(x => x.id === e.target.dataset.id);
+        if (e.target.dataset.field === 'qty') { a.quantity_share = parseInt(e.target.value, 10) || 0; refreshValidator(); refreshAllTasks(); refreshDebug(); }
+        else { a.deadline = e.target.value; refreshDebug(); }
+      });
+    });
+    grid.querySelectorAll('.acompte-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (S().acomptes.length <= 1) return;
+        S().acomptes = S().acomptes.filter(x => x.id !== btn.dataset.id);
+        if (S().acomptes.length === 0) { renderAcomptesTab(); refreshDebug(); return; }
+        buildAcomptesGrid(); refreshValidator(); refreshAllTasks(); refreshDebug(); icons();
+      });
+    });
+    icons();
+  }
+
+  function buildElementsList() {
+    const list = document.getElementById('elements-list');
+    if (!list) return;
+    list.innerHTML = S().elements.map(el => `
+      <div class="element-group" data-el="${el.id}">
+        <div class="element-group-head">
+          <span class="element-group-name"><i data-lucide="layers-2"></i> ${el.name}</span>
+          <span class="element-group-meta">${el.tasks.length} tâche${el.tasks.length > 1 ? 's' : ''}</span>
+        </div>
+        ${el.tasks.map(t => `
+          <div class="task-row" data-id="${t.id}">
+            <div class="task-header">
+              <div class="task-name">${t.name} <small>— ${t.machine}</small></div>
+              <div class="task-cumul" data-cumul></div>
+            </div>
+            <div class="task-input-row">
+              <input type="number" class="sheets-input" min="0" step="500" value="${t.done}" data-id="${t.id}" />
+              <span class="sheets-label">ex. produits</span>
+              <div class="pct-bar-wrap" data-id="${t.id}"><div class="pct-bar-fill" data-fill></div></div>
+              <span class="pct-value" data-pct></span>
+            </div>
+            <div class="cascade-segments" data-segments></div>
+            <div data-warning></div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+    list.querySelectorAll('.sheets-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const t = allTasks().find(x => x.id === e.target.dataset.id);
+        t.done = Math.max(0, Math.min(S().quantity, parseInt(e.target.value, 10) || 0));
+        refreshTask(t.id); refreshDebug();
+      });
+    });
+    list.querySelectorAll('.pct-bar-wrap').forEach(bar => {
+      const apply = (e) => {
+        const t = allTasks().find(x => x.id === bar.dataset.id);
+        const rect = bar.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        t.done = Math.round(S().quantity * ratio / 500) * 500;
+        const input = document.querySelector(`.sheets-input[data-id="${t.id}"]`);
+        if (input) input.value = t.done;
+        refreshTask(t.id); refreshDebug();
+      };
+      bar.addEventListener('mousedown', (e) => {
+        apply(e);
+        const move = (ev) => apply(ev);
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+      });
+    });
+  }
+
+  function refreshValidator() {
+    const v = document.getElementById('validator');
+    if (!v) return;
+    const sum = S().acomptes.reduce((s, a) => s + a.quantity_share, 0);
+    const ok = sum === S().quantity;
+    v.className = 'validator ' + (ok ? 'ok' : 'warn');
+    v.innerHTML = `<i data-lucide="${ok ? 'check' : 'alert-triangle'}"></i> Somme des acomptes : ${fmt(sum)} / ${fmt(S().quantity)} ex.${ok ? '' : ' — à équilibrer'}`;
+    icons();
+  }
+
+  function refreshTask(taskId) {
+    let task = null, el = null, taskIdx = -1;
+    for (const e of S().elements) {
+      const i = e.tasks.findIndex(t => t.id === taskId);
+      if (i >= 0) { task = e.tasks[i]; el = e; taskIdx = i; break; }
+    }
+    if (!task) return;
+    const total = S().quantity;
+    const row = document.querySelector(`.task-row[data-id="${taskId}"]`);
+    if (!row) return;
+    const pct = total > 0 ? (task.done / total) * 100 : 0;
+    row.querySelector('[data-cumul]').innerHTML = `Cumul : <strong>${fmt(task.done)}</strong> / ${fmt(total)} ex.`;
+    row.querySelector('[data-fill]').style.width = pct + '%';
+    row.querySelector('[data-pct]').textContent = pct.toFixed(0) + ' %';
+    const cascade = cascadeFifo(task.done, S().acomptes);
+    row.querySelector('[data-segments]').innerHTML = cascade.map(c => {
+      const cls = c.saturated ? 'saturated' : (c.empty ? 'empty' : '');
+      const check = c.saturated ? '<i data-lucide="check"></i>' : '';
+      return `<div class="cascade-segment ${cls}" style="flex-grow:${c.cap}; flex-basis:0;">
+        <div class="cascade-segment-fill" style="width:${c.pct}%;"></div>
+        <div class="cascade-segment-row"><span class="cascade-segment-pos">${c.position}/${cascade.length} ${check}</span><span class="cascade-segment-pct">${Math.round(c.pct)}%</span></div>
+        <div class="cascade-segment-row"><span>${fmt(c.taken)} / ${fmt(c.cap)}</span></div>
+      </div>`;
+    }).join('');
+    const upstream = taskIdx > 0 ? el.tasks[taskIdx - 1] : null;
+    const warn = row.querySelector('[data-warning]');
+    if (upstream && task.done > upstream.done) {
+      warn.innerHTML = `<div class="cross-warning"><i data-lucide="alert-triangle"></i> Cumul (${fmt(task.done)}) supérieur à ${upstream.name} (${fmt(upstream.done)}) sur le même élément — physiquement improbable.</div>`;
+    } else { warn.innerHTML = ''; }
+    icons();
+  }
+  function refreshAllTasks() { allTasks().forEach(t => refreshTask(t.id)); }
+
+  function refreshDebug() {
+    const out = document.getElementById('debug-output');
+    const s = S(); const total = s.quantity;
+    const lines = [];
+    lines.push(`parent.id        = job_${s.jobId}`);
+    lines.push(`parent.quantity  = ${fmt(total)} ex.`);
+    lines.push(`elements         = ${s.elements.length}`);
+    lines.push(`acomptes         = ${s.acomptes.length}${s.acomptes.length === 0 ? '  (mono — engine voit 1 seul job, pas de fan-out)' : ''}`);
+    lines.push('');
+    if (s.acomptes.length === 0) {
+      lines.push('// Sans acompte : engine reçoit le job parent tel quel.');
+      s.elements.forEach(el => {
+        lines.push(`╒ ÉLÉMENT ${el.name}`);
+        el.tasks.forEach(t => lines.push(`│ ${t.name} (${t.machine}) — setup ${t.setup}m, run ${t.run}m, deadline ${s.baseDeadline}`));
+        lines.push('╘');
+      });
+    } else {
+      lines.push('// One TaskInput per (acompte × element.task). runMinutes ∝ quantity_share,');
+      lines.push('// deadline per acompte, recordedProgressPct from cascadeFifo, saturated dropped.');
+      lines.push('');
+      s.elements.forEach(el => {
+        lines.push(`╒ ÉLÉMENT ${el.name}`);
+        el.tasks.forEach(t => {
+          lines.push(`│ ${t.name} (${t.machine}) — declared ${fmt(t.done)} ex. (${((t.done/total)*100||0).toFixed(0)}%)`);
+          cascadeFifo(t.done, s.acomptes).forEach(c => {
+            const a = s.acomptes.find(x => x.id === c.acompteId);
+            const share = total > 0 ? c.cap / total : 0;
+            const runMin = t.run * share;
+            const remaining = (1 - c.pct / 100) * runMin;
+            const status = c.saturated ? 'isCompleted=true → DROPPED' : (c.empty ? 'fresh' : 'in_progress');
+            lines.push(`│   ${c.position}/${s.acomptes.length}  pct=${c.pct.toFixed(0).padStart(3)}%  setup=${String(t.setup).padStart(2)}m  run=${runMin.toFixed(0).padStart(4)}m  remaining=${remaining.toFixed(0).padStart(4)}m  deadline=${a.deadline}  [${status}]`);
+          });
+        });
+        lines.push('╘');
+      });
+    }
+    out.textContent = lines.join('\n');
+  }
+
+  function selectTab(name) {
+    activeTab = name;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.dataset.tab === name));
+    icons();
+  }
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+
+  function selectScenario(name) {
+    active = name;
+    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.toggle('active', b.dataset.scenario === name));
+    document.getElementById('modal-title').innerHTML = S().title;
+    renderDossierTab();
+    renderAcomptesTab();
+    refreshDebug();
+    icons();
+  }
+  document.querySelectorAll('.scenario-btn').forEach(b => b.addEventListener('click', () => selectScenario(b.dataset.scenario)));
+
+  selectScenario('mono');
+</script>
+</body>
+</html>

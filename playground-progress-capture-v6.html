@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playground — Modale Avancement v6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  html { font-size: 13px; }
+  :root {
+    --flux-base: rgb(15, 15, 15);
+    --flux-surface: rgb(26, 26, 26);
+    --flux-elevated: rgb(36, 36, 36);
+    --flux-hover: rgb(44, 44, 44);
+    --flux-border: rgb(42, 42, 42);
+    --flux-border-light: rgb(58, 58, 58);
+    --flux-text-primary: rgb(245, 245, 245);
+    --flux-text-secondary: rgb(209, 209, 209);
+    --flux-text-tertiary: rgb(161, 161, 161);
+    --flux-text-muted: rgb(128, 128, 128);
+    --zinc-900: rgb(24, 24, 27);
+    --zinc-800: rgb(39, 39, 42);
+    --zinc-700: rgb(63, 63, 70);
+    --zinc-300: rgb(212, 212, 216);
+    --emerald: rgb(16, 185, 129);
+    --emerald-300: rgb(110, 231, 183);
+    --amber-300: rgb(252, 211, 77);
+    --blue-600: rgb(37, 99, 235);
+    --blue-500: rgb(59, 130, 246);
+    --red-300: rgb(252, 165, 165);
+    --font: "Inter", system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font); font-weight: 500;
+    background: var(--flux-base); color: var(--flux-text-primary);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 16px; min-height: 100vh;
+  }
+
+  /* ── Controls ───────────────────────────────── */
+  .controls {
+    width: 100%; max-width: 1800px;
+    background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    border-radius: 7px; padding: 13px; margin-bottom: 24px;
+    display: flex; flex-wrap: wrap; gap: 7px 20px;
+  }
+  .controls h3 {
+    width: 100%; font-size: 11px; font-weight: 600;
+    color: var(--flux-text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 2px;
+  }
+  .control-row { display: flex; align-items: center; gap: 8px; }
+  .control-row label { font-size: 11.5px; color: var(--flux-text-tertiary); min-width: 110px; }
+  .ctl-input {
+    background: var(--zinc-900); border: 1px solid var(--flux-border-light);
+    border-radius: 4px; color: var(--flux-text-primary); padding: 4px 8px;
+    font-size: 11.5px; font-family: var(--font); font-weight: 500; outline: none;
+  }
+  .ctl-input:focus { border-color: var(--blue-500); }
+  .control-row input[type="checkbox"] { accent-color: var(--emerald); }
+
+  /* ── Layout ─────────────────────────────────── */
+  .side-by-side {
+    display: flex; gap: 28px; width: 100%; max-width: 1800px;
+    align-items: flex-start;
+  }
+  .side-by-side .modal-wrap { flex: 0 0 420px; }
+  .variant-label {
+    font-size: 11px; font-weight: 600; color: var(--flux-text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    text-align: center; margin-bottom: 8px;
+  }
+
+  /* ── Modal card ─────────────────────────────── */
+  .modal {
+    background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    border-radius: 8px; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .seg { padding: 14px 20px; border-bottom: 1px solid var(--flux-border); }
+  .seg:last-child { border-bottom: none; }
+
+  .seg-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 20px; background: var(--zinc-900);
+  }
+  .seg-header .title-group { display: flex; align-items: center; gap: 8px; }
+  .seg-header .title-group i { color: var(--flux-text-secondary); }
+  .seg-header h2 { font-size: 14px; font-weight: 600; }
+  .close-btn {
+    background: none; border: none; color: var(--flux-text-muted);
+    cursor: pointer; padding: 4px; border-radius: 3px;
+    display: flex; align-items: center;
+    transition: color 120ms, background 120ms;
+  }
+  .close-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+
+  .seg-identity { text-align: center; padding: 16px 20px 12px; }
+  .seg-identity .job-line { font-size: 15px; font-weight: 700; letter-spacing: 0.01em; }
+  .seg-identity .designation { font-size: 12px; color: var(--flux-text-tertiary); margin-top: 3px; }
+
+  .seg-triptych { padding: 0 20px 16px; }
+  .triptych {
+    display: flex; border: 1px solid var(--flux-border-light);
+    border-radius: 6px; overflow: hidden;
+  }
+  .triptych-cell {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 10px 6px; gap: 2px; border-right: 1px solid var(--flux-border);
+  }
+  .triptych-cell:last-child { border-right: none; }
+  .tc-label { font-size: 10px; font-weight: 600; color: var(--flux-text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  .tc-value { font-size: 13px; font-weight: 700; color: var(--flux-text-primary); font-variant-numeric: tabular-nums; }
+  .tc-sub { font-size: 10px; color: var(--flux-text-muted); }
+
+  .seg-band { text-align: center; padding: 16px 20px; position: relative; overflow: hidden; }
+  .seg-band .band-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; position: relative; z-index: 1; }
+  .seg-band .band-sub { font-size: 11.5px; color: rgba(255,255,255,0.7); position: relative; z-index: 1; }
+
+  /* ── Stepper ────────────────────────────────── */
+  .seg-action {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; padding: 18px 20px;
+  }
+  .action-label {
+    font-size: 12px; font-weight: 600; color: var(--flux-text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .stepper-row { display: flex; align-items: center; justify-content: center; }
+  .stepper-btn {
+    width: 40px; height: 40px; border-radius: 6px;
+    border: 1px solid var(--flux-border-light); background: rgb(45, 45, 45);
+    color: var(--flux-text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 120ms, color 120ms;
+  }
+  .stepper-btn:hover { background: rgb(60, 60, 60); color: var(--flux-text-primary); }
+  .stepper-btn:active { background: rgb(70, 70, 70); }
+  .stepper-value {
+    min-width: 120px; text-align: center; font-size: 28px; font-weight: 700;
+    font-family: var(--mono); font-variant-numeric: tabular-nums; padding: 0 12px;
+  }
+  .stepper-status {
+    text-align: center; font-size: 11.5px; font-weight: 600;
+    min-height: 17px; transition: color 120ms;
+  }
+  .stepper-status.on-time { color: var(--emerald-300); }
+  .stepper-status.late { color: var(--amber-300); }
+  .stepper-status.early { color: var(--emerald-300); }
+  .stepper-status.very-late { color: var(--red-300); }
+
+  /* ── Blocked link (in progress modal) ───────── */
+  .blocked-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 14px;
+    padding: 7px 14px; border-radius: 4px;
+    font-size: 11.5px; font-weight: 600;
+    color: var(--flux-text-muted);
+    background: none; border: 1px solid var(--flux-border-light);
+    font-family: var(--font); cursor: pointer;
+    transition: color 120ms, border-color 120ms, background 120ms;
+  }
+  .blocked-btn:hover {
+    color: var(--amber-300); border-color: rgba(245,158,11,0.4);
+    background: rgba(245,158,11,0.06);
+  }
+
+  /* ── Incident reasons (inside combined modal) ── */
+  .seg-incident {
+    padding: 18px 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .reason-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 10px 14px; border-radius: 6px;
+    border: 1px solid var(--flux-border-light); background: rgb(45, 45, 45);
+    color: var(--flux-text-secondary); font-size: 12px; font-weight: 600;
+    font-family: var(--font); cursor: pointer; text-align: left;
+    transition: background 120ms, border-color 120ms, color 120ms;
+  }
+  .reason-btn i { color: var(--flux-text-muted); flex-shrink: 0; }
+  .reason-btn:hover { background: rgb(55, 55, 55); color: var(--flux-text-primary); }
+  .reason-btn.selected {
+    border-color: var(--amber-300); background: rgba(245,158,11, 0.10);
+    color: var(--amber-300);
+  }
+  .reason-btn.selected i { color: var(--amber-300); }
+  .reason-btn { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .reason-main { font-size: 12px; }
+  .reason-effect { font-size: 10px; font-weight: 500; color: var(--flux-text-muted); }
+  .reason-btn.selected .reason-effect { color: rgba(252,211,77,0.6); }
+  .blocked-notice {
+    font-size: 10.5px; color: var(--flux-text-muted);
+    font-style: italic; text-align: center;
+    margin-top: 4px;
+  }
+  .back-link {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    font-size: 11px; font-weight: 600; color: var(--flux-text-muted);
+    cursor: pointer; transition: color 120ms;
+    background: none; border: none; font-family: var(--font);
+  }
+  .back-link:hover { color: var(--flux-text-primary); }
+
+  /* ── Blocked (future task) ──────────────────── */
+  .seg-blocked { padding: 20px; text-align: center; }
+  .blocked-icon-row { display: flex; justify-content: center; margin-bottom: 8px; }
+  .blocked-icon-circle {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(245,158,11, 0.15);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--amber-300);
+  }
+  .blocked-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .blocked-sub { font-size: 11.5px; color: var(--flux-text-tertiary); line-height: 1.6; margin-bottom: 14px; }
+  .blocked-pred-label { font-size: 10px; font-weight: 600; color: var(--flux-text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 8px; }
+  .blocked-predecessor {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--flux-border-light);
+    border-radius: 6px; overflow: hidden; text-align: center;
+  }
+  .pred-identity { padding: 10px 14px 6px; }
+  .pred-identity .job-line { font-size: 13px; font-weight: 700; }
+  .pred-identity .designation { font-size: 11px; color: var(--flux-text-tertiary); margin-top: 1px; }
+  .pred-triptych { padding: 0 14px 10px; }
+  .pred-triptych .triptych { border-color: var(--flux-border); }
+  .pred-triptych .triptych-cell { padding: 7px 4px; }
+  .pred-triptych .tc-value { font-size: 11.5px; }
+  .pred-triptych .tc-label { font-size: 9px; }
+  .pred-triptych .tc-sub { font-size: 9px; }
+
+  /* ── Footer ─────────────────────────────────── */
+  .seg-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 10px 20px; background: var(--zinc-900); border-bottom: none;
+  }
+  .btn {
+    padding: 6px 16px; border-radius: 3px; font-size: 13px; font-weight: 500;
+    font-family: var(--font); cursor: pointer; transition: background 120ms; border: none;
+  }
+  .btn-secondary { background: var(--zinc-800); color: var(--zinc-300); }
+  .btn-secondary:hover { background: var(--zinc-700); }
+  .btn-primary { background: var(--blue-600); color: white; }
+  .btn-primary:hover { background: var(--blue-500); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-amber { background: rgba(245,158,11,0.2); color: var(--amber-300); border: 1px solid rgba(245,158,11,0.4); }
+  .btn-amber:hover { background: rgba(245,158,11,0.3); }
+  .btn-amber:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .hidden { display: none !important; }
+  .toast {
+    position: fixed; top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: var(--emerald); color: white;
+    padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    transition: transform 0.3s ease; z-index: 100;
+  }
+  .toast.visible { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h3>Playground controls</h3>
+  <div class="control-row"><label>Heure actuelle</label><input type="time" id="ctl-now" value="10:30" class="ctl-input"></div>
+  <div class="control-row"><label>Début task</label><input type="time" id="ctl-start" value="09:15" class="ctl-input"></div>
+  <div class="control-row"><label>Fin prévue</label><input type="time" id="ctl-end" value="11:15" class="ctl-input"></div>
+  <div class="control-row"><label>Task splitée</label><input type="checkbox" id="ctl-split" checked></div>
+  <div class="control-row" id="split-controls"><label>Ma part du volume</label><input type="number" id="ctl-volume-pct" value="35" min="1" max="100" class="ctl-input" style="width:55px"> %</div>
+  <div class="control-row"><label>Job</label><input type="text" id="ctl-job" value="200000 · Siemens" class="ctl-input" style="width:160px;"></div>
+  <div class="control-row"><label>Désignation</label><input type="text" id="ctl-designation" value="Brochure 24p A4 quadri" class="ctl-input" style="width:200px;"></div>
+  <div class="control-row"><label>Station</label><input type="text" id="ctl-station" value="Heidelberg" class="ctl-input" style="width:120px;"></div>
+  <div class="control-row"><label>Opérateur</label><input type="text" id="ctl-operator" value="Marc D." class="ctl-input" style="width:120px;"></div>
+  <div class="control-row"><label>Tâche précédente</label><input type="text" id="ctl-prev-task" value="Impression recto" class="ctl-input" style="width:140px;"></div>
+  <div class="control-row"><label>Préc. station</label><input type="text" id="ctl-prev-station-name" value="SM102" class="ctl-input" style="width:80px;"></div>
+  <div class="control-row"><label>Préc. créneau</label><input type="text" id="ctl-prev-slot" value="9h00 → 10h30" class="ctl-input" style="width:120px;"></div>
+  <div class="control-row"><label>Couleur tuile</label>
+    <select id="ctl-color" class="ctl-input">
+      <option value="59,130,246" selected>Bleu</option>
+      <option value="168,85,247">Violet</option>
+      <option value="245,158,11">Amber</option>
+      <option value="16,185,129">Emerald</option>
+      <option value="239,68,68">Rouge</option>
+      <option value="107,114,128">Gris</option>
+    </select>
+  </div>
+</div>
+
+<div class="side-by-side">
+
+  <!-- ═══ 1. En cours (avec bouton blocage) ═══ -->
+  <div class="modal-wrap">
+    <div class="variant-label">En cours</div>
+    <div class="modal" id="modal-L">
+      <div class="seg seg-header">
+        <div class="title-group"><i data-lucide="clock" style="width:16px;height:16px"></i><h2 id="header-title-L">Avancement</h2></div>
+        <button class="close-btn"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+      </div>
+      <div class="seg seg-identity" id="seg-identity-L"></div>
+      <div class="seg-triptych" id="seg-triptych-L"></div>
+      <div class="seg seg-band" id="seg-band-L"></div>
+      <!-- Normal mode -->
+      <div class="seg seg-action" id="action-normal-L">
+        <div class="action-label">Je finirai à :</div>
+        <div class="stepper-row">
+          <button class="stepper-btn" id="stepper-minus-L"><i data-lucide="minus" style="width:16px;height:16px"></i></button>
+          <div class="stepper-value" id="stepper-value-L">11h15</div>
+          <button class="stepper-btn" id="stepper-plus-L"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+        </div>
+        <div class="stepper-status" id="stepper-status-L"></div>
+        <button class="blocked-btn" id="show-blocked-L">
+          <i data-lucide="alert-triangle" style="width:13px;height:13px"></i> Je suis bloqué(e)
+        </button>
+      </div>
+      <!-- Blocked mode -->
+      <div class="seg seg-incident hidden" id="action-blocked-L">
+        <div class="action-label" style="margin-bottom:4px">Motif du blocage :</div>
+        <button class="reason-btn" data-reason="prerequis">
+          <span class="reason-main">Une tâche prérequise n'est pas terminée</span>
+          <span class="reason-effect">Le démarrage sera repoussé d'1h dans le planning</span>
+        </button>
+        <button class="reason-btn" data-reason="machine">
+          <span class="reason-main">Ma machine a un souci</span>
+          <span class="reason-effect">Un créneau de maintenance d'1h sera ajouté sur cette machine</span>
+        </button>
+        <button class="reason-btn" data-reason="absence">
+          <span class="reason-main">Je dois m'absenter</span>
+          <span class="reason-effect">Une absence d'1h sera enregistrée à mon nom</span>
+        </button>
+        <div class="blocked-notice">Pensez à prévenir le chef d'atelier dès que possible.</div>
+        <button class="blocked-btn" id="back-normal-L">Retour</button>
+      </div>
+      <div class="seg seg-footer" id="footer-L">
+        <button class="btn btn-secondary">Annuler</button>
+        <button class="btn btn-primary" id="submit-L">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 2. Réputée terminée ═══ -->
+  <div class="modal-wrap">
+    <div class="variant-label">Réputée terminée</div>
+    <div class="modal">
+      <div class="seg seg-header">
+        <div class="title-group"><i data-lucide="clock" style="width:16px;height:16px"></i><h2>Avancement</h2></div>
+        <button class="close-btn"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+      </div>
+      <div class="seg seg-identity" id="seg-identity-R"></div>
+      <div class="seg-triptych" id="seg-triptych-R"></div>
+      <div class="seg seg-band" id="seg-band-R"></div>
+      <div class="seg seg-action">
+        <div class="action-label">J'ai terminé à :</div>
+        <div class="stepper-row">
+          <button class="stepper-btn" id="stepper-minus-R"><i data-lucide="minus" style="width:16px;height:16px"></i></button>
+          <div class="stepper-value" id="stepper-value-R">11h15</div>
+          <button class="stepper-btn" id="stepper-plus-R"><i data-lucide="plus" style="width:16px;height:16px"></i></button>
+        </div>
+        <div class="stepper-status" id="stepper-status-R"></div>
+      </div>
+      <div class="seg seg-footer">
+        <button class="btn btn-secondary">Annuler</button>
+        <button class="btn btn-primary" id="submit-R">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 3. Tâche future ═══ -->
+  <div class="modal-wrap">
+    <div class="variant-label">Tâche future (bloquée)</div>
+    <div class="modal">
+      <div class="seg seg-header">
+        <div class="title-group"><i data-lucide="clock" style="width:16px;height:16px"></i><h2>Avancement</h2></div>
+        <button class="close-btn"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+      </div>
+      <div class="seg seg-identity" id="seg-identity-F"></div>
+      <div class="seg-triptych" id="seg-triptych-F"></div>
+      <div class="seg seg-blocked" id="seg-blocked"></div>
+      <div class="seg seg-footer"><button class="btn btn-secondary">Fermer</button></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  lucide.createIcons();
+
+  const STEPS_POS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 300, 360];
+  const STEPS_NEG = [0, -15, -30, -45, -60, -90, -120, -180, -240, -300, -360];
+  function getOffset(idx) {
+    if (idx >= 0) return idx < STEPS_POS.length ? STEPS_POS[idx] : STEPS_POS[STEPS_POS.length-1] + (idx - STEPS_POS.length+1)*60;
+    const i = -idx;
+    return i < STEPS_NEG.length ? STEPS_NEG[i] : STEPS_NEG[STEPS_NEG.length-1] - (i - STEPS_NEG.length+1)*60;
+  }
+
+  let stepL = 0, stepR = 0;
+  let blockedModeL = false;
+  let selectedReason = null;
+
+  const parseTime = s => { const [h,m]=s.split(':').map(Number); return h*60+m; };
+  const fmtTime = m => `${Math.floor(m/60)}h${(m%60).toString().padStart(2,'0')}`;
+  function fmtDur(m) { const a=Math.abs(m); if(a<60) return `${a} min`; const h=Math.floor(a/60),r=a%60; return r===0?`${h}h`:`${h}h${r.toString().padStart(2,'0')}`; }
+
+  function renderStepper(valEl, stEl, end, idx, past) {
+    const o = getOffset(idx);
+    valEl.textContent = fmtTime(end + o);
+    if (o === 0) { stEl.textContent = "À l'heure"; stEl.className = 'stepper-status on-time'; }
+    else if (o > 0) {
+      stEl.textContent = past ? `${fmtDur(o)} de retard sur le planning` : `${fmtDur(o)} de retard par rapport au planning en vigueur`;
+      stEl.className = `stepper-status ${o > 30 ? 'very-late' : 'late'}`;
+    } else {
+      stEl.textContent = past ? `${fmtDur(-o)} d'avance sur le planning` : `${fmtDur(-o)} d'avance par rapport au planning en vigueur`;
+      stEl.className = 'stepper-status early';
+    }
+  }
+
+  function buildIdentity(id, job, desig) {
+    document.getElementById(id).innerHTML = `<div class="job-line">${job}</div><div class="designation">${desig}</div>`;
+  }
+  function buildTriptych(id, op, st, s, e, d, split, vol) {
+    let h = `<div class="triptych"><div class="triptych-cell"><span class="tc-label">Opérateur</span><span class="tc-value">${op}</span><span class="tc-sub">${st}</span></div><div class="triptych-cell"><span class="tc-label">Créneau</span><span class="tc-value">${fmtTime(s)} → ${fmtTime(e)}</span><span class="tc-sub">${fmtDur(d)}</span></div>`;
+    if (split) h += `<div class="triptych-cell"><span class="tc-label">Volume</span><span class="tc-value">${vol}%</span><span class="tc-sub">du total</span></div>`;
+    h += `</div>`;
+    document.getElementById(id).innerHTML = h;
+  }
+  function buildBand(id, rgb, pctFill, title, sub) {
+    const el = document.getElementById(id);
+    el.style.background = `linear-gradient(to right, rgba(16,185,129, 0.22) ${pctFill}%, rgba(${rgb}, 0.10) ${pctFill}%)`;
+    el.innerHTML = `<div class="band-title" style="color:var(--flux-text-primary)">${title}</div><div class="band-sub">${sub}</div>`;
+  }
+
+  function render() {
+    const now = parseTime(document.getElementById('ctl-now').value);
+    const start = parseTime(document.getElementById('ctl-start').value);
+    const end = parseTime(document.getElementById('ctl-end').value);
+    const split = document.getElementById('ctl-split').checked;
+    const volPct = parseInt(document.getElementById('ctl-volume-pct').value,10)||35;
+    const job = document.getElementById('ctl-job').value;
+    const desig = document.getElementById('ctl-designation').value;
+    const station = document.getElementById('ctl-station').value;
+    const operator = document.getElementById('ctl-operator').value;
+    const rgb = document.getElementById('ctl-color').value;
+    const dur = end - start;
+    const elapsed = Math.max(0, now - start);
+    const remaining = Math.max(0, end - now);
+    const overdue = Math.max(0, now - end);
+    const pctFill = dur > 0 ? Math.min(100, Math.round((elapsed/dur)*100)) : 0;
+    const volDone = dur > 0 ? Math.round((elapsed/dur)*(split ? volPct : 100)) : 0;
+    const volSub = split ? `il me reste ${fmtDur(remaining)} — j'en suis à ${volDone}% sur ${volPct}%` : `il me reste ${fmtDur(remaining)} — j'en suis à ${volDone}%`;
+
+    document.getElementById('split-controls').classList.toggle('hidden', !split);
+
+    // ── 1. En cours ──────────────────────────
+    buildIdentity('seg-identity-L', job, desig);
+    buildTriptych('seg-triptych-L', operator, station, start, end, dur, split, volPct);
+    buildBand('seg-band-L', rgb, pctFill, `Il est ${fmtTime(now)}, en théorie :`, volSub);
+    renderStepper(document.getElementById('stepper-value-L'), document.getElementById('stepper-status-L'), end, stepL, false);
+
+    // Toggle blocked/normal mode
+    const headerL = document.getElementById('header-title-L');
+    const footerSubmitL = document.getElementById('submit-L');
+    if (blockedModeL) {
+      document.getElementById('action-normal-L').classList.add('hidden');
+      document.getElementById('action-blocked-L').classList.remove('hidden');
+      headerL.textContent = 'Je suis bloqué(e)';
+      footerSubmitL.textContent = 'Signaler';
+      footerSubmitL.className = 'btn btn-amber';
+      footerSubmitL.disabled = !selectedReason;
+    } else {
+      document.getElementById('action-normal-L').classList.remove('hidden');
+      document.getElementById('action-blocked-L').classList.add('hidden');
+      headerL.textContent = 'Avancement';
+      footerSubmitL.textContent = 'Enregistrer';
+      footerSubmitL.className = 'btn btn-primary';
+      footerSubmitL.disabled = false;
+    }
+
+    // ── 2. Réputée terminée ──────────────────
+    buildIdentity('seg-identity-R', job, desig);
+    buildTriptych('seg-triptych-R', operator, station, start, end, dur, split, volPct);
+    const bandR = document.getElementById('seg-band-R');
+    bandR.style.background = `rgba(16,185,129, 0.22)`;
+    bandR.innerHTML = `<div class="band-title" style="color:var(--flux-text-primary)">Tâche réputée terminée</div><div class="band-sub">Fin prévue à ${fmtTime(end)} — il y a ${fmtDur(overdue)}</div>`;
+    renderStepper(document.getElementById('stepper-value-R'), document.getElementById('stepper-status-R'), end, stepR, true);
+
+    // ── 3. Future ────────────────────────────
+    buildIdentity('seg-identity-F', job, desig);
+    buildTriptych('seg-triptych-F', operator, station, start, end, dur, split, volPct);
+    const prevTask = document.getElementById('ctl-prev-task').value;
+    const prevSt = document.getElementById('ctl-prev-station-name').value;
+    const prevSlot = document.getElementById('ctl-prev-slot').value;
+    document.getElementById('seg-blocked').innerHTML = `
+      <div class="blocked-icon-row"><div class="blocked-icon-circle"><i data-lucide="lock" style="width:18px;height:18px"></i></div></div>
+      <div class="blocked-title">Cette tâche n'a pas encore commencé</div>
+      <div class="blocked-sub">L'avancement ne peut être renseigné que lorsque la tâche précédente est terminée.</div>
+      <div class="blocked-pred-label">Tâche précédente</div>
+      <div class="blocked-predecessor">
+        <div class="pred-identity"><div class="job-line">${job}</div><div class="designation">${prevTask}</div></div>
+        <div class="pred-triptych"><div class="triptych">
+          <div class="triptych-cell"><span class="tc-label">Station</span><span class="tc-value">${prevSt}</span></div>
+          <div class="triptych-cell"><span class="tc-label">Créneau</span><span class="tc-value">${prevSlot}</span></div>
+        </div></div>
+      </div>`;
+
+    try { lucide.createIcons(); } catch(e) { console.warn('lucide:', e); }
+  }
+
+  // ── Steppers ───────────────────────────────
+  document.getElementById('stepper-minus-L').addEventListener('click', () => { stepL--; render(); });
+  document.getElementById('stepper-plus-L').addEventListener('click', () => { stepL++; render(); });
+  document.getElementById('stepper-minus-R').addEventListener('click', () => { stepR--; render(); });
+  document.getElementById('stepper-plus-R').addEventListener('click', () => { stepR++; render(); });
+
+  // ── Blocked toggle ─────────────────────────
+  document.getElementById('show-blocked-L').addEventListener('click', () => {
+    blockedModeL = true; selectedReason = null;
+    document.querySelectorAll('#action-blocked-L .reason-btn').forEach(b => b.classList.remove('selected'));
+    render();
+  });
+  document.getElementById('back-normal-L').addEventListener('click', () => {
+    blockedModeL = false; selectedReason = null; render();
+  });
+
+  // ── Reason selection ───────────────────────
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#action-blocked-L .reason-btn');
+    if (!btn) return;
+    document.querySelectorAll('#action-blocked-L .reason-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedReason = btn.dataset.reason;
+    document.getElementById('submit-L').disabled = false;
+  });
+
+  // ── Submits ────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('visible');
+    setTimeout(() => t.classList.remove('visible'), 2000);
+  }
+  document.getElementById('submit-L').addEventListener('click', () => {
+    if (blockedModeL) {
+      const label = document.querySelector('#action-blocked-L .reason-btn.selected .reason-main')?.textContent.trim();
+      const effect = document.querySelector('#action-blocked-L .reason-btn.selected .reason-effect')?.textContent.trim();
+      showToast(`${effect || label}`);
+    } else {
+      const end = parseTime(document.getElementById('ctl-end').value);
+      showToast(`Enregistré — fin à ${fmtTime(end + getOffset(stepL))}`);
+    }
+  });
+  document.getElementById('submit-R').addEventListener('click', () => {
+    const end = parseTime(document.getElementById('ctl-end').value);
+    showToast(`Enregistré — terminé à ${fmtTime(end + getOffset(stepR))}`);
+  });
+
+  // ── Controls ───────────────────────────────
+  document.querySelectorAll('.controls input, .controls select').forEach(el => {
+    el.addEventListener('input', () => { stepL = 0; stepR = 0; blockedModeL = false; selectedReason = null; render(); });
+  });
+
+  render();
+</script>
+</body>
+</html>

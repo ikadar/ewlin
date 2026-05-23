@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playground — Liste de facturation</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --flux-base: #09090b;
+      --flux-elevated: #18181b;
+      --flux-surface: #1e1e22;
+      --flux-hover: #27272a;
+      --flux-border: #2e2e33;
+      --flux-text-primary: #fafafa;
+      --flux-text-secondary: #a1a1aa;
+      --flux-text-tertiary: #71717a;
+      --flux-text-muted: #52525b;
+      --blue-500: #3b82f6;
+      --blue-400: #60a5fa;
+      --green-400: #4ade80;
+      --green-500: #22c55e;
+      --green-900-20: rgba(20, 83, 45, 0.2);
+      --green-800-50: rgba(22, 101, 52, 0.5);
+      --yellow-400: #facc15;
+      --yellow-900-20: rgba(113, 63, 18, 0.2);
+      --yellow-800-50: rgba(133, 77, 14, 0.5);
+      --red-400: #f87171;
+      --red-900-20: rgba(127, 29, 29, 0.2);
+      --red-800-50: rgba(153, 27, 27, 0.5);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--flux-base);
+      color: var(--flux-text-primary);
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Controls bar (playground only) ──────────────────────────── */
+    .controls {
+      background: #111114;
+      border-bottom: 1px solid var(--flux-border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--flux-text-tertiary);
+      flex-shrink: 0;
+    }
+    .controls label { display: flex; align-items: center; gap: 6px; }
+    .controls select, .controls input[type="range"] {
+      background: var(--flux-surface);
+      border: 1px solid var(--flux-border);
+      color: var(--flux-text-primary);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+    .controls .val { color: var(--blue-400); font-variant-numeric: tabular-nums; min-width: 24px; }
+
+    /* ── Page layout ─────────────────────────────────────────────── */
+    .page {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    .card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--flux-elevated);
+      border: 1px solid var(--flux-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* ── Tab bar ──────────────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      align-items: flex-end;
+      border-bottom: 1px solid var(--flux-border);
+      background: var(--flux-elevated);
+      padding: 0 16px;
+    }
+
+    .tab {
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--flux-text-secondary);
+      transition: color 0.15s, background 0.15s;
+      background: transparent;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .tab:hover { color: var(--flux-text-primary); background: rgba(255,255,255,0.03); }
+    .tab.active { color: white; border-bottom-color: var(--blue-500); }
+    .tab .count { color: var(--flux-text-muted); font-size: 13px; }
+
+    /* ── Table ────────────────────────────────────────────────────── */
+    .table-wrap { flex: 1; overflow-y: auto; }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead { position: sticky; top: 0; z-index: 10; }
+    thead tr { background: var(--flux-hover); border-bottom: 1px solid var(--flux-border); }
+
+    th {
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      color: var(--flux-text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { color: var(--flux-text-primary); }
+    th .sort-icon { display: inline; margin-left: 3px; vertical-align: middle; opacity: 0; transition: opacity 0.15s; }
+    th:hover .sort-icon { opacity: 1; }
+    th.sorted .sort-icon { opacity: 1; color: var(--blue-400); }
+
+    td {
+      padding: 0 8px;
+      white-space: nowrap;
+      font-size: 13px;
+      color: var(--flux-text-secondary);
+      height: 36px;
+      vertical-align: middle;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--flux-border);
+      transition: background 0.1s;
+    }
+    tbody tr:hover { background: var(--flux-hover); }
+
+    /* ── Cells ────────────────────────────────────────────────────── */
+    .ref { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-weight: 500; color: var(--flux-text-primary); }
+    .client { color: var(--flux-text-primary); }
+    .sep { color: var(--flux-text-muted); margin: 0 3px; }
+    .referent { color: var(--flux-text-tertiary); }
+    .date { font-family: 'SF Mono', monospace; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .muted { color: var(--flux-text-muted); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid;
+      font-weight: 500;
+      font-size: 11px;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .badge-green { background: var(--green-900-20); color: var(--green-400); border-color: var(--green-800-50); }
+    .badge-yellow { background: var(--yellow-900-20); color: var(--yellow-400); border-color: var(--yellow-800-50); }
+    .badge-red { background: var(--red-900-20); color: var(--red-400); border-color: var(--red-800-50); }
+
+    .priority-0 { color: var(--red-400); font-weight: 600; }
+    .priority-1 { color: var(--yellow-400); font-weight: 500; }
+    .priority-2 { color: var(--flux-text-secondary); }
+    .priority-3 { color: var(--flux-text-muted); }
+
+    /* Check toggle */
+    .check-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-direction: row;
+    }
+    .check-btn:hover { opacity: 0.8; }
+    .check-btn .check-date { font-size: 10px; color: var(--flux-text-muted); font-family: monospace; }
+
+    /* ── Empty state ──────────────────────────────────────────────── */
+    .empty {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--flux-text-muted);
+      font-size: 13px;
+    }
+
+    /* ── Summary bar ──────────────────────────────────────────────── */
+    .summary-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--flux-border);
+      background: var(--flux-elevated);
+      font-size: 12px;
+      color: var(--flux-text-tertiary);
+    }
+    .summary-bar .stat { display: flex; align-items: center; gap: 4px; }
+    .summary-bar .stat-val { color: var(--flux-text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+
+<!-- ── Playground controls ──────────────────────────────────────── -->
+<div class="controls">
+  <span style="font-weight: 600; color: var(--flux-text-secondary);">Playground</span>
+  <label>
+    Nombre de jobs :
+    <input type="range" id="ctl-count" min="3" max="30" value="12" />
+    <span class="val" id="ctl-count-val">12</span>
+  </label>
+  <label>
+    % facturés :
+    <input type="range" id="ctl-invoiced" min="0" max="100" value="30" step="10" />
+    <span class="val" id="ctl-invoiced-val">30%</span>
+  </label>
+  <label>
+    Jours depuis départ (max) :
+    <input type="range" id="ctl-days" min="1" max="60" value="30" />
+    <span class="val" id="ctl-days-val">30</span>
+  </label>
+</div>
+
+<!-- ── Page ──────────────────────────────────────────────────────── -->
+<div class="page">
+  <div class="card">
+    <div class="summary-bar" id="summary-bar"></div>
+    <div class="tab-bar" id="tab-bar"></div>
+    <div class="table-wrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data generation ─────────────────────────────────────────────
+const CLIENTS = ['Imprimerie Duval', 'Cartons Martin', 'PackBox SAS', 'Label Express', 'Graphipole', 'Étiquettes Moreau', 'Cartonnages Renaud', 'PrintPro Lyon', 'Boîtiers Leroy', 'FlexiPack'];
+const REFERENTS = ['M. Dupont', 'Mme Leroy', 'P. Martin', 'S. Bernard', null, 'A. Petit', null, 'C. Moreau', 'J. Laurent', null];
+const DESIGNATIONS = ['Boîtes pliantes 200x150', 'Étiquettes adhésives rouleau', 'Présentoir comptoir carton', 'Pochettes à rabat 250g', 'Coffret luxe pelliculé', 'Chevalets de table A5', 'Displays PLV sol', 'Fourreaux bouteilles', 'Intercalaires palette', 'Cartes de visite HD'];
+const SHIPPERS = ['Chronopost', 'DHL Express', 'TNT', 'GLS', 'Enlèvement client', null, 'Schenker', 'UPS'];
+const PRIORITIES = [0, 1, 1, 2, 2, 2, 2, 3, 3, 3];
+const PRIORITY_LABELS = ['Impératif', 'Important', 'Standard', 'Flexible'];
+
+function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function generateJobs(count, invoicedPct, maxDays) {
+  const jobs = [];
+  const now = Date.now();
+  for (let i = 0; i < count; i++) {
+    const ref = String(42 + i).padStart(5, '0');
+    const daysAgo = Math.floor(Math.random() * maxDays) + 1;
+    const shippedDate = new Date(now - daysAgo * 86400000);
+    const invoiced = Math.random() * 100 < invoicedPct;
+    const invoicedDate = invoiced ? new Date(shippedDate.getTime() + Math.floor(Math.random() * 7 + 1) * 86400000) : null;
+    const exitDate = new Date(shippedDate.getTime() - Math.floor(Math.random() * 3) * 86400000);
+    const priority = randomItem(PRIORITIES);
+
+    jobs.push({
+      ref,
+      client: randomItem(CLIENTS),
+      referent: randomItem(REFERENTS),
+      designation: randomItem(DESIGNATIONS),
+      priority,
+      sortie: `${String(exitDate.getDate()).padStart(2,'0')}/${String(exitDate.getMonth()+1).padStart(2,'0')}`,
+      shippedDate,
+      shippedAt: `${String(shippedDate.getDate()).padStart(2,'0')}/${String(shippedDate.getMonth()+1).padStart(2,'0')}`,
+      shippedDaysAgo: daysAgo,
+      shipper: randomItem(SHIPPERS),
+      invoiced,
+      invoicedAt: invoicedDate ? `${String(invoicedDate.getDate()).padStart(2,'0')}/${String(invoicedDate.getMonth()+1).padStart(2,'0')}` : null,
+    });
+  }
+  return jobs;
+}
+
+// ── State ───────────────────────────────────────────────────────
+let activeTab = 'a-facturer';
+let sortCol = 'shippedAt';
+let sortDir = 'desc';
+let allJobs = [];
+
+const TABS = [
+  { key: 'a-facturer', label: 'À facturer' },
+  { key: 'factures', label: 'Facturés' },
+  { key: 'tous', label: 'Tous' },
+];
+
+const COLUMNS = [
+  { key: 'ref',        label: 'Réf.',          w: '80px' },
+  { key: 'designation',label: 'Désignation',    w: 'auto' },
+  { key: 'client',     label: 'Client',         w: 'auto' },
+  { key: 'shippedAt',  label: 'Parti le',       w: '100px' },
+  { key: 'invoiced',   label: 'Facturé',        w: '120px' },
+];
+
+// ── Render ──────────────────────────────────────────────────────
+function render() {
+  // Filter
+  let jobs = [...allJobs];
+  if (activeTab === 'a-facturer') jobs = jobs.filter(j => !j.invoiced);
+  else if (activeTab === 'factures') jobs = jobs.filter(j => j.invoiced);
+
+  // Sort
+  jobs.sort((a, b) => {
+    let va, vb;
+    switch (sortCol) {
+      case 'ref': va = a.ref; vb = b.ref; break;
+      case 'designation': va = a.designation; vb = b.designation; break;
+      case 'client': va = a.client; vb = b.client; break;
+      case 'shippedAt': va = a.shippedDate.getTime(); vb = b.shippedDate.getTime(); break;
+      case 'invoiced': va = a.invoiced ? 1 : 0; vb = b.invoiced ? 1 : 0; break;
+      default: va = 0; vb = 0;
+    }
+    const r = typeof va === 'string' ? va.localeCompare(vb) : (va < vb ? -1 : va > vb ? 1 : 0);
+    return sortDir === 'desc' ? -r : r;
+  });
+
+  // Counts
+  const counts = {
+    'a-facturer': allJobs.filter(j => !j.invoiced).length,
+    'factures': allJobs.filter(j => j.invoiced).length,
+    'tous': allJobs.length,
+  };
+
+  // Summary
+  const pending = allJobs.filter(j => !j.invoiced);
+  const oldest = pending.length > 0 ? Math.max(...pending.map(j => j.shippedDaysAgo)) : 0;
+  const avgAge = pending.length > 0 ? Math.round(pending.reduce((s, j) => s + j.shippedDaysAgo, 0) / pending.length) : 0;
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="stat"><span>Dossiers partis :</span> <span class="stat-val">${allJobs.length}</span></div>
+    <div class="stat"><span>En attente de facture :</span> <span class="stat-val">${pending.length}</span></div>
+    <div class="stat"><span>Ancienneté moy. :</span> <span class="stat-val">${avgAge}j</span></div>
+    <div class="stat"><span>Plus ancien :</span> <span class="stat-val"${oldest > 14 ? ' style="color:var(--red-400)"' : ''}>${oldest}j</span></div>
+  `;
+
+  // Tabs
+  document.getElementById('tab-bar').innerHTML = TABS.map(t =>
+    `<button class="tab ${activeTab === t.key ? 'active' : ''}" data-tab="${t.key}">
+      <span>${t.label}</span>
+      <span class="count">(${counts[t.key]})</span>
+    </button>`
+  ).join('');
+
+  // Thead
+  document.getElementById('thead').innerHTML = `<tr>${COLUMNS.map(c => {
+    const sorted = sortCol === c.key;
+    const icon = sorted
+      ? (sortDir === 'asc'
+        ? '<i data-lucide="chevron-up" style="width:12px;height:12px;stroke-width:2.5"></i>'
+        : '<i data-lucide="chevron-down" style="width:12px;height:12px;stroke-width:2.5"></i>')
+      : '<i data-lucide="chevrons-up-down" style="width:12px;height:12px;stroke-width:2"></i>';
+    return `<th class="${sorted ? 'sorted' : ''}" data-sort="${c.key}" style="width:${c.w}">
+      ${c.label} <span class="sort-icon">${icon}</span>
+    </th>`;
+  }).join('')}</tr>`;
+
+  // Tbody
+  if (jobs.length === 0) {
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="${COLUMNS.length}" class="empty">Aucun dossier</td></tr>`;
+  } else {
+    document.getElementById('tbody').innerHTML = jobs.map(j => {
+      const ageBadge = j.shippedDaysAgo > 14
+        ? `<span class="badge badge-red">${j.shippedDaysAgo}j</span>`
+        : j.shippedDaysAgo > 7
+          ? `<span class="badge badge-yellow">${j.shippedDaysAgo}j</span>`
+          : `<span class="badge badge-green">${j.shippedDaysAgo}j</span>`;
+
+      const invoiceCell = j.invoiced
+        ? `<button class="check-btn" data-ref="${j.ref}" data-action="uninvoice" title="Marquer comme non facturé">
+            <i data-lucide="circle-check" style="width:16px;height:16px;color:var(--green-500);stroke-width:2"></i>
+            <span class="check-date">${j.invoicedAt}</span>
+          </button>`
+        : `<button class="check-btn" data-ref="${j.ref}" data-action="invoice" title="Marquer comme facturé">
+            <i data-lucide="circle" style="width:16px;height:16px;color:var(--flux-text-muted);stroke-width:2"></i>
+          </button>`;
+
+      return `<tr>
+        <td><span class="ref">${j.ref}</span></td>
+        <td style="color:var(--flux-text-secondary)">${j.designation}</td>
+        <td><span class="client">${j.client}</span></td>
+        <td><span class="date" style="color:var(--flux-text-primary)">${j.shippedAt}</span></td>
+        <td>${invoiceCell}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  lucide.createIcons();
+
+  // Bind tab clicks
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => { activeTab = btn.dataset.tab; render(); });
+  });
+
+  // Bind sort clicks
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = col === 'shippedAt' ? 'desc' : 'asc'; }
+      render();
+    });
+  });
+
+  // Bind invoice toggles
+  document.querySelectorAll('.check-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ref = btn.dataset.ref;
+      const job = allJobs.find(j => j.ref === ref);
+      if (!job) return;
+      if (btn.dataset.action === 'invoice') {
+        job.invoiced = true;
+        const now = new Date();
+        job.invoicedAt = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}`;
+      } else {
+        job.invoiced = false;
+        job.invoicedAt = null;
+      }
+      render();
+    });
+  });
+}
+
+// ── Controls wiring ─────────────────────────────────────────────
+function regenerate() {
+  const count = +document.getElementById('ctl-count').value;
+  const invoiced = +document.getElementById('ctl-invoiced').value;
+  const days = +document.getElementById('ctl-days').value;
+  document.getElementById('ctl-count-val').textContent = count;
+  document.getElementById('ctl-invoiced-val').textContent = invoiced + '%';
+  document.getElementById('ctl-days-val').textContent = days;
+  allJobs = generateJobs(count, invoiced, days);
+  render();
+}
+
+document.getElementById('ctl-count').addEventListener('input', regenerate);
+document.getElementById('ctl-invoiced').addEventListener('input', regenerate);
+document.getElementById('ctl-days').addEventListener('input', regenerate);
+
+// Initial render
+regenerate();
+</script>
+</body>
+</html>

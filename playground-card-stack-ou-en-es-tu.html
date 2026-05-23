@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground Card Stack "Où en es-tu ?"</title>
+<style>
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --red-400:     #f87171;
+    --blue-400:    #60a5fa;
+    --slate-400:   #94a3b8;
+    --purple-400:  #a78bfa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    padding: 24px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+
+  /* ── Phone mock ─────────────────────────────────────────── */
+  .phone {
+    width: 360px;
+    height: 720px;
+    background: #000;
+    border-radius: 36px;
+    padding: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: var(--flux-base);
+    border-radius: 24px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .phone-statusbar {
+    height: 32px;
+    background: var(--flux-surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    border-bottom: 1px solid var(--flux-border);
+  }
+
+  .phone-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .phone-header .greeting {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 4px;
+  }
+  .phone-header .operator {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .card-area {
+    flex: 1;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  /* ── Task card ──────────────────────────────────────────── */
+  .task-card {
+    background: var(--flux-elevated);
+    border-radius: 18px;
+    border: 1px solid var(--flux-border-light);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+  }
+
+  .task-card.interlude {
+    border-color: rgba(251, 191, 36, 0.4);
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.06), var(--flux-elevated));
+  }
+
+  .task-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--blue-400);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .task-card.interlude .task-card-badge {
+    background: rgba(251, 191, 36, 0.16);
+    color: var(--amber-400);
+  }
+
+  .task-card-title {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .task-card-machine {
+    font-size: 14px;
+    color: var(--flux-text-secondary);
+  }
+
+  .task-card-time {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 13px;
+    color: var(--flux-text-tertiary);
+  }
+
+  /* Volume gauge */
+  .gauge {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .gauge-numbers {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+  }
+  .gauge-numbers strong {
+    font-size: 22px;
+    color: var(--flux-text-primary);
+    font-weight: 700;
+  }
+  .gauge-bar {
+    height: 10px;
+    background: var(--flux-surface);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+  }
+  .gauge-bar-fill {
+    height: 100%;
+    background: var(--emerald-400);
+    border-radius: 999px;
+    transition: width 0.6s ease;
+  }
+  .gauge-bar-fill.warning { background: var(--amber-400); }
+  .gauge-bar-fill.late { background: var(--red-400); }
+
+  /* Background indicator (machine continues without operator) */
+  .bg-indicator {
+    margin-top: auto;
+    padding: 10px 12px;
+    background: var(--flux-surface);
+    border-radius: 10px;
+    border: 1px dashed var(--flux-border-light);
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+  }
+  .bg-indicator strong { color: var(--amber-400); font-weight: 600; }
+
+  /* ── Modale (overlay au-dessus du téléphone) ──────────── */
+  .modale-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 10;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .modale {
+    width: 100%;
+    background: var(--flux-elevated);
+    border-radius: 20px 20px 0 0;
+    padding: 22px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: slideUp 0.3s ease;
+  }
+
+  .modale h2 {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .modale-context {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    background: var(--flux-surface);
+    padding: 8px 10px;
+    border-radius: 8px;
+    border-left: 2px solid var(--blue-400);
+  }
+
+  .modale-input {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .modale-input label {
+    font-size: 12px;
+    color: var(--flux-text-secondary);
+  }
+  .modale-input .input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modale-input input[type="number"] {
+    flex: 1;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--flux-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+    font-family: ui-monospace, SF Mono, monospace;
+  }
+  .modale-input .unit {
+    color: var(--flux-text-tertiary);
+    font-size: 13px;
+  }
+
+  .quick-pcts {
+    display: flex;
+    gap: 6px;
+  }
+  .quick-pcts button {
+    flex: 1;
+    padding: 8px 0;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    color: var(--flux-text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .quick-pcts button:hover {
+    background: var(--flux-hover);
+    color: var(--flux-text-primary);
+  }
+  .quick-pcts button.active {
+    background: rgba(96, 165, 250, 0.15);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+
+  .modale-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .modale-actions button {
+    padding: 12px 14px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    transition: all 0.15s;
+  }
+  .modale-actions button .small {
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.85;
+  }
+
+  .btn-done {
+    background: var(--emerald-400);
+    color: #052e16;
+  }
+  .btn-extend {
+    background: var(--blue-400);
+    color: #0c2547;
+  }
+  .btn-split {
+    background: var(--amber-400);
+    color: #422006;
+  }
+  .btn-cancel {
+    background: var(--flux-surface);
+    color: var(--flux-text-secondary);
+    border: 1px solid var(--flux-border);
+  }
+
+  /* ── Side panel ─────────────────────────────────────────── */
+  .panel {
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  .panel h3 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 14px;
+  }
+
+  .controls {
+    margin-bottom: 18px;
+  }
+
+  .stepper {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .stepper button {
+    background: var(--flux-elevated);
+    color: var(--flux-text-primary);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .stepper button:hover:not(:disabled) {
+    background: var(--flux-hover);
+  }
+  .stepper button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .stepper button.primary {
+    background: var(--blue-400);
+    color: #0c2547;
+    border-color: var(--blue-400);
+  }
+
+  .clock {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--flux-text-primary);
+    margin-bottom: 6px;
+  }
+  .clock-label {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 14px;
+  }
+
+  /* Timeline schematic */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .timeline-label {
+    width: 60px;
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    text-align: right;
+    font-family: ui-monospace, SF Mono, monospace;
+  }
+  .timeline-track {
+    flex: 1;
+    height: 22px;
+    background: var(--flux-base);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .timeline-segment {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: var(--blue-400);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 10px;
+    color: #0c2547;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: all 0.4s ease;
+  }
+  .timeline-segment.stahl { background: var(--amber-400); color: #422006; }
+  .timeline-segment.now {
+    background: var(--red-400);
+    width: 2px;
+    padding: 0;
+    z-index: 5;
+  }
+  .timeline-segment.completed {
+    background: var(--emerald-400);
+    color: #052e16;
+  }
+  .timeline-segment.continuation {
+    background: var(--purple-400);
+    color: #1e1b4b;
+  }
+
+  .narrative {
+    background: var(--flux-base);
+    border-radius: 10px;
+    padding: 14px;
+    height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--flux-border);
+  }
+  .narrative-entry {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--flux-border);
+    font-size: 13px;
+  }
+  .narrative-entry:last-child { border-bottom: 0; }
+  .narrative-time {
+    font-family: ui-monospace, SF Mono, monospace;
+    color: var(--flux-text-tertiary);
+    font-size: 11px;
+    margin-right: 8px;
+  }
+  .narrative-text { color: var(--flux-text-secondary); }
+  .narrative-text strong { color: var(--flux-text-primary); }
+  .narrative-text .algo { color: var(--purple-400); }
+  .narrative-text .op { color: var(--blue-400); }
+  .narrative-text .machine { color: var(--amber-400); }
+
+  /* Hidden state */
+  .hidden { display: none !important; }
+
+  /* Title block */
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .lede {
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    margin-bottom: 22px;
+    max-width: 820px;
+    line-height: 1.6;
+  }
+
+  .panel-stack { display: flex; flex-direction: column; gap: 18px; }
+
+</style>
+</head>
+<body>
+
+<div style="padding: 28px 24px 0; max-width: 1300px; margin: 0 auto;">
+  <h1>Card stack — "Où en es-tu ?" capture</h1>
+  <p class="lede">
+    Modèle <strong>capture par % du segment</strong>. Bernard ne fournit qu'un fait
+    (« je suis à X% »). L'algo décide seul de la conséquence (étendre, splitter, ou clore) ;
+    aucun choix de planification n'est laissé à l'opérateur, conformément au principe
+    <em>no manual placement</em>. Le panneau « Décision algo » à droite expose la décision
+    en preview pour ton oeil de designer — il n'existe pas dans la vraie UI opérateur.
+    Cas-test obligatoire : <strong>Bernard 10h-14h sur MBO + interlude calage Stahl 11h-11h15</strong>.
+  </p>
+</div>
+
+<div class="stage">
+
+  <!-- ───────── Smartphone Bernard ───────── -->
+  <div class="phone">
+    <div class="phone-screen" id="phoneScreen">
+      <div class="phone-statusbar">
+        <span id="phoneTime">10:00</span>
+        <span>📶 🔋</span>
+      </div>
+      <div class="phone-header">
+        <div class="greeting">Smartphone porté</div>
+        <div class="operator">Bernard</div>
+      </div>
+      <div class="card-area" id="cardArea">
+        <!-- Carte courante injectée ici -->
+      </div>
+
+      <!-- Modale "où en es-tu" — pure UX opérateur -->
+      <div class="modale-overlay hidden" id="modaleOverlay">
+        <div class="modale">
+          <h2 id="modaleTitle">Où en es-tu ?</h2>
+          <div id="modaleSubtitle" style="font-size:12px;color:var(--flux-text-tertiary);margin-top:-8px;"></div>
+          <div class="modale-input">
+            <label id="modaleLabel">
+              Tu devrais être à <strong style="color:var(--blue-400)">25%</strong>.
+            </label>
+            <div class="input-row">
+              <input type="number" id="modaleInput" value="25" min="0" max="100" step="1" />
+              <span class="unit">%</span>
+            </div>
+            <div class="quick-pcts" id="quickPcts"></div>
+          </div>
+          <div class="modale-actions">
+            <button class="btn-done" id="btnRegister">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── Side panel ───────── -->
+  <div class="panel-stack">
+
+    <div class="panel controls">
+      <h3>Scénario Bernard</h3>
+      <div class="clock" id="clockDisplay">10:00</div>
+      <div class="clock-label" id="clockLabel">Bernard arrive sur MBO. Carte ouverte.</div>
+      <div class="stepper">
+        <button id="btnNext" class="primary">Avancer →</button>
+        <button id="btnReset">↺ Recommencer</button>
+      </div>
+
+      <h3 style="margin-top: 20px;">Plan visuel (Bernard)</h3>
+      <div class="timeline">
+        <div class="timeline-row">
+          <div class="timeline-label">MBO</div>
+          <div class="timeline-track" id="trackMBO"></div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-label">Stahl</div>
+          <div class="timeline-track" id="trackStahl"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="algoPreviewPanel" style="display:none">
+      <h3>Décision algo (preview pour designer)</h3>
+      <div id="algoPreview" style="font-size:13px;color:var(--flux-text-secondary);line-height:1.5;background:var(--flux-base);padding:12px;border-radius:8px;border-left:3px solid var(--purple-400);"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Journal narratif</h3>
+      <div class="narrative" id="narrative"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// État du scénario
+// ════════════════════════════════════════════════════════════════
+const SCENARIO = {
+  mboTotal: 5000,
+  mboPlannedStart: 10 * 60,      // 10:00 in minutes
+  mboPlannedEnd: 14 * 60,        // 14:00
+  stahlPlannedStart: 11 * 60,    // 11:00
+  stahlPlannedEnd: 11 * 60 + 15, // 11:15
+  // We "scale" feuilles linearly with planned time; productivity ratio = 1.0 by default
+};
+
+let state = freshState();
+
+function freshState() {
+  return {
+    nowMin: 10 * 60,                  // 10:00
+    mboTotalQty: SCENARIO.mboTotal,   // 5000 feuilles — tag décoratif
+    // Each fragment carries 0..100% of its own work. capturedPct=null si pas saisi.
+    mboFragments: [{
+      start: SCENARIO.mboPlannedStart,
+      end: SCENARIO.mboPlannedEnd,
+      sharePct: 100,                  // ce fragment représente 100% du travail prévu pour J7-MBO
+      capturedPct: null,
+      completed: false,
+    }],
+    stahlState: 'planned',
+    activeCard: 'MBO',
+    pendingEvent: 'arrive',
+    narrative: [],
+  };
+}
+
+// Helpers
+function fmtT(min) {
+  const h = Math.floor(min / 60).toString().padStart(2, '0');
+  const m = (min % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// Fragment courant = le dernier non-completed (ou le dernier tout court)
+function currentFragment() {
+  const frags = state.mboFragments;
+  return frags.find(f => !f.completed) ?? frags[frags.length - 1];
+}
+
+// Avancement attendu DANS le fragment courant à l'instant t (0..100%)
+function expectedPctInCurrentFragment(t) {
+  const f = currentFragment();
+  const elapsed = Math.max(0, Math.min(f.end, t) - f.start);
+  const totalMinutes = f.end - f.start;
+  if (totalMinutes <= 0) return 100;
+  return Math.round((elapsed / totalMinutes) * 100);
+}
+
+// Avancement total cumulé sur le job à l'instant t (0..100% du job entier).
+// Somme des contributions de chaque fragment :
+//   - completed : sharePct × capturedPct/100 (capturedPct=100 si full done, < si split-closed)
+//   - en cours (le current fragment) : sharePct × expectedPctInFragment(t) / 100
+//   - futur : 0
+function expectedTotalPct(t) {
+  let total = 0;
+  const cur = currentFragment();
+  for (const frag of state.mboFragments) {
+    if (frag.completed) {
+      const cp = frag.capturedPct ?? 100;
+      total += frag.sharePct * cp / 100;
+    } else if (frag === cur) {
+      total += frag.sharePct * expectedPctInCurrentFragment(t) / 100;
+    }
+    // future : 0
+  }
+  return Math.round(total);
+}
+
+// ════════════════════════════════════════════════════════════════
+// Render
+// ════════════════════════════════════════════════════════════════
+function renderClock() {
+  document.getElementById('clockDisplay').textContent = fmtT(state.nowMin);
+  document.getElementById('phoneTime').textContent = fmtT(state.nowMin);
+}
+
+function renderCard() {
+  const area = document.getElementById('cardArea');
+  area.innerHTML = '';
+  if (state.activeCard === 'MBO') {
+    const f = currentFragment();
+    const expectedPct = expectedPctInCurrentFragment(state.nowMin);
+    const totalPct = expectedTotalPct(state.nowMin);
+    const fragIndex = state.mboFragments.indexOf(f);
+    const totalFragments = state.mboFragments.length;
+    const isMulti = totalFragments > 1;
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    // Une ligne contextuelle qui rappelle la taille du segment sur le tirage entier.
+    const segmentContext = isMulti
+      ? `<div style="font-size:12px;color:var(--flux-text-tertiary);">Ce segment ${fragIndex + 1}/${totalFragments} fait <strong style="color:var(--flux-text-secondary)">${f.sharePct}%</strong> du tirage J7.</div>`
+      : `<div style="font-size:12px;color:var(--flux-text-tertiary);">Tu fais l'intégralité du tirage J7.</div>`;
+    const gaugeRight = isMulti
+      ? `<span><strong>${expectedPct}%</strong> du segment <span style="color:var(--flux-text-tertiary);font-weight:400">· ${totalPct}% du tirage</span></span>`
+      : `<span><strong>${expectedPct}%</strong></span>`;
+    card.innerHTML = `
+      <div class="task-card-badge">● En cours</div>
+      <div class="task-card-title">J7 — Roule</div>
+      <div class="task-card-machine">MBO</div>
+      <div class="task-card-time">${fmtT(f.start)} → ${fmtT(f.end)}</div>
+      ${segmentContext}
+      <div class="gauge">
+        <div class="gauge-numbers">
+          <span style="color:var(--flux-text-tertiary);font-size:11px">Tu devrais en être à</span>
+          ${gaugeRight}
+        </div>
+        <div class="gauge-bar" style="position:relative">
+          <div class="gauge-bar-fill" style="width: ${expectedPct}%"></div>
+        </div>
+      </div>
+    `;
+    area.appendChild(card);
+  } else if (state.activeCard === 'Stahl') {
+    const card = document.createElement('div');
+    card.className = 'task-card interlude';
+    card.innerHTML = `
+      <div class="task-card-badge">⚠ Interlude · 15 min</div>
+      <div class="task-card-title">J9 — Calage</div>
+      <div class="task-card-machine">Stahl</div>
+      <div class="task-card-time">${fmtT(SCENARIO.stahlPlannedStart)} → ${fmtT(SCENARIO.stahlPlannedEnd)}</div>
+      <div style="font-size:13px;color:var(--flux-text-secondary);padding-top:4px;">
+        Tu retournes sur <strong style="color:var(--blue-400)">MBO J7</strong> après.
+      </div>
+      <div class="bg-indicator">
+        <strong>MBO</strong> tourne en attendant ton retour.
+      </div>
+    `;
+    area.appendChild(card);
+  } else if (state.activeCard === 'Done') {
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    card.innerHTML = `
+      <div class="task-card-badge" style="background:rgba(52,211,153,0.16);color:var(--emerald-400)">✓ Terminé</div>
+      <div class="task-card-title" style="font-size:18px">Bonne journée Bernard.</div>
+      <div class="task-card-machine">Tes tâches du jour sont closes.</div>
+    `;
+    area.appendChild(card);
+  }
+}
+
+function renderTimeline() {
+  // MBO track: planned 10:00 → 14:00 (current). Show fragments.
+  const mboTrack = document.getElementById('trackMBO');
+  const stahlTrack = document.getElementById('trackStahl');
+  mboTrack.innerHTML = '';
+  stahlTrack.innerHTML = '';
+
+  const dayStart = 10 * 60;
+  const dayEnd = 16 * 60;
+  const total = dayEnd - dayStart;
+
+  // MBO segments
+  state.mboFragments.forEach((frag, i) => {
+    const left = ((frag.start - dayStart) / total) * 100;
+    const width = ((frag.end - frag.start) / total) * 100;
+    const isPartial = frag.completed && frag.capturedPct !== null && frag.capturedPct < 100;
+    const isFullyDone = frag.completed && (frag.capturedPct === null || frag.capturedPct >= 100);
+    const seg = document.createElement('div');
+    seg.className = 'timeline-segment'
+      + (isFullyDone ? ' completed' : '')
+      + (i > 0 && !isFullyDone ? ' continuation' : '');
+    if (isPartial) {
+      seg.style.background = 'var(--amber-400)';
+      seg.style.color = '#422006';
+    }
+    seg.style.left = `${left}%`;
+    seg.style.width = `${width}%`;
+    if (isPartial) {
+      // contribution effective au job
+      const contrib = Math.round(frag.sharePct * frag.capturedPct / 100);
+      seg.textContent = `J7 · ${contrib}% / ${frag.sharePct}%`;
+    } else {
+      seg.textContent = `J7 · ${frag.sharePct}%`;
+    }
+    mboTrack.appendChild(seg);
+  });
+
+  // Stahl segment
+  if (state.stahlState !== 'cancelled') {
+    const left = ((SCENARIO.stahlPlannedStart - dayStart) / total) * 100;
+    const width = ((SCENARIO.stahlPlannedEnd - SCENARIO.stahlPlannedStart) / total) * 100;
+    const seg = document.createElement('div');
+    seg.className = 'timeline-segment stahl' + (state.stahlState === 'done' ? ' completed' : '');
+    seg.style.left = `${left}%`;
+    seg.style.width = `${width}%`;
+    seg.textContent = 'J9 calage';
+    stahlTrack.appendChild(seg);
+  }
+
+  // Now line on both tracks
+  [mboTrack, stahlTrack].forEach(track => {
+    const now = document.createElement('div');
+    now.className = 'timeline-segment now';
+    now.style.left = `${((state.nowMin - dayStart) / total) * 100}%`;
+    now.style.width = '2px';
+    track.appendChild(now);
+  });
+}
+
+function pushNarrative(time, html) {
+  state.narrative.push({ time, html });
+  const el = document.getElementById('narrative');
+  el.innerHTML = state.narrative.map(n => `
+    <div class="narrative-entry">
+      <span class="narrative-time">${fmtT(n.time)}</span>
+      <span class="narrative-text">${n.html}</span>
+    </div>
+  `).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderAll() {
+  renderClock();
+  renderCard();
+  renderTimeline();
+}
+
+// ════════════════════════════════════════════════════════════════
+// Modale "Où en es-tu ?" — saisie en %
+// L'UX opérateur est PURE (pas de chrome de design). Le preview de la
+// décision algo vit dans un panneau à côté, pas dans la modale.
+// ════════════════════════════════════════════════════════════════
+let currentModaleMode = null;
+
+function openModale(_unusedContext, expectedPct, mode) {
+  currentModaleMode = mode;
+  const overlay = document.getElementById('modaleOverlay');
+  const title = document.getElementById('modaleTitle');
+  const subtitleEl = document.getElementById('modaleSubtitle');
+  const labelEl = document.getElementById('modaleLabel');
+  const input = document.getElementById('modaleInput');
+  const quickPcts = document.getElementById('quickPcts');
+
+  title.textContent = 'Où en es-tu sur J7 ?';
+
+  const f = currentFragment();
+  const totalFragments = state.mboFragments.length;
+  const isMulti = totalFragments > 1;
+  const fragIndex = state.mboFragments.indexOf(f);
+
+  // Sous-titre : rappelle la taille du segment courant par rapport au tirage.
+  if (isMulti) {
+    subtitleEl.textContent = `Segment ${fragIndex + 1}/${totalFragments} — fait ${f.sharePct}% du tirage J7`;
+  } else {
+    subtitleEl.textContent = `MBO · ${fmtT(f.start)} → ${fmtT(f.end)}`;
+  }
+
+  // Phrase d'attendu adaptative.
+  if (isMulti) {
+    const totalNow = expectedTotalPct(state.nowMin);
+    labelEl.innerHTML = `
+      Tu devrais en être à <strong style="color:var(--blue-400)">${expectedPct}%</strong> de ce segment
+      <span style="color:var(--flux-text-tertiary)">· ${totalNow}% du tirage J7 entier</span>.
+    `;
+  } else {
+    labelEl.innerHTML = `Tu devrais en être à <strong style="color:var(--blue-400)">${expectedPct}%</strong> du tirage J7.`;
+  }
+
+  input.value = expectedPct;
+
+  const anchors = [
+    { label: 'Retard', delta: -10 },
+    { label: 'À l\'heure', delta: 0 },
+    { label: 'Avance', delta: +10 },
+    { label: 'Fini', value: 100 },
+  ];
+  quickPcts.innerHTML = anchors.map(a => {
+    const v = a.value !== undefined ? a.value : Math.max(0, Math.min(100, expectedPct + a.delta));
+    return `<button data-v="${v}">${a.label}<br><small>${v}%</small></button>`;
+  }).join('');
+  quickPcts.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      input.value = b.dataset.v;
+      updateAlgoPreview();
+    };
+  });
+
+  input.oninput = updateAlgoPreview;
+
+  overlay.classList.remove('hidden');
+  document.getElementById('algoPreviewPanel').style.display = 'block';
+  updateAlgoPreview();
+}
+
+// Met à jour le panneau "Décision algo (preview pour designer)" dans le side
+// panel — JAMAIS dans la modale, qui reste pure UX opérateur.
+function updateAlgoPreview() {
+  const input = document.getElementById('modaleInput');
+  const previewEl = document.getElementById('algoPreview');
+  const donePct = Math.max(0, Math.min(100, parseInt(input.value || '0', 10)));
+  const remainingPct = 100 - donePct;
+  const isDone = remainingPct <= 0;
+  const SMALL_TAIL = 5;
+
+  const f = currentFragment();
+  const residualOfJob = Math.round(f.sharePct * remainingPct / 100);
+
+  let txt;
+  if (currentModaleMode === 'pre-interlude') {
+    if (isDone) {
+      txt = `Bernard est à 100% → MBO clôturée. Stahl démarre normalement à ${fmtT(SCENARIO.stahlPlannedStart)}.`;
+    } else if (remainingPct <= SMALL_TAIL) {
+      txt = `Bernard est à ${donePct}% du segment (reste ${remainingPct}% = ${residualOfJob}% du tirage). Reste petit → l'algo prolonge MBO et glisse Stahl.`;
+    } else {
+      txt = `Bernard est à ${donePct}% du segment (reste ${remainingPct}% = ${residualOfJob}% du tirage). Reste significatif → l'algo split : Stahl maintenant, segment résiduel après.`;
+    }
+  } else {
+    if (isDone) {
+      txt = `Bernard est à 100% → MBO clôturée, journée terminée.`;
+    } else if (remainingPct <= SMALL_TAIL) {
+      txt = `Bernard est à ${donePct}% du segment (reste ${remainingPct}% = ${residualOfJob}% du tirage). Reste petit → l'algo prolonge MBO.`;
+    } else {
+      txt = `Bernard est à ${donePct}% du segment (reste ${remainingPct}% = ${residualOfJob}% du tirage). Reste significatif → l'algo replanifie les ${residualOfJob}% du tirage sur un autre créneau.`;
+    }
+  }
+
+  previewEl.textContent = txt;
+}
+
+function closeModale() {
+  document.getElementById('modaleOverlay').classList.add('hidden');
+  document.getElementById('algoPreviewPanel').style.display = 'none';
+  currentModaleMode = null;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Saisie operator → décision algo (déterministe, pas de choix opérateur)
+// ════════════════════════════════════════════════════════════════
+function registerSaisie(mode, donePct) {
+  closeModale();
+  const remainingPct = Math.max(0, 100 - donePct);
+  const isDone = remainingPct <= 0;
+  const SMALL_TAIL = 5; // %
+
+  const f = currentFragment();
+  // Vitesse au sein du fragment courant : minutes par % de fragment.
+  const fragMinutes = f.end - f.start;
+  const minutesPerPct = fragMinutes / 100;
+
+  if (mode === 'pre-interlude') {
+    if (isDone) {
+      // Bernard a fini en avance.
+      f.end = state.nowMin;
+      f.capturedPct = 100;
+      f.completed = true;
+      pushNarrative(state.nowMin, `<span class="op">Bernard saisit ${donePct}%</span>. <span class="algo">Algo décide</span> : MBO clôturée en avance, on attend Stahl.`);
+      state.activeCard = 'MBO';
+      state.pendingEvent = 'wait-stahl-start';
+    } else if (remainingPct <= SMALL_TAIL) {
+      // Petit reste : prolonger MBO plutôt que split. À l'arrivée de la nouvelle
+      // fin, le fragment est présumé entièrement fait → capturedPct=100.
+      const extra = Math.max(5, Math.round(remainingPct * minutesPerPct));
+      f.end = state.nowMin + extra;
+      f.capturedPct = 100;
+      f.completed = true;
+      SCENARIO.stahlPlannedStart += extra;
+      SCENARIO.stahlPlannedEnd += extra;
+      pushNarrative(state.nowMin, `<span class="op">Bernard saisit ${donePct}%</span> du segment (reste ${remainingPct}%). <span class="algo">Algo décide</span> : prolonge MBO de ${extra} min, Stahl glisse à ${fmtT(SCENARIO.stahlPlannedStart)}.`);
+      state.nowMin += extra;
+      state.pendingEvent = 'wait-stahl-start';
+    } else {
+      // Split : ferme fragment 1 split-closed, crée fragment 2 pour le reste.
+      // sharePct du fragment 1 reste inchangé (témoigne du planning d'origine),
+      // capturedPct = donePct (témoigne de ce qui a été réellement fait).
+      f.end = state.nowMin;
+      f.capturedPct = donePct;
+      f.completed = true;
+      const residualShare = Math.round(f.sharePct * remainingPct / 100);
+      const minutesPerOriginalPct = (SCENARIO.mboPlannedEnd - SCENARIO.mboPlannedStart) / 100;
+      const residualMin = Math.round(residualShare * minutesPerOriginalPct);
+      const fragStart = SCENARIO.stahlPlannedEnd;
+      const fragEnd = fragStart + residualMin;
+      state.mboFragments.push({ start: fragStart, end: fragEnd, sharePct: residualShare, capturedPct: null, completed: false });
+      pushNarrative(state.nowMin, `<span class="op">Bernard saisit ${donePct}%</span> du segment (reste ${remainingPct}%). <span class="algo">Algo décide</span> : split — Stahl maintenant, ${residualShare}% du tirage replanifiés ${fmtT(fragStart)}-${fmtT(fragEnd)}.`);
+      state.activeCard = 'Stahl';
+      state.stahlState = 'active';
+      state.pendingEvent = 'stahl-validating';
+    }
+  } else {
+    // mode === 'final'
+    if (isDone) {
+      f.end = state.nowMin;
+      f.capturedPct = 100;
+      f.completed = true;
+      pushNarrative(state.nowMin, `<span class="op">Bernard saisit ${donePct}%</span>. <span class="algo">Algo décide</span> : MBO clôturée, journée terminée.`);
+      state.activeCard = 'Done';
+      state.pendingEvent = 'done';
+    } else if (remainingPct <= SMALL_TAIL) {
+      const extra = Math.max(5, Math.round(remainingPct * minutesPerPct));
+      f.end += extra;
+      f.capturedPct = donePct;
+      pushNarrative(state.nowMin, `<span class="op">Bernard saisit ${donePct}%</span> (reste ${remainingPct}%). <span class="algo">Algo décide</span> : prolonge MBO jusqu'à ${fmtT(f.end)}.`);
+      state.pendingEvent = 'mbo-final';
+    } else {
+      f.end = state.nowMin;
+      f.capturedPct = donePct;
+      f.completed = true;
+      const residualShare = Math.round(f.sharePct * remainingPct / 100);
+      const minutesPerOriginalPct = (SCENARIO.mboPlannedEnd - SCENARIO.mboPlannedStart) / 100;
+      const residualMin = Math.round(residualShare * minutesPerOriginalPct);
+      const fragStart = state.nowMin + 60;
+      const fragEnd = fragStart + residualMin;
+      state.mboFragments.push({ start: fragStart, end: fragEnd, sharePct: residualShare, capturedPct: null, completed: false });
+      pushNarrative(state.nowMin, `<span class="op">Bernard saisit ${donePct}%</span> du segment (reste ${remainingPct}%). <span class="algo">Algo décide</span> : ${residualShare}% du tirage replanifiés ${fmtT(fragStart)}-${fmtT(fragEnd)} (potentiellement autre opérateur).`);
+      state.activeCard = 'Done';
+      state.pendingEvent = 'done';
+    }
+  }
+
+  renderAll();
+}
+
+// ════════════════════════════════════════════════════════════════
+// Step orchestrator (button "Avancer →")
+// ════════════════════════════════════════════════════════════════
+function nextStep() {
+  switch (state.pendingEvent) {
+    case 'arrive':
+      pushNarrative(state.nowMin, `<span class="op">Bernard</span> arrive sur <span class="machine">MBO</span>. Carte courante : J7 Roule, 5000 feuilles.`);
+      state.pendingEvent = 'mbo-pre-interlude';
+      document.getElementById('clockLabel').textContent = 'En roule. Bouton avancer → 11h00 (interlude Stahl planifié).';
+      break;
+
+    case 'mbo-pre-interlude':
+      state.nowMin = SCENARIO.stahlPlannedStart;
+      pushNarrative(state.nowMin, `Heure du calage <span class="machine">Stahl</span>. <span class="algo">Algo</span> ouvre la modale "où en es-tu ?".`);
+      openModale(null, expectedPctInCurrentFragment(state.nowMin), 'pre-interlude');
+      document.getElementById('clockLabel').textContent = 'Modale ouverte — saisis le %, l\'algo décide (preview à droite).';
+      break;
+
+    case 'wait-stahl-start':
+      // jump to Stahl
+      state.nowMin = SCENARIO.stahlPlannedStart;
+      state.activeCard = 'Stahl';
+      state.stahlState = 'active';
+      state.pendingEvent = 'stahl-validating';
+      pushNarrative(state.nowMin, `Smartphone bascule sur <span class="machine">Stahl</span> calage J9.`);
+      document.getElementById('clockLabel').textContent = 'Bernard est sur Stahl. Bouton avancer → fin calage.';
+      break;
+
+    case 'stahl-validating':
+      state.nowMin = SCENARIO.stahlPlannedEnd;
+      state.stahlState = 'done';
+      pushNarrative(state.nowMin, `<span class="op">Bernard</span> : calage Stahl <strong>fini</strong>. Smartphone bascule sur <span class="machine">MBO</span>.`);
+      state.activeCard = 'MBO';
+      // What event next?
+      state.pendingEvent = 'mbo-final';
+      document.getElementById('clockLabel').textContent = 'Retour sur MBO. Bouton avancer → fin prévue MBO.';
+      break;
+
+    case 'mbo-final':
+      state.nowMin = currentFragment().end;
+      pushNarrative(state.nowMin, `Fin prévue du segment <span class="machine">MBO</span>. <span class="algo">Algo</span> ouvre la modale finale.`);
+      openModale(null, expectedPctInCurrentFragment(state.nowMin), 'final');
+      document.getElementById('clockLabel').textContent = 'Modale finale — saisis le %.';
+      break;
+
+    case 'done':
+      pushNarrative(state.nowMin, `Journée close. Reset pour rejouer.`);
+      document.getElementById('btnNext').disabled = true;
+      document.getElementById('clockLabel').textContent = 'Fin du scénario. Recommencer pour explorer une autre branche.';
+      break;
+  }
+  renderAll();
+}
+
+// ════════════════════════════════════════════════════════════════
+// Wire up
+// ════════════════════════════════════════════════════════════════
+document.getElementById('btnNext').onclick = nextStep;
+document.getElementById('btnReset').onclick = () => {
+  SCENARIO.stahlPlannedStart = 11 * 60;
+  SCENARIO.stahlPlannedEnd = 11 * 60 + 15;
+  state = freshState();
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('clockLabel').textContent = 'Bernard arrive sur MBO. Carte ouverte.';
+  closeModale();
+  renderAll();
+};
+document.getElementById('btnRegister').onclick = () => {
+  if (!currentModaleMode) return;
+  const donePct = Math.max(0, Math.min(100, parseInt(document.getElementById('modaleInput').value || '0', 10)));
+  registerSaisie(currentModaleMode, donePct);
+};
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Journée de Bernard (6 instants)</title>
+<style>
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --red-400:     #f87171;
+    --blue-400:    #60a5fa;
+    --slate-400:   #94a3b8;
+    --purple-400:  #a78bfa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  header.intro {
+    padding: 28px 24px 0;
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .lede {
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    line-height: 1.6;
+    max-width: 860px;
+  }
+  .schedule {
+    margin-top: 14px;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--flux-text-secondary);
+    font-family: ui-monospace, SF Mono, monospace;
+    line-height: 1.7;
+    max-width: 860px;
+  }
+  .schedule strong { color: var(--flux-text-primary); }
+
+  /* Grid */
+  main.grid {
+    padding: 28px 24px 48px;
+    max-width: 1320px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 28px;
+  }
+
+  /* Phone */
+  .phone-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .phone {
+    width: 360px;
+    height: 640px;
+    background: #000;
+    border-radius: 36px;
+    padding: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: var(--flux-base);
+    border-radius: 24px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .phone-statusbar {
+    height: 32px;
+    background: var(--flux-surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    border-bottom: 1px solid var(--flux-border);
+    flex-shrink: 0;
+  }
+  .phone-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--flux-border);
+    flex-shrink: 0;
+  }
+  .phone-header .greeting {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 4px;
+  }
+  .phone-header .operator {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .card-area {
+    flex: 1;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  /* Task card variants */
+  .task-card {
+    background: var(--flux-elevated);
+    border-radius: 18px;
+    border: 1px solid var(--flux-border-light);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+  }
+  .task-card.idle {
+    border-color: var(--flux-border);
+    background: var(--flux-surface);
+  }
+  .task-card.calage {
+    border-color: rgba(96, 165, 250, 0.4);
+    background: linear-gradient(180deg, rgba(96, 165, 250, 0.06), var(--flux-elevated));
+  }
+  .task-card.interlude {
+    border-color: rgba(251, 191, 36, 0.4);
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.06), var(--flux-elevated));
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--blue-400);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .badge.muted {
+    background: var(--flux-base);
+    color: var(--flux-text-muted);
+    border: 1px solid var(--flux-border);
+  }
+  .badge.calage { background: rgba(96, 165, 250, 0.16); color: var(--blue-400); }
+  .badge.run    { background: rgba(52, 211, 153, 0.14); color: var(--emerald-400); }
+  .badge.amber  { background: rgba(251, 191, 36, 0.16); color: var(--amber-400); }
+
+  .title-big {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  .machine-line {
+    font-size: 14px;
+    color: var(--flux-text-secondary);
+  }
+  .time-line {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 13px;
+    color: var(--flux-text-tertiary);
+  }
+  .context-line {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    line-height: 1.5;
+  }
+  .context-line strong { color: var(--flux-text-secondary); font-weight: 600; }
+
+  /* Idle / preview specifics */
+  .idle-title {
+    font-size: 14px;
+    color: var(--flux-text-secondary);
+    margin-top: 8px;
+  }
+  .preview-block {
+    margin-top: auto;
+    border-top: 1px dashed var(--flux-border-light);
+    padding-top: 14px;
+  }
+  .preview-block .label {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+  }
+  .preview-block .next-time {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+  }
+  .preview-block .next-task {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--flux-text-primary);
+    margin-top: 2px;
+  }
+
+  /* Gauge — bloc empilé pour rester lisible sur largeur smartphone */
+  .gauge {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .gauge-text {
+    font-size: 14px;
+    color: var(--flux-text-secondary);
+    line-height: 1.4;
+  }
+  .gauge-text strong {
+    color: var(--flux-text-primary);
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .gauge-sub {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+  .gauge-sub strong {
+    color: var(--flux-text-secondary);
+    font-weight: 600;
+  }
+  .gauge-bar {
+    position: relative;
+    height: 10px;
+    background: #000;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 8px;
+    border: 1px solid var(--flux-border);
+  }
+  .gauge-bar-done {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: #6ee7b7;
+  }
+  .gauge-bar-current {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: #047857;
+  }
+  .gauge-bar-expected {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.32) 0,
+      rgba(255, 255, 255, 0.32) 2px,
+      transparent 2px,
+      transparent 6px
+    );
+    pointer-events: none;
+    z-index: 2;
+  }
+  .context-muted {
+    color: var(--flux-text-muted);
+    margin-top: -6px;
+  }
+
+  /* Section divider + segment list */
+  .section-divider {
+    height: 1px;
+    background: var(--flux-border);
+    margin: 4px 0;
+  }
+  .section-label {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  .seg-list { display: flex; flex-direction: column; gap: 6px; }
+  .seg-row {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--flux-surface);
+    border-radius: 10px;
+    border: 1px solid var(--flux-border);
+  }
+  .seg-row.current {
+    border-color: rgba(52, 211, 153, 0.4);
+    background: linear-gradient(180deg, rgba(52, 211, 153, 0.06), var(--flux-surface));
+  }
+  .seg-row.future {
+    opacity: 0.55;
+  }
+  .seg-icon {
+    font-size: 14px;
+    width: 22px;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+  .seg-row.done .seg-icon { color: var(--emerald-400); }
+  .seg-row.current .seg-icon { color: var(--blue-400); }
+  .seg-row.future .seg-icon { color: var(--flux-text-muted); }
+  .seg-body { flex: 1; min-width: 0; }
+  .seg-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--flux-text-primary);
+  }
+  .seg-meta {
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    margin-top: 1px;
+  }
+
+  /* Modale overlay */
+  .modale-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modale {
+    width: 100%;
+    background: var(--flux-elevated);
+    border-radius: 20px 20px 0 0;
+    padding: 22px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .modale h2 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .modale-subtitle {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    margin-top: -8px;
+  }
+  .modale-label {
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    line-height: 1.5;
+  }
+  .modale-label strong { color: var(--blue-400); }
+  .modale-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modale-input-row input {
+    flex: 1;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border-light);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--flux-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+    font-family: ui-monospace, SF Mono, monospace;
+  }
+  .modale-input-row .unit {
+    color: var(--flux-text-tertiary);
+    font-size: 13px;
+  }
+  .quick-pcts {
+    display: flex;
+    gap: 6px;
+  }
+  .quick-pcts span {
+    flex: 1;
+    padding: 8px 0;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    color: var(--flux-text-secondary);
+    font-size: 12px;
+    text-align: center;
+    font-weight: 500;
+  }
+  .quick-pcts span.active {
+    background: rgba(96, 165, 250, 0.15);
+    border-color: var(--blue-400);
+    color: var(--blue-400);
+  }
+  .quick-pcts span small {
+    display: block;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    margin-top: 2px;
+  }
+  .quick-pcts span.active small {
+    color: var(--blue-400);
+    opacity: 0.85;
+  }
+  .modale-cta {
+    background: var(--emerald-400);
+    color: #052e16;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  /* Caption */
+  .caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    max-width: 360px;
+    line-height: 1.55;
+  }
+  .caption strong {
+    color: var(--flux-text-primary);
+    font-family: ui-monospace, SF Mono, monospace;
+    margin-right: 4px;
+  }
+</style>
+</head>
+<body>
+
+<header class="intro">
+  <h1>Journée de Bernard — 6 instants sur smartphone</h1>
+  <p class="lede">
+    Emploi du temps de Bernard, où la roule MBO Fnac est <strong>splittée en deux segments</strong>
+    de 50 % chacun par un calage de la Stahl en milieu de matinée. Chaque téléphone montre
+    ce que Bernard verrait à l'instant indiqué. Sur les cartes de roule, le bloc
+    « Découpe du tirage » liste les segments avec leur état (✓ validé / ► en cours / ○ à venir).
+  </p>
+  <div class="schedule">
+    09:00 → 09:15 · <strong>Calage MBO</strong> (Fnac)<br>
+    09:15 → 10:15 · <strong>Roule MBO segment 1/2</strong> (Fnac, cible 50 %)<br>
+    10:15 → 10:30 · <strong>Calage Stahl</strong> (Printemps)<br>
+    10:30 → 11:30 · <strong>Roule MBO segment 2/2</strong> (Fnac, +50 % → 100 %)
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- ───────── 8:00 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>8:00</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card idle">
+            <div class="badge muted">○ Aucune tâche en cours</div>
+            <div class="idle-title">La journée n'a pas commencé.</div>
+            <div class="preview-block">
+              <div class="label">Prochaine tâche</div>
+              <div class="next-time">9:00 — dans 1 h</div>
+              <div class="next-task">Calage Fnac sur MBO</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>8:00</strong>Avant le démarrage. Bernard voit son prochain rendez-vous, rien d'autre.</p>
+  </article>
+
+  <!-- ───────── 9:00 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>9:00</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card calage">
+            <div class="badge calage">● Calage en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">9:00 → 9:15</div>
+            <div class="context-line">15 min prévues. Tu rouleras dès la fin du calage.</div>
+            <div class="preview-block">
+              <div class="label">Suite</div>
+              <div class="next-time">9:15 — Roule MBO Fnac (segment 1/2)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>9:00</strong>Le calage MBO démarre. Pas de gauge — un calage est binaire (fait / pas fait).</p>
+  </article>
+
+  <!-- ───────── 9:10 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>9:10</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card calage">
+            <div class="badge calage">● Calage en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">9:00 → 9:15</div>
+            <div class="context-line">Reste <strong>5 min</strong>. Tu rouleras dès la fin.</div>
+            <div class="preview-block">
+              <div class="label">Suite</div>
+              <div class="next-time">9:15 — Roule MBO Fnac (segment 1/2)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>9:10</strong>Calage en cours, 5 min avant la fin. La phrase de contexte change pour rappeler le restant.</p>
+  </article>
+
+  <!-- ───────── 9:15 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>9:15</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">9:15 → 10:15</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>0&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>0&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-current" style="left: 0%; width: 50%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+              <div class="seg-row future">
+                <span class="seg-icon">○</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · à venir</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>9:15</strong>Le run démarre. La liste « Découpe du tirage » montre que segment 1 est en cours (►) et segment 2 viendra après le calage Stahl (○).</p>
+  </article>
+
+  <!-- ───────── 9:45 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>9:45</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">9:15 → 10:15</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>50&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>25&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-current" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-expected" style="left: 0%; width: 25%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+              <div class="seg-row future">
+                <span class="seg-icon">○</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · à venir</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>9:45</strong>Mi-parcours du segment 1. La liste reste identique : segment 1 toujours en cours, segment 2 toujours à venir.</p>
+  </article>
+
+  <!-- ───────── 10:00 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:00</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">9:15 → 10:15</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>75&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>38&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-current" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-expected" style="left: 0%; width: 37.5%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+              <div class="seg-row future">
+                <span class="seg-icon">○</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · à venir</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>10:00</strong>15 min avant la fin du segment 1. Gauge à 75 % du segment.</p>
+  </article>
+
+  <!-- ───────── 10:15 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:15</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card" style="opacity: 0.45;">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">9:15 → 10:15</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>100&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>50&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-current" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-expected" style="left: 0%; width: 50%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+              <div class="seg-row future">
+                <span class="seg-icon">○</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · à venir</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modale-overlay">
+          <div class="modale">
+            <h2>Où en es-tu sur Fnac ?</h2>
+            <div class="modale-subtitle">Segment 1/2 — fait 50 % du tirage Fnac</div>
+            <div class="modale-label">
+              Tu devrais en être à <strong>100 %</strong> de ce segment
+              <span style="color:var(--flux-text-tertiary)">· 50 % du tirage Fnac entier</span>.
+            </div>
+            <div class="modale-input-row">
+              <input type="text" value="100" />
+              <span class="unit">%</span>
+            </div>
+            <div class="quick-pcts">
+              <span>Retard<small>90 %</small></span>
+              <span class="active">À l'heure<small>100 %</small></span>
+              <span>Avance<small>—</small></span>
+              <span>Fini<small>100 %</small></span>
+            </div>
+            <div class="modale-cta">Enregistrer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>10:15</strong>Fin prévue du segment 1. Modale "Où en es-tu ?" — défaut "à l'heure" = 100 % du segment, soit 50 % du tirage.</p>
+  </article>
+
+  <!-- ───────── 10:20 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:20</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card interlude">
+            <div class="badge amber">⚠ Interlude · Calage</div>
+            <div class="title-big">Printemps</div>
+            <div class="machine-line">Stahl</div>
+            <div class="time-line">10:15 → 10:30</div>
+            <div class="context-line">Reste <strong>10 min</strong>. Tu retournes ensuite sur <strong style="color:var(--blue-400)">MBO Fnac</strong>.</div>
+            <div class="preview-block">
+              <div class="label">Suite</div>
+              <div class="next-time">10:30 — Roule MBO Fnac (segment 2/2)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>10:20</strong>Calage Stahl interlude en cours, 5 min après le début. Le rappel "MBO Fnac après" reste persistant.</p>
+  </article>
+
+  <!-- ───────── 10:30 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:30</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>0&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>50&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-done" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-current" style="left: 50%; width: 50%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row done">
+                <span class="seg-icon">✓</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · validé</div>
+                </div>
+              </div>
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>10:30</strong>Retour sur MBO après Stahl. Segment 2 démarre. Le segment 1 passe en ✓ validé dans la liste.</p>
+  </article>
+
+  <!-- ───────── 11:00 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>11:00</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>50&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>75&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-done" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-current" style="left: 50%; width: 50%"></div>
+                <div class="gauge-bar-expected" style="left: 50%; width: 25%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row done">
+                <span class="seg-icon">✓</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · validé</div>
+                </div>
+              </div>
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>11:00</strong>Mi-parcours du segment 2. 50 % du segment, 75 % du tirage cumulé.</p>
+  </article>
+
+  <!-- ───────── 11:15 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>11:15</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>75&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>88&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-done" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-current" style="left: 50%; width: 50%"></div>
+                <div class="gauge-bar-expected" style="left: 50%; width: 37.5%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row done">
+                <span class="seg-icon">✓</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · validé</div>
+                </div>
+              </div>
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>11:15</strong>15 min avant la fin du segment 2. 75 % du segment, 88 % du tirage cumulé.</p>
+  </article>
+
+  <!-- ───────── 11:30 ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>11:30</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card" style="opacity: 0.45;">
+            <div class="badge run">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>100&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>100&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar">
+                <div class="gauge-bar-done" style="left: 0%; width: 50%"></div>
+                <div class="gauge-bar-current" style="left: 50%; width: 50%"></div>
+                <div class="gauge-bar-expected" style="left: 50%; width: 50%"></div>
+              </div>
+            </div>
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="seg-list">
+              <div class="seg-row done">
+                <span class="seg-icon">✓</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 1 · MBO</div>
+                  <div class="seg-meta">9:15 → 10:15 · 50&nbsp;% du tirage · validé</div>
+                </div>
+              </div>
+              <div class="seg-row current">
+                <span class="seg-icon">►</span>
+                <div class="seg-body">
+                  <div class="seg-title">Segment 2 · MBO</div>
+                  <div class="seg-meta">10:30 → 11:30 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modale-overlay">
+          <div class="modale">
+            <h2>Où en es-tu sur Fnac ?</h2>
+            <div class="modale-subtitle">Segment 2/2 — fait 50 % du tirage Fnac</div>
+            <div class="modale-label">
+              Tu devrais en être à <strong>100 %</strong> de ce segment
+              <span style="color:var(--flux-text-tertiary)">· 100 % du tirage Fnac entier</span>.
+            </div>
+            <div class="modale-input-row">
+              <input type="text" value="100" />
+              <span class="unit">%</span>
+            </div>
+            <div class="quick-pcts">
+              <span>Retard<small>90 %</small></span>
+              <span class="active">À l'heure<small>100 %</small></span>
+              <span>Avance<small>—</small></span>
+              <span>Fini<small>100 %</small></span>
+            </div>
+            <div class="modale-cta">Enregistrer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>11:30</strong>Fin du segment 2 = fin du tirage Fnac. Modale finale, défaut 100 % du segment soit 100 % du tirage.</p>
+  </article>
+
+</main>
+
+</body>
+</html>

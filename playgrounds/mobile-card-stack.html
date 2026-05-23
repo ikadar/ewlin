@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Mobile Card Stack v4</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0f0f0f; color: #e4e4e7;
+    display: flex; height: 100vh; overflow: hidden;
+  }
+  :root {
+    --flux-elevated:     rgb(36 36 36);
+    --flux-border:       rgb(42 42 42);
+    --flux-border-light: rgb(58 58 58);
+    --flux-text-primary: rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary: rgb(161 161 161);
+    --flux-text-muted:   #a1a1aa;
+    --flux-text-dim:     #71717a;
+    --flux-blue:         #2563eb;
+    --flux-green:        #059669;
+    --flux-green-text:   #6ee7b3;
+    --flux-amber-text:   #fbbf24;
+    --flux-red-text:     #fca5a5;
+    --flux-red:          #dc2626;
+    --flux-bg:           #18181b;
+    --flux-zinc-900:     rgb(24 24 27);
+  }
+
+  /* ─── Controls ─── */
+  .controls {
+    width: 310px; min-width: 310px; background: #18181b;
+    border-right: 1px solid #27272a; padding: 20px;
+    overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+  }
+  .controls h1 { font-size: 15px; font-weight: 600; color: #fafafa; }
+  .controls h2 {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #71717a; margin-bottom: 6px;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 8px; }
+  .control-row { display: flex; align-items: center; gap: 8px; }
+  .control-row label { font-size: 12px; color: #a1a1aa; min-width: 90px; }
+  .control-row .val {
+    font-size: 12px; color: #71717a; min-width: 44px;
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  input[type="range"] {
+    flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+    background: #3f3f46; border-radius: 2px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: #2563eb; cursor: pointer;
+  }
+  .toggle-group {
+    display: flex; gap: 2px; background: #27272a;
+    border-radius: 8px; padding: 2px;
+  }
+  .toggle-btn {
+    flex: 1; padding: 6px 6px; font-size: 11px; font-weight: 500;
+    border: none; border-radius: 6px; background: transparent;
+    color: #a1a1aa; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .toggle-btn.active { background: #3f3f46; color: #fafafa; }
+  .toggle-btn:hover:not(.active) { color: #d4d4d8; }
+  .demo-btn {
+    padding: 7px 14px; font-size: 12px; font-weight: 600;
+    border: none; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+    width: 100%;
+  }
+  .demo-btn.blue { background: var(--flux-blue); color: white; }
+  .demo-btn.blue:hover { background: #3b82f6; }
+  .demo-btn.green { background: var(--flux-green); color: white; }
+  .demo-btn.green:hover { background: #10b981; }
+  .ctrl-note {
+    font-size: 10px; color: #52525b; line-height: 1.4;
+  }
+
+  /* ─── Preview ─── */
+  .preview-area {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 24px; overflow: hidden;
+  }
+  .device-frame {
+    position: relative; background: #000; border-radius: 44px;
+    padding: 14px;
+    box-shadow: 0 0 0 2px #3f3f46, 0 20px 60px rgba(0,0,0,0.5);
+    transition: width 0.3s, height 0.3s; overflow: hidden;
+  }
+  .device-frame.bare {
+    border-radius: 0; padding: 0; box-shadow: none; background: transparent;
+  }
+  .device-frame .notch {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 32px; background: #000;
+    border-radius: 0 0 18px 18px; z-index: 100;
+  }
+  .device-frame.bare .notch { display: none; }
+  .device-screen {
+    width: 100%; height: 100%; border-radius: 32px;
+    overflow-y: auto; overflow-x: hidden;
+    background: var(--flux-bg); display: flex; flex-direction: column;
+    position: relative;
+  }
+  .device-frame.bare .device-screen { border-radius: 0; }
+
+  /* ─── App header ─── */
+  .app-header {
+    display: flex; align-items: center; padding: 10px 16px;
+    padding-top: 50px; background: var(--flux-bg);
+    border-bottom: 1px solid var(--flux-border);
+    gap: 10px; flex-shrink: 0; z-index: 10;
+  }
+  .device-frame.bare .app-header { padding-top: 10px; }
+  .app-header .hdr-center { flex: 1; min-width: 0; }
+  .app-header .hdr-name {
+    font-size: 14px; font-weight: 600; color: var(--flux-text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .app-header .hdr-mode {
+    font-size: 10px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--flux-text-dim);
+  }
+  .app-header .hdr-clock {
+    font-size: 13px; font-weight: 500; color: var(--flux-text-tertiary);
+    font-variant-numeric: tabular-nums; flex-shrink: 0;
+  }
+
+  /* ─── Card stack ─── */
+  .card-stack {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 14px; gap: 10px; overflow: hidden;
+  }
+
+  /* ─── Task card ─── */
+  .task-card {
+    background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    border-radius: 14px; display: flex; flex-direction: column;
+    transition: border-color 0.3s ease;
+    overflow: hidden; position: relative;
+    flex: 1; min-height: 0;
+  }
+  .task-card.active { border-color: var(--flux-border-light); }
+
+  /* ── Identity (IdentitySection.tsx) ── */
+  .card-identity {
+    text-align: center; padding: 14px 20px;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .card-identity .id-main {
+    font-size: 15px; font-weight: 700; color: var(--flux-text-primary);
+    letter-spacing: -0.01em;
+  }
+  .card-identity .id-sub {
+    font-size: 12px; color: var(--flux-text-tertiary); margin-top: 2px;
+  }
+
+  /* ── Triptych (TriptychSection.tsx) ── */
+  .card-triptych-wrap { padding: 0 0 16px; }
+  .card-triptych {
+    display: flex; margin: 0 20px;
+    border: 1px solid var(--flux-border-light); border-radius: 6px;
+    overflow: hidden;
+  }
+  .card-triptych .tri-cell {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 10px 6px; gap: 2px;
+    border-right: 1px solid var(--flux-border); text-align: center;
+  }
+  .card-triptych .tri-cell:last-child { border-right: none; }
+  .card-triptych .tri-label {
+    font-size: 10px; font-weight: 600; color: var(--flux-text-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .card-triptych .tri-value {
+    font-size: 13px; font-weight: 700; color: var(--flux-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .card-triptych .tri-sub {
+    font-size: 10px; color: var(--flux-text-muted);
+  }
+
+  /* ── ProgressBand (layout A — ProgressBand.tsx faithful) ── */
+  .card-progress-band {
+    text-align: center; padding: 16px 20px;
+    border-bottom: 1px solid var(--flux-border);
+    position: relative; overflow: hidden;
+    transition: box-shadow 0.3s;
+  }
+  .card-progress-band .pb-title {
+    font-size: 14px; font-weight: 700; color: var(--flux-text-primary);
+    position: relative; z-index: 1; margin-bottom: 4px;
+  }
+  .card-progress-band .pb-sub {
+    font-size: 11.5px; color: rgba(255,255,255,0.70);
+    position: relative; z-index: 1;
+  }
+
+  /* ── Heartbeat pulse — 600ms beat, variable rest gap ── */
+  @keyframes card-heartbeat {
+    /* Beat occupies 0–336ms (56% of 600ms), rest is silence.
+       Percentages are recalculated by JS relative to total cycle. */
+    0%   { opacity: 0; }
+    12%  { opacity: 0.45; }
+    22%  { opacity: 0.08; }
+    34%  { opacity: 0.45; }
+    56%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  .task-card .card-heartbeat {
+    position: absolute; inset: 0; z-index: 0;
+    background-color: rgba(255, 255, 255, 0.58);
+    border-radius: 14px;
+    pointer-events: none; opacity: 0;
+  }
+  .task-card .card-heartbeat.pulse {
+    animation-name: card-heartbeat;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    /* animation-duration set inline via JS */
+  }
+
+  /* ── Flash overlay (transition moment) ── */
+  @keyframes flash-green {
+    0% { opacity: 0.45; }
+    100% { opacity: 0; }
+  }
+  .card-flash {
+    position: absolute; inset: 0; z-index: 20;
+    background: rgba(16, 185, 129, 0.35);
+    border-radius: 14px;
+    pointer-events: none;
+    animation: flash-green 0.5s ease-out forwards;
+  }
+
+  /* ── View Transitions API: native scroll-up + content swap ── */
+  .task-card.active { view-transition-name: vt-active; }
+  .peek-card        { view-transition-name: vt-peek; }
+  .grace-peek:not(.hidden) { view-transition-name: vt-grace; }
+
+  @keyframes vt-up-out {
+    from { transform: translateY(0);     opacity: 1; }
+    to   { transform: translateY(-100%); opacity: 0; }
+  }
+  @keyframes vt-up-in {
+    from { transform: translateY(100%);  opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+  }
+
+  ::view-transition-old(vt-active),
+  ::view-transition-old(vt-peek),
+  ::view-transition-old(vt-grace) {
+    animation: vt-up-out 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+  ::view-transition-new(vt-active),
+  ::view-transition-new(vt-peek),
+  ::view-transition-new(vt-grace) {
+    animation: vt-up-in 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+
+  /* Root transition: keep it neutral so only named slots animate */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none; mix-blend-mode: normal;
+  }
+
+  /* ── Stepper (NonLinearStepper.tsx) ── */
+  .card-stepper {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; padding: 18px 20px;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .card-stepper .step-label {
+    font-size: 12px; font-weight: 600; color: var(--flux-text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .card-stepper .step-row {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-stepper .step-btn {
+    width: 40px; height: 40px; border-radius: 6px;
+    border: 1px solid var(--flux-border-light); background: rgb(45 45 45);
+    color: var(--flux-text-secondary);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s;
+  }
+  .card-stepper .step-btn:active {
+    background: rgb(70 70 70); color: var(--flux-text-primary);
+  }
+  .card-stepper .step-btn i { width: 16px; height: 16px; }
+  .card-stepper .step-time {
+    min-width: 120px; text-align: center;
+    font-size: 28px; font-weight: 700;
+    font-family: ui-monospace, 'SF Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--flux-text-primary); padding: 0 12px;
+  }
+  .card-status {
+    text-align: center; font-size: 11.5px; font-weight: 600;
+    min-height: 17px; transition: color 0.15s;
+  }
+  .card-status.is-ontime { color: rgb(110 231 183); }
+  .card-status.is-avance { color: rgb(110 231 183); }
+  .card-status.is-retard { color: var(--flux-amber-text); }
+  .card-status.is-retard-heavy { color: var(--flux-red-text); }
+
+  /* ── "Je confirme être à l'heure" button ── */
+  .card-confirm-ontime {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; margin-top: 10px; width: 100%;
+    padding: 10px 14px; border-radius: 6px;
+    border: 1px solid rgba(16, 185, 129, 0.40);
+    background: rgba(16, 185, 129, 0.10);
+    font-size: 12px; font-weight: 600;
+    color: var(--flux-green-text); cursor: pointer;
+    transition: all 0.12s;
+  }
+  .card-confirm-ontime:active {
+    background: rgba(16, 185, 129, 0.22);
+    transform: scale(0.98);
+  }
+  .card-confirm-ontime i { width: 14px; height: 14px; }
+  .card-confirm-ontime.confirmed {
+    border-color: rgba(16, 185, 129, 0.20);
+    background: rgba(16, 185, 129, 0.06);
+    color: rgba(110, 231, 183, 0.5);
+    pointer-events: none;
+  }
+
+  .card-blocked-btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; margin-top: 12px; padding: 7px 14px;
+    border-radius: 4px; border: 1px solid var(--flux-border-light);
+    background: transparent; font-size: 11.5px; font-weight: 600;
+    color: var(--flux-text-muted); cursor: pointer; transition: all 0.12s;
+  }
+  .card-blocked-btn:active {
+    color: var(--flux-amber-text);
+    border-color: rgba(251,191,36,0.4);
+    background: rgba(245,158,11,0.06);
+  }
+  .card-blocked-btn i { width: 13px; height: 13px; }
+
+  /* ── Debounce status bar ── */
+  .card-debounce {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 7px 20px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.02em;
+    transition: opacity 0.3s, max-height 0.3s, padding 0.3s;
+    overflow: hidden;
+  }
+  .card-debounce.hidden {
+    opacity: 0; max-height: 0; padding: 0 20px;
+  }
+  .card-debounce i { width: 12px; height: 12px; }
+  .card-debounce.saving {
+    color: var(--flux-text-dim); background: rgba(255,255,255,0.03);
+  }
+  .card-debounce.saved {
+    color: var(--flux-green-text); background: rgba(16,185,129,0.06);
+  }
+  .card-debounce.replan {
+    color: var(--flux-text-dim); background: rgba(37,99,235,0.06);
+  }
+  .card-debounce.replanned {
+    color: rgb(96,165,250); background: rgba(37,99,235,0.08);
+  }
+
+  /* ── Wait / Done ── */
+  .card-wait {
+    text-align: center; padding: 16px; font-size: 13px;
+    color: var(--flux-text-dim);
+  }
+  .card-done {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 24px 16px;
+    color: var(--flux-green-text); font-size: 15px; font-weight: 600;
+  }
+  .card-done i { width: 20px; height: 20px; }
+
+  /* ─── Grace peek (previous task — multiple visual variants) ─── */
+
+  /* Shared: the "pas fini" button inside */
+  .grace-not-done-btn {
+    margin-top: 8px; width: 100%; padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(251,191,36,0.35);
+    background: rgba(251,191,36,0.10);
+    cursor: pointer; transition: all 0.12s;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    font-size: 12px; font-weight: 600; color: var(--flux-amber-text);
+  }
+  .grace-not-done-btn:active {
+    background: rgba(251,191,36,0.20);
+    border-color: rgba(251,191,36,0.55);
+    transform: scale(0.98);
+  }
+  .grace-not-done-btn .grace-timer {
+    font-family: ui-monospace, 'SF Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+
+  .grace-peek {
+    flex-shrink: 0;
+    transition: opacity 0.4s ease, max-height 0.5s ease, transform 0.4s ease;
+    transform: translateY(0);
+  }
+  .grace-peek.hidden {
+    opacity: 0; max-height: 0; overflow: hidden;
+    transform: translateY(-40px);
+  }
+
+  /* A — Carte dashed (actuel) */
+  .grace-peek.gp-card {
+    background: rgba(36, 36, 36, 0.5); border: 1px dashed #52525b;
+    border-radius: 14px; padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+
+  /* B — Dépasse du haut (même largeur que la card, coins bas arrondis, haut coupé) */
+  .grace-peek.gp-overflow {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border); border-top: none;
+    border-radius: 0 0 14px 14px;
+    padding: 10px 16px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    margin-top: -14px;
+  }
+
+  /* C — Bande collée sous le header (minimal) */
+  .grace-peek.gp-strip {
+    background: rgba(251,191,36,0.06);
+    border-bottom: 1px solid rgba(251,191,36,0.20);
+    border-radius: 0;
+    padding: 8px 16px;
+    margin: 0 -14px;
+    margin-top: -10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .grace-peek.gp-strip .peek-label { display: none; }
+  .grace-peek.gp-strip .peek-job {
+    flex: 1; font-size: 11px; font-weight: 600;
+    color: var(--flux-text-tertiary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .grace-peek.gp-strip .peek-details { display: none; }
+  .grace-peek.gp-strip .grace-not-done-btn {
+    margin-top: 0; width: auto; padding: 6px 12px;
+    font-size: 11px; flex-shrink: 0;
+  }
+
+  /* ─── Peek card (bottom — mirrors grace peek: dépasse vers le bas) ─── */
+  .peek-card {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border); border-bottom: none;
+    border-radius: 14px 14px 0 0;
+    padding: 12px 16px 16px;
+    display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+  }
+  .peek-label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--flux-text-dim);
+  }
+  .peek-job { font-size: 12px; font-weight: 600; color: var(--flux-text-tertiary); }
+  .peek-details { font-size: 11px; color: var(--flux-text-dim); }
+
+  .swipe-hint {
+    text-align: center; font-size: 10px; color: #52525b;
+    padding: 4px 0; display: flex; align-items: center;
+    justify-content: center; gap: 6px; flex-shrink: 0;
+  }
+  .swipe-hint i { width: 12px; height: 12px; }
+
+  /* ─── Prompt ─── */
+  .prompt-area {
+    position: fixed; bottom: 0; left: 310px; right: 0;
+    background: #18181b; border-top: 1px solid #27272a;
+    padding: 12px 20px; display: flex; flex-direction: column; gap: 6px; z-index: 50;
+  }
+  .prompt-header { display: flex; align-items: center; justify-content: space-between; }
+  .prompt-header span {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #71717a;
+  }
+  .copy-btn {
+    padding: 3px 10px; font-size: 11px; font-weight: 600;
+    border: 1px solid #3f3f46; border-radius: 5px;
+    background: transparent; color: #a1a1aa; cursor: pointer;
+    transition: all 0.15s; display: flex; align-items: center; gap: 5px;
+  }
+  .copy-btn:hover { background: #27272a; color: #fafafa; }
+  .copy-btn.copied { background: var(--flux-green); border-color: var(--flux-green); color: white; }
+  .prompt-text {
+    font-size: 11px; line-height: 1.5; color: #d4d4d8;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    max-height: 60px; overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Mobile Card Stack v4</h1>
+
+  <div class="control-group">
+    <h2>Mode</h2>
+    <div class="toggle-group" id="mode-toggle">
+      <button class="toggle-btn active" data-val="operator">Operateur</button>
+      <button class="toggle-btn" data-val="station">Station</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Etat</h2>
+    <div class="toggle-group" id="state-toggle">
+      <button class="toggle-btn" data-val="attente">Attente</button>
+      <button class="toggle-btn" data-val="en-cours">En cours</button>
+      <button class="toggle-btn active" data-val="fin-proche">Fin proche</button>
+      <button class="toggle-btn" data-val="grace">Grace</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <h2>Temps</h2>
+    <div class="control-row">
+      <label>Restant (min)</label>
+      <input type="range" id="time-slider" min="0" max="150" value="4">
+      <span class="val" id="time-val">4 min</span>
+    </div>
+    <div class="control-row">
+      <label>Offset saisie</label>
+      <input type="range" id="offset-slider" min="-120" max="120" value="0">
+      <span class="val" id="offset-val">0 min</span>
+    </div>
+    <div class="control-row">
+      <label>Grace (min)</label>
+      <input type="range" id="grace-slider" min="0" max="300" value="258">
+      <span class="val" id="grace-val">4:18</span>
+    </div>
+  </div>
+
+
+  <div class="control-group">
+    <h2>Transitions</h2>
+    <button class="demo-btn green" id="play-transition">Jouer fin → grace</button>
+    <div class="ctrl-note">Pulse (3s) → flash vert → grace peek</div>
+  </div>
+
+  <div class="control-group">
+    <h2>Debounce saisie</h2>
+    <button class="demo-btn blue" id="play-debounce">Simuler 3 taps ±</button>
+    <div class="ctrl-note">Sauvegarde (2s) → recalcul (4s compressé)</div>
+  </div>
+</div>
+
+<div class="preview-area">
+  <div class="device-frame" id="device-frame">
+    <div class="notch"></div>
+    <div class="device-screen" id="device-screen">
+      <div class="app-header">
+        <div class="hdr-center">
+          <div class="hdr-name" id="hdr-name">Marc Dupont</div>
+          <div class="hdr-mode" id="hdr-mode">Operateur</div>
+        </div>
+        <div class="hdr-clock">14:35</div>
+      </div>
+      <div class="card-stack" id="card-stack">
+        <div class="grace-peek hidden" id="grace-peek"></div>
+        <div class="task-card active" id="active-card"></div>
+        <div class="peek-card" id="peek-card"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="prompt-area">
+  <div class="prompt-header">
+    <span>Prompt</span>
+    <button class="copy-btn" id="copy-btn">
+      <i data-lucide="clipboard" style="width:12px;height:12px;"></i> Copier
+    </button>
+  </div>
+  <div class="prompt-text" id="prompt-text"></div>
+</div>
+
+<script>
+const DEFAULTS = {
+  mode: 'operator', cardState: 'fin-proche',
+  timeRemaining: 4, offset: 0, device: '14', graceSeconds: 258,
+  acknowledged: false, graceStyle: 'overflow',
+};
+const state = { ...DEFAULTS };
+
+const TASKS = {
+  operator: [
+    { ref: 'J-1247', designation: 'Brochure Printemps 200ex', client: 'Dupont SA',
+      station: 'Massicot', operator: 'Marc Dupont', phase: 'calage',
+      slotStart: '9h30', slotEnd: '12h00', slotStartMin: 570, slotEndMin: 720,
+      durationMin: 150, volumePct: 35, setupMin: 20, tileColor: '59,130,246' },
+    { ref: 'J-1302', designation: 'Catalogue A4 Premium', client: 'LeClient SARL',
+      station: 'Massicot', operator: 'Marc Dupont', phase: 'roulage',
+      slotStart: '13h00', slotEnd: '15h30', slotStartMin: 780, slotEndMin: 930,
+      durationMin: 150, volumePct: 48, setupMin: 15, tileColor: '5,150,105' },
+    { ref: 'J-1298', designation: 'Flyer A5 Promo Été', client: 'Martin & Fils',
+      station: 'Plieuse', operator: 'Marc Dupont', phase: 'roulage',
+      slotStart: '15h30', slotEnd: '17h00', slotStartMin: 930, slotEndMin: 1020,
+      durationMin: 90, volumePct: 100, setupMin: 10, tileColor: '5,150,105' },
+  ],
+  station: [
+    { ref: 'J-1247', designation: 'Brochure Printemps 200ex', client: 'Dupont SA',
+      station: 'Massicot MCS-420', operator: 'Marc Dupont', phase: 'calage',
+      slotStart: '9h30', slotEnd: '12h00', slotStartMin: 570, slotEndMin: 720,
+      durationMin: 150, volumePct: 35, setupMin: 20, tileColor: '59,130,246' },
+    { ref: 'J-1302', designation: 'Catalogue A4 Premium', client: 'LeClient SARL',
+      station: 'Massicot MCS-420', operator: 'Sophie Martin', phase: 'roulage',
+      slotStart: '13h00', slotEnd: '15h30', slotStartMin: 780, slotEndMin: 930,
+      durationMin: 150, volumePct: 48, setupMin: 15, tileColor: '5,150,105' },
+  ],
+};
+
+const DEVICES = {
+  se: { w: 320, h: 568 }, '14': { w: 390, h: 844 }, bare: { w: 390, h: 720 },
+};
+
+function fmtDuration(min) {
+  const a = Math.abs(min); const h = Math.floor(a / 60); const m = a % 60;
+  if (h === 0) return m + ' min';
+  return m === 0 ? h + 'h' : h + 'h' + String(m).padStart(2, '0');
+}
+function fmtTimeMin(min) {
+  const h = Math.floor(min / 60); const m = min % 60;
+  return h + 'h' + String(m).padStart(2, '0');
+}
+function fmtGrace(sec) {
+  const m = Math.floor(sec / 60); const s = sec % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function wireToggle(id, key) {
+  const g = document.getElementById(id);
+  g.querySelectorAll('.toggle-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      g.querySelectorAll('.toggle-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state[key] = b.dataset.val;
+      updateAll();
+    });
+  });
+}
+wireToggle('mode-toggle', 'mode');
+wireToggle('state-toggle', 'cardState');
+
+
+
+document.getElementById('time-slider').addEventListener('input', e => {
+  state.timeRemaining = +e.target.value;
+  document.getElementById('time-val').textContent = fmtDuration(state.timeRemaining);
+  updateAll();
+});
+document.getElementById('offset-slider').addEventListener('input', e => {
+  state.offset = +e.target.value;
+  document.getElementById('offset-val').textContent = (state.offset > 0 ? '+' : '') + state.offset + ' min';
+  updateAll();
+});
+document.getElementById('grace-slider').addEventListener('input', e => {
+  state.graceSeconds = +e.target.value;
+  document.getElementById('grace-val').textContent = fmtGrace(state.graceSeconds);
+  updateAll();
+});
+
+// ─── Render task card content ───
+function renderTaskCard(el, t, opts) {
+  const { showBand, showStepper, showWait, showDone, timeRemaining, offset, heartbeatTotal, showFlash } = opts;
+  let h = '';
+
+  if (showFlash) h += '<div class="card-flash"></div>';
+  if (heartbeatTotal > 0) {
+    h += '<div class="card-heartbeat pulse" style="animation-duration:' + heartbeatTotal + 'ms"></div>';
+  } else {
+    h += '<div class="card-heartbeat"></div>';
+  }
+
+  // Identity
+  h += '<div class="card-identity">';
+  h += '<div class="id-main">' + t.ref + ' · ' + t.client + '</div>';
+  if (t.designation) h += '<div class="id-sub">' + t.designation + '</div>';
+  h += '</div>';
+
+  // Triptych — first cell: machine (op mode) or initials (station mode)
+  const isOpMode = state.mode === 'operator';
+  const initials = t.operator.split(' ').map(w => w[0]).join('.');
+  h += '<div class="card-triptych-wrap"><div class="card-triptych">';
+  h += '<div class="tri-cell"><span class="tri-label">' + (isOpMode ? 'Machine' : 'Opérateur') + '</span>';
+  h += '<span class="tri-value">' + (isOpMode ? t.station : initials) + '</span></div>';
+  h += '<div class="tri-cell"><span class="tri-label">Créneau</span>';
+  h += '<span class="tri-value">' + fmtTimeMin(t.slotStartMin) + '<br>→ ' + fmtTimeMin(t.slotEndMin) + '</span></div>';
+  if (t.volumePct != null) {
+    h += '<div class="tri-cell"><span class="tri-label">Volume</span>';
+    h += '<span class="tri-value">' + t.volumePct + '%</span>';
+    h += '<span class="tri-sub">du total</span></div>';
+  }
+  h += '</div></div>';
+
+  if (showWait) {
+    const wH = Math.floor(timeRemaining / 60); const wM = timeRemaining % 60;
+    h += '<div class="card-wait">Commence dans ' +
+      (wH > 0 ? wH + 'h ' + String(wM).padStart(2,'0') + 'min' : wM + ' min') + '</div>';
+  }
+
+  if (showBand) {
+    const nowMin = t.slotEndMin - timeRemaining;
+    const runStart = t.slotStartMin + t.setupMin;
+    const runDuration = Math.max(1, t.slotEndMin - runStart);
+    const totalDuration = Math.max(1, t.slotEndMin - t.slotStartMin);
+    const runElapsed = Math.max(0, nowMin - runStart);
+    const remaining = Math.max(0, t.slotEndMin - nowMin);
+    const pctFill = Math.min(100, Math.round((Math.max(0, nowMin - t.slotStartMin) / totalDuration) * 100));
+    const volDone = t.volumePct != null
+      ? Math.round((Math.max(0, runElapsed) / runDuration) * t.volumePct)
+      : Math.min(100, Math.round((Math.max(0, runElapsed) / runDuration) * 100));
+    const bg = 'linear-gradient(to right, rgba(16,185,129,0.22) ' + pctFill + '%, rgba(' + t.tileColor + ',0.10) ' + pctFill + '%)';
+    const isSetup = nowMin < runStart;
+    const volStr = t.volumePct != null ? volDone + '% sur ' + Math.round(t.volumePct) + '%' : volDone + '%';
+
+    let title, sub;
+    if (isSetup) {
+      title = 'Il est ' + fmtTimeMin(nowMin) + ', en théorie :';
+      sub = 'calage en cours — encore ' + fmtDuration(runStart - nowMin);
+    } else {
+      title = 'Il est ' + fmtTimeMin(nowMin) + ', en théorie :';
+      sub = 'il me reste ' + fmtDuration(remaining) + ' — j\'en suis à ' + volStr;
+    }
+
+    h += '<div class="card-progress-band" style="background:' + bg + '">';
+    h += '<div class="pb-title">' + title + '</div>';
+    h += '<div class="pb-sub">' + sub + '</div>';
+    h += '</div>';
+  }
+
+  if (showStepper) {
+    const currentTime = t.slotEndMin + offset;
+    const nowMin = t.slotEndMin - timeRemaining;
+    const stepLabel = currentTime > nowMin ? 'Je finirai à :' : 'J\'ai terminé à :';
+
+    h += '<div class="card-stepper">';
+    h += '<div class="step-label">' + stepLabel + '</div>';
+    h += '<div class="step-row">';
+    h += '<div class="step-btn"><i data-lucide="minus"></i></div>';
+    h += '<div class="step-time">' + fmtTimeMin(currentTime) + '</div>';
+    h += '<div class="step-btn"><i data-lucide="plus"></i></div>';
+    h += '</div>';
+
+    let statusClass, statusText;
+    if (offset === 0) { statusClass = 'is-ontime'; statusText = 'À l\'heure'; }
+    else if (offset > 0) {
+      statusClass = offset > 30 ? 'is-retard-heavy' : 'is-retard';
+      statusText = fmtDuration(offset) + ' de retard par rapport au planning en vigueur';
+    } else {
+      statusClass = 'is-avance';
+      statusText = fmtDuration(-offset) + ' d\'avance par rapport au planning en vigueur';
+    }
+    h += '<div class="card-status ' + statusClass + '">' + statusText + '</div>';
+
+    if (opts.showConfirmOntime && !opts.isAcknowledged) {
+      h += '<div class="card-confirm-ontime" id="confirm-ontime-btn"><i data-lucide="check-circle"></i> Je confirme être à l\'heure</div>';
+    }
+
+    h += '<div class="card-blocked-btn"><i data-lucide="alert-triangle"></i> Je suis bloqué(e)</div>';
+    h += '</div>';
+
+    // Debounce status bar (below stepper)
+    h += '<div class="card-debounce hidden" id="debounce-bar"></div>';
+
+  }
+
+  if (showDone) {
+    h += '<div class="card-done"><i data-lucide="check-circle"></i>Tâche terminée</div>';
+  }
+
+  el.innerHTML = h;
+}
+
+function renderAll() {
+  const tasks = TASKS[state.mode];
+  const el = document.getElementById('active-card');
+  const graceEl = document.getElementById('grace-peek');
+  const peekEl = document.getElementById('peek-card');
+  const isGrace = state.cardState === 'grace';
+
+  // Heartbeat: 600ms beat + variable rest — only if NOT acknowledged
+  const BEAT_MS = 600;
+  let heartbeatTotal = 0; // 0 = no pulse
+  if (state.cardState === 'fin-proche' && !state.acknowledged) {
+    const threshold = Math.max(5, Math.round(tasks[0].durationMin * 0.1));
+    if (state.timeRemaining <= threshold && state.timeRemaining > 0) {
+      const ratio = state.timeRemaining / threshold;
+      const restMs = 200 + ratio * 3500;
+      heartbeatTotal = BEAT_MS + restMs;
+    } else if (state.timeRemaining <= 0) {
+      heartbeatTotal = BEAT_MS + 200;
+    }
+  }
+  // Inject dynamic keyframes so the 600ms beat shape is constant
+  const dynStyle = document.getElementById('dyn-heartbeat') || (() => {
+    const s = document.createElement('style');
+    s.id = 'dyn-heartbeat';
+    document.head.appendChild(s);
+    return s;
+  })();
+  if (heartbeatTotal > 0) {
+    const beatEnd = (BEAT_MS / heartbeatTotal) * 100;
+    const p = (frac) => (frac * beatEnd).toFixed(1);
+    dynStyle.textContent = `
+      @keyframes card-heartbeat {
+        0%              { opacity: 0; }
+        ${p(0.12)}%     { opacity: 0.45; }
+        ${p(0.22)}%     { opacity: 0.08; }
+        ${p(0.34)}%     { opacity: 0.45; }
+        ${p(0.56)}%     { opacity: 0; }
+        100%            { opacity: 0; }
+      }`;
+  }
+
+  if (isGrace) {
+    // Grace state: previous task peeks on top, next task is active
+    const prev = tasks[0];
+    const active = tasks[1];
+    const next = tasks[2];
+
+    // Grace peek (top) — variant based on graceStyle
+    const gs = state.graceStyle;
+    const gpClass = gs === 'overflow' ? 'gp-overflow' : gs === 'strip' ? 'gp-strip' : 'gp-card';
+    graceEl.className = 'grace-peek ' + gpClass;
+
+    const btnHtml = '<div class="grace-not-done-btn">' +
+      'Je n\'ai pas fini · <span class="grace-timer">' + fmtGrace(state.graceSeconds) + '</span></div>';
+
+    const fullContent =
+      '<div class="peek-label">Précédent</div>' +
+      '<div class="peek-job">' + prev.ref + ' · ' + prev.designation + '</div>' +
+      '<div class="peek-details">' + prev.station + ' · ' + prev.slotStart + ' – ' + prev.slotEnd + '</div>' +
+      btnHtml;
+
+    if (gs === 'strip') {
+      graceEl.innerHTML =
+        '<div class="peek-job">' + prev.ref + ' · ' + prev.designation + '</div>' +
+        btnHtml;
+    } else {
+      graceEl.innerHTML = fullContent;
+    }
+
+    // Active card = next task (en-cours)
+    if (active) {
+      el.className = 'task-card active';
+      renderTaskCard(el, active, {
+        showBand: true, showStepper: true, showWait: false, showDone: false,
+        timeRemaining: active.durationMin, offset: 0, heartbeatTotal: 0, showFlash: false,
+        showConfirmOntime: false, isAcknowledged: false,
+      });
+    }
+
+    // Peek = task after next
+    if (next) {
+      peekEl.style.display = '';
+      peekEl.innerHTML =
+        '<div class="peek-label">Suivant</div>' +
+        '<div class="peek-job">' + next.ref + ' · ' + next.designation + '</div>' +
+        '<div class="peek-details">' + next.station + ' · ' + next.slotStart + ' – ' + next.slotEnd + '</div>';
+    } else {
+      peekEl.style.display = 'none';
+    }
+  } else {
+    // Normal states
+    graceEl.className = 'grace-peek hidden';
+    el.className = 'task-card' + (state.cardState === 'attente' ? '' : ' active');
+
+    const isFin = state.cardState === 'fin-proche';
+    const threshold = Math.max(5, Math.round(tasks[0].durationMin * 0.1));
+    const inEndZone = isFin && state.timeRemaining <= threshold;
+
+    renderTaskCard(el, tasks[0], {
+      showBand: state.cardState === 'en-cours' || isFin,
+      showStepper: state.cardState === 'en-cours' || isFin,
+      showWait: state.cardState === 'attente',
+      showDone: false,
+      timeRemaining: state.timeRemaining,
+      offset: state.offset,
+      heartbeatTotal: heartbeatTotal,
+      showFlash: false,
+      showConfirmOntime: inEndZone,
+      isAcknowledged: state.acknowledged,
+    });
+
+    // Peek (bottom)
+    const next = tasks[1];
+    if (next) {
+      peekEl.style.display = '';
+      peekEl.innerHTML =
+        '<div class="peek-label">Suivant</div>' +
+        '<div class="peek-job">' + next.ref + ' · ' + next.designation + '</div>' +
+        '<div class="peek-details">' + next.station + ' · ' + next.slotStart + ' – ' + next.slotEnd + '</div>';
+    } else {
+      peekEl.style.display = 'none';
+    }
+  }
+}
+
+function updateDevice() {
+  const f = document.getElementById('device-frame');
+  const d = DEVICES[state.device];
+  if (state.device === 'bare') {
+    f.className = 'device-frame bare';
+    f.style.width = d.w + 'px'; f.style.height = d.h + 'px';
+  } else {
+    f.className = 'device-frame';
+    f.style.width = (d.w + 28) + 'px'; f.style.height = (d.h + 28) + 'px';
+  }
+}
+
+function updateHeader() {
+  const isOp = state.mode === 'operator';
+  document.getElementById('hdr-name').textContent = isOp ? 'Marc Dupont' : 'Massicot MCS-420';
+  document.getElementById('hdr-mode').textContent = isOp ? 'Opérateur' : 'Station';
+}
+
+function updatePrompt() {
+  const p = [];
+  p.push('Mobile card stack: ProgressCaptureModal structure (IdentitySection, TriptychSection, ProgressBand layout-A, NonLinearStepper).');
+  p.push('State: "' + state.cardState + '".');
+  if (state.cardState === 'fin-proche' && state.timeRemaining <= 5)
+    p.push('Pulse animation on ProgressBand (approaching end, ' + state.timeRemaining + 'min left).');
+  if (state.cardState === 'grace')
+    p.push('Grace period: previous task peeks from top with ' + fmtGrace(state.graceSeconds) + ' countdown. Active card = next task. Swipe down to recover.');
+  document.getElementById('prompt-text').textContent = p.join(' ');
+}
+
+function updateAll() {
+  renderAll(); updateDevice(); updateHeader(); updatePrompt();
+  lucide.createIcons();
+  // Wire confirm button click
+  const confirmBtn = document.getElementById('confirm-ontime-btn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', () => {
+      state.acknowledged = true;
+      updateAll();
+    });
+  }
+}
+
+// Reset acknowledged when switching state
+const origWire = wireToggle;
+document.getElementById('state-toggle').querySelectorAll('.toggle-btn').forEach(b => {
+  b.addEventListener('click', () => { state.acknowledged = false; });
+});
+
+// ─── Transition via View Transitions API ───
+function transitionToGrace() {
+  const apply = () => {
+    state.cardState = 'grace';
+    state.graceSeconds = 295;
+    document.getElementById('grace-slider').value = 295;
+    document.getElementById('grace-val').textContent = fmtGrace(295);
+    document.querySelectorAll('#state-toggle .toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === 'grace');
+    });
+    updateAll();
+  };
+  if (document.startViewTransition) {
+    document.startViewTransition(apply);
+  } else {
+    apply();
+  }
+}
+
+document.getElementById('play-transition').addEventListener('click', () => {
+  // Step 1: fin-proche with pulse
+  state.cardState = 'fin-proche';
+  state.timeRemaining = 2;
+  state.acknowledged = false;
+  document.getElementById('time-slider').value = 2;
+  document.getElementById('time-val').textContent = '2 min';
+  document.querySelectorAll('#state-toggle .toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === 'fin-proche');
+  });
+  updateAll();
+
+  // Step 2: after pulse, flash, then transition
+  setTimeout(() => {
+    const activeEl = document.getElementById('active-card');
+    const flash = document.createElement('div');
+    flash.className = 'card-flash';
+    activeEl.appendChild(flash);
+
+    setTimeout(transitionToGrace, 400);
+  }, 3000);
+});
+
+// ─── Debounce cascade demo ───
+document.getElementById('play-debounce').addEventListener('click', () => {
+  // Ensure we're in a state with a stepper
+  if (state.cardState === 'attente' || state.cardState === 'grace') {
+    state.cardState = 'fin-proche';
+    state.timeRemaining = 15;
+    document.getElementById('time-slider').value = 15;
+    document.getElementById('time-val').textContent = '15 min';
+    document.querySelectorAll('#state-toggle .toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === 'fin-proche');
+    });
+    updateAll();
+  }
+
+  const bar = document.getElementById('debounce-bar');
+  if (!bar) return;
+
+  // Step 1: saving (debounce saisie 2s)
+  bar.className = 'card-debounce saving';
+  bar.innerHTML = '<i data-lucide="loader"></i> Enregistrement dans 2s…';
+  lucide.createIcons();
+
+  setTimeout(() => {
+    // Step 2: saved
+    bar.className = 'card-debounce saved';
+    bar.innerHTML = '<i data-lucide="check"></i> Enregistré';
+    lucide.createIcons();
+
+    setTimeout(() => {
+      // Step 3: replan countdown (compressed: 4s = 1min in real)
+      bar.className = 'card-debounce replan';
+      let sec = 55;
+      const iv = setInterval(() => {
+        sec -= 14;
+        if (sec <= 0) {
+          clearInterval(iv);
+          bar.className = 'card-debounce replanned';
+          bar.innerHTML = '<i data-lucide="refresh-cw"></i> Planning recalculé';
+          lucide.createIcons();
+          setTimeout(() => { bar.className = 'card-debounce hidden'; }, 2000);
+          return;
+        }
+        bar.innerHTML = '<i data-lucide="clock"></i> Recalcul dans ' + sec + 's…';
+        lucide.createIcons();
+      }, 1000);
+      bar.innerHTML = '<i data-lucide="clock"></i> Recalcul dans ' + sec + 's…';
+      lucide.createIcons();
+    }, 1200);
+  }, 2000);
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+  const t = document.getElementById('prompt-text').textContent;
+  navigator.clipboard.writeText(t).then(() => {
+    const b = document.getElementById('copy-btn');
+    b.classList.add('copied');
+    b.innerHTML = '<i data-lucide="check" style="width:12px;height:12px;"></i> Copié !';
+    lucide.createIcons();
+    setTimeout(() => {
+      b.classList.remove('copied');
+      b.innerHTML = '<i data-lucide="clipboard" style="width:12px;height:12px;"></i> Copier';
+      lucide.createIcons();
+    }, 1400);
+  });
+});
+
+updateAll();
+</script>
+</body>
+</html>

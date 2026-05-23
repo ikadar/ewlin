@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground Rapport de Production</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    font-size: 13px;
+    /* ── Flux Dashboard dark palette (spec 3.15) ── */
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-active:         rgb(52 52 52);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+  }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    min-height: 100vh;
+  }
+
+  .page { display: flex; gap: 24px; padding: 24px 32px; max-width: 1500px; margin: 0 auto; }
+
+  /* ── Controls (playground only) ─────────────── */
+  .controls {
+    flex: 0 0 220px;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    padding: 16px;
+    position: sticky;
+    top: 24px;
+    height: fit-content;
+  }
+  .controls h2 { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .cg { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--flux-border); }
+  .cg:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .cl { font-size: 10px; color: var(--flux-text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .ab {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--flux-border-light);
+    background: var(--flux-elevated); color: var(--flux-text-secondary); border-radius: 4px;
+    font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.1s;
+    font-family: inherit; margin-bottom: 3px; text-align: left;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ab:hover { background: var(--flux-hover); }
+  .ab i { width: 12px; height: 12px; flex-shrink: 0; }
+  .ab.muted { margin-top: 6px; color: var(--flux-text-muted); }
+
+  /* ── Table shell — FLUX_TABLE_SHELL ─────────── */
+  .flux-shell {
+    flex: 1;
+    min-width: 0;
+    background: var(--flux-elevated);
+    border-radius: 8px;
+    border: 1px solid var(--flux-border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Tab bar — FluxTabBar ────────────────────── */
+  .tab-bar {
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--flux-border);
+    background: var(--flux-elevated);
+    padding: 0 1rem;           /* px-4 */
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 0.5rem 0.75rem;   /* py-2 px-3 */
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 0.875rem;       /* text-sm */
+    font-weight: 500;          /* font-medium */
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.12s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;       /* -mb-px */
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;             /* gap-1.5 */
+    color: var(--flux-text-secondary);
+  }
+  .tab:hover { color: white; background: rgba(44,44,44,0.5); }
+  .tab.active { color: white; border-bottom-color: rgb(59 130 246); background: var(--flux-elevated); } /* border-blue-500 */
+  .tab .tn { font-size: 0.875rem; color: var(--flux-text-muted); }
+
+  /* ── Table ──────────────────────────────────── */
+  .scroll { flex: 1; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; }
+
+  /* ── thead — sticky top-0 z-30 bg-flux-hover ── */
+  thead { position: sticky; top: 0; z-index: 30; }
+  thead tr { background: var(--flux-hover); border-bottom: 1px solid var(--flux-border); }
+
+  /* ── th — px-2 py-3, sortable = group cursor-pointer select-none ── */
+  th {
+    padding: 0.75rem 0.5rem; /* py-3 px-2 */
+    text-align: left;
+    font-size: 0.875rem;     /* text-sm */
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--flux-text-secondary);
+    cursor: pointer;
+    user-select: none;
+  }
+  th.no-sort { cursor: default; }
+
+  /* ── Sort chevrons — w-3 h-3 (12px) ─────────── */
+  th .chev {
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 2px;     /* ml-0.5 */
+    width: 12px; height: 12px;
+  }
+  th .chev svg { width: 12px; height: 12px; }
+  th .chev.inactive { opacity: 0; transition: opacity 0.12s; color: var(--flux-text-muted); }
+  th:hover .chev.inactive { opacity: 1; }
+  th .chev.active { opacity: 1; color: rgb(96 165 250); } /* blue-400 */
+
+  /* ── tbody rows — border-b, group, hover:bg-flux-hover, h-[2.25rem] ── */
+  tbody tr {
+    border-bottom: 1px solid var(--flux-border);
+    transition: background-color 0.1s;
+    cursor: default;
+  }
+  tbody tr:hover { background: var(--flux-hover); }
+  tbody tr.seen { opacity: 0.4; }
+  tbody tr.seen:hover { opacity: 0.6; }
+
+  /* ── td — px-4 py-0 text-sm ─────────────────── */
+  td {
+    padding: 0 1rem;         /* px-4 py-0 */
+    height: 2.25rem;         /* FLUX_BODY_TR_STYLE */
+    font-size: 0.875rem;     /* text-sm */
+    color: var(--flux-text-secondary);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  /* ── Badge — FluxPrerequisiteBadge ──────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;       /* px-1.5 py-0.5 */
+    border-radius: 0.25rem; /* rounded-[0.25rem] */
+    border: 1px solid;
+    font-weight: 500;       /* font-medium */
+    white-space: nowrap;
+    line-height: 1.375;     /* leading-snug */
+    font-size: 11px;
+  }
+  .badge-green  { background: rgb(20 83 45 / 0.20); color: rgb(74 222 128);  border-color: rgb(22 101 52 / 0.50); }
+  .badge-yellow { background: rgb(113 63 18 / 0.20); color: rgb(250 204 21); border-color: rgb(133 77 14 / 0.50); }
+  .badge-red    { background: rgb(127 29 29 / 0.20); color: rgb(248 113 113); border-color: rgb(153 27 27 / 0.50); }
+
+  /* ── Checkbox ───────────────────────────────── */
+  .vu {
+    width: 14px; height: 14px;
+    appearance: none;
+    border: 1.5px solid var(--flux-border-light);
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.1s;
+    position: relative;
+    vertical-align: middle;
+  }
+  .vu:hover { border-color: var(--flux-text-muted); }
+  .vu:checked { background: rgb(74 222 128); border-color: rgb(74 222 128); }
+  .vu:checked::after {
+    content: '';
+    position: absolute; left: 3px; top: 0.5px;
+    width: 5px; height: 8px;
+    border: solid var(--flux-base); border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+  }
+
+  /* ── ID mono — same as FluxTable ID cell ────── */
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .id-cell { font-weight: 500; color: var(--flux-text-primary); }
+  .dot-sep { color: rgb(82 82 91); margin: 0 3px; }
+
+  .offset { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; }
+
+  .empty td { text-align: center; color: var(--flux-text-muted); height: 80px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="controls">
+    <h2>Générer</h2>
+    <div class="cg">
+      <div class="cl">Ajouter</div>
+      <button class="ab" onclick="add('retard-minor')"><i data-lucide="clock"></i>Retard &lt; 30 min</button>
+      <button class="ab" onclick="add('retard-major')"><i data-lucide="alert-triangle"></i>Retard &gt; 30 min</button>
+      <button class="ab" onclick="add('a-lheure')"><i data-lucide="check"></i>À l'heure</button>
+      <button class="ab" onclick="add('avance')"><i data-lucide="trending-up"></i>Avance</button>
+      <button class="ab" onclick="add('panne-machine')"><i data-lucide="octagon-x"></i>Panne machine</button>
+      <button class="ab" onclick="add('absence')"><i data-lucide="user-x"></i>Absence opérateur</button>
+    </div>
+    <div class="cg">
+      <button class="ab" onclick="demo()"><i data-lucide="database"></i>Charger démo</button>
+      <button class="ab muted" onclick="clear_()"><i data-lucide="trash-2"></i>Tout effacer</button>
+    </div>
+  </div>
+
+  <div class="flux-shell">
+    <div class="tab-bar">
+      <button class="tab active" data-f="all" onclick="flt('all',this)"><span>Tous</span><span class="tn" id="n-all">(0)</span></button>
+      <button class="tab" data-f="important" onclick="flt('important',this)"><span>Important</span><span class="tn" id="n-important">(0)</span></button>
+      <button class="tab" data-f="info" onclick="flt('info',this)"><span>Pour info</span><span class="tn" id="n-info">(0)</span></button>
+      <button class="tab" data-f="seen" onclick="flt('seen',this)"><span>Vu</span><span class="tn" id="n-seen">(0)</span></button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr id="hdr"></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── Chevron SVGs (match FluxTable SortChevron) ── */
+const UP   = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`;
+const DOWN = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+const BOTH = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>`;
+
+const COLS = [
+  { key:'vu',       label:'Vu',        sort:false, w:'40px', align:'center' },
+  { key:'type',     label:'Type',      sort:true },
+  { key:'job',      label:'Job',       sort:true },
+  { key:'task',     label:'Tâche',     sort:true },
+  { key:'offset',   label:'Écart',     sort:true },
+  { key:'station',  label:'Station',   sort:true },
+  { key:'operator', label:'Opérateur', sort:true },
+  { key:'time',     label:'Quand',     sort:true, align:'right' },
+];
+
+/* ── Data ─────────────────────────────────────── */
+const OPS = ['M. Dupont','L. Martin','S. Bernard','A. Moreau','J. Petit'];
+const STS = ['Heidelberg XL 106','KBA Rapida 105','Komori LS-40','Polar 137','Bobst Expertcut'];
+const CLS = ['Leclerc','Carrefour','Auchan','Décathlon','FNAC','Leroy Merlin'];
+const TSK = ['Impression recto','Impression verso','Découpe','Pliage','Rainage','Pelliculage'];
+const TYPES = {
+  'retard-minor': 'Retard',
+  'retard-major': 'Retard',
+  'a-lheure':     'À l\'heure',
+  'avance':       'Avance',
+  'panne-machine':'Panne machine',
+  'absence':      'Absence opérateur',
+};
+const TYPE_ORDER = {'panne-machine':0,'absence':1,'retard-major':2,'retard-minor':3,'a-lheure':4,'avance':5};
+
+let evts=[], nid=1, fil='all', sCol='time', sDir='desc';
+const pk = a=>a[Math.floor(Math.random()*a.length)];
+const ri = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+
+function mk(type,ago) {
+  ago=ago??ri(1,240);
+  const e={id:nid++,type,jobNum:ri(41000,42999),client:pk(CLS),task:pk(TSK),station:pk(STS),operator:pk(OPS),createdAt:new Date(Date.now()-ago*60000),seen:false};
+  if(type==='retard-minor') e.offset=ri(5,29);
+  else if(type==='retard-major') e.offset=ri(31,120);
+  else if(type==='avance') e.offset=-ri(5,45);
+  else if(type==='a-lheure') e.offset=0;
+  return e;
+}
+
+function sev(e){ return (e.type==='retard-minor'||e.type==='avance'||e.type==='a-lheure')?'info':'important'; }
+
+/* ── Render header ────────────────────────────── */
+function renderHdr(){
+  document.getElementById('hdr').innerHTML = COLS.map(c=>{
+    const st = c.w ? `style="width:${c.w};text-align:${c.align||'left'}"` : (c.align==='right'?'style="text-align:right"':'');
+    const cls = c.sort ? '' : 'no-sort';
+    if(!c.sort) return `<th class="${cls}" ${st}>${c.label}</th>`;
+    let chev;
+    if(sCol===c.key) chev=`<span class="chev active">${sDir==='asc'?UP:DOWN}</span>`;
+    else chev=`<span class="chev inactive">${BOTH}</span>`;
+    return `<th class="${cls}" ${st} data-col="${c.key}">${c.label}${chev}</th>`;
+  }).join('');
+}
+
+/* ── Sort ──────────────────────────────────────── */
+document.addEventListener('click', e=>{
+  const th=e.target.closest('th[data-col]');
+  if(!th) return;
+  const col=th.dataset.col;
+  if(sCol===col) sDir=sDir==='asc'?'desc':'asc';
+  else { sCol=col; sDir=col==='time'?'desc':'asc'; }
+  render();
+});
+
+function cmp(a,b){
+  let va,vb;
+  switch(sCol){
+    case 'type':     va=TYPE_ORDER[a.type]??9; vb=TYPE_ORDER[b.type]??9; break;
+    case 'job':      va=a.jobNum; vb=b.jobNum; break;
+    case 'task':     va=a.task; vb=b.task; break;
+    case 'offset':   va=a.offset??-999; vb=b.offset??-999; break;
+    case 'station':  va=a.station; vb=b.station; break;
+    case 'operator': va=a.operator; vb=b.operator; break;
+    case 'time': default: va=a.createdAt.getTime(); vb=b.createdAt.getTime(); break;
+  }
+  let r=typeof va==='string'?va.localeCompare(vb):(va<vb?-1:va>vb?1:0);
+  return sDir==='desc'?-r:r;
+}
+
+/* ── Cell renderers ───────────────────────────── */
+function typeCell(e){
+  const l=TYPES[e.type];
+  if(e.type==='retard-major'||e.type==='panne-machine'||e.type==='absence')
+    return `<span class="badge badge-red">${l}</span>`;
+  if(e.type==='retard-minor')
+    return `<span class="badge badge-yellow">${l}</span>`;
+  if(e.type==='avance')
+    return `<span class="badge badge-green">${l}</span>`;
+  return l;
+}
+
+function offCell(e){
+  if(e.offset===undefined) return '<span style="color:var(--flux-text-muted)">—</span>';
+  if(e.offset===0) return '<span class="offset" style="color:var(--flux-text-muted)">0 min</span>';
+  const a=Math.abs(e.offset), s=e.offset>0?'+':'-';
+  const c=e.type==='retard-minor'?'rgb(250 204 21)':e.type==='retard-major'?'rgb(248 113 113)':'var(--flux-text-secondary)';
+  return `<span class="offset" style="color:${c}">${s}${a} min</span>`;
+}
+
+function ago(d){
+  const m=Math.floor((Date.now()-d.getTime())/60000);
+  if(m<1) return "à l'instant";
+  if(m<60) return `il y a ${m} min`;
+  const h=Math.floor(m/60);
+  if(h<24) return `il y a ${h}h${String(m%60).padStart(2,'0')}`;
+  return `il y a ${Math.floor(h/24)}j`;
+}
+
+/* ── Main render ──────────────────────────────── */
+function render(){
+  // counts
+  const cn={all:evts.length,important:0,info:0,seen:0};
+  for(const e of evts){if(e.seen)cn.seen++;else cn[sev(e)]++;}
+  for(const k of ['all','important','info','seen']) document.getElementById('n-'+k).textContent='('+cn[k]+')';
+
+  // filter + sort
+  let ls=[...evts];
+  if(fil==='important') ls=ls.filter(e=>!e.seen&&sev(e)==='important');
+  else if(fil==='info') ls=ls.filter(e=>!e.seen&&sev(e)==='info');
+  else if(fil==='seen') ls=ls.filter(e=>e.seen);
+  ls.sort(cmp);
+
+  renderHdr();
+
+  const tb=document.getElementById('tb');
+  if(!ls.length){ tb.innerHTML='<tr class="empty"><td colspan="8">Aucun événement</td></tr>'; return; }
+
+  tb.innerHTML=ls.map(e=>`<tr class="${e.seen?'seen':''}">
+    <td style="text-align:center"><input type="checkbox" class="vu" ${e.seen?'checked':''} onchange="tog(${e.id},this.checked)"></td>
+    <td>${typeCell(e)}</td>
+    <td><span class="mono id-cell">#${e.jobNum}</span><span class="dot-sep">·</span><span style="color:var(--flux-text-tertiary)">${e.client}</span></td>
+    <td>${e.task}</td>
+    <td>${offCell(e)}</td>
+    <td>${e.station}</td>
+    <td>${e.operator}</td>
+    <td style="text-align:right;color:var(--flux-text-muted);font-size:11px">${ago(e.createdAt)}</td>
+  </tr>`).join('');
+}
+
+/* ── Actions ──────────────────────────────────── */
+function flt(k,btn){ fil=k; document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===btn)); render(); }
+function tog(id,v){ const e=evts.find(x=>x.id===id); if(e){e.seen=v; render();} }
+function add(t){ evts.push(mk(t,0)); render(); }
+function clear_(){ evts=[]; nid=1; render(); }
+
+function demo(){
+  evts=[]; nid=1;
+  evts.push(mk('retard-major',3));
+  evts.push(mk('panne-machine',12));
+  evts.push(mk('a-lheure',15));
+  evts.push(mk('retard-minor',18));
+  evts.push(mk('avance',35));
+  evts.push(mk('a-lheure',42));
+  evts.push(mk('retard-major',48));
+  evts.push(mk('retard-minor',72));
+  evts.push(mk('absence',90));
+  evts.push(mk('a-lheure',105));
+  evts.push(mk('avance',110));
+  evts.push(mk('retard-minor',150));
+  evts.push(mk('retard-major',200));
+  evts[5].seen=true;
+  evts[8].seen=true;
+  render();
+}
+
+demo();
+lucide.createIcons();
+</script>
+</body>
+</html>

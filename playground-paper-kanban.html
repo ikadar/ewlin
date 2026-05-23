@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground · Kanban Papier</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  /* ── Flux palette (mirrors apps/web/src/index.css) ──────── */
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-active:         rgb(52 52 52);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --emerald-bg:  rgba(52, 211, 153, 0.10);
+    --amber-400:   #fbbf24;
+    --amber-100:   #fef3c7;
+    --amber-bg:    rgba(251, 191, 36, 0.10);
+    --amber-500-20: rgba(245, 158, 11, 0.20);
+    --amber-500-25: rgba(245, 158, 11, 0.25);
+    --red-400:     #f87171;
+    --red-bg:      rgba(248, 113, 113, 0.10);
+    --blue-400:    #60a5fa;
+    --blue-bg:     rgba(96, 165, 250, 0.10);
+    --zinc-500:    rgb(113 113 122);
+    --zinc-700:    rgb(63 63 70);
+    --zinc-900-50: rgba(24 24 27 / 0.5);
+    --zinc-950:    rgb(9 9 11);
+    --white-5:     rgba(255 255 255 / 0.05);
+    --white-10:    rgba(255 255 255 / 0.10);
+    --white-15:    rgba(255 255 255 / 0.15);
+
+    --col-to-order:   var(--amber-400);
+    --col-ordered:    var(--blue-400);
+    --col-available:  var(--emerald-400);
+
+    --column-width: 350px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, 'SF Pro Text', sans-serif;
+    background: var(--zinc-950);
+    color: rgb(228 228 231);
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  *::-webkit-scrollbar { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); border-radius: 999px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+
+  /* ── Root layout (mirrors RootLayout.tsx) ───────────────── */
+  .root {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar (mirrors Sidebar.tsx — w-14 = 56px) ────────── */
+  .sidebar-nav {
+    width: 56px;
+    flex-shrink: 0;
+    background: var(--zinc-900-50);
+    border-right: 1px solid var(--white-5);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-top {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0; gap: 8px;
+  }
+  .sidebar-spacer { flex: 1; }
+  .sidebar-bottom {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0; gap: 8px;
+    border-top: 1px solid var(--white-5);
+  }
+  .sb-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    border: none; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    background: transparent;
+    color: var(--zinc-500);
+  }
+  .sb-btn:hover {
+    background: var(--white-10);
+    color: rgb(212 212 216);
+  }
+  .sb-btn.active {
+    background: rgba(16, 185, 129, 0.20); /* tw:bg-emerald-500/20 (prod) */
+    color: rgb(209 250 229); /* tw:text-emerald-100 */
+  }
+  .sb-btn.active:hover {
+    background: rgba(16, 185, 129, 0.25);
+    color: rgb(236 253 245);
+  }
+  .sb-btn i, .sb-btn svg { width: 20px; height: 20px; }
+  .sb-btn[disabled] { color: var(--zinc-700); cursor: not-allowed; }
+
+  /* ── Content area ────────────────────────────────────────── */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--flux-base);
+  }
+
+  /* ── Page header (mirrors settings page pattern) ─────────── */
+  .page-header {
+    border-bottom: 1px solid var(--flux-border);
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .page-header-left {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .page-header h1 {
+    font-size: 1.25rem; font-weight: 600; color: var(--flux-text-primary); /* tw:text-xl */
+  }
+  .page-header .subtitle {
+    font-size: 0.75rem; color: var(--flux-text-muted); margin-left: 4px; /* tw:text-xs */
+  }
+  .page-header .pill {
+    font-size: 0.75rem; padding: 2px 7px; border-radius: 999px; /* tw:text-xs */
+    background: rgba(96,165,250,.12); color: var(--blue-400);
+    border: 1px solid rgba(96,165,250,.22); font-weight: 500;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .page-header-actions {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .header-btn {
+    background: var(--flux-elevated); color: var(--flux-text-secondary);
+    border: 1px solid var(--flux-border); border-radius: 8px;
+    padding: 5px 12px; font-size: 0.875rem; cursor: pointer; /* tw:text-sm */
+    font-family: inherit; display: flex; align-items: center; gap: 5px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .header-btn:hover {
+    background: var(--flux-hover); color: var(--flux-text-primary);
+    border-color: var(--flux-border-light);
+  }
+  .header-select {
+    background: var(--flux-elevated); color: var(--flux-text-secondary);
+    border: 1px solid var(--flux-border); border-radius: 8px;
+    padding: 5px 10px; font-size: 0.875rem; cursor: pointer; /* tw:text-sm */
+    font-family: inherit;
+  }
+
+  /* ── Main area = board + controls ────────────────────────── */
+  .main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── Board ───────────────────────────────────────────────── */
+  .board {
+    flex: 1;
+    display: flex;
+    gap: 20px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    min-height: 0;
+  }
+
+  /* ── Column ──────────────────────────────────────────────── */
+  .column {
+    flex: 0 0 var(--column-width);
+    display: flex;
+    flex-direction: column;
+    background: var(--flux-surface);
+    border-radius: 10px;
+    border: 1px solid var(--flux-border);
+    min-height: 0;
+  }
+  .column-header {
+    padding: 12px 14px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--flux-border);
+    flex-shrink: 0;
+  }
+  .column-title {
+    font-size: 0.875rem; font-weight: 600; /* tw:text-sm */
+    display: flex; align-items: center; gap: 8px;
+    color: var(--flux-text-primary);
+  }
+  .column-title .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+  .column-count {
+    font-size: 0.75rem; color: var(--flux-text-muted); /* tw:text-xs */
+    background: var(--flux-elevated); padding: 1px 7px; border-radius: 999px;
+    font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .column-body {
+    padding: 8px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 60px;
+    transition: background 0.15s;
+  }
+  .column-body.drag-over {
+    background: rgba(255,255,255,.02);
+    outline: 2px dashed rgba(255,255,255,.1);
+    outline-offset: -4px;
+    border-radius: 0 0 10px 10px;
+  }
+
+  /* ── Job card (mirrors ElementSection: bg-white/[0.015] border-white/5) ── */
+  .job-card {
+    background: rgba(255,255,255, 0.015);
+    border: 1px solid rgba(255,255,255, 0.05);
+    border-radius: 0;
+    cursor: grab;
+    padding: 10px;
+    transition: border-color 0.15s, opacity 0.2s;
+  }
+  .job-card:hover { border-color: rgba(255,255,255, 0.1); }
+  .job-card.dragging { opacity: 1; }
+  .job-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .job-name {
+    font-size: 12.5px; font-weight: 500; /* tw:text-[12.5px] font-medium */
+    display: flex; align-items: center; gap: 6px;
+    color: rgb(212 212 216); /* tw:text-zinc-300 */
+    min-width: 0;
+  }
+  .job-id {
+    font-weight: 700; color: var(--flux-text-primary);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .job-client {
+    color: rgb(212 212 216); /* tw:text-zinc-300 */
+    flex-shrink: 0;
+  }
+  .job-label {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .job-meta {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .job-deadline {
+    font-size: 0.75rem; color: var(--flux-text-muted); /* tw:text-xs */
+    display: flex; align-items: center; gap: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .job-deadline.urgent { color: var(--red-400); }
+  .job-deadline.soon { color: var(--amber-400); }
+  .job-badge {
+    font-size: 9px; padding: 1px 4px; border-radius: 3px; /* tw:text-[9px] */
+    font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .job-badge.priority-high {
+    background: rgba(239,68,68,.15); color: rgb(252 165 165); /* tw:text-red-300 */
+    border: 1px solid rgba(239,68,68,.4);
+  }
+  .job-badge.priority-medium {
+    background: rgba(245,158,11,.15); color: rgb(252 211 77); /* tw:text-amber-300 */
+    border: 1px solid rgba(245,158,11,.4);
+  }
+  .job-progress {
+    padding: 0 0 6px;
+    font-size: 0.75rem; color: var(--flux-text-muted); /* tw:text-xs */
+    display: flex; align-items: center; gap: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .progress-bar-bg {
+    flex: 1; height: 2px; background: var(--flux-hover); border-radius: 1px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; border-radius: 1px;
+    background: var(--emerald-400);
+    transition: width 0.3s ease;
+  }
+
+  /* ── Element sub-cards (mirrors TaskTile: border-l-4 + subtle bg) ── */
+  .elements-list {
+    display: flex; flex-direction: column; gap: 4px; /* tw:space-y-1 */
+  }
+  .element-card {
+    background: rgba(59,130,246, 0.12);
+    border: none;
+    border-left: 4px solid #3b82f6; /* tw:border-l-4 border-blue-500 */
+    border-radius: 0;
+    padding: 7px 10px 7px 11px;
+    cursor: grab;
+    min-height: 32px;
+    transition: filter 0.15s, opacity 0.2s;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .element-card:hover { filter: brightness(1.25); }
+  .element-card.dragging { opacity: 1; }
+  .element-info {
+    display: flex; align-items: center; gap: 6px;
+    min-width: 0; flex: 1;
+  }
+  .element-swatch { display: none; }
+  .group-count {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+    color: rgb(161 161 170); /* tw:text-zinc-400 */
+    background: rgba(255,255,255, 0.05);
+    border: 1px solid rgba(255,255,255, 0.08);
+    border-radius: 3px;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+  .element-name {
+    font-size: 12.5px; font-weight: 500; color: rgb(147 197 253); /* tw:text-[12.5px] font-medium text-blue-300 */
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .element-paper {
+    font-size: 11px; color: rgb(161 161 170); /* tw:text-[11px] text-zinc-400 */
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  .element-qty {
+    font-size: 11px; color: rgb(161 161 170); /* tw:text-[11px] text-zinc-400 */
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 3px;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+
+  /* ── Cutout (emplacement découpé) ────────────────────────── */
+  .element-cutout {
+    border: 1px dashed rgba(255,255,255, 0.1);
+    border-left: 4px solid rgba(255,255,255, 0.15);
+    border-radius: 0;
+    padding: 6px 10px 6px 11px;
+    min-height: 32px;
+    display: flex; align-items: center; gap: 6px;
+    color: var(--flux-text-muted);
+    font-size: 11px; /* tw:text-[11px] */
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent, transparent 4px,
+      rgba(255,255,255,.012) 4px, rgba(255,255,255,.012) 8px
+    );
+  }
+  .cutout-name { opacity: 0.85; }
+  .cutout-badge {
+    margin-left: auto;
+    font-size: 9px; padding: 1px 5px; border-radius: 3px; /* tw:text-[9px] */
+    font-weight: 700; letter-spacing: 0.04em;
+  }
+  .cutout-badge.ordered   { background: rgba(59,130,246,.15);  color: rgb(147 197 253); border: 1px solid rgba(59,130,246,.4); }
+  .cutout-badge.available { background: rgba(16,185,129,.15);  color: rgb(110 231 183); border: 1px solid rgba(16,185,129,.4); }
+  .cutout-badge.to-order  { background: rgba(245,158,11,.15); color: rgb(252 211 77);  border: 1px solid rgba(245,158,11,.4); }
+
+  /* ── Standalone element (detached, living alone) ─────────── */
+  .standalone {
+    background: rgba(255,255,255, 0.015);
+    border: 1px solid rgba(255,255,255, 0.05);
+    border-radius: 0;
+    overflow: hidden;
+    cursor: grab;
+    transition: border-color 0.15s, opacity 0.2s;
+  }
+  .standalone:hover { border-color: rgba(255,255,255, 0.1); }
+  .standalone.dragging { opacity: 1; }
+  .standalone-header {
+    padding: 4px 11px;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10.5px; color: var(--flux-text-muted); /* tw:text-[10.5px] */
+    margin-bottom: 4px;
+  }
+  .standalone-body {
+    background: rgba(59,130,246, 0.12);
+    border-left: 4px solid #3b82f6;
+    padding: 7px 10px 7px 11px;
+    min-height: 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .standalone-body:hover { filter: brightness(1.25); }
+  .standalone-body .element-name { color: rgb(147 197 253); /* tw:text-blue-300 */ }
+  .standalone-body .element-paper { color: rgb(161 161 170); }
+  .standalone-body .element-qty { color: rgb(161 161 170); }
+
+  /* ── Single-element job ──────────────────────────────────── */
+  .job-card.single .job-header { margin-bottom: 4px; }
+  .single-detail {
+    background: rgba(59,130,246, 0.12);
+    border-left: 4px solid #3b82f6;
+    padding: 7px 10px 7px 11px;
+    min-height: 32px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: rgb(161 161 170); /* tw:text-[11px] text-zinc-400 */
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+
+  /* ── Controls sidebar (playground-only) ──────────────────── */
+  .controls {
+    width: 220px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--flux-border);
+    background: var(--flux-surface);
+    padding: 14px;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .ctrl-section h3 {
+    font-size: 0.75rem; font-weight: 600; color: var(--flux-text-muted); /* tw:text-xs */
+    text-transform: uppercase; letter-spacing: .06em;
+    margin-bottom: 8px;
+  }
+  .ctrl-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 3px 0;
+  }
+  .ctrl-row label { font-size: 0.875rem; color: var(--flux-text-secondary); /* tw:text-sm */ }
+  .ctrl-row input[type="range"] { width: 70px; accent-color: var(--blue-400); }
+  .ctrl-row input[type="number"] {
+    width: 44px; background: var(--flux-elevated); color: var(--flux-text-primary);
+    border: 1px solid var(--flux-border); border-radius: 6px; padding: 2px 5px;
+    font-size: 0.875rem; text-align: center; font-family: inherit; /* tw:text-sm */
+  }
+  .ctrl-row .val {
+    font-size: 0.75rem; color: var(--flux-text-muted); /* tw:text-xs */ min-width: 22px;
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .ctrl-btn {
+    width: 100%; padding: 6px 10px; border-radius: 8px;
+    font-size: 0.875rem; font-family: inherit; cursor: pointer; /* tw:text-sm */
+    border: 1px solid var(--flux-border); background: var(--flux-elevated);
+    color: var(--flux-text-secondary); transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .ctrl-btn:hover { background: var(--flux-hover); color: var(--flux-text-primary); }
+  .ctrl-btn.primary {
+    background: rgba(96,165,250,.12); color: var(--blue-400);
+    border-color: rgba(96,165,250,.22);
+  }
+  .ctrl-btn.primary:hover { background: rgba(96,165,250,.2); }
+
+  .toggle {
+    position: relative; width: 32px; height: 17px;
+    background: var(--flux-hover); border-radius: 999px;
+    cursor: pointer; transition: background 0.2s;
+    border: 1px solid var(--flux-border);
+  }
+  .toggle.on { background: rgba(96,165,250,.25); border-color: rgba(96,165,250,.35); }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--flux-text-muted); transition: all 0.2s;
+  }
+  .toggle.on::after { left: 17px; background: var(--blue-400); }
+
+  .event-log {
+    background: var(--flux-base); border: 1px solid var(--flux-border);
+    border-radius: 6px; padding: 6px; max-height: 160px; overflow-y: auto;
+    font-size: 0.75rem; font-family: 'JetBrains Mono', 'SF Mono', monospace; /* tw:text-xs */
+    color: var(--flux-text-muted); line-height: 1.6;
+  }
+  .event-log .ev-drop { color: var(--emerald-400); }
+  .event-log .ev-detach { color: var(--amber-400); }
+</style>
+</head>
+<body>
+<div class="root">
+  <!-- ── Sidebar nav (mirrors Sidebar.tsx) ──────────────── -->
+  <nav class="sidebar-nav" aria-label="Main navigation">
+    <div class="sidebar-top">
+      <button class="sb-btn" aria-label="Planning opérateurs" title="Planning opérateurs">
+        <i data-lucide="users"></i>
+      </button>
+      <button class="sb-btn" aria-label="Planning machines" title="Planning machines">
+        <i data-lucide="calendar-days"></i>
+      </button>
+      <button class="sb-btn" aria-label="Flux de production" title="Flux de production">
+        <i data-lucide="tower-control"></i>
+      </button>
+      <button class="sb-btn" aria-label="Logistique" title="Logistique">
+        <i data-lucide="truck"></i>
+      </button>
+      <button class="sb-btn active" aria-label="Papier" title="Papier">
+        <i data-lucide="scroll-text"></i>
+      </button>
+      <button class="sb-btn" aria-label="Statistiques" title="Statistiques">
+        <i data-lucide="bar-chart-3"></i>
+      </button>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-bottom">
+      <button class="sb-btn" aria-label="Settings" title="Settings">
+        <i data-lucide="settings"></i>
+      </button>
+      <button class="sb-btn" aria-label="Historique" title="Historique">
+        <i data-lucide="history"></i>
+      </button>
+      <button class="sb-btn" disabled aria-label="User">
+        <i data-lucide="user"></i>
+      </button>
+      <button class="sb-btn" aria-label="Theme" title="Theme">
+        <i data-lucide="sun"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── Content ───────────────────────────────────────── -->
+  <div class="content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Papier</h1>
+        <span class="pill">Playground</span>
+      </div>
+      <div class="page-header-actions">
+        <label style="font-size:0.875rem;color:var(--flux-text-muted);display:flex;align-items:center;gap:5px">
+          Trier par
+          <select class="header-select" id="sortSelect">
+            <option value="deadline">Date de sortie</option>
+            <option value="name">Nom</option>
+          </select>
+        </label>
+        <button class="header-btn" id="resetBtn">
+          <i data-lucide="rotate-ccw" style="width:13px;height:13px"></i>
+          Réinitialiser
+        </button>
+      </div>
+    </div>
+
+    <div class="main-area">
+      <div class="board" id="board"></div>
+
+      <!-- ── Playground controls ─────────────────────── -->
+      <div class="controls">
+        <div class="ctrl-section">
+          <h3>Données</h3>
+          <div class="ctrl-row">
+            <label>Jobs</label>
+            <input type="number" id="jobCountInput" value="8" min="1" max="20">
+          </div>
+          <div class="ctrl-row">
+            <label>Max éléments</label>
+            <input type="number" id="maxElInput" value="4" min="1" max="8">
+          </div>
+          <div class="ctrl-row">
+            <label>% commandé</label>
+            <div style="display:flex;align-items:center;gap:5px">
+              <input type="range" id="orderedSlider" min="0" max="100" value="30">
+              <span class="val" id="orderedVal">30</span>
+            </div>
+          </div>
+          <div class="ctrl-row">
+            <label>% disponible</label>
+            <div style="display:flex;align-items:center;gap:5px">
+              <input type="range" id="availableSlider" min="0" max="100" value="20">
+              <span class="val" id="availableVal">20</span>
+            </div>
+          </div>
+          <button class="ctrl-btn primary" id="generateBtn">
+            <i data-lucide="shuffle" style="width:12px;height:12px"></i>
+            Regénérer
+          </button>
+        </div>
+
+        <div class="ctrl-section">
+          <h3>Affichage</h3>
+          <div class="ctrl-row">
+            <label>Deadline</label>
+            <div class="toggle on" data-key="showDeadline"></div>
+          </div>
+          <div class="ctrl-row">
+            <label>Largeur col.</label>
+            <div style="display:flex;align-items:center;gap:5px">
+              <input type="range" id="colWidthSlider" min="260" max="420" value="320" step="10">
+              <span class="val" id="colWidthVal">320</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ctrl-section">
+          <h3>Événements</h3>
+          <div class="event-log" id="eventLog">
+            <div style="opacity:.6;font-style:italic">Glisser-déposer pour tracer...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLUMNS = [
+  { id: 'to_order',  label: 'A commander', dotColor: '#fbbf24' },
+  { id: 'ordered',   label: 'Commandé',    dotColor: '#60a5fa' },
+  { id: 'available', label: 'Disponible',  dotColor: '#34d399' },
+];
+
+const PAPERS = [
+  { name: 'Couché brillant 350g', format: '65×92' },
+  { name: 'Offset 80g',           format: '65×90' },
+  { name: 'Offset 120g',          format: '65×90' },
+  { name: 'Couché mat 250g',      format: '52×72' },
+  { name: 'Tintoretto 300g',      format: '70×100' },
+  { name: 'Chromocard 300g',      format: '65×92' },
+  { name: 'Cyclus Offset 140g',   format: '52×72' },
+  { name: 'Splendorgel 170g',     format: '70×100' },
+  { name: 'Conqueror CX22 100g',  format: '65×90' },
+];
+
+const JOBS_DATA = [
+  { client: 'Siemens', label: 'Catalogue Printemps' },
+  { client: 'Mairie Paris', label: 'Affiche Paris Expo' },
+  { client: 'ENR Group', label: 'Dépliant 3 volets' },
+  { client: 'Jazz Club', label: 'Flyer Soirée' },
+  { client: 'Dupont Avocat', label: 'Cartes de visite' },
+  { client: 'AXA', label: 'Plaquette Groupe' },
+  { client: 'Le Gourmet', label: 'Menu Restaurant' },
+  { client: 'BNP', label: 'Enveloppe C5' },
+  { client: 'Renault', label: 'Pochette Salon Auto' },
+  { client: 'Danone', label: 'Rapport ESG 2026' },
+  { client: 'LVMH', label: 'Coffret Édition Luxe' },
+  { client: 'Vinci', label: 'Livret Formation' },
+  { client: 'Leclerc', label: 'Calendrier Mural' },
+  { client: 'Arc-en-ciel', label: 'Signet Librairie' },
+  { client: 'Bio Coop', label: 'Sticker Vitrine' },
+  { client: 'Total', label: 'Programme Gala' },
+  { client: 'Hermès', label: 'Carte de voeux' },
+  { client: 'La Poste', label: 'Chemise Rapport' },
+  { client: 'Airbus', label: 'Brochure Corporate' },
+  { client: 'Sanofi', label: 'Notice technique' },
+];
+
+const EL_NAMES = [
+  'Couverture', 'Intérieur', 'Encart', 'Jaquette', 'Rabat',
+  'Dos', 'Intercalaire', 'Chemise', 'Pochette', 'Signet',
+];
+
+let state = { jobs: [], opts: { showDeadline: true } };
+
+function paperKey(el) { return `${el.paper}|${el.format}`; }
+function paperLabel(key) { const [p, f] = key.split('|'); return `${p} ${f}`; }
+
+function groupByPaper(elements) {
+  const map = new Map();
+  for (const el of elements) {
+    const k = paperKey(el);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(el);
+  }
+  return map;
+}
+
+function generate() {
+  const n = +document.getElementById('jobCountInput').value || 8;
+  const maxEl = +document.getElementById('maxElInput').value || 4;
+  const pOrd = +document.getElementById('orderedSlider').value / 100;
+  const pAvl = +document.getElementById('availableSlider').value / 100;
+
+  state.jobs = [];
+  for (let j = 0; j < n; j++) {
+    const elCount = Math.max(1, Math.ceil(Math.random() * maxEl));
+    const elements = [];
+
+    const coverPaper = PAPERS[Math.floor(Math.random() * PAPERS.length)];
+    const intPaper = PAPERS[Math.floor(Math.random() * PAPERS.length)];
+
+    for (let e = 0; e < elCount; e++) {
+      const r = Math.random();
+      const isCover = e === 0;
+      const paper = isCover ? coverPaper : intPaper;
+      elements.push({
+        id: `el-${j}-${e}`, jobId: `job-${j}`,
+        name: isCover ? 'Couverture' : `Intérieur ${e}`,
+        paper: paper.name, format: paper.format,
+        qty: (Math.floor(Math.random() * 9) + 1) * 500,
+        status: r < pAvl ? 'available' : r < pAvl + pOrd ? 'ordered' : 'to_order',
+      });
+    }
+    const dOut = Math.floor(Math.random() * 21) + 1;
+    const dl = new Date(); dl.setDate(dl.getDate() + dOut);
+    const jd = JOBS_DATA[j % JOBS_DATA.length];
+    state.jobs.push({
+      id: `job-${j}`,
+      jobId: 100000 + j,
+      client: jd.client,
+      label: jd.label,
+      deadline: dl,
+      elements,
+    });
+  }
+  render();
+}
+
+// ── Rendering ──────────────────────────────────────────────
+function leftmost(job) {
+  for (const c of ['to_order','ordered','available'])
+    if (job.elements.some(e => e.status === c)) return c;
+  return 'to_order';
+}
+
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  for (const col of COLUMNS) {
+    const div = document.createElement('div');
+    div.className = 'column'; div.dataset.column = col.id;
+
+    const { html, count } = buildCol(col.id);
+    div.innerHTML = `<div class="column-header">
+      <div class="column-title"><span class="dot" style="background:${col.dotColor}"></span>${col.label}</div>
+      <span class="column-count">${count}</span>
+    </div>`;
+    const body = document.createElement('div');
+    body.className = 'column-body'; body.dataset.column = col.id;
+    body.innerHTML = html;
+    div.appendChild(body);
+    board.appendChild(div);
+  }
+  lucide.createIcons();
+  bindDnD();
+}
+
+function buildCol(colId) {
+  let html = '', count = 0;
+  const standaloneGroups = [];
+
+  for (const job of state.jobs) {
+    const here = job.elements.filter(e => e.status === colId);
+    if (!here.length) continue;
+    if (leftmost(job) === colId) {
+      html += renderJob(job, colId); count++;
+    } else {
+      const groups = groupByPaper(here);
+      for (const [pk, els] of groups) {
+        standaloneGroups.push({ pk, els, job }); count++;
+      }
+    }
+  }
+  for (const { pk, els, job } of standaloneGroups) html += renderStandalone(pk, els, job);
+  return { html, count };
+}
+
+function renderJob(job, colId) {
+  const here = job.elements.filter(e => e.status === colId);
+  const away = job.elements.filter(e => e.status !== colId);
+  const hereGroups = groupByPaper(here);
+  const awayGroups = groupByPaper(away);
+
+  let dlHtml = '';
+  if (state.opts.showDeadline) {
+    const d = Math.ceil((job.deadline - Date.now()) / 864e5);
+    const cls = d <= 3 ? 'urgent' : d <= 7 ? 'soon' : '';
+    dlHtml = `<span class="job-deadline ${cls}"><i data-lucide="calendar" style="width:11px;height:11px"></i>${d}j</span>`;
+  }
+
+  const totalGroups = new Set([...hereGroups.keys(), ...awayGroups.keys()]).size;
+
+  if (totalGroups === 1 && awayGroups.size === 0) {
+    const [pk, els] = [...hereGroups.entries()][0];
+    const totalQty = els.reduce((s, e) => s + e.qty, 0);
+    const countBadge = els.length > 1 ? `<span class="group-count">&times;${els.length} élt</span>` : '';
+    return `<div class="job-card single" draggable="true" data-job-id="${job.id}" data-drag-type="job">
+      <div class="job-header">
+        <div class="job-name"><span class="job-id">${job.jobId}</span> <span class="job-client">${job.client}</span> <span class="job-label">${job.label}</span></div>
+        <div class="job-meta">${dlHtml}</div>
+      </div>
+      <div class="single-detail">
+        ${paperLabel(pk)}
+        ${countBadge}
+        <span style="margin-left:auto;font-variant-numeric:tabular-nums">${totalQty.toLocaleString('fr-FR')} f.</span>
+      </div>
+    </div>`;
+  }
+
+  let elHtml = '';
+  for (const [pk, els] of hereGroups) elHtml += renderPaperGroup(pk, els, job.id);
+  for (const [pk, els] of awayGroups) elHtml += renderCutout(pk, els);
+
+  return `<div class="job-card" draggable="true" data-job-id="${job.id}" data-drag-type="job">
+    <div class="job-header">
+      <div class="job-name"><span class="job-id">${job.jobId}</span> <span class="job-client">${job.client}</span> <span class="job-label">${job.label}</span></div>
+      <div class="job-meta">${dlHtml}</div>
+    </div>
+    <div class="elements-list">${elHtml}</div>
+  </div>`;
+}
+
+function renderPaperGroup(pk, els, jobId) {
+  const totalQty = els.reduce((s, e) => s + e.qty, 0);
+  const countBadge = els.length > 1 ? `<span class="group-count">&times;${els.length} élt</span>` : '';
+  const elIds = els.map(e => e.id).join(',');
+  return `<div class="element-card" draggable="true" data-paper-key="${pk}" data-element-ids="${elIds}" data-job-id="${jobId}" data-drag-type="paper-group">
+    <div class="element-info">
+      <span class="element-name">${paperLabel(pk)}</span>
+      ${countBadge}
+    </div>
+    <span class="element-qty">${totalQty.toLocaleString('fr-FR')} f.</span>
+  </div>`;
+}
+
+function renderCutout(pk, els) {
+  const status = els[0].status;
+  const col = COLUMNS.find(c => c.id === status);
+  const cls = status === 'ordered' ? 'ordered' : status === 'available' ? 'available' : 'to-order';
+  const countBadge = els.length > 1 ? ` ×${els.length}` : '';
+  return `<div class="element-cutout">
+    <span class="cutout-name">${paperLabel(pk)}${countBadge}</span>
+    <span class="cutout-badge ${cls}">${col.label}</span>
+  </div>`;
+}
+
+function renderStandalone(pk, els, job) {
+  const totalQty = els.reduce((s, e) => s + e.qty, 0);
+  const countBadge = els.length > 1 ? `<span class="group-count">&times;${els.length} élt</span>` : '';
+  const elIds = els.map(e => e.id).join(',');
+  return `<div class="standalone" draggable="true" data-paper-key="${pk}" data-element-ids="${elIds}" data-job-id="${job.id}" data-drag-type="paper-group">
+    <div class="standalone-header">
+      <span style="font-weight:700;color:var(--flux-text-primary)">${job.jobId}</span>
+      <span>${job.client}</span>
+      <span>${job.label}</span>
+    </div>
+    <div class="standalone-body">
+      <div class="element-info">
+        <span class="element-name">${paperLabel(pk)}</span>
+        ${countBadge}
+      </div>
+      <span class="element-qty">${totalQty.toLocaleString('fr-FR')} f.</span>
+    </div>
+  </div>`;
+}
+
+// ── Drag & Drop ─────────────────────────────────────────────
+let drag = null;
+
+function bindDnD() {
+  document.querySelectorAll('[draggable="true"]').forEach(el => {
+    el.addEventListener('dragstart', function(e) {
+      drag = {
+        type: this.dataset.dragType,
+        jobId: this.dataset.jobId,
+        paperKey: this.dataset.paperKey,
+        elIds: this.dataset.elementIds ? this.dataset.elementIds.split(',') : [],
+      };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      this.classList.add('dragging');
+      if (drag.type === 'paper-group') e.stopPropagation();
+    });
+    el.addEventListener('dragend', function() {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.column-body').forEach(b => b.classList.remove('drag-over'));
+      drag = null;
+    });
+  });
+  document.querySelectorAll('.column-body').forEach(body => {
+    body.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over'); });
+    body.addEventListener('dragleave', function(e) { if (!this.contains(e.relatedTarget)) this.classList.remove('drag-over'); });
+    body.addEventListener('drop', function(e) {
+      e.preventDefault(); this.classList.remove('drag-over');
+      if (!drag) return;
+      const to = this.dataset.column;
+      if (drag.type === 'job') {
+        const job = state.jobs.find(j => j.id === drag.jobId);
+        if (!job || leftmost(job) === to) return;
+        job.elements.forEach(el => { el.status = to; });
+        log('drop', `${job.jobId} ${job.client} → ${COLUMNS.find(c=>c.id===to).label} (${job.elements.length} él.)`);
+      } else if (drag.type === 'paper-group') {
+        const job = state.jobs.find(j => j.id === drag.jobId);
+        if (!job) return;
+        const ids = new Set(drag.elIds);
+        const matched = job.elements.filter(e => ids.has(e.id));
+        if (!matched.length || matched[0].status === to) return;
+        matched.forEach(e => { e.status = to; });
+        log('detach', `${paperLabel(drag.paperKey)} (${job.jobId}) → ${COLUMNS.find(c=>c.id===to).label} (${matched.length} él.)`);
+      }
+      render();
+    });
+  });
+}
+
+function log(type, msg) {
+  const el = document.getElementById('eventLog');
+  const t = new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const d = document.createElement('div');
+  d.className = type === 'drop' ? 'ev-drop' : 'ev-detach';
+  d.textContent = `[${t}] ${msg}`;
+  if (el.firstChild?.style?.fontStyle) el.innerHTML = '';
+  el.prepend(d);
+}
+
+// ── Controls ────────────────────────────────────────────────
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => {
+    t.classList.toggle('on');
+    state.opts[t.dataset.key] = t.classList.contains('on');
+    render();
+  });
+});
+document.getElementById('orderedSlider').addEventListener('input', e => { document.getElementById('orderedVal').textContent = e.target.value; });
+document.getElementById('availableSlider').addEventListener('input', e => { document.getElementById('availableVal').textContent = e.target.value; });
+document.getElementById('colWidthSlider').addEventListener('input', e => {
+  document.getElementById('colWidthVal').textContent = e.target.value;
+  document.documentElement.style.setProperty('--column-width', e.target.value + 'px');
+});
+document.getElementById('generateBtn').addEventListener('click', generate);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  document.getElementById('jobCountInput').value = 8;
+  document.getElementById('maxElInput').value = 4;
+  document.getElementById('orderedSlider').value = 30; document.getElementById('orderedVal').textContent = '30';
+  document.getElementById('availableSlider').value = 20; document.getElementById('availableVal').textContent = '20';
+  generate();
+});
+document.getElementById('sortSelect').addEventListener('change', e => {
+  const k = e.target.value;
+  state.jobs.sort((a, b) => k === 'deadline' ? a.deadline - b.deadline : a.client.localeCompare(b.client));
+  render();
+});
+
+generate();
+</script>
+</body>
+</html>

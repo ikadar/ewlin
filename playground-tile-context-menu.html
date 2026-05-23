@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Playground — Actions clic-droit sur tuile</title>
+<style>
+:root {
+  --bg: #0e0e10;
+  --panel: #17171a;
+  --panel-2: #202024;
+  --panel-3: #1a1a1d;
+  --border: #2c2c33;
+  --border-soft: #232328;
+  --text: #ececef;
+  --text-dim: #8b8b95;
+  --text-faint: #5a5a63;
+  --accent: #6ea8fe;
+  --green: #4ade80;
+  --green-soft: rgba(74, 222, 128, 0.13);
+  --green-strong: rgba(74, 222, 128, 0.22);
+  --red: #f87171;
+  --red-soft: rgba(248, 113, 113, 0.13);
+  --red-strong: rgba(248, 113, 113, 0.22);
+  --tile-prod: linear-gradient(90deg, #1f6feb 0%, #1e40af 100%);
+  --tile-future: linear-gradient(90deg, #6366f1 0%, #4338ca 100%);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  height: 100vh;
+}
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 16px 14px;
+  overflow-y: auto;
+}
+.main {
+  padding: 18px 22px;
+  overflow-y: auto;
+}
+h1 { font-size: 14px; font-weight: 600; margin: 0 0 14px; }
+h2 {
+  font-size: 11px; font-weight: 600;
+  margin: 18px 0 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.control { margin-bottom: 10px; }
+.control-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-dim);
+  cursor: pointer;
+}
+.control-label input { margin: 0; accent-color: var(--accent); }
+.toggle-group {
+  display: flex;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px; gap: 2px;
+}
+.toggle-group button {
+  flex: 1; background: none; border: none;
+  color: var(--text-dim);
+  padding: 6px 8px; border-radius: 4px;
+  cursor: pointer; font-size: 12px;
+  font-family: inherit;
+}
+.toggle-group button:hover { color: var(--text); }
+.toggle-group button.active { background: var(--accent); color: white; }
+.preset-list { display: flex; flex-direction: column; gap: 4px; }
+.preset {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 9px; border-radius: 4px;
+  font-size: 12px; text-align: left;
+  cursor: pointer; font-family: inherit;
+}
+.preset:hover { border-color: var(--accent); background: #25252b; }
+
+/* Compare grid */
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.view-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.view-card-title {
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.view-card-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.3px;
+}
+.tile-mock {
+  height: 30px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  display: flex; align-items: center;
+  padding: 0 10px;
+  font-size: 11px; color: white;
+  background: var(--tile-prod);
+  font-weight: 500;
+  position: relative;
+}
+.tile-mock.future { background: var(--tile-future); }
+.tile-mock-hint {
+  position: absolute; right: 8px;
+  font-size: 10px; opacity: 0.85;
+  font-weight: 400;
+}
+
+.menu-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.menu-col-header {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 6px 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.menu-col-header .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.menu-col-header.actuel .dot { background: var(--text-dim); }
+.menu-col-header.cible .dot { background: var(--accent); }
+.menu-col-header.cible { color: var(--accent); }
+
+.context-menu {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  min-height: 220px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.menu-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  color: var(--text);
+  border-left: 2px solid transparent;
+  margin-bottom: 1px;
+}
+.menu-item.will-remove {
+  background: var(--red-soft);
+  border-left-color: var(--red);
+  color: var(--red);
+}
+.menu-item.will-remove .label { text-decoration: line-through; }
+.menu-item.newly-added {
+  background: var(--green-soft);
+  border-left-color: var(--green);
+  color: var(--green);
+}
+.menu-item.disabled {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+.menu-item .icon {
+  width: 12px;
+  display: inline-flex; justify-content: center;
+  font-size: 11px; color: var(--text-dim);
+  flex-shrink: 0;
+}
+.menu-item.will-remove .icon { color: var(--red); }
+.menu-item.newly-added .icon { color: var(--green); }
+.menu-item .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-empty {
+  padding: 18px 8px;
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Matrix */
+.matrix {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 22px;
+}
+.matrix h2 { margin-top: 0; }
+.matrix table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.matrix th, .matrix td {
+  padding: 6px 8px; text-align: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+.matrix tr:last-child td { border-bottom: none; }
+.matrix th {
+  font-weight: 500;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.matrix th.col-actuel { color: var(--text-dim); }
+.matrix th.col-cible { color: var(--accent); }
+.matrix th.group { font-size: 11px; color: var(--text); border-bottom: 2px solid var(--border); }
+.matrix td.action-name { text-align: left; color: var(--text); white-space: nowrap; }
+.matrix td.action-name .ico { color: var(--text-dim); margin-right: 6px; display: inline-block; width: 12px; }
+.matrix .yes { color: var(--green); font-weight: 600; }
+.matrix .no { color: var(--text-faint); }
+.matrix .pair-actuel { background: rgba(255,255,255,0.015); }
+.matrix .pair-cible { background: rgba(110, 168, 254, 0.04); }
+.matrix .changed-add { color: var(--green); font-weight: 700; background: var(--green-soft); }
+.matrix .changed-remove { color: var(--red); font-weight: 700; background: var(--red-soft); text-decoration: line-through; }
+
+/* Summary */
+.summary {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 22px;
+}
+.summary h2 { margin-top: 0; }
+.summary-totals {
+  display: flex; gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.summary-pill {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.summary-pill.add { background: var(--green-soft); color: var(--green); border: 1px solid rgba(74, 222, 128, 0.35); }
+.summary-pill.rem { background: var(--red-soft); color: var(--red); border: 1px solid rgba(248, 113, 113, 0.35); }
+.summary-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  font-size: 11px;
+}
+.summary-list .delta {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  margin-right: 6px; font-weight: 700;
+}
+.summary-list .delta.add { color: var(--green); }
+.summary-list .delta.rem { color: var(--red); }
+
+/* Prompt */
+.prompt-output {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.prompt-output h2 { margin-top: 0; }
+.prompt-output pre {
+  white-space: pre-wrap;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  margin: 0; color: var(--text);
+  background: var(--panel-2);
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-soft);
+}
+.copy-btn {
+  margin-top: 10px;
+  background: var(--accent);
+  color: white; border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px; font-weight: 500;
+}
+.copy-btn:hover { opacity: 0.92; }
+
+.legend {
+  display: flex; gap: 14px;
+  font-size: 10px; color: var(--text-dim);
+  margin-bottom: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  align-items: center;
+}
+.legend .swatch {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>Clic-droit sur tuile</h1>
+
+    <h2>Mode scénario</h2>
+    <div class="control">
+      <div class="toggle-group" id="mode-toggle">
+        <button data-value="prod" class="active">Prod</button>
+        <button data-value="preprod">Préprod</button>
+      </div>
+    </div>
+
+    <h2>État de la tâche</h2>
+    <div class="control">
+      <div class="toggle-group" id="state-toggle">
+        <button data-value="past" class="active">Past-started</button>
+        <button data-value="future">Future-start</button>
+      </div>
+    </div>
+
+    <h2>Affichage</h2>
+    <div class="control">
+      <label class="control-label">
+        <input type="checkbox" id="show-hidden">
+        Items masqués (grisés)
+      </label>
+    </div>
+
+    <h2>Présets</h2>
+    <div class="preset-list">
+      <button class="preset" data-preset="prod-past">Prod · en cours</button>
+      <button class="preset" data-preset="prod-future">Prod · à venir</button>
+      <button class="preset" data-preset="preprod-past">Préprod · en cours</button>
+      <button class="preset" data-preset="preprod-future">Préprod · à venir</button>
+      <button class="preset" data-preset="diff-mode">Tout afficher (masqués inclus)</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="legend">
+      <span><span class="swatch" style="background: var(--green-soft); border: 1px solid var(--green);"></span>action ajoutée en cible</span>
+      <span><span class="swatch" style="background: var(--red-soft); border: 1px solid var(--red);"></span>action retirée en cible</span>
+      <span><span class="swatch" style="background: var(--text-faint);"></span>masquée par gate</span>
+    </div>
+
+    <div class="compare-grid">
+      <div class="view-card">
+        <div class="view-card-title">JDP — Job Details Panel</div>
+        <div class="view-card-sub" id="sub-jdp">jdp · prod · past</div>
+        <div class="tile-mock" id="tile-jdp"><span class="tile-mock-label">Tâche</span><span class="tile-mock-hint">→ clic-droit</span></div>
+        <div class="menu-pair">
+          <div>
+            <div class="menu-col-header actuel"><span class="dot"></span>Actuel</div>
+            <div class="context-menu" id="menu-jdp-actuel"></div>
+          </div>
+          <div>
+            <div class="menu-col-header cible"><span class="dot"></span>Cible</div>
+            <div class="context-menu" id="menu-jdp-cible"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="view-card">
+        <div class="view-card-title">Planning Opérateur</div>
+        <div class="view-card-sub" id="sub-op">op · prod · past</div>
+        <div class="tile-mock" id="tile-op"><span class="tile-mock-label">Tâche</span><span class="tile-mock-hint">→ clic-droit</span></div>
+        <div class="menu-pair">
+          <div>
+            <div class="menu-col-header actuel"><span class="dot"></span>Actuel</div>
+            <div class="context-menu" id="menu-op-actuel"></div>
+          </div>
+          <div>
+            <div class="menu-col-header cible"><span class="dot"></span>Cible</div>
+            <div class="context-menu" id="menu-op-cible"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="view-card">
+        <div class="view-card-title">Planning Station</div>
+        <div class="view-card-sub" id="sub-st">st · prod · past</div>
+        <div class="tile-mock" id="tile-st"><span class="tile-mock-label">Tâche</span><span class="tile-mock-hint">→ clic-droit</span></div>
+        <div class="menu-pair">
+          <div>
+            <div class="menu-col-header actuel"><span class="dot"></span>Actuel</div>
+            <div class="context-menu" id="menu-st-actuel"></div>
+          </div>
+          <div>
+            <div class="menu-col-header cible"><span class="dot"></span>Cible</div>
+            <div class="context-menu" id="menu-st-cible"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="matrix">
+      <h2>Matrice complète actuel | cible — toutes vues × modes</h2>
+      <table id="matrix-table"></table>
+    </div>
+
+    <div class="summary">
+      <h2>Diff actuel → cible (toutes combinaisons)</h2>
+      <div class="summary-totals">
+        <span class="summary-pill add" id="total-add">+0 ajouts</span>
+        <span class="summary-pill rem" id="total-rem">−0 retraits</span>
+      </div>
+      <div class="summary-list" id="summary-list"></div>
+    </div>
+
+    <div class="prompt-output">
+      <h2>Prompt</h2>
+      <pre id="prompt"></pre>
+      <button class="copy-btn" id="copy-btn">Copier</button>
+    </div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// Data model
+// ============================================================
+
+const ACTIONS = [
+  { id: 'voir',     label: 'Voir détails',           icon: '◉', stateGate: 'any'    },
+  { id: 'saisir',   label: "Saisir l'avancement",    icon: '◷', stateGate: 'past'   },
+  { id: 'terminer', label: 'Marquer terminé',        icon: '☑', stateGate: 'past'   },
+  { id: 'pin',      label: 'Épingler',               icon: '⊙', stateGate: 'any'    },
+  { id: 'definir',  label: 'Définir heure début',    icon: '◰', stateGate: 'future' },
+  { id: 'rappel',   label: 'Rappeler (désassigner)', icon: '↶', stateGate: 'any'    },
+  { id: 'diviser',  label: 'Diviser',                icon: '✂', stateGate: 'any'    },
+  { id: 'fusion',   label: 'Fusionner',              icon: '◇', stateGate: 'any'    },
+];
+
+const ACTUEL = {
+  voir:     { 'jdp-prod': 0, 'jdp-preprod': 0, 'op-prod': 1, 'op-preprod': 1, 'st-prod': 1, 'st-preprod': 1 },
+  saisir:   { 'jdp-prod': 0, 'jdp-preprod': 0, 'op-prod': 1, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 0 },
+  terminer: { 'jdp-prod': 1, 'jdp-preprod': 0, 'op-prod': 0, 'op-preprod': 0, 'st-prod': 1, 'st-preprod': 1 },
+  pin:      { 'jdp-prod': 1, 'jdp-preprod': 1, 'op-prod': 1, 'op-preprod': 1, 'st-prod': 1, 'st-preprod': 1 },
+  definir:  { 'jdp-prod': 0, 'jdp-preprod': 0, 'op-prod': 1, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 0 },
+  rappel:   { 'jdp-prod': 1, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 0, 'st-prod': 1, 'st-preprod': 1 },
+  diviser:  { 'jdp-prod': 1, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 0, 'st-prod': 1, 'st-preprod': 1 },
+  fusion:   { 'jdp-prod': 1, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 0, 'st-prod': 1, 'st-preprod': 1 },
+};
+
+const CIBLE = {
+  voir:     { 'jdp-prod': 0, 'jdp-preprod': 0, 'op-prod': 1, 'op-preprod': 1, 'st-prod': 1, 'st-preprod': 1 },
+  saisir:   { 'jdp-prod': 1, 'jdp-preprod': 0, 'op-prod': 1, 'op-preprod': 0, 'st-prod': 1, 'st-preprod': 0 },
+  terminer: { 'jdp-prod': 1, 'jdp-preprod': 0, 'op-prod': 1, 'op-preprod': 0, 'st-prod': 1, 'st-preprod': 0 },
+  pin:      { 'jdp-prod': 0, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 1 },
+  definir:  { 'jdp-prod': 0, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 1 },
+  rappel:   { 'jdp-prod': 0, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 1 },
+  diviser:  { 'jdp-prod': 0, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 1 },
+  fusion:   { 'jdp-prod': 0, 'jdp-preprod': 1, 'op-prod': 0, 'op-preprod': 1, 'st-prod': 0, 'st-preprod': 1 },
+};
+
+const COLS = [
+  { key: 'jdp-prod',    label: 'JDP·P'  },
+  { key: 'jdp-preprod', label: 'JDP·PP' },
+  { key: 'op-prod',     label: 'OP·P'   },
+  { key: 'op-preprod',  label: 'OP·PP'  },
+  { key: 'st-prod',     label: 'ST·P'   },
+  { key: 'st-preprod',  label: 'ST·PP'  },
+];
+
+const COL_FULL = {
+  'jdp-prod': 'JDP / Prod',
+  'jdp-preprod': 'JDP / Préprod',
+  'op-prod': 'Opérateur / Prod',
+  'op-preprod': 'Opérateur / Préprod',
+  'st-prod': 'Station / Prod',
+  'st-preprod': 'Station / Préprod',
+};
+
+// ============================================================
+// State
+// ============================================================
+
+const state = {
+  mode: 'prod',
+  taskState: 'past',
+  showHidden: false,
+};
+
+// ============================================================
+// Helpers
+// ============================================================
+
+const visibleByState = (action, ts) => action.stateGate === 'any' || action.stateGate === ts;
+
+// ============================================================
+// Rendering
+// ============================================================
+
+function renderMenu(view, version) {
+  const matrix = version === 'actuel' ? ACTUEL : CIBLE;
+  const other = version === 'actuel' ? CIBLE : ACTUEL;
+  const key = `${view}-${state.mode}`;
+  const el = document.getElementById(`menu-${view}-${version}`);
+  el.innerHTML = '';
+
+  let rendered = 0;
+  for (const action of ACTIONS) {
+    const enabled = !!matrix[action.id][key];
+    const otherEnabled = !!other[action.id][key];
+    const enabledByState = visibleByState(action, state.taskState);
+    const visible = enabled && enabledByState;
+
+    if (!visible && !state.showHidden) continue;
+
+    rendered++;
+    const item = document.createElement('div');
+    let cls = 'menu-item';
+    if (!visible) cls += ' disabled';
+    else if (enabled !== otherEnabled) {
+      cls += version === 'actuel' ? ' will-remove' : ' newly-added';
+    }
+    item.className = cls;
+
+    const icon = document.createElement('span');
+    icon.className = 'icon';
+    icon.textContent = action.icon;
+    item.appendChild(icon);
+
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = action.label;
+    item.appendChild(label);
+
+    el.appendChild(item);
+  }
+
+  if (rendered === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'menu-empty';
+    empty.textContent = '(aucune action)';
+    el.appendChild(empty);
+  }
+}
+
+function renderMatrix() {
+  const table = document.getElementById('matrix-table');
+  let html = '<thead>';
+  html += '<tr><th rowspan="2" style="text-align:left">Action</th>';
+  for (const c of COLS) html += `<th colspan="2" class="group">${c.label}</th>`;
+  html += '</tr><tr>';
+  for (let i = 0; i < COLS.length; i++) {
+    html += '<th class="col-actuel">A</th><th class="col-cible">C</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const action of ACTIONS) {
+    html += `<tr><td class="action-name"><span class="ico">${action.icon}</span>${action.label}</td>`;
+    for (const c of COLS) {
+      const a = !!ACTUEL[action.id][c.key];
+      const ci = !!CIBLE[action.id][c.key];
+      let aCls = 'pair-actuel ' + (a ? 'yes' : 'no');
+      let cCls = 'pair-cible '  + (ci ? 'yes' : 'no');
+      if (a !== ci) {
+        if (a && !ci) { aCls = 'pair-actuel changed-remove'; cCls = 'pair-cible no'; }
+        else          { aCls = 'pair-actuel no'; cCls = 'pair-cible changed-add'; }
+      }
+      const aChar = a ? '✓' : '·';
+      const cChar = ci ? '✓' : '·';
+      html += `<td class="${aCls}">${aChar}</td><td class="${cCls}">${cChar}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function renderSummary() {
+  const list = document.getElementById('summary-list');
+  let added = 0, removed = 0;
+  const adds = [], rems = [];
+
+  for (const action of ACTIONS) {
+    for (const c of COLS) {
+      const a = !!ACTUEL[action.id][c.key];
+      const ci = !!CIBLE[action.id][c.key];
+      if (a === ci) continue;
+      if (!a && ci) {
+        added++;
+        adds.push(`<div><span class="delta add">+</span>${action.label} <small style="color:var(--text-faint)">${COL_FULL[c.key]}</small></div>`);
+      } else {
+        removed++;
+        rems.push(`<div><span class="delta rem">−</span>${action.label} <small style="color:var(--text-faint)">${COL_FULL[c.key]}</small></div>`);
+      }
+    }
+  }
+
+  document.getElementById('total-add').textContent = `+${added} ajouts`;
+  document.getElementById('total-rem').textContent = `−${removed} retraits`;
+  list.innerHTML = `<div>${adds.join('')}</div><div>${rems.join('')}</div>`;
+}
+
+function updateContextLabels() {
+  const stateLabel = state.taskState;
+  document.getElementById('sub-jdp').textContent = `jdp · ${state.mode} · ${stateLabel}`;
+  document.getElementById('sub-op').textContent  = `op · ${state.mode} · ${stateLabel}`;
+  document.getElementById('sub-st').textContent  = `st · ${state.mode} · ${stateLabel}`;
+
+  const tileLabel = state.taskState === 'past'
+    ? 'Élément A · démarrée à 13:00'
+    : 'Élément A · prévue à 17:30';
+  for (const v of ['jdp', 'op', 'st']) {
+    const tile = document.getElementById(`tile-${v}`);
+    tile.classList.toggle('future', state.taskState === 'future');
+    tile.querySelector('.tile-mock-label').textContent = tileLabel;
+  }
+}
+
+function updatePrompt() {
+  const modeLabel = state.mode === 'prod' ? 'Prod' : 'Préprod';
+  const stateLabel = state.taskState === 'past' ? 'past-started (en cours / passée)' : 'future-start (à venir)';
+
+  const block = (view, viewLabel) => {
+    const key = `${view}-${state.mode}`;
+    const a = ACTIONS.filter(x => ACTUEL[x.id][key] && visibleByState(x, state.taskState)).map(x => x.label);
+    const c = ACTIONS.filter(x => CIBLE[x.id][key]  && visibleByState(x, state.taskState)).map(x => x.label);
+    return `${viewLabel}\n  Actuel : ${a.length ? a.join(', ') : '(aucune)'}\n  Cible  : ${c.length ? c.join(', ') : '(aucune)'}`;
+  };
+
+  let added = 0, removed = 0;
+  for (const a of ACTIONS) for (const c of COLS) {
+    if (ACTUEL[a.id][c.key] !== CIBLE[a.id][c.key]) {
+      ACTUEL[a.id][c.key] ? removed++ : added++;
+    }
+  }
+
+  const prompt =
+    `Pour le mode ${modeLabel} sur une tâche ${stateLabel}, le clic-droit affiche :\n\n` +
+    block('jdp', 'JDP') + '\n\n' +
+    block('op',  'Opérateur') + '\n\n' +
+    block('st',  'Station') + '\n\n' +
+    `Diff total actuel → cible : +${added} ajouts, −${removed} retraits.`;
+
+  document.getElementById('prompt').textContent = prompt;
+}
+
+function updateAll() {
+  for (const v of ['jdp', 'op', 'st']) {
+    renderMenu(v, 'actuel');
+    renderMenu(v, 'cible');
+  }
+  renderMatrix();
+  renderSummary();
+  updateContextLabels();
+  updatePrompt();
+}
+
+// ============================================================
+// Event handlers
+// ============================================================
+
+function bindToggle(id, key) {
+  const root = document.getElementById(id);
+  root.addEventListener('click', e => {
+    if (e.target.tagName !== 'BUTTON') return;
+    state[key] = e.target.dataset.value;
+    syncToggleUI();
+    updateAll();
+  });
+}
+
+function syncToggleUI() {
+  document.querySelectorAll('#mode-toggle button').forEach(b => b.classList.toggle('active', b.dataset.value === state.mode));
+  document.querySelectorAll('#state-toggle button').forEach(b => b.classList.toggle('active', b.dataset.value === state.taskState));
+  document.getElementById('show-hidden').checked = state.showHidden;
+}
+
+bindToggle('mode-toggle', 'mode');
+bindToggle('state-toggle', 'taskState');
+
+document.getElementById('show-hidden').addEventListener('change', e => {
+  state.showHidden = e.target.checked;
+  updateAll();
+});
+
+const PRESETS = {
+  'prod-past':       { mode: 'prod',    taskState: 'past',   showHidden: false },
+  'prod-future':     { mode: 'prod',    taskState: 'future', showHidden: false },
+  'preprod-past':    { mode: 'preprod', taskState: 'past',   showHidden: false },
+  'preprod-future':  { mode: 'preprod', taskState: 'future', showHidden: false },
+  'diff-mode':       { mode: 'preprod', taskState: 'future', showHidden: true  },
+};
+
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    Object.assign(state, PRESETS[btn.dataset.preset]);
+    syncToggleUI();
+    updateAll();
+  });
+});
+
+document.getElementById('copy-btn').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(document.getElementById('prompt').textContent);
+  const btn = document.getElementById('copy-btn');
+  const orig = btn.textContent;
+  btn.textContent = 'Copié !';
+  setTimeout(() => { btn.textContent = orig; }, 1200);
+});
+
+updateAll();
+</script>
+</body>
+</html>

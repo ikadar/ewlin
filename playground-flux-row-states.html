@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Flux Row States — Calibration playground</title>
+<style>
+  :root {
+    /* ──── Theme ──── */
+    --flux-base: #0a0e14;
+    --flux-elevated: #131820;
+    --flux-border: #2a3340;
+    --flux-border-light: #364254;
+    --flux-text: #e1e7ef;
+    --flux-text-secondary: #b0bcc8;
+    --flux-text-muted: #7a8896;
+    --flux-hover: #1a212b;
+
+    /* ──── Status hues (matching FluxJobStatusDot) ──── */
+    --hue-late: 239, 68, 68;        /* red-500 */
+    --hue-conflict: 250, 204, 21;   /* yellow-400 */
+    --hue-planned: 59, 130, 246;    /* blue-500 */
+    --hue-unplanned: 113, 113, 122; /* zinc-500 */
+    --hue-shipped: 34, 197, 94;     /* green-500 */
+    --hue-orange: 249, 115, 22;     /* orange-500 */
+
+    /* ──── Live-tunable parameters (defaults) ──── */
+    --hachure-angle: -45deg;        /* -45deg = montantes ↗, 45deg = descendantes ↘ */
+    --hachure-density: 6px;
+    --bg-opacity-solid: 0.14;       /* locked 2026-05-06 */
+    --bg-opacity-hachure: 0.17;     /* locked 2026-05-06 */
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--flux-base);
+    color: var(--flux-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  /* ════════════════ Sticky controls bar ════════════════ */
+  .controls-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(19, 24, 32, 0.96);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--flux-border);
+    padding: 14px 24px;
+  }
+
+  .controls-bar h1 {
+    margin: 0 0 10px 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .controls-bar h1 .lead {
+    font-weight: 400;
+    color: var(--flux-text-muted);
+    font-size: 12px;
+    margin-left: 12px;
+  }
+
+  .controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px 20px;
+    align-items: start;
+  }
+
+  .control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .control > label {
+    font-size: 11px;
+    color: var(--flux-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .control > label .value {
+    color: var(--flux-text);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* ──── Segmented buttons ──── */
+  .segmented {
+    display: flex;
+    gap: 0;
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .segmented button {
+    flex: 1;
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    color: var(--flux-text-muted);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 120ms, color 120ms;
+    white-space: nowrap;
+  }
+  .segmented button:hover {
+    color: var(--flux-text-secondary);
+  }
+  .segmented button.active {
+    background: rgba(99, 102, 241, 0.18);
+    color: rgb(165, 180, 252);
+  }
+
+  /* ──── Slider ──── */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--flux-border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: rgb(99, 102, 241);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--flux-elevated);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: rgb(99, 102, 241);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--flux-elevated);
+  }
+
+  /* ──── Native select ──── */
+  select {
+    background: var(--flux-base);
+    color: var(--flux-text);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4l3 3 3-3' stroke='%237a8896' stroke-width='1.4' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+  select:hover { border-color: var(--flux-border-light); }
+
+  .reset-btn {
+    align-self: end;
+    background: transparent;
+    color: var(--flux-text-muted);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 120ms;
+  }
+  .reset-btn:hover {
+    color: var(--flux-text);
+    border-color: var(--flux-border-light);
+  }
+
+  /* ════════════════ Main content ════════════════ */
+  .matrix-wrapper {
+    padding: 24px;
+    transition: filter 200ms;
+  }
+  body.sim-deuter   .matrix-wrapper { filter: url(#sim-deuter); }
+  body.sim-protan   .matrix-wrapper { filter: url(#sim-protan); }
+  body.sim-tritan   .matrix-wrapper { filter: url(#sim-tritan); }
+  body.sim-achromat .matrix-wrapper { filter: url(#sim-achromat); }
+
+  .panel {
+    background: var(--flux-elevated);
+    border: 1px solid var(--flux-border);
+    border-radius: 8px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: var(--flux-text);
+  }
+  .panel-subtitle {
+    color: var(--flux-text-muted);
+    font-size: 12px;
+    margin: 0;
+  }
+  .panel-note {
+    padding: 12px 20px;
+    background: rgba(var(--hue-planned), 0.06);
+    border-top: 1px solid var(--flux-border);
+    font-size: 11px;
+    color: var(--flux-text-muted);
+    line-height: 1.5;
+  }
+  .panel-note code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    background: rgba(0,0,0,0.3);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--flux-text-secondary);
+  }
+
+  /* ════════════════ Flux table ════════════════ */
+  table.flux-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .flux-table colgroup col.col-id       { width: 110px; }
+  .flux-table colgroup col.col-customer { width: 220px; }
+  .flux-table colgroup col.col-spec     { width: 180px; }
+  .flux-table colgroup col.col-deadline { width: 110px; }
+  .flux-table colgroup col.col-label    { width: auto; }
+
+  .flux-table tr {
+    height: 36px;
+    border-bottom: 1px solid var(--flux-border);
+  }
+  .flux-table tr:last-child { border-bottom: none; }
+  .flux-table td {
+    padding: 0 16px;
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .flux-table td.col-id {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 500;
+    color: var(--flux-text);
+    font-size: 12px;
+  }
+  .flux-table td.col-label {
+    color: var(--flux-text-muted);
+    font-size: 11px;
+    font-style: italic;
+    text-align: right;
+  }
+
+  /* Status dot (8px, identical to FluxJobStatusDot) */
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+  .dot.late      { background: rgb(var(--hue-late)); }
+  .dot.conflict  { background: rgb(var(--hue-conflict)); }
+  .dot.planned   { background: rgb(var(--hue-planned)); }
+  .dot.unplanned { background: rgb(var(--hue-unplanned)); }
+
+  /* ════════════════ Row backgrounds ════════════════ */
+  /* Solid (état stable) */
+  .bg-late      { background-color: rgba(var(--hue-late),     var(--bg-opacity-solid)); }
+  .bg-conflict  { background-color: rgba(var(--hue-conflict), var(--bg-opacity-solid)); }
+  .bg-planned   { /* flat */ }
+  .bg-shipped   { background-color: rgba(var(--hue-shipped),  calc(var(--bg-opacity-solid) + 0.02)); }
+
+  /* Hachures bicolores (transition prêt à partir) */
+  .bg-late-ready-A {
+    background: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-late), var(--bg-opacity-hachure)) 0,
+      rgba(var(--hue-late), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) calc(var(--hachure-density) * 2)
+    );
+  }
+  .bg-late-ready-B {
+    background: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-orange), calc(var(--bg-opacity-hachure) + 0.02)) 0,
+      rgba(var(--hue-orange), calc(var(--bg-opacity-hachure) + 0.02)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) calc(var(--hachure-density) * 2)
+    );
+  }
+  .bg-late-ready-C {
+    background: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) - 0.06)) 0,
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) - 0.06)) var(--hachure-density),
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) + 0.10)) var(--hachure-density),
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) + 0.10)) calc(var(--hachure-density) * 2)
+    );
+  }
+  /* Active variant in the matrix is driven by body.variant-X */
+  body.variant-A .bg-late-ready { background: var(--late-ready-A-bg); }
+  body.variant-B .bg-late-ready { background: var(--late-ready-B-bg); }
+  body.variant-C .bg-late-ready { background: var(--late-ready-C-bg); }
+  /* The variants generate the same bg as the *-A/B/C classes via CSS vars below */
+  :root {
+    --late-ready-A-bg: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-late), var(--bg-opacity-hachure)) 0,
+      rgba(var(--hue-late), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) calc(var(--hachure-density) * 2)
+    );
+    --late-ready-B-bg: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-orange), calc(var(--bg-opacity-hachure) + 0.02)) 0,
+      rgba(var(--hue-orange), calc(var(--bg-opacity-hachure) + 0.02)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) calc(var(--hachure-density) * 2)
+    );
+    --late-ready-C-bg: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) - 0.06)) 0,
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) - 0.06)) var(--hachure-density),
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) + 0.10)) var(--hachure-density),
+      rgba(var(--hue-late), calc(var(--bg-opacity-hachure) + 0.10)) calc(var(--hachure-density) * 2)
+    );
+  }
+
+  .bg-conflict-ready {
+    background: repeating-linear-gradient(
+      var(--hachure-angle),
+      rgba(var(--hue-conflict), calc(var(--bg-opacity-hachure) - 0.02)) 0,
+      rgba(var(--hue-conflict), calc(var(--bg-opacity-hachure) - 0.02)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) var(--hachure-density),
+      rgba(var(--hue-shipped), var(--bg-opacity-hachure)) calc(var(--hachure-density) * 2)
+    );
+  }
+  .bg-planned-ready {
+    background: repeating-linear-gradient(
+      var(--hachure-angle),
+      transparent 0,
+      transparent var(--hachure-density),
+      rgba(var(--hue-shipped), calc(var(--bg-opacity-hachure) - 0.02)) var(--hachure-density),
+      rgba(var(--hue-shipped), calc(var(--bg-opacity-hachure) - 0.02)) calc(var(--hachure-density) * 2)
+    );
+  }
+
+  /* ════════════════ Layout helpers ════════════════ */
+  .row-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 20px;
+    background: var(--flux-base);
+    border-top: 1px solid var(--flux-border);
+    font-size: 11px;
+    color: var(--flux-text-muted);
+  }
+  .row-meta strong { color: var(--flux-text-secondary); font-weight: 600; }
+</style>
+</head>
+
+<body class="variant-A sim-normal">
+
+<!-- ════════════════ STICKY CONTROLS ════════════════ -->
+<header class="controls-bar">
+  <h1>Flux Row States — Calibration<span class="lead">Modifie en live, la matrice ci-dessous se met à jour. Ctrl+R pour reset.</span></h1>
+
+  <div class="controls-grid">
+    <!-- Direction des hachures -->
+    <div class="control">
+      <label>Direction hachures</label>
+      <div class="segmented" data-control="angle">
+        <button data-value="-45deg" class="active">↗ Montantes</button>
+        <button data-value="45deg">↘ Descendantes</button>
+      </div>
+    </div>
+
+    <!-- Densité -->
+    <div class="control">
+      <label>Densité hachures <span class="value" id="density-value">6px</span></label>
+      <input type="range" id="density" min="2" max="20" value="6" step="1">
+    </div>
+
+    <!-- Variante late+prêt -->
+    <div class="control">
+      <label>Variante <code style="font-family:inherit; color:var(--flux-text-secondary)">late+prêt</code></label>
+      <div class="segmented" data-control="variant">
+        <button data-value="A" class="active">A · rouge+vert</button>
+        <button data-value="B">B · orange+vert</button>
+        <button data-value="C">C · mono rouge</button>
+      </div>
+    </div>
+
+    <!-- Simulation vision -->
+    <div class="control">
+      <label>Simulation vision</label>
+      <select id="sim">
+        <option value="normal">Normale</option>
+        <option value="deuter">Deutéranopie (rouge-vert, fréquente)</option>
+        <option value="protan">Protanopie (rouge-vert, rare)</option>
+        <option value="tritan">Tritanopie (bleu-jaune, très rare)</option>
+        <option value="achromat">Achromatopsie (sans couleur)</option>
+      </select>
+    </div>
+
+    <!-- Opacité fond plein -->
+    <div class="control">
+      <label>Opacité fond plein <span class="value" id="solid-opacity-value">0.14</span></label>
+      <input type="range" id="solid-opacity" min="0.05" max="0.40" value="0.14" step="0.01">
+    </div>
+
+    <!-- Opacité hachures -->
+    <div class="control">
+      <label>Opacité hachures <span class="value" id="hachure-opacity-value">0.17</span></label>
+      <input type="range" id="hachure-opacity" min="0.05" max="0.40" value="0.17" step="0.01">
+    </div>
+
+    <!-- Reset -->
+    <div class="control">
+      <label>&nbsp;</label>
+      <button class="reset-btn" id="reset">Reset défauts</button>
+    </div>
+  </div>
+</header>
+
+<div class="matrix-wrapper">
+
+  <!-- ════════════════ 1. Matrice complète ════════════════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="panel-title">1. Matrice complète des 8 états</h2>
+      <p class="panel-subtitle">
+        4 jobStatus (pastille) × phases du cycle de vie. La row <em>late · prêt à partir</em> reflète la variante sélectionnée dans la barre de contrôles.
+      </p>
+    </div>
+    <table class="flux-table">
+      <colgroup>
+        <col class="col-id"/><col class="col-customer"/><col class="col-spec"/><col class="col-deadline"/><col class="col-label"/>
+      </colgroup>
+      <tr class="bg-late">
+        <td class="col-id"><span class="dot late"></span>F-00012</td>
+        <td>Carteries Dupont</td>
+        <td>500 ex. — 21×29.7</td>
+        <td>J+0</td>
+        <td class="col-label">late · pas prêt</td>
+      </tr>
+      <tr class="bg-late-ready">
+        <td class="col-id"><span class="dot late"></span>F-00018</td>
+        <td>Imprimerie Lemarchand</td>
+        <td>1 200 ex. — 14.8×21</td>
+        <td>J+0</td>
+        <td class="col-label">late · prêt à partir</td>
+      </tr>
+      <tr class="bg-conflict">
+        <td class="col-id"><span class="dot conflict"></span>F-00024</td>
+        <td>Éditions Bernard</td>
+        <td>800 ex. — 21×29.7</td>
+        <td>J+1</td>
+        <td class="col-label">conflict · pas prêt</td>
+      </tr>
+      <tr class="bg-conflict-ready">
+        <td class="col-id"><span class="dot conflict"></span>F-00031</td>
+        <td>Papeterie Royale</td>
+        <td>2 400 ex. — 10.5×14.8</td>
+        <td>J+2</td>
+        <td class="col-label">conflict · prêt à partir</td>
+      </tr>
+      <tr class="bg-planned">
+        <td class="col-id"><span class="dot planned"></span>F-00045</td>
+        <td>Pharmacie Centrale</td>
+        <td>1 500 ex. — 21×29.7</td>
+        <td>J+3</td>
+        <td class="col-label">planned · pas prêt</td>
+      </tr>
+      <tr class="bg-planned-ready">
+        <td class="col-id"><span class="dot planned"></span>F-00067</td>
+        <td>Cabinet Martin</td>
+        <td>600 ex. — 21×29.7</td>
+        <td>J+5</td>
+        <td class="col-label">planned · prêt à partir</td>
+      </tr>
+      <tr class="bg-shipped">
+        <td class="col-id"><span class="dot late"></span>F-00009</td>
+        <td>Boulangerie Lefèvre</td>
+        <td>300 ex. — 14.8×21</td>
+        <td>Parti 25/02</td>
+        <td class="col-label">late à l'origine · parti</td>
+      </tr>
+      <tr class="bg-shipped">
+        <td class="col-id"><span class="dot planned"></span>F-00076</td>
+        <td>Restaurant Vert</td>
+        <td>1 000 ex. — 10.5×14.8</td>
+        <td>Parti 25/02</td>
+        <td class="col-label">planned · parti</td>
+      </tr>
+    </table>
+    <div class="row-meta">
+      <span><strong>Plein</strong> = état stable</span>
+      <span><strong>Hachuré bicolore</strong> = transition (prêt à partir)</span>
+      <span><strong>Vert plein</strong> = parti</span>
+      <span><strong>Pastille</strong> = production health (canal indépendant)</span>
+    </div>
+  </div>
+
+  <!-- ════════════════ 2. Comparaison variantes A/B/C ════════════════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="panel-title">2. Comparaison variantes <em>late · prêt à partir</em></h2>
+      <p class="panel-subtitle">
+        Les trois variantes A/B/C affichées simultanément (indépendamment du sélecteur). Toutes utilisent la densité, l'angle et l'opacité courants.
+      </p>
+    </div>
+    <table class="flux-table">
+      <colgroup>
+        <col class="col-id"/><col class="col-customer"/><col class="col-spec"/><col class="col-deadline"/><col class="col-label"/>
+      </colgroup>
+      <tr class="bg-late-ready-A">
+        <td class="col-id"><span class="dot late"></span>F-00018</td>
+        <td>Imprimerie Lemarchand</td>
+        <td>1 200 ex.</td>
+        <td>J+0</td>
+        <td class="col-label">A · rouge + vert (grammaire crossfade)</td>
+      </tr>
+      <tr class="bg-late-ready-B">
+        <td class="col-id"><span class="dot late"></span>F-00018</td>
+        <td>Imprimerie Lemarchand</td>
+        <td>1 200 ex.</td>
+        <td>J+0</td>
+        <td class="col-label">B · orange + vert (CVD-friendly)</td>
+      </tr>
+      <tr class="bg-late-ready-C">
+        <td class="col-id"><span class="dot late"></span>F-00018</td>
+        <td>Imprimerie Lemarchand</td>
+        <td>1 200 ex.</td>
+        <td>J+0</td>
+        <td class="col-label">C · rouge clair + rouge foncé (mono)</td>
+      </tr>
+    </table>
+    <div class="panel-note">
+      A préserve la grammaire (couleur d'origine + couleur cible vert). B remplace rouge par orange, qui contient la composante jaune préservée chez les daltoniens. C abandonne la grammaire bicolore et n'utilise que des nuances de rouge — sûr mais raconte moins la transition.
+    </div>
+  </div>
+
+  <!-- ════════════════ 3. Stress test : flux dense ════════════════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="panel-title">3. Stress test — flux dense (16 rows)</h2>
+      <p class="panel-subtitle">
+        Mélange réaliste pour simuler une journée chargée : combien d'attention chaque pattern attire-t-il quand il est noyé dans le scroll ?
+      </p>
+    </div>
+    <table class="flux-table">
+      <colgroup>
+        <col class="col-id"/><col class="col-customer"/><col class="col-spec"/><col class="col-deadline"/><col class="col-label"/>
+      </colgroup>
+      <tr class="bg-shipped"><td class="col-id"><span class="dot planned"></span>F-00001</td><td>Pharma Lyon</td><td>800 ex.</td><td>Parti 24/02</td><td class="col-label">parti</td></tr>
+      <tr class="bg-shipped"><td class="col-id"><span class="dot late"></span>F-00002</td><td>Mairie Aubagne</td><td>200 ex.</td><td>Parti 24/02</td><td class="col-label">late · parti</td></tr>
+      <tr class="bg-late"><td class="col-id"><span class="dot late"></span>F-00003</td><td>Cinéma Le Royal</td><td>5 000 flyers</td><td>J+0</td><td class="col-label">late</td></tr>
+      <tr class="bg-late-ready"><td class="col-id"><span class="dot late"></span>F-00004</td><td>Boucherie Garcia</td><td>500 cartes</td><td>J+0</td><td class="col-label">late · prêt</td></tr>
+      <tr class="bg-conflict"><td class="col-id"><span class="dot conflict"></span>F-00005</td><td>Éditions Verte</td><td>1 200 ex.</td><td>J+1</td><td class="col-label">conflict</td></tr>
+      <tr class="bg-planned"><td class="col-id"><span class="dot planned"></span>F-00006</td><td>Garage Auto+</td><td>300 ex.</td><td>J+2</td><td class="col-label">planned</td></tr>
+      <tr class="bg-planned"><td class="col-id"><span class="dot planned"></span>F-00007</td><td>Étoile du Sud</td><td>1 000 ex.</td><td>J+2</td><td class="col-label">planned</td></tr>
+      <tr class="bg-conflict-ready"><td class="col-id"><span class="dot conflict"></span>F-00008</td><td>Pâtisserie Vidal</td><td>600 ex.</td><td>J+3</td><td class="col-label">conflict · prêt</td></tr>
+      <tr class="bg-planned"><td class="col-id"><span class="dot planned"></span>F-00009</td><td>Cabinet Dentaire</td><td>2 000 ex.</td><td>J+3</td><td class="col-label">planned</td></tr>
+      <tr class="bg-planned-ready"><td class="col-id"><span class="dot planned"></span>F-00010</td><td>Boutique Ondine</td><td>400 ex.</td><td>J+4</td><td class="col-label">planned · prêt</td></tr>
+      <tr class="bg-planned"><td class="col-id"><span class="dot planned"></span>F-00011</td><td>Salon Coiffure</td><td>250 ex.</td><td>J+5</td><td class="col-label">planned</td></tr>
+      <tr class="bg-planned"><td class="col-id"><span class="dot unplanned"></span>F-00012</td><td>Restaurant Bleu</td><td>800 ex.</td><td>—</td><td class="col-label">unplanned</td></tr>
+      <tr class="bg-shipped"><td class="col-id"><span class="dot planned"></span>F-00013</td><td>Crèche du Parc</td><td>500 ex.</td><td>Parti 25/02</td><td class="col-label">parti</td></tr>
+      <tr class="bg-late"><td class="col-id"><span class="dot late"></span>F-00014</td><td>Hôtel des Pins</td><td>3 000 ex.</td><td>J+0</td><td class="col-label">late</td></tr>
+      <tr class="bg-shipped"><td class="col-id"><span class="dot planned"></span>F-00015</td><td>Mairie Toulon</td><td>1 200 ex.</td><td>Parti 25/02</td><td class="col-label">parti</td></tr>
+      <tr class="bg-planned-ready"><td class="col-id"><span class="dot planned"></span>F-00016</td><td>Pharma Marseille</td><td>700 ex.</td><td>J+6</td><td class="col-label">planned · prêt</td></tr>
+    </table>
+    <div class="panel-note">
+      Test à faire : scroll rapidement et identifie les rows en transition (hachurées) vs stables (pleines). Si les transitions ressortent immédiatement, la grammaire fonctionne. Sinon, augmente l'opacité hachures ou la densité.
+    </div>
+  </div>
+
+  <!-- ════════════════ 4. Hauteurs alternatives ════════════════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <h2 class="panel-title">4. Hauteurs alternatives de row</h2>
+      <p class="panel-subtitle">
+        Aujourd'hui la row Flux fait 36px (`FluxTable.tsx:384`). Si elle changeait, comment le pattern réagit-il ?
+      </p>
+    </div>
+    <table class="flux-table">
+      <colgroup>
+        <col class="col-id"/><col class="col-customer"/><col class="col-spec"/><col class="col-deadline"/><col class="col-label"/>
+      </colgroup>
+      <tr class="bg-late-ready" style="height:28px;">
+        <td class="col-id"><span class="dot late"></span>F-00018</td><td>Imprimerie Lemarchand</td><td>1 200 ex.</td><td>J+0</td>
+        <td class="col-label">28px (compact)</td>
+      </tr>
+      <tr class="bg-late-ready" style="height:36px;">
+        <td class="col-id"><span class="dot late"></span>F-00018</td><td>Imprimerie Lemarchand</td><td>1 200 ex.</td><td>J+0</td>
+        <td class="col-label">36px (actuel)</td>
+      </tr>
+      <tr class="bg-late-ready" style="height:44px;">
+        <td class="col-id"><span class="dot late"></span>F-00018</td><td>Imprimerie Lemarchand</td><td>1 200 ex.</td><td>J+0</td>
+        <td class="col-label">44px (confort)</td>
+      </tr>
+      <tr class="bg-late-ready" style="height:52px;">
+        <td class="col-id"><span class="dot late"></span>F-00018</td><td>Imprimerie Lemarchand</td><td>1 200 ex.</td><td>J+0</td>
+        <td class="col-label">52px (large)</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+
+<!-- ════════════════ SVG filters for daltonism simulation ════════════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="sim-deuter">
+    <feColorMatrix type="matrix" values="
+      0.625 0.375 0    0 0
+      0.7   0.3   0    0 0
+      0     0.3   0.7  0 0
+      0     0     0    1 0" />
+  </filter>
+  <filter id="sim-protan">
+    <feColorMatrix type="matrix" values="
+      0.567 0.433 0     0 0
+      0.558 0.442 0     0 0
+      0     0.242 0.758 0 0
+      0     0     0     1 0" />
+  </filter>
+  <filter id="sim-tritan">
+    <feColorMatrix type="matrix" values="
+      0.95  0.05  0     0 0
+      0     0.433 0.567 0 0
+      0     0.475 0.525 0 0
+      0     0     0     1 0" />
+  </filter>
+  <filter id="sim-achromat">
+    <feColorMatrix type="matrix" values="
+      0.299 0.587 0.114 0 0
+      0.299 0.587 0.114 0 0
+      0.299 0.587 0.114 0 0
+      0     0     0     1 0" />
+  </filter>
+</svg>
+
+<script>
+  const root = document.documentElement;
+  const body = document.body;
+
+  const DEFAULTS = {
+    angle: '-45deg',
+    density: 6,
+    variant: 'A',
+    sim: 'normal',
+    solidOpacity: 0.14,
+    hachureOpacity: 0.17,
+  };
+
+  // ──── Helpers ────
+  function setSegmentedActive(group, value) {
+    group.querySelectorAll('button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.value === value);
+    });
+  }
+
+  // ──── Direction (segmented) ────
+  const angleGroup = document.querySelector('[data-control="angle"]');
+  angleGroup.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    setSegmentedActive(angleGroup, btn.dataset.value);
+    root.style.setProperty('--hachure-angle', btn.dataset.value);
+  });
+
+  // ──── Variant (segmented) ────
+  const variantGroup = document.querySelector('[data-control="variant"]');
+  variantGroup.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    setSegmentedActive(variantGroup, btn.dataset.value);
+    body.classList.remove('variant-A', 'variant-B', 'variant-C');
+    body.classList.add('variant-' + btn.dataset.value);
+  });
+
+  // ──── Density (slider) ────
+  const densitySlider = document.getElementById('density');
+  const densityValue = document.getElementById('density-value');
+  densitySlider.addEventListener('input', e => {
+    const v = e.target.value;
+    densityValue.textContent = v + 'px';
+    root.style.setProperty('--hachure-density', v + 'px');
+  });
+
+  // ──── Solid opacity (slider) ────
+  const solidSlider = document.getElementById('solid-opacity');
+  const solidValue  = document.getElementById('solid-opacity-value');
+  solidSlider.addEventListener('input', e => {
+    const v = parseFloat(e.target.value).toFixed(2);
+    solidValue.textContent = v;
+    root.style.setProperty('--bg-opacity-solid', v);
+  });
+
+  // ──── Hachure opacity (slider) ────
+  const hachureSlider = document.getElementById('hachure-opacity');
+  const hachureValue  = document.getElementById('hachure-opacity-value');
+  hachureSlider.addEventListener('input', e => {
+    const v = parseFloat(e.target.value).toFixed(2);
+    hachureValue.textContent = v;
+    root.style.setProperty('--bg-opacity-hachure', v);
+  });
+
+  // ──── Simulation (select) ────
+  const simSelect = document.getElementById('sim');
+  simSelect.addEventListener('change', e => {
+    body.classList.remove('sim-normal', 'sim-deuter', 'sim-protan', 'sim-tritan', 'sim-achromat');
+    body.classList.add('sim-' + e.target.value);
+  });
+
+  // ──── Reset button ────
+  document.getElementById('reset').addEventListener('click', () => {
+    setSegmentedActive(angleGroup,   DEFAULTS.angle);
+    setSegmentedActive(variantGroup, DEFAULTS.variant);
+    root.style.setProperty('--hachure-angle', DEFAULTS.angle);
+    root.style.setProperty('--hachure-density', DEFAULTS.density + 'px');
+    root.style.setProperty('--bg-opacity-solid', DEFAULTS.solidOpacity);
+    root.style.setProperty('--bg-opacity-hachure', DEFAULTS.hachureOpacity);
+    densitySlider.value = DEFAULTS.density;
+    densityValue.textContent = DEFAULTS.density + 'px';
+    solidSlider.value = DEFAULTS.solidOpacity;
+    solidValue.textContent = DEFAULTS.solidOpacity.toFixed(2);
+    hachureSlider.value = DEFAULTS.hachureOpacity;
+    hachureValue.textContent = DEFAULTS.hachureOpacity.toFixed(2);
+    body.className = 'variant-' + DEFAULTS.variant + ' sim-' + DEFAULTS.sim;
+    simSelect.value = DEFAULTS.sim;
+  });
+
+  // ──── Keyboard shortcut: Ctrl+R for reset (no full page reload) ────
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'r' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('reset').click();
+    }
+  });
+</script>
+
+</body>
+</html>

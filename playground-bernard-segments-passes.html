@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Représenter les segments passés (4 propositions)</title>
+<style>
+  :root {
+    --flux-base:           rgb(15 15 15);
+    --flux-surface:        rgb(26 26 26);
+    --flux-elevated:       rgb(36 36 36);
+    --flux-hover:          rgb(44 44 44);
+    --flux-border:         rgb(42 42 42);
+    --flux-border-light:   rgb(58 58 58);
+    --flux-text-primary:   rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary:  rgb(161 161 161);
+    --flux-text-muted:     rgb(128 128 128);
+
+    --emerald-400: #34d399;
+    --amber-400:   #fbbf24;
+    --red-400:     #f87171;
+    --blue-400:    #60a5fa;
+    --slate-400:   #94a3b8;
+    --purple-400:  #a78bfa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--flux-base);
+    color: var(--flux-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  header.intro {
+    padding: 28px 24px 0;
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .lede {
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    line-height: 1.6;
+    max-width: 860px;
+  }
+
+  main.grid {
+    padding: 28px 24px 48px;
+    max-width: 1700px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 28px;
+  }
+
+  /* Phone */
+  .phone-cell { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .phone {
+    width: 360px;
+    height: 720px;
+    background: #000;
+    border-radius: 36px;
+    padding: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: var(--flux-base);
+    border-radius: 24px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-statusbar {
+    height: 32px;
+    background: var(--flux-surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    border-bottom: 1px solid var(--flux-border);
+    flex-shrink: 0;
+  }
+  .phone-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--flux-border);
+    flex-shrink: 0;
+  }
+  .phone-header .greeting {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    margin-bottom: 4px;
+  }
+  .phone-header .operator { font-size: 18px; font-weight: 600; }
+
+  .card-area {
+    flex: 1;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  .task-card {
+    background: var(--flux-elevated);
+    border-radius: 18px;
+    border: 1px solid var(--flux-border-light);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(52, 211, 153, 0.14);
+    color: var(--emerald-400);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
+  .title-big { font-size: 22px; font-weight: 700; line-height: 1.15; }
+  .machine-line { font-size: 14px; color: var(--flux-text-secondary); }
+  .time-line {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 13px;
+    color: var(--flux-text-tertiary);
+  }
+
+  /* Gauge */
+  .gauge { display: flex; flex-direction: column; gap: 4px; }
+  .gauge-text {
+    font-size: 14px;
+    color: var(--flux-text-secondary);
+    line-height: 1.4;
+  }
+  .gauge-text strong {
+    color: var(--flux-text-primary);
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .gauge-sub {
+    font-size: 12px;
+    color: var(--flux-text-tertiary);
+    line-height: 1.4;
+  }
+  .gauge-sub strong {
+    color: var(--flux-text-secondary);
+    font-weight: 600;
+  }
+  .gauge-bar {
+    height: 8px;
+    background: var(--flux-surface);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .gauge-bar-fill {
+    height: 100%;
+    background: var(--emerald-400);
+    border-radius: 999px;
+  }
+
+  /* Section divider */
+  .section-divider {
+    height: 1px;
+    background: var(--flux-border);
+    margin: 4px 0;
+  }
+  .section-label {
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  /* ─────────────────────────────────────────────────────
+     Proposition A — Mini-timeline horizontale du tirage
+     ───────────────────────────────────────────────────── */
+  .pa-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pa-track {
+    display: flex;
+    height: 38px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--flux-border-light);
+  }
+  .pa-seg {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #052e16;
+    flex: 1;
+    position: relative;
+  }
+  .pa-seg.done { background: var(--emerald-400); }
+  .pa-seg.current {
+    background: var(--flux-surface);
+    color: var(--flux-text-primary);
+    border-left: 2px dashed var(--blue-400);
+  }
+  .pa-seg .pa-name { font-size: 11px; font-weight: 700; }
+  .pa-seg .pa-meta {
+    font-size: 9px;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+  .pa-seg.current .pa-meta { color: var(--blue-400); opacity: 1; }
+  .pa-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--flux-text-muted);
+    font-family: ui-monospace, SF Mono, monospace;
+  }
+
+  /* ─────────────────────────────────────────────────────
+     Proposition B — Liste verticale des segments
+     ───────────────────────────────────────────────────── */
+  .pb-list { display: flex; flex-direction: column; gap: 6px; }
+  .pb-row {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--flux-surface);
+    border-radius: 10px;
+    border: 1px solid var(--flux-border);
+  }
+  .pb-row.current {
+    border-color: rgba(52, 211, 153, 0.4);
+    background: linear-gradient(180deg, rgba(52, 211, 153, 0.06), var(--flux-surface));
+  }
+  .pb-icon {
+    font-size: 14px;
+    width: 22px;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+  .pb-row.done .pb-icon { color: var(--emerald-400); }
+  .pb-row.current .pb-icon { color: var(--blue-400); }
+  .pb-body { flex: 1; min-width: 0; }
+  .pb-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--flux-text-primary);
+  }
+  .pb-meta {
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    margin-top: 1px;
+  }
+
+  /* ─────────────────────────────────────────────────────
+     Proposition C — Barre cumulée du tirage
+     ───────────────────────────────────────────────────── */
+  .pc-bar {
+    height: 22px;
+    background: var(--flux-surface);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--flux-border-light);
+  }
+  .pc-bar-done {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    background: var(--emerald-400);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #052e16;
+  }
+  .pc-bar-cursor {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 3px;
+    background: var(--blue-400);
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+  }
+  .pc-bar-cursor::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--blue-400);
+  }
+  .pc-numbers {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    font-family: ui-monospace, SF Mono, monospace;
+  }
+  .pc-numbers .pc-here {
+    color: var(--blue-400);
+    font-weight: 700;
+  }
+
+  /* ─────────────────────────────────────────────────────
+     Proposition D — Chips récap compactes
+     ───────────────────────────────────────────────────── */
+  .pd-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pd-chip-label {
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+  }
+  .pd-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: rgba(52, 211, 153, 0.12);
+    color: var(--emerald-400);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid rgba(52, 211, 153, 0.25);
+  }
+  .pd-chip .pd-check { font-size: 11px; }
+
+  /* Caption */
+  .caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--flux-text-secondary);
+    max-width: 360px;
+    line-height: 1.55;
+  }
+  .caption strong {
+    display: block;
+    color: var(--flux-text-primary);
+    font-size: 14px;
+    margin-bottom: 4px;
+    letter-spacing: 0.2px;
+  }
+</style>
+</head>
+<body>
+
+<header class="intro">
+  <h1>Représenter les segments passés — 4 propositions</h1>
+  <p class="lede">
+    Tous les écrans ci-dessous montrent <strong>le même instant</strong> :
+    Bernard à 10:30, début du segment 2/2 de la roule Fnac sur MBO. Le segment 1
+    est terminé (50 % du tirage), le segment 2 démarre (encore 50 % à imprimer).
+    Chaque téléphone propose une représentation différente du passé. Le bas
+    de la carte, qui était auparavant vide, sert maintenant à mémoriser
+    le contexte cumulé.
+  </p>
+</header>
+
+<main class="grid">
+
+  <!-- ───────── Proposition A — Mini-timeline horizontale ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:30</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>0&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>50&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar"><div class="gauge-bar-fill" style="width: 0%"></div></div>
+            </div>
+
+            <div class="section-divider"></div>
+            <div class="section-label">Le tirage en deux temps</div>
+            <div class="pa-timeline">
+              <div class="pa-track">
+                <div class="pa-seg done" style="flex: 1">
+                  <span class="pa-name">Seg 1 · 50 %</span>
+                  <span class="pa-meta">9:15 → 10:15 · fait</span>
+                </div>
+                <div class="pa-seg current" style="flex: 1">
+                  <span class="pa-name">Seg 2 · 50 %</span>
+                  <span class="pa-meta">en cours</span>
+                </div>
+              </div>
+              <div class="pa-times">
+                <span>9:15</span>
+                <span>10:15</span>
+                <span>11:30</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>A · Mini-timeline horizontale</strong>Le tirage entier est représenté comme un ruban en deux blocs proportionnels. Le passé est plein, le présent en pointillé bleu. Format compact qui rend le passé physiquement visible sans rouvrir la lecture textuelle.</p>
+  </article>
+
+  <!-- ───────── Proposition B — Liste verticale des segments ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:30</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>0&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>50&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar"><div class="gauge-bar-fill" style="width: 0%"></div></div>
+            </div>
+
+            <div class="section-divider"></div>
+            <div class="section-label">Découpe du tirage</div>
+            <div class="pb-list">
+              <div class="pb-row done">
+                <span class="pb-icon">✓</span>
+                <div class="pb-body">
+                  <div class="pb-title">Segment 1 · MBO</div>
+                  <div class="pb-meta">9:15 → 10:15 · 50&nbsp;% du tirage · validé</div>
+                </div>
+              </div>
+              <div class="pb-row current">
+                <span class="pb-icon">►</span>
+                <div class="pb-body">
+                  <div class="pb-title">Segment 2 · MBO</div>
+                  <div class="pb-meta">10:30 → 11:30 · 50&nbsp;% du tirage · en cours</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>B · Liste verticale</strong>Chaque segment est une ligne avec icône, titre, créneau et état. Maximum d'info par segment — bien quand il y en a plusieurs ou quand chacun a un opérateur/machine différent. Plus verbeux mais plus précis.</p>
+  </article>
+
+  <!-- ───────── Proposition C — Barre cumulée du tirage ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:30</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+
+            <div class="section-label">Tirage Fnac entier</div>
+            <div class="pc-bar">
+              <div class="pc-bar-done" style="width: 50%">Seg 1 · 50&nbsp;%</div>
+              <div class="pc-bar-cursor" style="left: 50%"></div>
+            </div>
+            <div class="pc-numbers">
+              <span>0 %</span>
+              <span class="pc-here">↑ tu es ici · 50 %</span>
+              <span>100 %</span>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="gauge">
+              <div class="gauge-text">Sur le segment courant : <strong>0&nbsp;%</strong></div>
+              <div class="gauge-sub">Encore <strong>50&nbsp;%</strong> du tirage à imprimer ici.</div>
+              <div class="gauge-bar"><div class="gauge-bar-fill" style="width: 0%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>C · Barre cumulée du tirage</strong>Une seule grande barre 0→100&nbsp;% du tirage, avec le segment 1 rempli en vert et un curseur "tu es ici" qui voyage en temps réel. Sous, la barre du segment courant. La double échelle se LIT, plus besoin de la deviner.</p>
+  </article>
+
+  <!-- ───────── Proposition D — Chips récap compactes ───────── -->
+  <article class="phone-cell">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-statusbar"><span>10:30</span><span>📶 🔋</span></div>
+        <div class="phone-header">
+          <div class="greeting">Smartphone</div>
+          <div class="operator">Bernard</div>
+        </div>
+        <div class="card-area">
+          <div class="task-card">
+            <div class="badge">● Roule en cours</div>
+            <div class="title-big">Fnac</div>
+            <div class="machine-line">MBO</div>
+            <div class="time-line">10:30 → 11:30</div>
+
+            <div class="pd-chips">
+              <span class="pd-chip-label">Avant ce segment :</span>
+              <div class="pd-chip-row">
+                <span class="pd-chip"><span class="pd-check">✓</span> Seg 1 · 50&nbsp;% · 9:15-10:15</span>
+              </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="gauge">
+              <div class="gauge-text">Tu devrais en être à <strong>0&nbsp;%</strong> du segment.</div>
+              <div class="gauge-sub">Soit <strong>50&nbsp;%</strong> du tirage Fnac entier.</div>
+              <div class="gauge-bar"><div class="gauge-bar-fill" style="width: 0%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption"><strong>D · Chips récap</strong>Format minimaliste : un petit "pill" vert par segment passé. Léger et discret, fonctionne aussi bien pour 1 segment que pour 5. Convient si l'historique doit rester en arrière-plan, pas en élément dominant.</p>
+  </article>
+
+</main>
+
+</body>
+</html>

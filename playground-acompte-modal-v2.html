@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Playground : modale acomptes v2 (Solde + sans bar)</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  :root {
+    --flux-base: rgb(15 15 15);
+    --flux-surface: rgb(26 26 26);
+    --flux-elevated: rgb(36 36 36);
+    --flux-border: rgb(42 42 42);
+    --flux-border-light: rgb(58 58 58);
+    --flux-text-primary: rgb(245 245 245);
+    --flux-text-secondary: rgb(209 209 209);
+    --flux-text-tertiary: rgb(161 161 161);
+    --flux-text-muted: rgb(128 128 128);
+    --emerald-400: #34d399;
+    --emerald-500: #10b981;
+    --amber-300: #fcd34d;
+    --red-400: #f87171;
+    --indigo-400: #818cf8;
+    --indigo-500: #6366f1;
+    --zinc-800: #27272a;
+    --zinc-900: #18181b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--flux-base); color: var(--flux-text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 32px 24px 48px; }
+
+  header.page-header { margin-bottom: 16px; }
+  header.page-header h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  header.page-header p { color: var(--flux-text-tertiary); font-size: 12px; max-width: 800px; }
+
+  .variant-switch { display: flex; gap: 6px; margin: 16px 0 20px; flex-wrap: wrap; }
+  .variant-btn {
+    border: 1px solid var(--flux-border); background: var(--flux-elevated);
+    color: var(--flux-text-tertiary); padding: 8px 14px; font-size: 12px;
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+  }
+  .variant-btn:hover { background: rgb(44 44 44); color: var(--flux-text-secondary); }
+  .variant-btn.active { border-color: var(--indigo-500); background: rgba(99,102,241,0.12); color: var(--flux-text-primary); }
+  .variant-btn small { color: var(--flux-text-muted); font-size: 11px; }
+
+  /* ── Modal frame ─────────────────────────── */
+  .modal {
+    background: var(--flux-base);
+    border: 1px solid var(--flux-border);
+    border-radius: 7px;
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .modal-header-bar { padding: 11px 13px; background: var(--zinc-900); border-bottom: 1px solid var(--flux-border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 15px; font-weight: 500; color: var(--flux-text-primary); }
+  .modal-close { background: transparent; border: 0; color: var(--flux-text-tertiary); cursor: pointer; padding: 3px; }
+  .modal-tabs { display: flex; padding: 0 13px; background: var(--zinc-900); border-bottom: 1px solid var(--flux-border); }
+  .modal-tab { padding: 8px 16px; font-size: 12px; font-weight: 500; color: var(--flux-text-tertiary); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+  .modal-tab.active { color: var(--flux-text-primary); border-bottom-color: var(--indigo-500); }
+  .modal-body { padding: 20px 24px; min-height: 500px; max-height: 75vh; overflow-y: auto; }
+  .modal-footer { padding: 10px 13px; background: var(--zinc-900); border-top: 1px solid var(--flux-border); display: flex; justify-content: flex-end; gap: 8px; }
+  .btn { border: 1px solid var(--flux-border); background: var(--flux-elevated); color: var(--flux-text-secondary); padding: 6px 14px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+  .btn:hover { background: rgb(44 44 44); color: var(--flux-text-primary); }
+  .btn-primary { background: var(--indigo-500); border-color: var(--indigo-500); color: white; }
+  .btn-primary:hover { background: var(--indigo-400); border-color: var(--indigo-400); }
+
+  /* ── Total ref ─────────────────────────── */
+  .total-ref {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 12px 16px; background: var(--flux-surface);
+    border: 1px solid var(--flux-border); border-radius: 6px;
+    margin-bottom: 20px;
+  }
+  .total-ref-label { font-size: 11px; color: var(--flux-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .total-ref-value { font-size: 18px; font-weight: 600; color: var(--flux-text-primary); font-variant-numeric: tabular-nums; }
+  .total-ref-unit { font-size: 12px; color: var(--flux-text-muted); }
+  .total-ref-meta { margin-left: auto; font-size: 11px; color: var(--flux-text-muted); font-style: italic; }
+
+  /* ── SECTION HEADER ─────────────────────── */
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 22px 0 12px;
+  }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--flux-text-muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .section-add { color: var(--flux-text-tertiary); background: transparent; border: 0; cursor: pointer; padding: 4px 8px; font-size: 12px; border-radius: 4px; display: flex; align-items: center; gap: 4px; }
+  .section-add:hover { background: var(--flux-elevated); color: var(--flux-text-primary); }
+
+  /* ═════════════════════════════════════════════════════════════
+     VARIANT A — HORIZONTAL ACOMPTES + SECTION TÂCHES DESSOUS
+     ═════════════════════════════════════════════════════════════ */
+  .va-acomptes-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .va-acompte-card {
+    position: relative;
+    padding: 12px 14px;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+  }
+  .va-acompte-card.solde {
+    border-color: rgba(52, 211, 153, 0.35);
+    background: rgba(16, 185, 129, 0.04);
+  }
+  .va-acompte-card-label {
+    font-size: 10px;
+    color: var(--flux-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    font-weight: 700;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .va-acompte-card.solde .va-acompte-card-label { color: var(--emerald-400); }
+  .va-acompte-card.solde .va-acompte-card-label .badge { background: rgba(16,185,129,0.18); color: var(--emerald-400); padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+  .va-acompte-remove {
+    position: absolute; top: 6px; right: 6px;
+    background: transparent; border: 0; color: var(--flux-text-muted);
+    cursor: pointer; padding: 4px; border-radius: 3px;
+  }
+  .va-acompte-remove:hover { color: var(--red-400); background: rgba(248,113,113,0.08); }
+  .va-field { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; }
+  .va-field:last-child { margin-bottom: 0; }
+  .va-field-icon { color: var(--flux-text-muted); width: 12px; height: 12px; flex-shrink: 0; }
+  .va-field input[type=number] {
+    flex: 1; background: var(--flux-base); border: 1px solid var(--flux-border);
+    color: var(--flux-text-primary); padding: 5px 8px; border-radius: 4px;
+    font: inherit; font-size: 13px; font-weight: 600; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .va-field input[type=datetime-local] {
+    flex: 1; background: var(--flux-base); border: 1px solid var(--flux-border);
+    color: var(--flux-text-secondary); padding: 4px 6px; border-radius: 4px;
+    font: inherit; font-size: 11px; color-scheme: dark; cursor: pointer;
+  }
+  .va-field input:focus { outline: 0; border-color: var(--indigo-400); }
+  .va-acompte-card.solde .va-field input { border-color: rgba(52,211,153,0.30); }
+  .va-acompte-card.solde .va-field input:focus { border-color: var(--emerald-400); }
+  .va-field .unit { font-size: 10px; color: var(--flux-text-muted); }
+
+  .va-validator {
+    margin-top: 12px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--flux-text-muted);
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .va-validator.ok { color: var(--emerald-400); }
+  .va-validator.warn { color: var(--amber-300); }
+
+  .va-element-group {
+    padding: 14px 16px;
+    border: 1px solid var(--flux-border);
+    border-left: 3px solid var(--indigo-500);
+    background: rgba(255,255,255,0.012);
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  .va-element-group-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+  .va-element-name { font-size: 14px; font-weight: 600; color: var(--flux-text-primary); }
+  .va-element-meta { margin-left: auto; font-size: 11px; color: var(--flux-text-muted); }
+
+  .va-task-row { padding: 8px 0; }
+  .va-task-row + .va-task-row { border-top: 1px dashed var(--flux-border); }
+  .va-task-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .va-task-name { font-size: 13px; font-weight: 600; color: var(--flux-text-secondary); }
+  .va-task-cumul { font-size: 11px; color: var(--flux-text-tertiary); font-variant-numeric: tabular-nums; }
+  .va-task-cumul strong { color: var(--flux-text-primary); font-weight: 600; }
+  .va-task-input-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .va-task-input {
+    width: 130px; background: var(--flux-elevated); border: 1px solid var(--flux-border);
+    color: var(--flux-text-primary); padding: 6px 10px; font: inherit; font-size: 13px;
+    text-align: right; border-radius: 4px; font-variant-numeric: tabular-nums;
+  }
+  .va-task-input:focus { outline: 0; border-color: var(--indigo-400); }
+  .va-task-pct { font-size: 13px; font-weight: 600; color: var(--flux-text-secondary); font-variant-numeric: tabular-nums; min-width: 46px; text-align: right; }
+  .va-task-percent-label { font-size: 11px; color: var(--flux-text-muted); }
+
+  /* Draggable slider — track is a sibling div, the native <input type=range>
+     overlays with a transparent track + visible grab thumb. */
+  .va-task-slider-wrap {
+    position: relative; flex: 1; height: 22px;
+    display: flex; align-items: center;
+  }
+  .va-task-slider-track {
+    position: absolute; left: 0; right: 0;
+    height: 6px; background: var(--zinc-800); border-radius: 3px;
+    overflow: hidden; pointer-events: none;
+  }
+  .va-task-slider-fill {
+    height: 100%; background: var(--indigo-500);
+    transition: width 60ms linear;
+  }
+  .va-task-slider {
+    position: relative; z-index: 1;
+    width: 100%; height: 22px;
+    -webkit-appearance: none; appearance: none;
+    background: transparent; cursor: grab;
+  }
+  .va-task-slider:focus { outline: none; }
+  .va-task-slider:active { cursor: grabbing; }
+  .va-task-slider::-webkit-slider-runnable-track { height: 6px; background: transparent; }
+  .va-task-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #f5f5f5; border: 1px solid rgba(0,0,0,0.25);
+    margin-top: -5px; cursor: grab;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .va-task-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.05); }
+  .va-task-slider::-moz-range-track { height: 6px; background: transparent; }
+  .va-task-slider::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #f5f5f5; border: 1px solid rgba(0,0,0,0.25); cursor: grab;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .va-task-slider::-moz-range-thumb:active { cursor: grabbing; }
+
+  .va-cascade {
+    display: flex; gap: 4px; height: 44px;
+  }
+  .va-segment {
+    border: 1px solid var(--flux-border); background: var(--zinc-800);
+    padding: 6px 10px; position: relative; overflow: hidden; min-width: 80px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    border-radius: 4px;
+  }
+  .va-segment-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: rgba(16, 185, 129, 0.30);
+    transition: width 80ms linear;
+  }
+  .va-segment.saturated { border-color: rgba(52,211,153,0.45); }
+  .va-segment.saturated .va-segment-fill { background: rgba(16,185,129,0.55); }
+  .va-segment.solde { border-color: rgba(52,211,153,0.35); background: rgba(16,185,129,0.06); }
+  .va-segment.empty .va-segment-fill { background: transparent; }
+  .va-segment-row { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--flux-text-secondary); font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .va-segment-pos { font-weight: 700; color: var(--flux-text-primary); display: flex; align-items: center; gap: 4px; }
+  .va-segment.empty .va-segment-pos, .va-segment.empty .va-segment-row { color: var(--flux-text-muted); }
+  .va-segment.solde .va-segment-pos { color: var(--emerald-400); }
+  .va-segment-pct { font-size: 10px; color: var(--flux-text-tertiary); }
+  .va-segment.saturated .va-segment-pct { color: var(--emerald-400); }
+
+  /* Single delivery card variant (N=1) */
+  .va-single-card {
+    padding: 16px 20px;
+    background: var(--flux-surface);
+    border: 1px dashed var(--flux-border-light);
+    border-radius: 6px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .va-single-card-info { flex: 1; }
+  .va-single-card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--flux-text-muted); margin-bottom: 4px; font-weight: 700; }
+  .va-single-card-value { font-size: 16px; font-weight: 600; color: var(--flux-text-primary); font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+  .va-single-card-meta { font-size: 11px; color: var(--flux-text-tertiary); }
+
+  /* ═════════════════════════════════════════════════════════════
+     VARIANT B — TABLE DENSE (1 ROW PER TASK × COLONNES ACOMPTES)
+     ═════════════════════════════════════════════════════════════ */
+  .vb-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--flux-surface);
+    border: 1px solid var(--flux-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .vb-table thead { background: var(--zinc-900); }
+  .vb-table th, .vb-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-right: 1px solid var(--flux-border);
+    border-bottom: 1px solid var(--flux-border);
+    font-size: 12px;
+  }
+  .vb-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--flux-text-muted); font-weight: 700; }
+  .vb-table th.solde-col { color: var(--emerald-400); background: rgba(16,185,129,0.06); }
+  .vb-table tr:last-child td { border-bottom: 0; }
+  .vb-table td:last-child, .vb-table th:last-child { border-right: 0; }
+  .vb-table td.solde-col { background: rgba(16,185,129,0.04); }
+
+  .vb-task-cell { font-weight: 600; color: var(--flux-text-secondary); }
+  .vb-element-row td { background: var(--zinc-900); font-weight: 700; color: var(--flux-text-primary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
+
+  .vb-input {
+    width: 90px; background: var(--flux-base); border: 1px solid var(--flux-border);
+    color: var(--flux-text-primary); padding: 4px 6px; font: inherit; font-size: 12px;
+    text-align: right; border-radius: 3px; font-variant-numeric: tabular-nums;
+  }
+  .vb-input:focus { outline: 0; border-color: var(--indigo-400); }
+  .vb-pct { font-size: 11px; color: var(--flux-text-tertiary); font-variant-numeric: tabular-nums; }
+  .vb-cell-mini {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 4px 0;
+  }
+  .vb-cell-mini-bar {
+    height: 4px; background: var(--zinc-800); border-radius: 2px; position: relative; overflow: hidden;
+  }
+  .vb-cell-mini-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: rgba(16, 185, 129, 0.5);
+  }
+  .vb-cell-mini-row { display: flex; justify-content: space-between; font-size: 10px; font-variant-numeric: tabular-nums; }
+  .vb-cell-mini-row .qty { color: var(--flux-text-secondary); }
+  .vb-cell-mini-row .pct { color: var(--flux-text-muted); }
+  .vb-cell-mini.saturated .vb-cell-mini-fill { background: var(--emerald-500); }
+  .vb-cell-mini.saturated .pct { color: var(--emerald-400); }
+
+  .vb-acomptes-config {
+    display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-end;
+  }
+  .vb-acompte-chip {
+    padding: 6px 12px; background: var(--flux-surface); border: 1px solid var(--flux-border);
+    border-radius: 4px; font-size: 11px; min-width: 130px;
+  }
+  .vb-acompte-chip.solde { border-color: rgba(52,211,153,0.35); background: rgba(16,185,129,0.04); }
+  .vb-acompte-chip-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .vb-acompte-chip-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--flux-text-tertiary); font-weight: 700; }
+  .vb-acompte-chip.solde .vb-acompte-chip-name { color: var(--emerald-400); }
+  .vb-acompte-chip-remove { background: transparent; border: 0; color: var(--flux-text-muted); cursor: pointer; padding: 2px; }
+  .vb-acompte-chip input[type=number] { width: 100%; background: var(--flux-base); border: 1px solid var(--flux-border); color: var(--flux-text-primary); padding: 3px 6px; font: inherit; font-size: 12px; text-align: right; border-radius: 3px; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+  .vb-acompte-chip input[type=datetime-local] { width: 100%; background: var(--flux-base); border: 1px solid var(--flux-border); color: var(--flux-text-secondary); padding: 2px 4px; font: inherit; font-size: 10px; border-radius: 3px; color-scheme: dark; }
+  .vb-acompte-chip input:focus { outline: 0; border-color: var(--indigo-400); }
+  .vb-acompte-chip.solde input { border-color: rgba(52,211,153,0.30); }
+
+  /* Lucide */
+  .lucide { width: 14px; height: 14px; stroke-width: 1.6; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <h1>Modale acomptes — propositions visuelles v2</h1>
+    <p>Le dernier acompte s'appelle <strong>Solde</strong> (terme métier — la livraison qui solde le tirage). Le slider horizontal de % est retiré : seul l'input number reste, et la cascade segments visualise la répartition. Sélectionne une variante ci-dessous.</p>
+  </header>
+
+  <div class="variant-switch">
+    <button class="variant-btn active" data-variant="A"><i data-lucide="layout-grid"></i> Variant A <small>Acomptes en haut + sections tâches dessous</small></button>
+    <button class="variant-btn" data-variant="B"><i data-lucide="table"></i> Variant B <small>Table dense (tâches × acomptes)</small></button>
+  </div>
+
+  <div class="modal">
+    <div class="modal-header-bar">
+      <div class="modal-title">Modifier le Job 12347 · ACME · Cartes de visite</div>
+      <button class="modal-close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+    </div>
+    <div class="modal-tabs">
+      <div class="modal-tab">Dossier</div>
+      <div class="modal-tab active" id="tab-label">Acomptes (3)</div>
+    </div>
+    <div class="modal-body" id="body"></div>
+    <div class="modal-footer">
+      <button class="btn">Annuler</button>
+      <button class="btn btn-primary"><i data-lucide="check" style="width:14px;height:14px;"></i> Enregistrer les acomptes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = {
+  variant: 'A',
+  totalQuantity: 100000,
+  acomptes: [
+    { id: 'a1', positionIndex: 1, quantityShare: 20000, deadline: '2026-06-15T17:00' },
+    { id: 'a2', positionIndex: 2, quantityShare: 40000, deadline: '2026-06-22T17:00' },
+    { id: 'a3', positionIndex: 3, quantityShare: 40000, deadline: '2026-07-02T12:00' },
+  ],
+  elements: [
+    {
+      id: 'el1', name: 'Carte 350g',
+      tasks: [
+        { logicalTaskId: 'lt-g37', label: 'G37', copiesDone: 80000 },
+        { logicalTaskId: 'lt-p137', label: 'P137', copiesDone: 50000 },
+        { logicalTaskId: 'lt-duplo', label: 'Duplo 10p', copiesDone: 30000 },
+      ],
+    },
+  ],
+};
+
+const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+const icons = () => window.lucide?.createIcons();
+
+function cascadeFifo(total, acomptes) {
+  let remaining = Math.max(0, total);
+  return acomptes.map((a, i) => {
+    const cap = Math.max(0, a.quantityShare);
+    const taken = Math.min(remaining, cap);
+    remaining -= taken;
+    const pct = cap > 0 ? (taken / cap) * 100 : 0;
+    return {
+      acompteId: a.id, position: i + 1, total: acomptes.length,
+      taken, capacity: cap, progressPct: pct,
+      saturated: cap > 0 && taken >= cap,
+      empty: taken === 0,
+      isSolde: i === acomptes.length - 1 && acomptes.length >= 2,
+    };
+  });
+}
+
+function acompteLabel(idx, total) {
+  if (total === 1) return 'Livraison complète';
+  if (idx === total - 1) return 'Solde';
+  return `Acompte ${idx + 1}/${total - 1}`;
+}
+
+function totalRefHtml() {
+  return `
+    <div class="total-ref">
+      <span class="total-ref-label">Total job</span>
+      <strong class="total-ref-value">${fmt(state.totalQuantity)}</strong>
+      <span class="total-ref-unit">exemplaires</span>
+      <span class="total-ref-meta">édité dans l'onglet Dossier</span>
+    </div>
+  `;
+}
+
+/* ── VARIANT A ─────────────────────────── */
+function renderA() {
+  const sum = state.acomptes.reduce((s, a) => s + a.quantityShare, 0);
+  const balanced = sum === state.totalQuantity;
+  const acomptesRow = state.acomptes.map((a, i) => {
+    const isSolde = i === state.acomptes.length - 1 && state.acomptes.length >= 2;
+    const label = acompteLabel(i, state.acomptes.length);
+    return `
+      <div class="va-acompte-card ${isSolde ? 'solde' : ''}">
+        ${state.acomptes.length > 1 ? `<button class="va-acompte-remove" data-action="remove" data-id="${a.id}"><i data-lucide="trash-2" style="width:11px;height:11px;"></i></button>` : ''}
+        <div class="va-acompte-card-label">
+          ${isSolde ? '<span class="badge">SOLDE</span>' : ''}
+          ${label}
+        </div>
+        <div class="va-field">
+          <i data-lucide="package" class="va-field-icon"></i>
+          <input type="number" min="0" step="1000" value="${a.quantityShare}" data-acompte="${a.id}" data-field="quantityShare" />
+          <span class="unit">ex.</span>
+        </div>
+        <div class="va-field">
+          <i data-lucide="calendar-clock" class="va-field-icon"></i>
+          <input type="datetime-local" value="${a.deadline}" data-acompte="${a.id}" data-field="deadline" />
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const elementsBlock = state.elements.map((el) => {
+    const tasks = el.tasks.map((t) => {
+      const pct = state.totalQuantity > 0 ? (t.copiesDone / state.totalQuantity) * 100 : 0;
+      const cascade = cascadeFifo(t.copiesDone, state.acomptes);
+      const segs = cascade.map((c) => {
+        const cls = [
+          c.saturated ? 'saturated' : '',
+          c.empty ? 'empty' : '',
+          c.isSolde ? 'solde' : '',
+        ].filter(Boolean).join(' ');
+        const labelSeg = c.isSolde ? 'Solde' : `${c.position}/${c.total}`;
+        const check = c.saturated ? '<i data-lucide="check" style="width:11px;height:11px;"></i>' : '';
+        return `
+          <div class="va-segment ${cls}" style="flex-grow:${c.capacity};flex-basis:0;">
+            <div class="va-segment-fill" style="width:${c.progressPct}%;"></div>
+            <div class="va-segment-row">
+              <span class="va-segment-pos">${labelSeg} ${check}</span>
+              <span class="va-segment-pct">${Math.round(c.progressPct)}%</span>
+            </div>
+            <div class="va-segment-row">
+              <span style="font-size:10px;color:var(--flux-text-tertiary);">${fmt(c.taken)} / ${fmt(c.capacity)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="va-task-row" data-task="${t.logicalTaskId}">
+          <div class="va-task-head">
+            <span class="va-task-name">${t.label}</span>
+            <span class="va-task-cumul">Cumul : <strong>${fmt(t.copiesDone)}</strong> / ${fmt(state.totalQuantity)} ex.</span>
+          </div>
+          <div class="va-task-input-row">
+            <input type="number" class="va-task-input" min="0" max="${state.totalQuantity}" step="500" value="${t.copiesDone}" data-task-input="${t.logicalTaskId}" />
+            <span class="va-task-percent-label">ex.</span>
+            <div class="va-task-slider-wrap">
+              <div class="va-task-slider-track"><div class="va-task-slider-fill" style="width:${pct}%;"></div></div>
+              <input type="range" class="va-task-slider" min="0" max="${state.totalQuantity}" step="500" value="${t.copiesDone}" data-task-input="${t.logicalTaskId}" aria-label="Avancement ${t.label}" />
+            </div>
+            <span class="va-task-pct">${Math.round(pct)} %</span>
+          </div>
+          <div class="va-cascade">${segs}</div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="va-element-group">
+        <div class="va-element-group-head">
+          <span class="va-element-name">${el.name}</span>
+          <span class="va-element-meta">${el.tasks.length} tâche${el.tasks.length > 1 ? 's' : ''}</span>
+        </div>
+        ${tasks}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    ${totalRefHtml()}
+    <div class="section-head">
+      <div class="section-title"><i data-lucide="split"></i> Acomptes</div>
+      <button class="section-add" data-action="add"><i data-lucide="plus"></i> Ajouter</button>
+    </div>
+    <div class="va-acomptes-row">${acomptesRow}</div>
+    <div class="va-validator ${balanced ? 'ok' : 'warn'}">
+      <i data-lucide="${balanced ? 'check' : 'alert-triangle'}"></i>
+      Somme : ${fmt(sum)} / ${fmt(state.totalQuantity)} ex. ${balanced ? '' : '— à équilibrer'}
+    </div>
+    <div class="section-head">
+      <div class="section-title"><i data-lucide="gauge"></i> Avancement — exemplaires produits par tâche</div>
+    </div>
+    ${elementsBlock}
+  `;
+}
+
+/* ── VARIANT B — Table ─────────────────────── */
+function renderB() {
+  const sum = state.acomptes.reduce((s, a) => s + a.quantityShare, 0);
+  const balanced = sum === state.totalQuantity;
+  const acompteChips = state.acomptes.map((a, i) => {
+    const isSolde = i === state.acomptes.length - 1 && state.acomptes.length >= 2;
+    const label = acompteLabel(i, state.acomptes.length);
+    return `
+      <div class="vb-acompte-chip ${isSolde ? 'solde' : ''}">
+        <div class="vb-acompte-chip-head">
+          <span class="vb-acompte-chip-name">${label}</span>
+          ${state.acomptes.length > 1 ? `<button class="vb-acompte-chip-remove" data-action="remove" data-id="${a.id}"><i data-lucide="x" style="width:11px;height:11px;"></i></button>` : ''}
+        </div>
+        <input type="number" min="0" step="1000" value="${a.quantityShare}" data-acompte="${a.id}" data-field="quantityShare" />
+        <input type="datetime-local" value="${a.deadline}" data-acompte="${a.id}" data-field="deadline" />
+      </div>
+    `;
+  }).join('');
+
+  // Build table : columns = [task name][total declared] then per-acompte cell with mini bar
+  const ths = state.acomptes.map((a, i) => {
+    const isSolde = i === state.acomptes.length - 1 && state.acomptes.length >= 2;
+    return `<th class="${isSolde ? 'solde-col' : ''}" style="text-align:center;">${acompteLabel(i, state.acomptes.length)}</th>`;
+  }).join('');
+  const rows = state.elements.map((el) => {
+    const elRow = `<tr class="vb-element-row"><td colspan="${state.acomptes.length + 2}">${el.name}</td></tr>`;
+    const taskRows = el.tasks.map((t) => {
+      const pct = state.totalQuantity > 0 ? (t.copiesDone / state.totalQuantity) * 100 : 0;
+      const cascade = cascadeFifo(t.copiesDone, state.acomptes);
+      const cells = cascade.map((c) => {
+        const cls = c.saturated ? 'saturated' : '';
+        const isSolde = c.isSolde;
+        return `
+          <td class="${isSolde ? 'solde-col' : ''}">
+            <div class="vb-cell-mini ${cls}">
+              <div class="vb-cell-mini-bar"><div class="vb-cell-mini-fill" style="width:${c.progressPct}%"></div></div>
+              <div class="vb-cell-mini-row">
+                <span class="qty">${fmt(c.taken)} / ${fmt(c.capacity)}</span>
+                <span class="pct">${Math.round(c.progressPct)}%</span>
+              </div>
+            </div>
+          </td>
+        `;
+      }).join('');
+      return `
+        <tr>
+          <td class="vb-task-cell">${t.label}</td>
+          <td>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <input type="number" class="vb-input" min="0" max="${state.totalQuantity}" step="500" value="${t.copiesDone}" data-task-input="${t.logicalTaskId}" />
+                <span class="vb-pct">${Math.round(pct)}%</span>
+              </div>
+              <div class="va-task-slider-wrap" style="width:120px;">
+                <div class="va-task-slider-track"><div class="va-task-slider-fill" style="width:${pct}%;"></div></div>
+                <input type="range" class="va-task-slider" min="0" max="${state.totalQuantity}" step="500" value="${t.copiesDone}" data-task-input="${t.logicalTaskId}" aria-label="Avancement ${t.label}" />
+              </div>
+            </div>
+          </td>
+          ${cells}
+        </tr>
+      `;
+    }).join('');
+    return elRow + taskRows;
+  }).join('');
+
+  return `
+    ${totalRefHtml()}
+    <div class="section-head">
+      <div class="section-title"><i data-lucide="split"></i> Acomptes</div>
+      <button class="section-add" data-action="add"><i data-lucide="plus"></i> Ajouter</button>
+    </div>
+    <div class="vb-acomptes-config">${acompteChips}</div>
+    <div class="va-validator ${balanced ? 'ok' : 'warn'}">
+      <i data-lucide="${balanced ? 'check' : 'alert-triangle'}"></i>
+      Somme : ${fmt(sum)} / ${fmt(state.totalQuantity)} ex. ${balanced ? '' : '— à équilibrer'}
+    </div>
+    <div class="section-head">
+      <div class="section-title"><i data-lucide="gauge"></i> Avancement par tâche × acompte</div>
+    </div>
+    <table class="vb-table">
+      <thead>
+        <tr>
+          <th>Tâche</th>
+          <th style="text-align:right;">Saisi (cumul)</th>
+          ${ths}
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function render() {
+  document.getElementById('tab-label').textContent = `Acomptes (${state.acomptes.length})`;
+  document.getElementById('body').innerHTML = state.variant === 'A' ? renderA() : renderB();
+  // Wire inputs
+  document.querySelectorAll('input[data-acompte][data-field]').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      const t = e.currentTarget;
+      const id = t.getAttribute('data-acompte');
+      const f = t.getAttribute('data-field');
+      const a = state.acomptes.find((x) => x.id === id);
+      if (!a) return;
+      if (f === 'quantityShare') a.quantityShare = Number.parseInt(t.value, 10) || 0;
+      else if (f === 'deadline') a.deadline = t.value;
+      render();
+    });
+  });
+  document.querySelectorAll('input[data-task-input]').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      const t = e.currentTarget;
+      const id = t.getAttribute('data-task-input');
+      const v = Number.parseInt(t.value, 10) || 0;
+      for (const ele of state.elements) {
+        const task = ele.tasks.find((x) => x.logicalTaskId === id);
+        if (task) task.copiesDone = Math.max(0, Math.min(state.totalQuantity, v));
+      }
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="remove"]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-id');
+      if (state.acomptes.length <= 1) return;
+      state.acomptes = state.acomptes.filter((a) => a.id !== id);
+      state.acomptes.forEach((a, i) => { a.positionIndex = i + 1; });
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="add"]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const last = state.acomptes[state.acomptes.length - 1];
+      const pad = (n) => String(n).padStart(2, '0');
+      let next = '2026-07-15T17:00';
+      if (last?.deadline) {
+        const d = new Date(last.deadline);
+        d.setDate(d.getDate() + 7);
+        next = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+      state.acomptes.push({
+        id: 'a' + Math.random().toString(36).slice(2, 6),
+        positionIndex: state.acomptes.length + 1,
+        quantityShare: 0,
+        deadline: next,
+      });
+      render();
+    });
+  });
+  icons();
+}
+
+document.querySelectorAll('.variant-btn').forEach((b) => {
+  b.addEventListener('click', () => {
+    state.variant = b.getAttribute('data-variant');
+    document.querySelectorAll('.variant-btn').forEach((x) => x.classList.toggle('active', x === b));
+    render();
+  });
+});
+
+render();
+</script>
+</body>
+</html>
