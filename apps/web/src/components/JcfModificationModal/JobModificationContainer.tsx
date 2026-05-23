@@ -96,8 +96,32 @@ export function JobModificationContainer({
       setSaving(true);
       setError(null);
       try {
-        // 1) Per-element sequence + gate edits.
+        // 1) Per-element sequence + gate + prerequisite edits.
+        const elementIdByName = new Map(job.elements.map(e => [e.name, e.id]));
+
         for (const el of changes.elements) {
+          // Resolve precedence names → ids. Collect unknowns explicitly so a
+          // typo doesn't silently drop the precedence link (which used to be
+          // the previous behaviour). Surface the failure before any mutation
+          // fires so partial-save states don't happen.
+          const requestedNames = el.precedences
+            .split(',')
+            .map(n => n.trim())
+            .filter(Boolean);
+          const prerequisiteElementIds: string[] = [];
+          const unknownNames: string[] = [];
+          for (const name of requestedNames) {
+            const id = elementIdByName.get(name);
+            if (id != null) prerequisiteElementIds.push(id);
+            else unknownNames.push(name);
+          }
+          if (unknownNames.length > 0) {
+            throw new Error(
+              `Précédences inconnues sur l'élément "${el.name}" : ${unknownNames.join(', ')}. ` +
+              `Vérifie l'orthographe — les noms doivent correspondre exactement aux éléments du job.`
+            );
+          }
+
           await updateElementSequence({
             elementId: el.dbId,
             dsl: el.sequenceDsl,
@@ -106,6 +130,7 @@ export function JobModificationContainer({
             needsPaper: el.needsPaper,
             needsForme: el.needsForme,
             needsPlates: el.needsPlates,
+            prerequisiteElementIds,
           }).unwrap();
         }
         // 2) Element deletions.
@@ -171,6 +196,7 @@ export function JobModificationContainer({
       isOpen
       onClose={onClose}
       job={modificationData}
+      fullJob={job}
       onSave={handleSave}
       error={error}
       isSaving={isSaving}
