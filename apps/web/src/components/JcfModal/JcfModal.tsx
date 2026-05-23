@@ -23,6 +23,18 @@ export interface JcfModalProps {
   error?: string | null;
   /** v0.5.13b: Custom label for save button (default: "Enregistrer") */
   saveLabel?: string;
+  /**
+   * Tab strip rendered as a second header row below the title bar.
+   * When provided, the consumer controls activeTabId + onTabChange.
+   * Badge: an optional count chip on the right of the label.
+   * variant: 'tab' (default) is the normal tab with underline-on-active styling.
+   *          'cta' is rendered as an inline call-to-action button (indigo accent,
+   *          no underline) and never appears active — used to surface a creation
+   *          intent in the header instead of an empty-state tab.
+   */
+  tabs?: Array<{ id: string; label: string; badge?: string | number | null; variant?: 'tab' | 'cta' }>;
+  activeTabId?: string;
+  onTabChange?: (id: string) => void;
 }
 
 /**
@@ -41,6 +53,9 @@ export function JcfModal({
   isSaving = false,
   error = null,
   saveLabel,
+  tabs,
+  activeTabId,
+  onTabChange,
 }: JcfModalProps) {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
@@ -99,18 +114,56 @@ export function JcfModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="flex-shrink-0 flex items-center justify-between px-[13px] py-[10px] bg-zinc-900 border-b border-zinc-800">
-          <h1 className="text-[15px] leading-[23px] font-medium text-zinc-100" data-testid="jcf-modal-title">
-            {title}
-          </h1>
-          <button
-            onClick={requestClose}
-            className="p-[3px] rounded-[3px] hover:bg-zinc-800 transition-colors"
-            aria-label="Fermer"
-            data-testid="jcf-modal-close"
-          >
-            <X size={20} className="text-zinc-400 hover:text-zinc-100" />
-          </button>
+        <header className="flex-shrink-0 bg-zinc-900 border-b border-zinc-800" data-testid="jcf-modal-header">
+          <div className="flex items-center justify-between px-[13px] py-[10px]">
+            <h1 className="text-[15px] leading-[23px] font-medium text-zinc-100" data-testid="jcf-modal-title">
+              {title}
+            </h1>
+            <button
+              onClick={requestClose}
+              className="p-[3px] rounded-[3px] hover:bg-zinc-800 transition-colors"
+              aria-label="Fermer"
+              data-testid="jcf-modal-close"
+            >
+              <X size={20} className="text-zinc-400 hover:text-zinc-100" />
+            </button>
+          </div>
+          {tabs && tabs.length > 1 && (
+            <div className="flex items-stretch border-t border-zinc-800 px-[13px]" role="tablist" data-testid="jcf-modal-tabs">
+              {tabs.map((tab) => {
+                const isActive = tab.id === activeTabId;
+                const isCta = tab.variant === 'cta';
+                let className: string;
+                if (isCta) {
+                  // CTA-styled entry: not a real tab, no underline, indigo accent.
+                  // Used to surface a creation intent in the header (e.g. "+ Découper en acomptes")
+                  // instead of routing through an empty-state tab.
+                  className = 'px-3 py-1.5 my-1.5 ml-1 text-[12px] font-medium border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 rounded transition-colors flex items-center gap-1.5';
+                } else if (isActive) {
+                  className = 'px-4 py-2 text-[12px] font-medium border-b-2 -mb-px border-indigo-500 text-zinc-100 transition-colors flex items-center gap-2';
+                } else {
+                  className = 'px-4 py-2 text-[12px] font-medium border-b-2 -mb-px border-transparent text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-2';
+                }
+                return (
+                  <button
+                    key={tab.id}
+                    role={isCta ? 'button' : 'tab'}
+                    aria-selected={isCta ? undefined : isActive}
+                    onClick={() => onTabChange?.(tab.id)}
+                    className={className}
+                    data-testid={`jcf-modal-tab-${tab.id}`}
+                  >
+                    {tab.label}
+                    {tab.badge != null && tab.badge !== '' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums ${
+                        isActive ? 'bg-indigo-500 text-white' : 'bg-zinc-800 text-zinc-300'
+                      }`}>{tab.badge}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </header>
 
         {/* Content */}

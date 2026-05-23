@@ -44,6 +44,8 @@ export { ZOOM_LEVELS, DEFAULT_PIXELS_PER_HOUR } from '../utils/zoom';
 
 export { JcfModal } from './JcfModal';
 export type { JcfModalProps } from './JcfModal';
+export { AcompteModal } from './AcompteModal';
+export type { AcompteModalProps } from './AcompteModal';
 
 export { JcfDonePanel } from './JcfDonePanel/JcfDonePanel';
 export { computeRemainingDsl } from './JcfDonePanel/computeRemainingDsl';

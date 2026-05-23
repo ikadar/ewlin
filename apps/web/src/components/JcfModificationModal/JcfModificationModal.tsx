@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { JcfModal } from '../JcfModal';
 import { JcfJobHeader } from '../JcfJobHeader';
 import {
@@ -6,6 +6,9 @@ import {
   type JcfElement,
   type SequenceDonePanelData,
 } from '../JcfElementsTable';
+import { AcompteTab, type AcompteTabHandle } from '../AcompteModal/AcompteTab';
+import { useGetAcomptesQuery } from '../../store/api/acompteApi';
+import type { JobDetailsResponse } from '../../store/api/scheduleApi';
 
 /**
  * JCF modification modal — Pillar B entry point. Reuses the **same**
@@ -69,6 +72,12 @@ export interface JcfModificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   job: JobModificationData;
+  /**
+   * Full server-side job (response from `GET /jobs/{id}`). Needed by the
+   * « Acomptes & avancement » tab which queries acomptes + declarations
+   * and reads the canonical task list / element list via logicalTaskId.
+   */
+  fullJob: JobDetailsResponse;
   onSave: (changes: ModificationChanges) => Promise<void>;
   error?: string | null;
   isSaving?: boolean;
@@ -110,10 +119,28 @@ export function JcfModificationModal({
   isOpen,
   onClose,
   job,
+  fullJob,
   onSave,
   error = null,
   isSaving = false,
 }: JcfModificationModalProps) {
+  // Tab state — JcfModal now hosts two tabs : « Dossier » (the existing
+  // header + elements table) and « Acomptes & avancement » (a faithful
+  // port of the playground-saturation modal).
+  const [activeTab, setActiveTab] = useState<'dossier' | 'acomptes'>('dossier');
+  const acompteTabRef = useRef<AcompteTabHandle>(null);
+  const [tabError, setTabError] = useState<string | null>(null);
+  // Local draft delivery count fed back by AcompteTab via onDraftCountChange.
+  // Always ≥ 1 (the synthetic single-delivery counts). Drives the
+  // « Livraisons (N) » tab label — N reflects the about-to-save state.
+  const [draftDeliveryCount, setDraftDeliveryCount] = useState(1);
+  const { data: acomptesData } = useGetAcomptesQuery(fullJob.id);
+  const serverAcompteCount = acomptesData?.acomptes.length ?? 0;
+  // Tab label count : if user is editing, show their draft count ; otherwise
+  // use the server count mapped to "1 if no acomptes else N".
+  const tabLivraisonsCount = activeTab === 'acomptes'
+    ? draftDeliveryCount
+    : Math.max(1, serverAcompteCount);
   // ── Header state ─────────────────────────────────────────────────────────
   // Mirrors the legacy `isEditMode` flow in App.tsx : ID Job + Template
   // are non-editable (passed as `undefined` callbacks below) ; everything
@@ -142,7 +169,10 @@ export function JcfModificationModal({
   const [elements, setElements] = useState<JcfElement[]>(job.elements);
 
   // ── Save handler ─────────────────────────────────────────────────────────
-  const handleSave = useCallback(async () => {
+  // Branches on the active tab : Dossier saves the JCF mutations via the
+  // existing onSave callback ; Acomptes delegates to AcompteTab's
+  // imperative ref (replaceAcomptes + writeAcompteProgressDeclarations).
+  const handleSaveDossier = useCallback(async () => {
     const finalNames = new Set(elements.map(el => el.name));
     const elementChanges: ModificationChanges['elements'] = [];
     const unsavedNewElements: string[] = [];
@@ -209,10 +239,51 @@ export function JcfModificationModal({
     onSave,
   ]);
 
+  const handleSave = useCallback(async () => {
+    setTabError(null);
+    if (activeTab === 'acomptes') {
+      try {
+        await acompteTabRef.current?.save();
+      } catch (e: unknown) {
+        const msg = (e as { data?: { error?: string } } | undefined)?.data?.error
+          ?? (e instanceof Error ? e.message : 'Erreur de sauvegarde des acomptes.');
+        setTabError(msg);
+        throw e;
+      }
+      return;
+    }
+    await handleSaveDossier();
+  }, [activeTab, handleSaveDossier]);
+
   const title = useMemo(
     () => `Modifier le Job ${job.reference} · ${job.client}`,
     [job.reference, job.client],
   );
+
+  const tabs = useMemo(
+    () => [
+      { id: 'dossier', label: 'Dossier' },
+      {
+        id: 'acomptes',
+        // « Livraisons » is the umbrella term — N=1 is the single full delivery,
+        // N≥2 are real acomptes (split deliveries). Always shows the count.
+        label: `Livraisons (${tabLivraisonsCount})`,
+      },
+    ],
+    [tabLivraisonsCount],
+  );
+
+  const handleTabChange = useCallback((id: string) => {
+    if (id === 'dossier' || id === 'acomptes') {
+      setActiveTab(id);
+    }
+  }, []);
+
+  const saveLabel = activeTab === 'acomptes'
+    ? (draftDeliveryCount >= 2
+        ? 'Enregistrer les acomptes'
+        : (serverAcompteCount > 0 ? 'Annuler le découpage' : 'Enregistrer'))
+    : 'Enregistrer les modifications';
 
   // We don't pass onJobIdChange / onTemplateSelect — that's how the
   // creation JCF already conveys "disabled" for those fields. Same
@@ -225,9 +296,16 @@ export function JcfModificationModal({
       title={title}
       onSave={handleSave}
       isSaving={isSaving}
-      error={error}
-      saveLabel="Enregistrer les modifications"
+      error={tabError ?? error}
+      saveLabel={saveLabel}
+      tabs={tabs}
+      activeTabId={activeTab}
+      onTabChange={handleTabChange}
     >
+      {activeTab === 'acomptes' ? (
+        <AcompteTab ref={acompteTabRef} job={fullJob} onDraftCountChange={setDraftDeliveryCount} />
+      ) : (
+      <>
       <JcfJobHeader
         jobId={job.reference}
         client={client}
@@ -281,6 +359,8 @@ export function JcfModificationModal({
           lockedElementNames={Object.keys(job.elementDbIdByInitialName)}
         />
       </div>
+      </>
+      )}
     </JcfModal>
   );
 }

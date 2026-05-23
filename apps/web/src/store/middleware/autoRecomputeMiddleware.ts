@@ -27,6 +27,7 @@ import { stationCategoryApi } from '../api/stationCategoryApi';
 import { providerApi } from '../api/providerApi';
 import { fluxApi } from '../api/fluxApi';
 import { scheduleApi } from '../api/scheduleApi';
+import { acompteApi } from '../api/acompteApi';
 import { saisieApi } from '../api/saisieApi';
 import { pinApi } from '../api/pinApi';
 
@@ -49,7 +50,7 @@ export function registerAutoRecomputeTrigger(fn: TriggerFn | null): void {
 type AutoRecomputeEndpointName =
   // Operator lifecycle — absences, schedules, skills propagate through.
   | Extract<keyof typeof operatorApi.endpoints,
-      'createOperator' | 'updateOperator' | 'deleteOperator'
+      'createOperator' | 'updateOperator' | 'deleteOperator' | 'restoreOperator'
       | 'replaceSkills' | 'replaceConcurrentGroups'>
   // Station availability, tick granularity, schedule exceptions, etc.
   | Extract<keyof typeof stationApi.endpoints,
@@ -85,7 +86,11 @@ type AutoRecomputeEndpointName =
   | Extract<keyof typeof stationApi.endpoints, 'addStationException'>
   // Operator incident — absence blocks the operator's availability
   // window, engine must reassign or defer affected tasks.
-  | Extract<keyof typeof operatorApi.endpoints, 'addOperatorAbsence'>;
+  | Extract<keyof typeof operatorApi.endpoints, 'addOperatorAbsence'>
+  // Acompte lifecycle — replace/delete acomptes changes the engine fan-out,
+  // and a new progress declaration cascades into per-acompte recordedProgressPct.
+  | Extract<keyof typeof acompteApi.endpoints,
+      'replaceAcomptes' | 'deleteAcomptes' | 'writeAcompteProgressDeclaration'>;
 
 /**
  * Endpoints whose success means "the scheduling problem constraints
@@ -102,6 +107,7 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'createOperator',
   'updateOperator',
   'deleteOperator',
+  'restoreOperator',
   'replaceSkills',
   'replaceConcurrentGroups',
   'createStation',
@@ -122,6 +128,9 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'pinAtTime',
   'addStationException',
   'addOperatorAbsence',
+  'replaceAcomptes',
+  'deleteAcomptes',
+  'writeAcompteProgressDeclaration',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {

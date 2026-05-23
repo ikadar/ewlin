@@ -1103,3 +1103,49 @@ html.light [data-testid^="task-tile-"][style*="white"] {
   background: rgba(255, 255, 255, 0.03);
   border: 1px dashed rgba(255, 255, 255, 0.12);
 }
+
+/* ─── Acompte progress slider ───────────────────────────────────────
+   Draggable range input used in the AcompteTab for per-task copies
+   declarations. Visually consistent with the OperatorsPage proficiency
+   editor (op-prof-slider) : transparent native track (the colored fill
+   sits beneath via a sibling div), white circular thumb with grab cursor.
+*/
+.acompte-progress-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+}
+.acompte-progress-slider:focus { outline: none; }
+.acompte-progress-slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 3px;
+  background: transparent;
+}
+.acompte-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  margin-top: -5px;
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.acompte-progress-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+.acompte-progress-slider::-moz-range-track {
+  height: 5px;
+  border-radius: 3px;
+  background: transparent;
+}
+.acompte-progress-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: grab;
+}
+.acompte-progress-slider::-moz-range-thumb:active { cursor: grabbing; }

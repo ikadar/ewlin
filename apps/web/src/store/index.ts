@@ -38,6 +38,7 @@ import { archiveApi } from './api/archiveApi';
 import { simulationApi } from './api/simulationApi';
 import { jobTestApi } from './api/jobTestApi';
 import { productionReportApi } from './api/productionReportApi';
+import { acompteApi } from './api/acompteApi';
 import { uiReducer } from './slices/uiSlice';
 import { jcfReducer } from './slices/jcfSlice';
 import { errorReducer } from './slices/errorSlice';
@@ -77,6 +78,7 @@ export const store = configureStore({
     [simulationApi.reducerPath]: simulationApi.reducer,
     [jobTestApi.reducerPath]: jobTestApi.reducer,
     [productionReportApi.reducerPath]: productionReportApi.reducer,
+    [acompteApi.reducerPath]: acompteApi.reducer,
     // Auth state slice
     auth: authReducer,
     // UI state slice
@@ -116,6 +118,7 @@ export const store = configureStore({
       .concat(simulationApi.middleware)
       .concat(jobTestApi.middleware)
       .concat(productionReportApi.middleware)
+      .concat(acompteApi.middleware)
       // Fires useAutoRecompute.trigger when a scheduling-constraint
       // mutation fulfils. Registered last so the API middlewares run
       // first and the /fulfilled action is fully processed before we

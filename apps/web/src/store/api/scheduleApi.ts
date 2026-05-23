@@ -201,6 +201,8 @@ export interface JobDetailsElement {
 
 export interface JobDetailsTask {
   id: string;
+  /** Stable cross-scenario logical task id — key for AcompteProgressDeclaration. */
+  logicalTaskId: string;
   sequenceOrder: number;
   taskType: string;
   status: string;
