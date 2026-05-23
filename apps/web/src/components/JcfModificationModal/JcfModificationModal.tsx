@@ -265,9 +265,11 @@ export function JcfModificationModal({
       { id: 'dossier', label: 'Dossier' },
       {
         id: 'acomptes',
-        // « Livraisons » is the umbrella term — N=1 is the single full delivery,
-        // N≥2 are real acomptes (split deliveries). Always shows the count.
-        label: `Livraisons (${tabLivraisonsCount})`,
+        // « Acomptes » keeps the domain term users actually use ; N = 1 is a
+        // single full delivery (« Livraison complète » inside the tab body),
+        // N ≥ 2 are real acomptes where the last is the Solde. Count is the
+        // about-to-save delivery count.
+        label: `Acomptes (${tabLivraisonsCount})`,
       },
     ],
     [tabLivraisonsCount],

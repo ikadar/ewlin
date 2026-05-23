@@ -18,6 +18,13 @@
     --flux-text-muted: rgb(128 128 128);
     --emerald-400: #34d399;
     --emerald-500: #10b981;
+    /* Canonical tile-completed palette — must match
+       apps/web/src/components/Tile/colorUtils.ts PALETTE.completed.
+       Used so an "acompte prêt" card reads visually identical to a
+       tuile completed on the planning board. */
+    --tile-completed-rgb: 34, 197, 94;
+    --tile-completed-border: #22c55e;
+    --tile-completed-text: #86efac;
     --amber-300: #fcd34d;
     --red-400: #f87171;
     --indigo-400: #818cf8;
@@ -89,24 +96,57 @@
   .section-add:hover { background: var(--flux-elevated); color: var(--flux-text-primary); }
 
   /* ═════════════════════════════════════════════════════════════
-     VARIANT A — HORIZONTAL ACOMPTES + SECTION TÂCHES DESSOUS
+     VARIANT A — DEUX COLONNES (acomptes à gauche, avancement à droite)
      ═════════════════════════════════════════════════════════════ */
-  .va-acomptes-row {
+  .va-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 10px;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+  }
+  .va-acomptes-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .va-acompte-card {
     position: relative;
     padding: 12px 14px;
     background: var(--flux-surface);
     border: 1px solid var(--flux-border);
-    border-radius: 6px;
+    border-radius: 0;
+    transition: background-color 200ms ease, border-color 200ms ease;
   }
-  .va-acompte-card.solde {
-    border-color: rgba(52, 211, 153, 0.35);
-    background: rgba(16, 185, 129, 0.04);
+  /* "Prêt" state = visually match a completed tile on the planning board.
+     Visual signature = thick solid emerald LEFT BAR (not a full border) +
+     subtle background wash. Box-shadow inset paints the bar without
+     shifting any layout (unlike a border-left, which would push content).
+     Palette matches apps/web/src/components/Tile/colorUtils.ts PALETTE.completed
+     and the OPACITY.completed.run = 0.09 used for tile body fills. */
+  .va-acompte-card.full {
+    background: rgba(var(--tile-completed-rgb), 0.09);
+    box-shadow: inset 4px 0 0 var(--tile-completed-border);
   }
+  .va-acompte-card.full .va-acompte-card-label {
+    color: var(--tile-completed-text);
+  }
+  .va-acompte-card.full .va-acompte-ready {
+    color: var(--tile-completed-text);
+  }
+  .va-acompte-ready {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--flux-text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+  .va-acompte-ready strong { color: var(--flux-text-secondary); font-weight: 600; }
+  .va-acompte-card.full .va-acompte-ready strong { color: var(--tile-completed-text); }
+  .va-acompte-ready.zero strong { color: var(--flux-text-muted); }
+  .va-acompte-ready-detail {
+    margin-top: 3px;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+  }
+  /* Solde stays neutral — no color difference vs other acomptes. */
   .va-acompte-card-label {
     font-size: 10px;
     color: var(--flux-text-tertiary);
@@ -114,10 +154,7 @@
     letter-spacing: 0.05em;
     margin-bottom: 8px;
     font-weight: 700;
-    display: flex; align-items: center; gap: 6px;
   }
-  .va-acompte-card.solde .va-acompte-card-label { color: var(--emerald-400); }
-  .va-acompte-card.solde .va-acompte-card-label .badge { background: rgba(16,185,129,0.18); color: var(--emerald-400); padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; }
   .va-acompte-remove {
     position: absolute; top: 6px; right: 6px;
     background: transparent; border: 0; color: var(--flux-text-muted);
@@ -139,9 +176,67 @@
     font: inherit; font-size: 11px; color-scheme: dark; cursor: pointer;
   }
   .va-field input:focus { outline: 0; border-color: var(--indigo-400); }
-  .va-acompte-card.solde .va-field input { border-color: rgba(52,211,153,0.30); }
-  .va-acompte-card.solde .va-field input:focus { border-color: var(--emerald-400); }
+  .va-field input[readonly] {
+    background: var(--zinc-900); color: var(--flux-text-tertiary);
+    cursor: not-allowed; border-color: var(--flux-border);
+  }
+  .va-field input[readonly]:focus { border-color: var(--flux-border); }
   .va-field .unit { font-size: 10px; color: var(--flux-text-muted); }
+  .va-acompte-card-hint {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--flux-text-muted);
+    font-style: italic;
+  }
+
+  .va-warning {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    color: var(--amber-300);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+  }
+
+  /* Element sub-tabs — secondary nav inside the right column. Smaller, more
+     subtle than the modal-level tabs ; underline style for visual consistency. */
+  .va-element-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--flux-border);
+    margin-bottom: 16px;
+  }
+  .va-element-tab {
+    background: transparent;
+    border: 0;
+    color: var(--flux-text-tertiary);
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .va-element-tab:hover { color: var(--flux-text-secondary); }
+  .va-element-tab.active {
+    color: var(--flux-text-primary);
+    border-bottom-color: var(--indigo-500);
+  }
+  .va-element-tab-warn-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber-300);
+    display: inline-block;
+  }
+  .va-element-tab-meta { font-size: 10px; color: var(--flux-text-muted); }
 
   .va-validator {
     margin-top: 12px;
@@ -159,9 +254,8 @@
   .va-element-group {
     padding: 14px 16px;
     border: 1px solid var(--flux-border);
-    border-left: 3px solid var(--indigo-500);
     background: rgba(255,255,255,0.012);
-    border-radius: 4px;
+    border-radius: 0;
     margin-bottom: 12px;
   }
   .va-element-group-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
@@ -239,12 +333,11 @@
   }
   .va-segment.saturated { border-color: rgba(52,211,153,0.45); }
   .va-segment.saturated .va-segment-fill { background: rgba(16,185,129,0.55); }
-  .va-segment.solde { border-color: rgba(52,211,153,0.35); background: rgba(16,185,129,0.06); }
+  /* Solde stays neutral on segments too — only saturation drives any green accent. */
   .va-segment.empty .va-segment-fill { background: transparent; }
   .va-segment-row { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--flux-text-secondary); font-variant-numeric: tabular-nums; line-height: 1.2; }
   .va-segment-pos { font-weight: 700; color: var(--flux-text-primary); display: flex; align-items: center; gap: 4px; }
   .va-segment.empty .va-segment-pos, .va-segment.empty .va-segment-row { color: var(--flux-text-muted); }
-  .va-segment.solde .va-segment-pos { color: var(--emerald-400); }
   .va-segment-pct { font-size: 10px; color: var(--flux-text-tertiary); }
   .va-segment.saturated .va-segment-pct { color: var(--emerald-400); }
 
@@ -281,10 +374,8 @@
     font-size: 12px;
   }
   .vb-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--flux-text-muted); font-weight: 700; }
-  .vb-table th.solde-col { color: var(--emerald-400); background: rgba(16,185,129,0.06); }
   .vb-table tr:last-child td { border-bottom: 0; }
   .vb-table td:last-child, .vb-table th:last-child { border-right: 0; }
-  .vb-table td.solde-col { background: rgba(16,185,129,0.04); }
 
   .vb-task-cell { font-weight: 600; color: var(--flux-text-secondary); }
   .vb-element-row td { background: var(--zinc-900); font-weight: 700; color: var(--flux-text-primary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
@@ -320,15 +411,13 @@
     padding: 6px 12px; background: var(--flux-surface); border: 1px solid var(--flux-border);
     border-radius: 4px; font-size: 11px; min-width: 130px;
   }
-  .vb-acompte-chip.solde { border-color: rgba(52,211,153,0.35); background: rgba(16,185,129,0.04); }
+  /* Solde chip stays neutral — same border/background as other acomptes. */
   .vb-acompte-chip-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .vb-acompte-chip-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--flux-text-tertiary); font-weight: 700; }
-  .vb-acompte-chip.solde .vb-acompte-chip-name { color: var(--emerald-400); }
   .vb-acompte-chip-remove { background: transparent; border: 0; color: var(--flux-text-muted); cursor: pointer; padding: 2px; }
   .vb-acompte-chip input[type=number] { width: 100%; background: var(--flux-base); border: 1px solid var(--flux-border); color: var(--flux-text-primary); padding: 3px 6px; font: inherit; font-size: 12px; text-align: right; border-radius: 3px; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
   .vb-acompte-chip input[type=datetime-local] { width: 100%; background: var(--flux-base); border: 1px solid var(--flux-border); color: var(--flux-text-secondary); padding: 2px 4px; font: inherit; font-size: 10px; border-radius: 3px; color-scheme: dark; }
   .vb-acompte-chip input:focus { outline: 0; border-color: var(--indigo-400); }
-  .vb-acompte-chip.solde input { border-color: rgba(52,211,153,0.30); }
 
   /* Lucide */
   .lucide { width: 14px; height: 14px; stroke-width: 1.6; }
@@ -342,8 +431,12 @@
   </header>
 
   <div class="variant-switch">
-    <button class="variant-btn active" data-variant="A"><i data-lucide="layout-grid"></i> Variant A <small>Acomptes en haut + sections tâches dessous</small></button>
+    <button class="variant-btn active" data-variant="A"><i data-lucide="columns-2"></i> Variant A <small>Deux colonnes (acomptes à gauche, avancement à droite)</small></button>
     <button class="variant-btn" data-variant="B"><i data-lucide="table"></i> Variant B <small>Table dense (tâches × acomptes)</small></button>
+  </div>
+  <div class="variant-switch" style="margin-top:-8px;">
+    <button class="variant-btn active" data-scenario="mono"><i data-lucide="file"></i> Mono-élément <small>Cartes de visite (3 tâches)</small></button>
+    <button class="variant-btn" data-scenario="multi"><i data-lucide="book-open"></i> Multi-élément <small>Livret 32p (couv. + intérieur)</small></button>
   </div>
 
   <div class="modal">
@@ -364,33 +457,137 @@
 </div>
 
 <script>
+const scenarios = {
+  mono: {
+    jobTitle: 'Modifier le Job 12347 · ACME · Cartes de visite (mono-élément)',
+    totalQuantity: 100000,
+    elements: [
+      {
+        id: 'el1', name: 'Carte 350g',
+        tasks: [
+          { logicalTaskId: 'lt-g37', label: 'G37', copiesDone: 80000 },
+          { logicalTaskId: 'lt-p137', label: 'P137', copiesDone: 50000 },
+          { logicalTaskId: 'lt-duplo', label: 'Duplo 10p', copiesDone: 30000 },
+        ],
+      },
+    ],
+  },
+  multi: {
+    jobTitle: 'Modifier le Job 12348 · Cap Horn · Livret 32 pages (multi-élément)',
+    totalQuantity: 100000,
+    elements: [
+      {
+        id: 'cover', name: 'Couverture 300g',
+        tasks: [
+          { logicalTaskId: 'c-g37',  label: 'G37',  copiesDone: 70000 },
+          { logicalTaskId: 'c-p137', label: 'P137', copiesDone: 45000 },
+        ],
+      },
+      {
+        id: 'inside', name: 'Intérieur 90g',
+        tasks: [
+          { logicalTaskId: 'i-g37',   label: 'G37',   copiesDone: 55000 },
+          { logicalTaskId: 'i-duplo', label: 'Duplo', copiesDone: 25000 },
+        ],
+      },
+    ],
+  },
+};
+
 const state = {
   variant: 'A',
-  totalQuantity: 100000,
+  scenario: 'mono',
+  totalQuantity: scenarios.mono.totalQuantity,
   acomptes: [
     { id: 'a1', positionIndex: 1, quantityShare: 20000, deadline: '2026-06-15T17:00' },
     { id: 'a2', positionIndex: 2, quantityShare: 40000, deadline: '2026-06-22T17:00' },
     { id: 'a3', positionIndex: 3, quantityShare: 40000, deadline: '2026-07-02T12:00' },
   ],
-  elements: [
-    {
-      id: 'el1', name: 'Carte 350g',
-      tasks: [
-        { logicalTaskId: 'lt-g37', label: 'G37', copiesDone: 80000 },
-        { logicalTaskId: 'lt-p137', label: 'P137', copiesDone: 50000 },
-        { logicalTaskId: 'lt-duplo', label: 'Duplo 10p', copiesDone: 30000 },
-      ],
-    },
-  ],
+  elements: JSON.parse(JSON.stringify(scenarios.mono.elements)),
+  activeElementId: scenarios.mono.elements[0].id,
 };
 
-const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+function loadScenario(name) {
+  const s = scenarios[name];
+  if (!s) return;
+  state.scenario = name;
+  state.totalQuantity = s.totalQuantity;
+  state.elements = JSON.parse(JSON.stringify(s.elements));
+  state.activeElementId = s.elements[0].id;
+  // Don't touch acomptes : the user's split intent is independent of the job's
+  // element shape. recomputeSolde() will re-balance the solde against the new total.
+  recomputeSolde();
+  document.querySelector('.modal-title').textContent = s.jobTitle;
+  render();
+}
+
+function elementHasWarning(el) {
+  return el.tasks.some((t, i) => i > 0 && t.copiesDone > el.tasks[i - 1].copiesDone);
+}
+
+/**
+ * For an acompte, compute the number of exemplaires effectively ready to ship,
+ * given the cascade of each element's LAST task (the one that produces the
+ * shippable output). For multi-element jobs, the acompte's ready count is the
+ * MIN across all elements' last-task cascade allocations — bottleneck rules
+ * (can't ship couv+intérieur sets if only the couv is done).
+ *
+ * Per-element breakdown is also returned for an explanatory detail line.
+ *
+ * @returns {{ ready: number, perElement: Array<{name: string, ready: number}> }}
+ */
+function readyForAcompte(acompte, elements, allAcomptes) {
+  if (elements.length === 0) return { ready: 0, perElement: [] };
+  const perElement = elements.map((el) => {
+    if (el.tasks.length === 0) return { name: el.name, ready: 0 };
+    const lastTask = el.tasks[el.tasks.length - 1];
+    const cascade = cascadeFifo(lastTask.copiesDone, allAcomptes);
+    const row = cascade.find((c) => c.acompteId === acompte.id);
+    return { name: el.name, ready: row ? row.taken : 0 };
+  });
+  const ready = perElement.reduce((m, x) => Math.min(m, x.ready), Infinity);
+  return { ready: ready === Infinity ? 0 : ready, perElement };
+}
+
+/** Returns true when this acompte is fully served (= ready to ship in full).
+ *  Used to flip the card into the "tile completed" emerald aesthetic. */
+function isAcompteFull(acompte) {
+  const cap = acompte.quantityShare;
+  if (cap <= 0) return false;
+  const { ready } = readyForAcompte(acompte, state.elements, state.acomptes);
+  return ready >= cap;
+}
+
+function readyHtml(acompte, elements, allAcomptes) {
+  const cap = acompte.quantityShare;
+  if (cap <= 0) return '';
+  const { ready, perElement } = readyForAcompte(acompte, elements, allAcomptes);
+  const cls = ready >= cap ? 'full' : ready === 0 ? 'zero' : '';
+  // Show per-element detail only when multi-element AND elements diverge.
+  const showDetail = perElement.length > 1
+    && perElement.some((x, i) => i > 0 && x.ready !== perElement[0].ready);
+  const detail = showDetail
+    ? `<div class="va-acompte-ready-detail">${perElement.map((x) => `${x.name} : ${fmt(x.ready)}`).join(' · ')}</div>`
+    : '';
+  return `
+    <div class="va-acompte-ready ${cls}" data-acompte-ready="${acompte.id}">
+      Prêt : <strong>${fmt(ready)}</strong> / ${fmt(cap)} ex.
+      ${detail}
+    </div>
+  `;
+}
+
+const fmt = (n) => {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return '0';
+  return Math.round(n).toLocaleString('fr-FR');
+};
+const safeInt = (n) => (typeof n === 'number' && Number.isFinite(n)) ? n : 0;
 const icons = () => window.lucide?.createIcons();
 
 function cascadeFifo(total, acomptes) {
-  let remaining = Math.max(0, total);
+  let remaining = Math.max(0, safeInt(total));
   return acomptes.map((a, i) => {
-    const cap = Math.max(0, a.quantityShare);
+    const cap = Math.max(0, safeInt(a.quantityShare));
     const taken = Math.min(remaining, cap);
     remaining -= taken;
     const pct = cap > 0 ? (taken / cap) * 100 : 0;
@@ -410,6 +607,23 @@ function acompteLabel(idx, total) {
   return `Acompte ${idx + 1}/${total - 1}`;
 }
 
+/** Enforce the invariant : last acompte = total − Σ(others).
+ *  Called after any mutation of state.acomptes that changes counts or the
+ *  qty of a non-last entry. Mutates state.acomptes[last].quantityShare in-place. */
+function recomputeSolde() {
+  if (state.acomptes.length === 0) return;
+  const lastIdx = state.acomptes.length - 1;
+  if (state.acomptes.length === 1) {
+    // Single delivery — the lone entry IS the whole job.
+    state.acomptes[0].quantityShare = state.totalQuantity;
+    return;
+  }
+  const sumOthers = state.acomptes
+    .slice(0, lastIdx)
+    .reduce((s, a) => s + a.quantityShare, 0);
+  state.acomptes[lastIdx].quantityShare = state.totalQuantity - sumOthers;
+}
+
 function totalRefHtml() {
   return `
     <div class="total-ref">
@@ -424,71 +638,89 @@ function totalRefHtml() {
 /* ── VARIANT A ─────────────────────────── */
 function renderA() {
   const sum = state.acomptes.reduce((s, a) => s + a.quantityShare, 0);
-  const balanced = sum === state.totalQuantity;
+  const solde = state.acomptes[state.acomptes.length - 1];
+  const soldeIsNegative = solde && solde.quantityShare < 0;
+  const isSingle = state.acomptes.length === 1;
   const acomptesRow = state.acomptes.map((a, i) => {
-    const isSolde = i === state.acomptes.length - 1 && state.acomptes.length >= 2;
+    const isLast = i === state.acomptes.length - 1;
+    const isSoldeRow = isLast && !isSingle;
+    const isSingleRow = isLast && isSingle;
     const label = acompteLabel(i, state.acomptes.length);
+    // Last row's qty is computed = total - Σ(others). Read-only by design.
+    const qtyReadonly = isSoldeRow || isSingleRow;
+    const hint = isSoldeRow
+      ? `<div class="va-acompte-card-hint">= ${fmt(state.totalQuantity)} − Σ(autres acomptes)</div>`
+      : isSingleRow
+        ? '<div class="va-acompte-card-hint">Quantité totale du job</div>'
+        : '';
+    const full = isAcompteFull(a);
     return `
-      <div class="va-acompte-card ${isSolde ? 'solde' : ''}">
-        ${state.acomptes.length > 1 ? `<button class="va-acompte-remove" data-action="remove" data-id="${a.id}"><i data-lucide="trash-2" style="width:11px;height:11px;"></i></button>` : ''}
-        <div class="va-acompte-card-label">
-          ${isSolde ? '<span class="badge">SOLDE</span>' : ''}
-          ${label}
-        </div>
+      <div class="va-acompte-card ${full ? 'full' : ''}" data-acompte-card="${a.id}">
+        ${state.acomptes.length > 1 && !isSoldeRow ? `<button class="va-acompte-remove" data-action="remove" data-id="${a.id}"><i data-lucide="trash-2" style="width:11px;height:11px;"></i></button>` : ''}
+        <div class="va-acompte-card-label">${label}</div>
         <div class="va-field">
           <i data-lucide="package" class="va-field-icon"></i>
-          <input type="number" min="0" step="1000" value="${a.quantityShare}" data-acompte="${a.id}" data-field="quantityShare" />
+          <input type="number" min="0" step="1000" value="${a.quantityShare}" data-acompte="${a.id}" data-field="quantityShare" ${qtyReadonly ? 'readonly tabindex="-1"' : ''} title="${qtyReadonly ? 'Calculé automatiquement' : ''}" />
           <span class="unit">ex.</span>
         </div>
         <div class="va-field">
           <i data-lucide="calendar-clock" class="va-field-icon"></i>
           <input type="datetime-local" value="${a.deadline}" data-acompte="${a.id}" data-field="deadline" />
         </div>
+        ${hint}
+        ${readyHtml(a, state.elements, state.acomptes)}
       </div>
     `;
   }).join('');
 
-  const elementsBlock = state.elements.map((el) => {
-    const tasks = el.tasks.map((t) => {
+  // Render only the ACTIVE element's tasks. The other elements stay accessible
+  // via the sub-tab strip above. Mono-element jobs show a single (non-clickable
+  // feeling but still rendered) tab — keeps the visual structure consistent.
+  const activeElement = state.elements.find((el) => el.id === state.activeElementId) ?? state.elements[0];
+  const elementTabsHtml = `
+    <div class="va-element-tabs">
+      ${state.elements.map((el) => {
+        const isActive = el.id === activeElement.id;
+        const warn = elementHasWarning(el);
+        return `
+          <button
+            class="va-element-tab ${isActive ? 'active' : ''}"
+            data-element-tab="${el.id}"
+            title="${warn ? 'Incoherence d avancement detectee' : ''}"
+          >
+            ${el.name}
+            <span class="va-element-tab-meta">(${el.tasks.length})</span>
+            ${warn ? '<span class="va-element-tab-warn-dot" data-warn-dot></span>' : ''}
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  const elementsBlock = elementTabsHtml + [activeElement].map((el) => {
+    const tasks = el.tasks.map((t, taskIdx) => {
       const pct = state.totalQuantity > 0 ? (t.copiesDone / state.totalQuantity) * 100 : 0;
       const cascade = cascadeFifo(t.copiesDone, state.acomptes);
-      const segs = cascade.map((c) => {
-        const cls = [
-          c.saturated ? 'saturated' : '',
-          c.empty ? 'empty' : '',
-          c.isSolde ? 'solde' : '',
-        ].filter(Boolean).join(' ');
-        const labelSeg = c.isSolde ? 'Solde' : `${c.position}/${c.total}`;
-        const check = c.saturated ? '<i data-lucide="check" style="width:11px;height:11px;"></i>' : '';
-        return `
-          <div class="va-segment ${cls}" style="flex-grow:${c.capacity};flex-basis:0;">
-            <div class="va-segment-fill" style="width:${c.progressPct}%;"></div>
-            <div class="va-segment-row">
-              <span class="va-segment-pos">${labelSeg} ${check}</span>
-              <span class="va-segment-pct">${Math.round(c.progressPct)}%</span>
-            </div>
-            <div class="va-segment-row">
-              <span style="font-size:10px;color:var(--flux-text-tertiary);">${fmt(c.taken)} / ${fmt(c.capacity)}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+      const segs = buildCascadeSegmentsHtml(cascade);
+      const upstream = taskIdx > 0 ? el.tasks[taskIdx - 1] : null;
+      const warning = warningHtml(t, upstream);
       return `
-        <div class="va-task-row" data-task="${t.logicalTaskId}">
+        <div class="va-task-row" data-task-row="${t.logicalTaskId}">
           <div class="va-task-head">
             <span class="va-task-name">${t.label}</span>
-            <span class="va-task-cumul">Cumul : <strong>${fmt(t.copiesDone)}</strong> / ${fmt(state.totalQuantity)} ex.</span>
+            <span class="va-task-cumul" data-cumul>Cumul : <strong>${fmt(t.copiesDone)}</strong> / ${fmt(state.totalQuantity)} ex.</span>
           </div>
           <div class="va-task-input-row">
             <input type="number" class="va-task-input" min="0" max="${state.totalQuantity}" step="500" value="${t.copiesDone}" data-task-input="${t.logicalTaskId}" />
             <span class="va-task-percent-label">ex.</span>
             <div class="va-task-slider-wrap">
-              <div class="va-task-slider-track"><div class="va-task-slider-fill" style="width:${pct}%;"></div></div>
+              <div class="va-task-slider-track"><div class="va-task-slider-fill" data-slider-fill style="width:${pct}%;"></div></div>
               <input type="range" class="va-task-slider" min="0" max="${state.totalQuantity}" step="500" value="${t.copiesDone}" data-task-input="${t.logicalTaskId}" aria-label="Avancement ${t.label}" />
             </div>
-            <span class="va-task-pct">${Math.round(pct)} %</span>
+            <span class="va-task-pct" data-pct>${Math.round(pct)} %</span>
           </div>
-          <div class="va-cascade">${segs}</div>
+          <div class="va-cascade" data-cascade>${segs}</div>
+          <div data-warning>${warning}</div>
         </div>
       `;
     }).join('');
@@ -504,20 +736,39 @@ function renderA() {
   }).join('');
 
   return `
-    ${totalRefHtml()}
-    <div class="section-head">
-      <div class="section-title"><i data-lucide="split"></i> Acomptes</div>
-      <button class="section-add" data-action="add"><i data-lucide="plus"></i> Ajouter</button>
+    <div class="va-grid">
+      <section>
+        <div class="section-head" style="margin-top:0;">
+          <div class="section-title"><i data-lucide="split"></i> Acomptes</div>
+          <button class="section-add" data-action="add"><i data-lucide="plus"></i> Ajouter</button>
+        </div>
+        <div class="va-acomptes-stack">${acomptesRow}</div>
+        ${validatorHtml(soldeIsNegative, sum)}
+      </section>
+      <section>
+        <div class="section-head" style="margin-top:0;">
+          <div class="section-title"><i data-lucide="gauge"></i> Avancement — exemplaires produits par tâche</div>
+        </div>
+        ${elementsBlock}
+      </section>
     </div>
-    <div class="va-acomptes-row">${acomptesRow}</div>
-    <div class="va-validator ${balanced ? 'ok' : 'warn'}">
-      <i data-lucide="${balanced ? 'check' : 'alert-triangle'}"></i>
-      Somme : ${fmt(sum)} / ${fmt(state.totalQuantity)} ex. ${balanced ? '' : '— à équilibrer'}
+  `;
+}
+
+function validatorHtml(soldeIsNegative, sum) {
+  if (soldeIsNegative) {
+    return `
+      <div class="va-validator warn" data-validator style="margin-top:12px;">
+        <i data-lucide="alert-triangle"></i>
+        Sur-allocation : les acomptes saisis dépassent la quantité totale. Réduis-en au moins un.
+      </div>
+    `;
+  }
+  return `
+    <div class="va-validator ok" data-validator style="margin-top:12px;">
+      <i data-lucide="check"></i>
+      Solde calculé automatiquement (total − Σ autres). Somme = ${fmt(sum)} ex.
     </div>
-    <div class="section-head">
-      <div class="section-title"><i data-lucide="gauge"></i> Avancement — exemplaires produits par tâche</div>
-    </div>
-    ${elementsBlock}
   `;
 }
 
@@ -526,24 +777,27 @@ function renderB() {
   const sum = state.acomptes.reduce((s, a) => s + a.quantityShare, 0);
   const balanced = sum === state.totalQuantity;
   const acompteChips = state.acomptes.map((a, i) => {
-    const isSolde = i === state.acomptes.length - 1 && state.acomptes.length >= 2;
+    const isLast = i === state.acomptes.length - 1;
+    const isSoldeRow = isLast && state.acomptes.length >= 2;
+    const isSingleRow = isLast && state.acomptes.length === 1;
+    const qtyReadonly = isSoldeRow || isSingleRow;
     const label = acompteLabel(i, state.acomptes.length);
     return `
-      <div class="vb-acompte-chip ${isSolde ? 'solde' : ''}">
+      <div class="vb-acompte-chip">
         <div class="vb-acompte-chip-head">
           <span class="vb-acompte-chip-name">${label}</span>
-          ${state.acomptes.length > 1 ? `<button class="vb-acompte-chip-remove" data-action="remove" data-id="${a.id}"><i data-lucide="x" style="width:11px;height:11px;"></i></button>` : ''}
+          ${state.acomptes.length > 1 && !isSoldeRow ? `<button class="vb-acompte-chip-remove" data-action="remove" data-id="${a.id}"><i data-lucide="x" style="width:11px;height:11px;"></i></button>` : ''}
         </div>
-        <input type="number" min="0" step="1000" value="${a.quantityShare}" data-acompte="${a.id}" data-field="quantityShare" />
+        <input type="number" min="0" step="1000" value="${a.quantityShare}" data-acompte="${a.id}" data-field="quantityShare" ${qtyReadonly ? 'readonly tabindex="-1"' : ''} title="${qtyReadonly ? 'Calculé automatiquement' : ''}" />
         <input type="datetime-local" value="${a.deadline}" data-acompte="${a.id}" data-field="deadline" />
       </div>
     `;
   }).join('');
 
-  // Build table : columns = [task name][total declared] then per-acompte cell with mini bar
+  // Build table : columns = [task name][total declared] then per-acompte cell with mini bar.
+  // Solde stays neutral (no green column tint).
   const ths = state.acomptes.map((a, i) => {
-    const isSolde = i === state.acomptes.length - 1 && state.acomptes.length >= 2;
-    return `<th class="${isSolde ? 'solde-col' : ''}" style="text-align:center;">${acompteLabel(i, state.acomptes.length)}</th>`;
+    return `<th style="text-align:center;">${acompteLabel(i, state.acomptes.length)}</th>`;
   }).join('');
   const rows = state.elements.map((el) => {
     const elRow = `<tr class="vb-element-row"><td colspan="${state.acomptes.length + 2}">${el.name}</td></tr>`;
@@ -552,9 +806,8 @@ function renderB() {
       const cascade = cascadeFifo(t.copiesDone, state.acomptes);
       const cells = cascade.map((c) => {
         const cls = c.saturated ? 'saturated' : '';
-        const isSolde = c.isSolde;
         return `
-          <td class="${isSolde ? 'solde-col' : ''}">
+          <td>
             <div class="vb-cell-mini ${cls}">
               <div class="vb-cell-mini-bar"><div class="vb-cell-mini-fill" style="width:${c.progressPct}%"></div></div>
               <div class="vb-cell-mini-row">
@@ -588,16 +841,12 @@ function renderB() {
   }).join('');
 
   return `
-    ${totalRefHtml()}
-    <div class="section-head">
+    <div class="section-head" style="margin-top:0;">
       <div class="section-title"><i data-lucide="split"></i> Acomptes</div>
       <button class="section-add" data-action="add"><i data-lucide="plus"></i> Ajouter</button>
     </div>
     <div class="vb-acomptes-config">${acompteChips}</div>
-    <div class="va-validator ${balanced ? 'ok' : 'warn'}">
-      <i data-lucide="${balanced ? 'check' : 'alert-triangle'}"></i>
-      Somme : ${fmt(sum)} / ${fmt(state.totalQuantity)} ex. ${balanced ? '' : '— à équilibrer'}
-    </div>
+    ${validatorHtml(state.acomptes[state.acomptes.length - 1].quantityShare < 0, sum)}
     <div class="section-head">
       <div class="section-title"><i data-lucide="gauge"></i> Avancement par tâche × acompte</div>
     </div>
@@ -614,10 +863,177 @@ function renderB() {
   `;
 }
 
+/** Cross-machine sanity : a downstream task should not have produced more
+ *  exemplaires than its upstream (you can't massicoter what hasn't été
+ *  imprimé). Surfaces a warning chip when violated. Returns empty string
+ *  when no upstream or when ordering is physically plausible. */
+function warningHtml(task, upstream) {
+  if (!upstream) return '';
+  if (task.copiesDone <= upstream.copiesDone) return '';
+  return `
+    <div class="va-warning">
+      <i data-lucide="alert-triangle" style="width:12px;height:12px;"></i>
+      Cumul (${fmt(task.copiesDone)} ex.) supérieur à ${upstream.label} (${fmt(upstream.copiesDone)} ex.) — physiquement improbable.
+    </div>
+  `;
+}
+
+function buildCascadeSegmentsHtml(cascade) {
+  return cascade.map((c) => {
+    const cls = [
+      c.saturated ? 'saturated' : '',
+      c.empty ? 'empty' : '',
+      c.isSolde ? 'solde' : '',
+    ].filter(Boolean).join(' ');
+    const labelSeg = c.isSolde ? 'Solde' : `${c.position}/${c.total}`;
+    const check = c.saturated ? '<i data-lucide="check" style="width:11px;height:11px;"></i>' : '';
+    return `
+      <div class="va-segment ${cls}" style="flex-grow:${c.capacity};flex-basis:0;">
+        <div class="va-segment-fill" style="width:${c.progressPct}%;"></div>
+        <div class="va-segment-row">
+          <span class="va-segment-pos">${labelSeg} ${check}</span>
+          <span class="va-segment-pct">${Math.round(c.progressPct)}%</span>
+        </div>
+        <div class="va-segment-row">
+          <span style="font-size:10px;color:var(--flux-text-tertiary);">${fmt(c.taken)} / ${fmt(c.capacity)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Granular refresh : updates only the derived display of one task row, without
+ * rebuilding the slider/input DOM nodes. Mouse-capture on the slider thumb
+ * survives mid-drag because the <input type=range> node is never replaced.
+ */
+/** Refresh the « Prêt : X / Y » block on each acompte card. Called after
+ *  any task change (cascade changes ⇒ ready counts change). */
+function refreshAcompteReady() {
+  state.acomptes.forEach((a) => {
+    // Replace the inner « Prêt: X / Y » block in place.
+    const block = document.querySelector(`[data-acompte-ready="${a.id}"]`);
+    if (block && block.parentNode) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = readyHtml(a, state.elements, state.acomptes).trim();
+      const newNode = wrapper.firstElementChild;
+      if (newNode) block.parentNode.replaceChild(newNode, block);
+    }
+    // Toggle the « completed-tile » aesthetic on the card itself.
+    const card = document.querySelector(`[data-acompte-card="${a.id}"]`);
+    if (card) card.classList.toggle('full', isAcompteFull(a));
+  });
+}
+
+/** Update the warning-dot indicator on each element sub-tab. Called after any
+ *  task change so the dot appears/disappears live even when the warning sits
+ *  on the currently-active tab. */
+function refreshElementTabsWarnings() {
+  state.elements.forEach((el) => {
+    const tabEl = document.querySelector(`.va-element-tab[data-element-tab="${el.id}"]`);
+    if (!tabEl) return;
+    const hasWarn = elementHasWarning(el);
+    let dot = tabEl.querySelector('[data-warn-dot]');
+    if (hasWarn && !dot) {
+      const span = document.createElement('span');
+      span.className = 'va-element-tab-warn-dot';
+      span.setAttribute('data-warn-dot', '');
+      tabEl.appendChild(span);
+    } else if (!hasWarn && dot) {
+      dot.remove();
+    }
+  });
+}
+
+function refreshTaskRow(taskId) {
+  let task = null;
+  let parentEl = null;
+  let taskIdx = -1;
+  for (const el of state.elements) {
+    const idx = el.tasks.findIndex((t) => t.logicalTaskId === taskId);
+    if (idx >= 0) { task = el.tasks[idx]; parentEl = el; taskIdx = idx; break; }
+  }
+  if (!task || !parentEl) return;
+  const pct = state.totalQuantity > 0 ? (task.copiesDone / state.totalQuantity) * 100 : 0;
+  const cascade = cascadeFifo(task.copiesDone, state.acomptes);
+  const upstream = taskIdx > 0 ? parentEl.tasks[taskIdx - 1] : null;
+
+  document.querySelectorAll(`[data-task-row="${taskId}"]`).forEach((row) => {
+    const cumulEl = row.querySelector('[data-cumul]');
+    if (cumulEl) cumulEl.innerHTML = `Cumul : <strong>${fmt(task.copiesDone)}</strong> / ${fmt(state.totalQuantity)} ex.`;
+    const pctEl = row.querySelector('[data-pct]');
+    if (pctEl) pctEl.textContent = `${Math.round(pct)} %`;
+    const fillEl = row.querySelector('[data-slider-fill]');
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    const cascadeEl = row.querySelector('[data-cascade]');
+    if (cascadeEl) cascadeEl.innerHTML = buildCascadeSegmentsHtml(cascade);
+    const warnEl = row.querySelector('[data-warning]');
+    if (warnEl) warnEl.innerHTML = warningHtml(task, upstream);
+    // Sync the OTHER input (number ↔ slider) that the user didn't touch —
+    // skip the currently focused element to avoid mid-drag/typing jitter.
+    row.querySelectorAll(`input[data-task-input="${taskId}"]`).forEach((inp) => {
+      if (document.activeElement !== inp && Number(inp.value) !== task.copiesDone) {
+        inp.value = String(task.copiesDone);
+      }
+    });
+  });
+  // The downstream task's warning depends on THIS task's value. Refresh it too.
+  if (parentEl.tasks[taskIdx + 1]) {
+    const downstream = parentEl.tasks[taskIdx + 1];
+    const downstreamWarnEl = document.querySelector(`[data-task-row="${downstream.logicalTaskId}"] [data-warning]`);
+    if (downstreamWarnEl) downstreamWarnEl.innerHTML = warningHtml(downstream, task);
+  }
+  refreshElementTabsWarnings();
+  refreshAcompteReady();
+  if (window.lucide) lucide.createIcons();
+}
+
+function refreshAllTaskRows() {
+  for (const el of state.elements) {
+    for (const t of el.tasks) refreshTaskRow(t.logicalTaskId);
+  }
+}
+
+function refreshValidator() {
+  const sum = state.acomptes.reduce((s, a) => s + a.quantityShare, 0);
+  const solde = state.acomptes[state.acomptes.length - 1];
+  const negative = solde && solde.quantityShare < 0;
+  document.querySelectorAll('[data-validator]').forEach((v) => {
+    if (negative) {
+      v.className = 'va-validator warn';
+      v.innerHTML = `
+        <i data-lucide="alert-triangle"></i>
+        Sur-allocation : les acomptes saisis dépassent la quantité totale. Réduis-en au moins un.
+      `;
+    } else {
+      v.className = 'va-validator ok';
+      v.innerHTML = `
+        <i data-lucide="check"></i>
+        Solde calculé automatiquement (total − Σ autres). Somme = ${fmt(sum)} ex.
+      `;
+    }
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+/** Refresh the Solde card's quantity input value after a non-solde change. */
+function refreshSoldeQty() {
+  if (state.acomptes.length === 0) return;
+  const last = state.acomptes[state.acomptes.length - 1];
+  document.querySelectorAll(`input[data-acompte="${last.id}"][data-field="quantityShare"]`).forEach((inp) => {
+    if (document.activeElement !== inp) inp.value = String(last.quantityShare);
+  });
+}
+
 function render() {
   document.getElementById('tab-label').textContent = `Acomptes (${state.acomptes.length})`;
   document.getElementById('body').innerHTML = state.variant === 'A' ? renderA() : renderB();
-  // Wire inputs
+  wireEvents();
+  icons();
+}
+
+function wireEvents() {
+  // Acompte qty/deadline inputs
   document.querySelectorAll('input[data-acompte][data-field]').forEach((el) => {
     el.addEventListener('input', (e) => {
       const t = e.currentTarget;
@@ -625,62 +1041,103 @@ function render() {
       const f = t.getAttribute('data-field');
       const a = state.acomptes.find((x) => x.id === id);
       if (!a) return;
-      if (f === 'quantityShare') a.quantityShare = Number.parseInt(t.value, 10) || 0;
-      else if (f === 'deadline') a.deadline = t.value;
+      if (f === 'quantityShare') {
+        // Solde's qty input is readonly, but be defensive — skip if it's the last one.
+        const isLast = state.acomptes[state.acomptes.length - 1].id === id;
+        if (isLast) return;
+        a.quantityShare = Number.parseInt(t.value, 10) || 0;
+        recomputeSolde();
+        refreshSoldeQty();
+        refreshAllTaskRows();    // cascades depend on acompte capacities
+        refreshValidator();
+      } else if (f === 'deadline') {
+        a.deadline = t.value;
+        // Deadline doesn't affect cascade math — no derived refresh needed.
+      }
+    });
+  });
+  // Element sub-tab navigation — switch the active element. Triggers a render
+  // because the task list shown depends on activeElementId. The acomptes column
+  // is unaffected (parent-level).
+  document.querySelectorAll('[data-element-tab]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const id = e.currentTarget.getAttribute('data-element-tab');
+      if (id === state.activeElementId) return;
+      state.activeElementId = id;
       render();
     });
   });
+  // Task input — both number input and slider share data-task-input. We update
+  // state + refresh derived only ; DO NOT call render() (would destroy the
+  // slider DOM mid-drag and break mouse capture).
   document.querySelectorAll('input[data-task-input]').forEach((el) => {
     el.addEventListener('input', (e) => {
       const t = e.currentTarget;
       const id = t.getAttribute('data-task-input');
-      const v = Number.parseInt(t.value, 10) || 0;
+      const v = Math.max(0, Math.min(state.totalQuantity, Number.parseInt(t.value, 10) || 0));
       for (const ele of state.elements) {
         const task = ele.tasks.find((x) => x.logicalTaskId === id);
-        if (task) task.copiesDone = Math.max(0, Math.min(state.totalQuantity, v));
+        if (task) task.copiesDone = v;
       }
-      render();
+      refreshTaskRow(id);
     });
   });
+  // Add / remove acomptes — shape changes, full rebuild is OK.
   document.querySelectorAll('[data-action="remove"]').forEach((el) => {
     el.addEventListener('click', (e) => {
       const id = e.currentTarget.getAttribute('data-id');
       if (state.acomptes.length <= 1) return;
       state.acomptes = state.acomptes.filter((a) => a.id !== id);
       state.acomptes.forEach((a, i) => { a.positionIndex = i + 1; });
+      recomputeSolde();
       render();
     });
   });
   document.querySelectorAll('[data-action="add"]').forEach((el) => {
     el.addEventListener('click', () => {
-      const last = state.acomptes[state.acomptes.length - 1];
+      // New acompte is inserted JUST BEFORE the Solde (becomes the new last-but-one).
+      // The Solde stays the last entry and gets recomputed to absorb the change.
+      const solde = state.acomptes[state.acomptes.length - 1];
+      const beforeSolde = state.acomptes.slice(0, -1);
       const pad = (n) => String(n).padStart(2, '0');
-      let next = '2026-07-15T17:00';
-      if (last?.deadline) {
-        const d = new Date(last.deadline);
-        d.setDate(d.getDate() + 7);
-        next = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      let nextDeadline = '2026-07-15T17:00';
+      if (solde?.deadline) {
+        const d = new Date(solde.deadline);
+        d.setDate(d.getDate() - 7);
+        nextDeadline = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
       }
-      state.acomptes.push({
+      const newAcompte = {
         id: 'a' + Math.random().toString(36).slice(2, 6),
-        positionIndex: state.acomptes.length + 1,
+        positionIndex: 0,
         quantityShare: 0,
-        deadline: next,
-      });
+        deadline: nextDeadline,
+      };
+      state.acomptes = [...beforeSolde, newAcompte, solde];
+      state.acomptes.forEach((a, i) => { a.positionIndex = i + 1; });
+      recomputeSolde();
       render();
     });
   });
-  icons();
 }
 
-document.querySelectorAll('.variant-btn').forEach((b) => {
+document.querySelectorAll('.variant-btn[data-variant]').forEach((b) => {
   b.addEventListener('click', () => {
     state.variant = b.getAttribute('data-variant');
-    document.querySelectorAll('.variant-btn').forEach((x) => x.classList.toggle('active', x === b));
+    document.querySelectorAll('.variant-btn[data-variant]').forEach((x) => x.classList.toggle('active', x === b));
     render();
   });
 });
+document.querySelectorAll('.variant-btn[data-scenario]').forEach((b) => {
+  b.addEventListener('click', () => {
+    const sc = b.getAttribute('data-scenario');
+    document.querySelectorAll('.variant-btn[data-scenario]').forEach((x) => x.classList.toggle('active', x === b));
+    loadScenario(sc);
+  });
+});
 
+// Enforce the Solde invariant on the initial state too — defensive against
+// a hand-typed state.acomptes that doesn't sum to total.
+recomputeSolde();
 render();
 </script>
 </body>
