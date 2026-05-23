@@ -119,3 +119,27 @@ export function getFluxJobStatus(
   );
   return planned ? 'planned' : 'unplanned';
 }
+
+/**
+ * Whether a job is "prêt à partir" — production complete but not yet shipped.
+ *
+ * True iff: not already shipped, AND every non-empty station + every outsourcing
+ * task across all elements is in 'done' state, AND at least one signal of completion
+ * exists (so a fully-empty job doesn't qualify).
+ */
+export function isReadyToShip(job: FluxJob): boolean {
+  if (job.parti.shipped) return false;
+  let hasAnyDoneSignal = false;
+  for (const el of job.elements) {
+    for (const station of Object.values(el.stations)) {
+      if (!station || station.state === 'empty') continue;
+      if (station.state === 'done') { hasAnyDoneSignal = true; continue; }
+      return false;
+    }
+    for (const ot of el.outsourcing) {
+      if (ot.status === 'done') { hasAnyDoneSignal = true; continue; }
+      return false;
+    }
+  }
+  return hasAnyDoneSignal;
+}

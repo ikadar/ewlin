@@ -3,10 +3,44 @@ import {
   worstPrerequisiteStatus,
   sortStationDataBySeverity,
   getMultiElementStationData,
+  isReadyToShip,
   PREREQUISITE_COLOR_SEVERITY,
   STATION_STATE_SEVERITY,
 } from './fluxAggregation';
-import type { FluxElement, FluxStationData } from './fluxTypes';
+import type { FluxElement, FluxJob, FluxStationData } from './fluxTypes';
+
+function elem(overrides: Partial<FluxElement> = {}): FluxElement {
+  return {
+    id: 'e1',
+    label: 'Main',
+    bat: 'bat_approved',
+    papier: 'in_stock',
+    formes: 'none',
+    plaques: 'ready',
+    stations: {},
+    outsourcing: [],
+    ...overrides,
+  };
+}
+
+function job(overrides: Partial<FluxJob> = {}): FluxJob {
+  return {
+    id: '00042',
+    client: 'Ducros',
+    referent: null,
+    designation: 'Cartes 500',
+    sortie: '15/03',
+    sortieIso: '2026-03-15',
+    deadlineRelativeWorkingDays: null,
+    batDeadline: null,
+    deadlinePriority: 2,
+    elements: [elem()],
+    transporteur: null,
+    parti: { shipped: false, date: null },
+    facture: { invoiced: false, date: null },
+    ...overrides,
+  };
+}
 
 describe('PREREQUISITE_COLOR_SEVERITY', () => {
   it('red has lowest severity (0)', () => {
@@ -161,5 +195,120 @@ describe('STATION_STATE_SEVERITY', () => {
     expect(STATION_STATE_SEVERITY['in-progress']).toBeLessThan(STATION_STATE_SEVERITY.planned);
     expect(STATION_STATE_SEVERITY.planned).toBeLessThan(STATION_STATE_SEVERITY.done);
     expect(STATION_STATE_SEVERITY.done).toBeLessThan(STATION_STATE_SEVERITY.empty);
+  });
+});
+
+describe('isReadyToShip', () => {
+  it('returns false when already shipped', () => {
+    const j = job({
+      parti: { shipped: true, date: '25/02' },
+      elements: [elem({ stations: { 'cat-offset': { state: 'done' } } })],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns false when all stations empty (no done signal)', () => {
+    const j = job({ elements: [elem({ stations: { 'cat-offset': { state: 'empty' } } })] });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns false when at least one station is in-progress', () => {
+    const j = job({
+      elements: [elem({ stations: {
+        'cat-offset': { state: 'done' },
+        'cat-cutting': { state: 'in-progress', progress: 50 },
+      } })],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns false when at least one station is planned', () => {
+    const j = job({
+      elements: [elem({ stations: {
+        'cat-offset': { state: 'done' },
+        'cat-cutting': { state: 'planned' },
+      } })],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns false when at least one station is late', () => {
+    const j = job({
+      elements: [elem({ stations: {
+        'cat-offset': { state: 'done' },
+        'cat-cutting': { state: 'late', progress: 80 },
+      } })],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns true when all non-empty stations are done', () => {
+    const j = job({
+      elements: [elem({ stations: {
+        'cat-offset': { state: 'done' },
+        'cat-cutting': { state: 'done' },
+      } })],
+    });
+    expect(isReadyToShip(j)).toBe(true);
+  });
+
+  it('returns true when mix of empty and done stations', () => {
+    const j = job({
+      elements: [elem({ stations: {
+        'cat-offset': { state: 'done' },
+        'cat-cutting': { state: 'empty' },
+      } })],
+    });
+    expect(isReadyToShip(j)).toBe(true);
+  });
+
+  it('returns false when an ST task is still pending', () => {
+    const j = job({
+      elements: [elem({
+        stations: { 'cat-offset': { state: 'done' } },
+        outsourcing: [{ taskId: 't1', actionType: 'finition', providerName: 'X', status: 'pending' }],
+      })],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns false when an ST task is in progress', () => {
+    const j = job({
+      elements: [elem({
+        stations: { 'cat-offset': { state: 'done' } },
+        outsourcing: [{ taskId: 't1', actionType: 'finition', providerName: 'X', status: 'progress' }],
+      })],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns true when all ST tasks are done and stations are done', () => {
+    const j = job({
+      elements: [elem({
+        stations: { 'cat-offset': { state: 'done' } },
+        outsourcing: [{ taskId: 't1', actionType: 'finition', providerName: 'X', status: 'done' }],
+      })],
+    });
+    expect(isReadyToShip(j)).toBe(true);
+  });
+
+  it('returns false when one element of a multi-element job is not done', () => {
+    const j = job({
+      elements: [
+        elem({ id: 'e1', stations: { 'cat-offset': { state: 'done' } } }),
+        elem({ id: 'e2', stations: { 'cat-offset': { state: 'in-progress', progress: 30 } } }),
+      ],
+    });
+    expect(isReadyToShip(j)).toBe(false);
+  });
+
+  it('returns true when all elements of a multi-element job are done', () => {
+    const j = job({
+      elements: [
+        elem({ id: 'e1', stations: { 'cat-offset': { state: 'done' }, 'cat-cutting': { state: 'done' } } }),
+        elem({ id: 'e2', stations: { 'cat-offset': { state: 'done' } } }),
+      ],
+    });
+    expect(isReadyToShip(j)).toBe(true);
   });
 });
