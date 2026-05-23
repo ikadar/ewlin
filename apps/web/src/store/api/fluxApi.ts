@@ -17,6 +17,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
 import { scheduleApi } from './scheduleApi';
+import { prodSnapshotApi } from './prodSnapshotApi';
 import { shipperApi } from './shipperApi';
 import type { FluxJob, FluxSTStatus, FluxOutsourcingTask, FluxStationData, PrerequisiteColumn, PrerequisiteStatus } from '../../components/FluxTable/fluxTypes';
 
@@ -169,7 +170,7 @@ export interface UpdateJobShipperArg {
 export interface UpdatePrerequisiteArg {
   /** Element GUID (used in the PATCH URL) */
   elementId: string;
-  /** Parent job reference ID (used for optimistic cache update lookup) */
+  /** Parent job internal UUID (used for optimistic cache update lookup) */
   jobId: string;
   column: PrerequisiteColumn;
   value: PrerequisiteStatus;
@@ -225,6 +226,7 @@ export const fluxApi = createApi({
           // Cross-API invalidation: schedule snapshot uses task.status for outsourced tile state
           const { scheduleApi } = await import('./scheduleApi');
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
         } catch {
           // noop — no optimistic update to roll back
         }
@@ -248,7 +250,7 @@ export const fluxApi = createApi({
       async onQueryStarted({ jobId, elementId, column, value }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
-            const job = draft.find((j) => j.id === jobId);
+            const job = draft.find((j) => j.internalId === jobId);
             if (job) {
               const el = job.elements.find((e) => e.id === elementId);
               if (el) el[column] = value;
@@ -259,7 +261,12 @@ export const fluxApi = createApi({
           await queryFulfilled;
           // Invalidate the scheduling snapshot so the scheduling view
           // reflects the updated prerequisite status on next render.
+          // Both Préprod (Snapshot) and Prod (ProdSnapshot) consumers
+          // wrap the same /schedule/snapshot endpoint with separate
+          // tags ; in Prod, the planning reads via prodSnapshotApi so
+          // the gate flip stays invisible if only Snapshot is busted.
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
           // Refetch flux jobs to get server-side auto-set date fields
           // (e.g. batSentAt, paperOrderedAt) that the optimistic update can't predict.
           dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
@@ -304,6 +311,7 @@ export const fluxApi = createApi({
           await queryFulfilled;
           // Invalidate scheduler snapshot so JCF edit mode sees updated shipperId
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
         } catch {
           patchResult.undo();
         }
@@ -336,6 +344,7 @@ export const fluxApi = createApi({
         try {
           await queryFulfilled;
           dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
           // Refetch flux to update station indicators (tasks marked completed by backend)
           dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
         } catch {

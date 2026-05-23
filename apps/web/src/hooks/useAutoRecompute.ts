@@ -16,6 +16,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { scheduleApi, useComputeScheduleMutation } from '../store';
+import { prodSnapshotApi } from '../store/api/prodSnapshotApi';
 import { useAppDispatch } from '../store';
 import {
   addAutoRecomputeEventListener,
@@ -50,7 +51,15 @@ export function useAutoRecompute(onEvent?: OnEvent): UseAutoRecomputeReturn {
     bindAutoRecomputeRuntime({
       runFast: () => computeSchedule({ mode: 'full' }).unwrap(),
       invalidateSnapshot: () => {
+        // Invalidate both slices: `Snapshot` (Préprod consumer via
+        // useGetSnapshotQuery) and `ProdSnapshot` (Prod consumer via
+        // useGetProdSnapshotQuery). They wrap the same /schedule/snapshot
+        // endpoint with different cache keys, so both must be busted
+        // for the planning view to re-fetch after a reality mutation
+        // — otherwise the Prod planning shows the pre-compute state
+        // (e.g. paperStatus still "à commander" after a Flux gate flip).
         dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
       },
     });
     // Intentionally don't unbind on unmount: leaving the last binding

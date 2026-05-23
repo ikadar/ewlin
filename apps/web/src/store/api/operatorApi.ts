@@ -4,8 +4,6 @@
 
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
-import { scheduleApi } from './scheduleApi';
-import { prodSnapshotApi } from './prodSnapshotApi';
 
 export interface OperatorSkillResponse {
   stationId: string;
@@ -156,15 +154,6 @@ export const operatorApi = createApi({
         body,
       }),
       invalidatesTags: ['Operators'],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
-        } catch {
-          // noop
-        }
-      },
     }),
   }),
 });

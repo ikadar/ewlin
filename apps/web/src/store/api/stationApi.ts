@@ -7,8 +7,6 @@
 
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithFixtureSupport } from './baseApi';
-import { scheduleApi } from './scheduleApi';
-import { prodSnapshotApi } from './prodSnapshotApi';
 
 export interface StationResponse {
   id: string;
@@ -89,14 +87,6 @@ export const stationApi = createApi({
         body,
       }),
       invalidatesTags: ['Stations'],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-        } catch {
-          // mutation failed — no invalidation needed
-        }
-      },
     }),
     deleteStation: builder.mutation<void, string>({
       query: (id) => ({
@@ -115,15 +105,6 @@ export const stationApi = createApi({
         body,
       }),
       invalidatesTags: ['Stations'],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
-        } catch {
-          // noop
-        }
-      },
     }),
   }),
 });
