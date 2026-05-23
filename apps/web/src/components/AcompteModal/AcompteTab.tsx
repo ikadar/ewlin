@@ -170,6 +170,12 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
   const [deliveries, setDeliveries] = useState<DeliveryDraft[]>([]);
   const [elementGroups, setElementGroups] = useState<ElementGroupDraft[]>([]);
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  // Track which logical_task_ids had a non-null declaration loaded from the
+  // server. Required to handle the "user resets a previously-saved progress
+  // back to 0" case : without it, flushDeclarations would skip writing 0
+  // (current copies > 0 is the only trigger), leaving the stale value alive
+  // in DB and the engine still reading the job as in-progress.
+  const [previouslyDeclaredTaskIds, setPreviouslyDeclaredTaskIds] = useState<ReadonlySet<string>>(new Set());
 
   /* ── Initialize deliveries from server (or synth single if virgin). ── */
   useEffect(() => {
@@ -196,6 +202,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
     const declByLogical = new Map(
       (declarationsData?.declarations ?? []).map((d) => [d.logicalTaskId, d.declaredTotalCopiesDone]),
     );
+    setPreviouslyDeclaredTaskIds(new Set(declByLogical.keys()));
     const groups: ElementGroupDraft[] = [];
     const tasksById = new Map(job.tasks.map((t) => [t.id, t]));
     for (const el of job.elements) {
@@ -333,9 +340,16 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
   );
 
   async function flushDeclarations() {
+    // Write the declaration when EITHER (a) the user has saisi > 0 copies,
+    // OR (b) the server already had a declaration for this task — in which
+    // case we must upsert (potentially to 0) so the user can undo a prior
+    // saisie. Without (b), a slider drag back to 0 leaves the old value
+    // alive in DB and the engine keeps reading in-progress (silent state
+    // divergence — the form ships clean, the wall doesn't update).
     for (const g of elementGroups) {
       for (const t of g.tasks) {
-        if (t.copiesDone > 0) {
+        const hadPrior = previouslyDeclaredTaskIds.has(t.logicalTaskId);
+        if (t.copiesDone > 0 || hadPrior) {
           await writeDeclaration({
             jobId: job.id,
             logical_task_id: t.logicalTaskId,
@@ -598,22 +612,28 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                             </span>
                           </div>
                           {/* Cascade segments */}
+                          {/* Cascade segments use the canonical tile-completed palette
+                              (rgb 34,197,94 == #22c55e, text #86efac) so they read as
+                              the same « validated » signal as the .full acompte card +
+                              the planning-board tuile completed. Previously these used
+                              Tailwind emerald-500 (#10b981) which drifted just enough
+                              to look like a separate green from the rest. */}
                           <div className="flex gap-1 h-[44px] mt-2">
                             {cascade.map((c, ci) => (
                               <div
                                 key={c.acompteId}
                                 className={`relative border px-2 py-1.5 min-w-[80px] flex flex-col justify-between overflow-hidden ${
-                                  c.saturated ? 'border-emerald-500/45' : 'border-zinc-800'
+                                  c.saturated ? 'border-[rgba(34,197,94,0.45)]' : 'border-zinc-800'
                                 } bg-zinc-800/40`}
                                 style={{ flexGrow: Math.max(1, c.capacity), flexBasis: 0 }}
                               >
                                 <div
                                   className={`absolute left-0 top-0 bottom-0 transition-[width] ${
                                     c.saturated
-                                      ? 'bg-emerald-500/55'
+                                      ? 'bg-[rgba(34,197,94,0.55)]'
                                       : c.empty
                                         ? 'bg-transparent'
-                                        : 'bg-emerald-500/30'
+                                        : 'bg-[rgba(34,197,94,0.30)]'
                                   }`}
                                   style={{ width: `${c.progressPct}%` }}
                                 />
@@ -624,9 +644,9 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                                     }`}
                                   >
                                     {acompteShortLabel(ci, cascade.length)}
-                                    {c.saturated && <Check className="w-2.5 h-2.5 text-emerald-400" />}
+                                    {c.saturated && <Check className="w-2.5 h-2.5 text-[#86efac]" />}
                                   </span>
-                                  <span className={c.saturated ? 'text-emerald-400' : 'text-zinc-500'}>
+                                  <span className={c.saturated ? 'text-[#86efac]' : 'text-zinc-500'}>
                                     {Math.round(c.progressPct)}%
                                   </span>
                                 </div>

@@ -130,6 +130,11 @@ export function JcfModificationModal({
   const [activeTab, setActiveTab] = useState<'dossier' | 'acomptes'>('dossier');
   const acompteTabRef = useRef<AcompteTabHandle>(null);
   const [tabError, setTabError] = useState<string | null>(null);
+  // Local saving flag for the Acomptes tab — the parent's `isSaving` prop is
+  // only toggled on the Dossier branch (it wraps JobModificationContainer's
+  // updateElementSequence/updateJob path). Mirrored here for the acompte
+  // mutations so the Save button shows the spinner + disables itself.
+  const [acompteSaving, setAcompteSaving] = useState(false);
   // Local draft delivery count fed back by AcompteTab via onDraftCountChange.
   // Always ≥ 1 (the synthetic single-delivery counts). Drives the
   // « Livraisons (N) » tab label — N reflects the about-to-save state.
@@ -242,6 +247,14 @@ export function JcfModificationModal({
   const handleSave = useCallback(async () => {
     setTabError(null);
     if (activeTab === 'acomptes') {
+      // Toggle the local saving flag so the Save button shows
+      // « Enregistrement... » and disables itself during the in-flight
+      // mutations. Without this, the JcfModal button stayed clickable
+      // (the parent's isSaving prop only covers the Dossier path) and a
+      // fast double-click could fire two replaceAcomptes calls — RTK
+      // Query dedups identical pending requests but the second can race
+      // against tag invalidation and surface a 409.
+      setAcompteSaving(true);
       try {
         await acompteTabRef.current?.save();
       } catch (e: unknown) {
@@ -249,6 +262,8 @@ export function JcfModificationModal({
           ?? (e instanceof Error ? e.message : 'Erreur de sauvegarde des acomptes.');
         setTabError(msg);
         throw e;
+      } finally {
+        setAcompteSaving(false);
       }
       // Acomptes path persisted via RTK mutations + autoRecomputeMiddleware
       // already kicks off a fresh compute on writeAcompteProgressDeclaration.
@@ -304,7 +319,7 @@ export function JcfModificationModal({
       onClose={onClose}
       title={title}
       onSave={handleSave}
-      isSaving={isSaving}
+      isSaving={isSaving || acompteSaving}
       error={tabError ?? error}
       saveLabel={saveLabel}
       tabs={tabs}
