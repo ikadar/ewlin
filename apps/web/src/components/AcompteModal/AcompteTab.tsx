@@ -1,30 +1,52 @@
 /**
  * AcompteTab — body of the « Acomptes » tab inside JcfModificationModal.
  *
- * Auto-Solde model :
- *   N = 1 : the row is « Livraison complète », quantity auto-set to job.quantity,
- *           deadline = job.workshopExitDate. Quantity is read-only.
- *   N ≥ 2 : the LAST row is the « Solde · Acompte N/N ». Its quantity is auto-
- *           computed as total − Σ(other acomptes) and is read-only. The other
- *           rows are normal editable « Acompte i/N ».
+ * The tab juggles two concerns side by side, with DIFFERENT semantics :
  *
- * Adding from N = 1 inserts a new acompte BEFORE the current row (which keeps
- * being the Solde). Removing the last editable row collapses back to N = 1.
+ *  1. ACOMPTE SPLIT (left column) — N livraisons + qty + deadline.
+ *     Pure planning intent. Editable in Préprod, promoted to Prod. Owner :
+ *     the user. The split can be renegotiated even when work is in flight.
+ *
+ *  2. AVANCEMENT (right column) — copies done per task.
+ *     Reality declaration. Bootstrap-only via this form : the slider is
+ *     EDITABLE when the task has no tile placed yet (or all placements are
+ *     in the future) ; otherwise READ-ONLY and a hint redirects the user
+ *     to clic-droit on the tile.
+ *
+ *     The rationale : once a tile is placed in the past, the split-at-NOW
+ *     invariant (« past pre-NOW verbatim, post-NOW mutable ») forbids
+ *     rewriting history from a form that has no tile context. The canonical
+ *     saisie path (clic-droit, IA palette, silence-is-consent push) knows
+ *     the assignment, knows scheduledEnd, can split properly. A raw wall
+ *     write from here would just slam a pct on the wall and produce
+ *     incoherent state (tile-stuck-in-the-past visuals overriding the
+ *     declared pct).
+ *
+ *     Editable rule : `earliestStart === undefined || earliestStart > NOW`
+ *     where earliestStart is the min scheduledStart across all assignments
+ *     for this task in the current scenario. None placed ⇒ bootstrap mode.
+ *     All future ⇒ still seedable. Past or in-progress ⇒ locked.
+ *
+ * Auto-Solde model (left column) :
+ *   N = 1 : the row is « Livraison complète », quantity auto-set to
+ *           job.quantity, deadline = job.workshopExitDate. Quantity readonly.
+ *   N ≥ 2 : the LAST row is the « Solde · Acompte N/N ». Its quantity is
+ *           auto-computed as total − Σ(other acomptes) and is read-only.
+ *           The other rows are normal editable « Acompte i/N ».
  *
  * Per-card « Prêt : X / Y ex. » : bottleneck of each element's LAST task
- * cascade for this acompte. When ready === quantityShare, the card flips into
- * the « completed tile » aesthetic (emerald inset left bar + 9% emerald wash +
- * emerald-300 text) — same visual signature as a planning board tuile completed
- * (see apps/web/src/components/Tile/colorUtils.ts PALETTE.completed).
+ * cascade for this acompte. When ready === quantityShare, the card flips
+ * into the « completed tile » aesthetic.
  *
- * Right column carries an element sub-tab strip in multi-element jobs ; only
- * the active element's tasks are shown. A small amber dot on the tab marks a
- * cross-machine cumul inversion within that element (e.g. massicot > impression).
+ * Right column carries an element sub-tab strip in multi-element jobs ;
+ * only the active element's tasks are shown. A small amber dot on the tab
+ * marks a cross-machine cumul inversion within that element.
  */
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Check, Package, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, Lock, Package, Plus, Trash2 } from 'lucide-react';
 import type { JobDetailsResponse } from '../../store/api/scheduleApi';
+import { useGetSnapshotQuery } from '../../store/api/scheduleApi';
 import {
   useGetAcomptesQuery,
   useReplaceAcomptesMutation,
@@ -32,6 +54,7 @@ import {
 } from '../../store/api/acompteApi';
 import { useRecordProgressDirectMutation } from '../../store/api/saisieApi';
 import { useGetStationsQuery } from '../../store/api/stationApi';
+import { useNow } from '../../contexts/NowContext';
 import { cascadeFifo, type AcompteForCascade } from './cascadeFifo';
 
 export interface AcompteTabProps {
@@ -64,6 +87,17 @@ interface TaskDraft {
   taskLabel: string;
   sequenceOrder: number;
   copiesDone: number;
+  /**
+   * False when this task already has at least one assignment with
+   * scheduledStart < NOW. Past + in-progress tiles freeze the saisie
+   * from THIS form : the canonical UX for declaring progress on a
+   * placed tile is clic-droit / IA palette / silence-is-consent push
+   * (those have full assignment context + split-at-NOW semantics). The
+   * Acomptes tab's avancement slider is only a bootstrap / seed channel
+   * for tasks that haven't yet been placed (or whose placement is
+   * entirely in the future). See AcompteTab docblock for the rationale.
+   */
+  saisieEditable: boolean;
 }
 
 interface ElementGroupDraft {
@@ -159,9 +193,25 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
 
   const { data: acomptesData } = useGetAcomptesQuery(job.id);
   const { data: stations = [] } = useGetStationsQuery();
+  const { data: snapshot } = useGetSnapshotQuery();
   const [replaceAcomptes] = useReplaceAcomptesMutation();
   const [deleteAcomptes] = useDeleteAcomptesMutation();
   const [recordProgressDirect] = useRecordProgressDirectMutation();
+  const now = useNow();
+
+  // Map<taskId, earliest scheduledStart (ms)> across all assignments in the
+  // current scenario. Used to flip the saisie slider into read-only mode for
+  // tasks whose tile is already in the past (or in progress).
+  const earliestStartByTaskId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of snapshot?.assignments ?? []) {
+      if (!a.scheduledStart) continue;
+      const t = new Date(a.scheduledStart).getTime();
+      const prev = map.get(a.taskId);
+      if (prev === undefined || t < prev) map.set(a.taskId, t);
+    }
+    return map;
+  }, [snapshot]);
 
   const stationNameById = useMemo(
     () => new Map(stations.map((s) => [s.id, s.name])),
@@ -224,6 +274,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
 
     const groups: ElementGroupDraft[] = [];
     const tasksById = new Map(job.tasks.map((t) => [t.id, t]));
+    const nowMs = now.getTime();
     for (const el of job.elements) {
       const tasks: TaskDraft[] = [];
       for (const tid of el.taskIds) {
@@ -233,12 +284,18 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
         const copiesDone = totalQuantity > 0 && (t.recordedProgressPct ?? 0) > 0
           ? Math.round(((t.recordedProgressPct ?? 0) / 100) * totalQuantity)
           : 0;
+        // Read-only iff a tile is already placed in the past or in-progress
+        // (scheduledStart < NOW). The past is verbatim per the split-at-NOW
+        // invariant ; trying to mutate it from a form is a category error.
+        const earliestStart = earliestStartByTaskId.get(t.id);
+        const saisieEditable = earliestStart === undefined || earliestStart > nowMs;
         tasks.push({
           taskId: t.id,
           logicalTaskId: t.logicalTaskId,
           taskLabel: stationLabel,
           sequenceOrder: t.sequenceOrder,
           copiesDone,
+          saisieEditable,
         });
       }
       tasks.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
@@ -253,7 +310,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
       if (prev && groups.some((g) => g.elementId === prev)) return prev;
       return groups[0].elementId;
     });
-  }, [job.elements, job.tasks, stationNameById, totalQuantity]);
+  }, [job.elements, job.tasks, stationNameById, totalQuantity, earliestStartByTaskId, now]);
 
   /* ── Notify parent of draft delivery count (always ≥ 1). ──────────── */
   useEffect(() => {
@@ -373,6 +430,12 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
     // drag back to 0 would silently no-op (the wall keeps the prior pct).
     for (const g of elementGroups) {
       for (const t of g.tasks) {
+        // Skip read-only tasks (tile already placed in past/in-progress) :
+        // the form can't write progress on them, the slider was disabled
+        // upstream, so the value here is just the seeded wall value — no
+        // mutation to flush. Defensive guard in case state drift somehow
+        // bypassed the UI lock.
+        if (!t.saisieEditable) continue;
         const hadPrior = previouslyDeclaredTaskIds.has(t.logicalTaskId);
         if (t.copiesDone > 0 || hadPrior) {
           const pct = totalQuantity > 0 ? (t.copiesDone / totalQuantity) * 100 : 0;
@@ -609,26 +672,32 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                               onChange={(e) =>
                                 setTaskCopiesDone(activeGroupIdx, taskIdx, Number.parseInt(e.target.value, 10) || 0)
                               }
-                              className="w-[110px] bg-zinc-900 border border-zinc-800 px-2 py-1 text-[13px] text-zinc-100 text-right tabular-nums focus:outline-none focus:border-indigo-500"
+                              readOnly={!task.saisieEditable}
+                              tabIndex={task.saisieEditable ? undefined : -1}
+                              title={task.saisieEditable ? '' : 'Tuile déjà posée — saisis via clic-droit sur la tuile dans le planning.'}
+                              className={`w-[110px] border px-2 py-1 text-[13px] text-right tabular-nums focus:outline-none ${
+                                task.saisieEditable
+                                  ? 'bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-indigo-500'
+                                  : 'bg-zinc-950/60 border-zinc-800 text-zinc-500 cursor-not-allowed'
+                              }`}
                             />
                             <span className="text-[11px] text-zinc-500">ex.</span>
                             <div className="flex-1 relative h-[22px] flex items-center">
                               <div className="absolute inset-x-0 h-[6px] bg-zinc-800 overflow-hidden pointer-events-none">
                                 <div
-                                  className="h-full bg-indigo-500 transition-[width]"
+                                  className={`h-full transition-[width] ${
+                                    task.saisieEditable ? 'bg-indigo-500' : 'bg-zinc-600'
+                                  }`}
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
-                              {/* step=1 (not 500) — when the job quantity isn't
-                                  a multiple of the slider step, HTML5 normalises
-                                  values that aren't on a step boundary by clamping
-                                  to the nearest reachable step. A 3 800 ex. job
-                                  with step=500 caps the slider at 3 500 (= 92 %)
-                                  even when state holds 3 800 — the thumb is stuck
-                                  mid-track and a fresh drag can't reach the max.
-                                  step=1 makes every integer reachable ; the drag
-                                  feel stays smooth (mouse pixel resolution is the
-                                  real granularity, not the step). */}
+                              {/* step=1 (not 500) — see slider-step rationale below.
+                                  saisieEditable gate : when the task already has
+                                  a tile placed in the past or in-progress, the
+                                  Acomptes tab loses authority over saisie (split-
+                                  at-NOW only happens via clic-droit / IA palette,
+                                  not via raw wall writes). The slider becomes a
+                                  read-only display of the wall value. */}
                               <input
                                 type="range"
                                 min={0}
@@ -638,14 +707,31 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                                 onChange={(e) =>
                                   setTaskCopiesDone(activeGroupIdx, taskIdx, Number.parseInt(e.target.value, 10) || 0)
                                 }
-                                className="acompte-progress-slider relative z-10 w-full appearance-none bg-transparent cursor-grab active:cursor-grabbing focus:outline-none"
+                                disabled={!task.saisieEditable}
+                                title={task.saisieEditable ? '' : 'Tuile déjà posée — saisis via clic-droit sur la tuile dans le planning.'}
+                                className={`acompte-progress-slider relative z-10 w-full appearance-none bg-transparent focus:outline-none ${
+                                  task.saisieEditable ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-60'
+                                }`}
                                 aria-label={`Exemplaires produits — ${task.taskLabel}`}
                               />
                             </div>
                             <span className="text-[13px] text-zinc-300 tabular-nums w-[52px] text-right whitespace-nowrap">
                               {Math.round(pct)}&nbsp;%
                             </span>
+                            {!task.saisieEditable && (
+                              <span
+                                className="text-zinc-500"
+                                title="Tuile déjà posée — saisis via clic-droit sur la tuile dans le planning."
+                              >
+                                <Lock className="w-3 h-3" />
+                              </span>
+                            )}
                           </div>
+                          {!task.saisieEditable && (
+                            <div className="text-[10px] text-zinc-600 italic mb-2">
+                              Tuile déjà commencée — l'avancement se déclare via clic-droit sur la tuile (split-at-NOW préservé).
+                            </div>
+                          )}
                           {/* Cascade segments */}
                           {/* Cascade segments use the canonical tile-completed palette
                               (rgb 34,197,94 == #22c55e, text #86efac) so they read as
