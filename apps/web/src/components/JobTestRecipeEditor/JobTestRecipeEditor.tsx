@@ -13,7 +13,7 @@
  * designation, quantity, scaled run minutes per step, and resolved dates.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Check, AlertTriangle, BookOpen } from 'lucide-react';
 import { JcfPrioritySelect } from '../JcfJobHeader/JcfPrioritySelect';
 import { SearchableSelect, type SearchableOption } from '../JobTestPickers/SearchableSelect';
@@ -59,27 +59,56 @@ export function JobTestRecipeEditor({ initial, baseJobs, onClose, onSaved }: Job
   const [priority, setPriority] = useState<number>(initial?.deadlinePriority ?? 2);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const deadlineRef = useRef<HTMLInputElement>(null);
+  const deadlineRelRef = useRef<HTMLInputElement>(null);
+  const batDeadlineRef = useRef<HTMLInputElement>(null);
+
   const [createRecipe, { isLoading: isCreating }] = useCreateRecipeMutation();
   const [updateRecipe, { isLoading: isUpdating }] = useUpdateRecipeMutation();
   const isSaving = isCreating || isUpdating;
 
-  const baseJobOptions = useMemo<SearchableOption[]>(
-    () =>
-      baseJobs.map((j) => ({
-        value: j.id,
-        label: j.description,
-        sublabel: `${j.reference} · qty ${j.quantity ?? '?'}`,
-      })),
-    [baseJobs],
-  );
+  const baseJobOptions = useMemo<SearchableOption[]>(() => {
+    const live: SearchableOption[] = baseJobs.map((j) => ({
+      value: j.id,
+      label: j.description,
+      sublabel: `${j.reference} · qty ${j.quantity ?? '?'}`,
+    }));
+    // When editing a recipe whose base has been wiped (RAZ jobs), inject a
+    // ghost option so the picker can keep the current selection visible —
+    // the user can either keep it (snapshot-driven) or repoint to a live base.
+    const initialBaseId = initial?.baseJobId;
+    if (
+      initial !== null &&
+      initial.baseJobMissing &&
+      initialBaseId !== undefined &&
+      !live.some((opt) => opt.value === initialBaseId)
+    ) {
+      live.unshift({
+        value: initialBaseId,
+        label: `${initial.baseJobDescription ?? '(snapshot)'} (job supprimé)`,
+        sublabel: `${initial.baseJobReference ?? '—'} · snapshot`,
+      });
+    }
+    return live;
+  }, [baseJobs, initial]);
 
-  const baseJob = baseJobs.find((j) => j.id === baseJobId) ?? null;
-  const baseQty = baseJob?.quantity ?? null;
+  // Source of truth for the preview : prefer the live job from the picker
+  // list, fall back to the snapshot summary on the recipe response so the
+  // preview keeps working even after a RAZ (live base gone, snapshot still
+  // there). Description / qty come from whichever side is available.
+  const liveBase = baseJobs.find((j) => j.id === baseJobId) ?? null;
+  const snapshotDescription = initial?.baseJobDescription ?? null;
+  const snapshotQuantity = initial?.baseJobQuantity ?? null;
+  const baseDescription = liveBase?.description ?? snapshotDescription;
+  const baseQty = liveBase?.quantity ?? snapshotQuantity;
+  const baseAvailable = liveBase !== null || snapshotDescription !== null;
+  const baseLiveMissing =
+    initial !== null && initial.baseJobMissing && baseJobId === initial.baseJobId;
   const newQty = quantity.trim() === '' ? baseQty ?? 1 : Number(quantity) || 0;
   const ratio = baseQty && baseQty > 0 ? newQty / baseQty : 1;
 
   const orRequiredSatisfied = deadline.trim() !== '' || deadlineRel.trim() !== '';
-  const canSave = baseJobId !== '' && orRequiredSatisfied;
+  const canSave = baseJobId !== '';
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -97,12 +126,31 @@ export function JobTestRecipeEditor({ initial, baseJobs, onClose, onSaved }: Job
     e.preventDefault();
     if (!canSave) return;
 
+    // Read DOM values via refs as source of truth — datetime-local inputs can
+    // diverge from React state (autofill, partial input, HMR transitions),
+    // so we don't trust the state alone at submit time.
+    // TODO: tackle the underlying state-sync issue (custom DateTimeInput that
+    // properly bridges native input ↔ React state, or onBlur-stricter binding)
+    // so this DOM-read workaround can disappear.
+    const readInputOrState = (
+      ref: React.RefObject<HTMLInputElement | null>,
+      state: string,
+    ): string => (ref.current?.value ?? state).trim();
+    const deadlineDom = readInputOrState(deadlineRef, deadline);
+    const deadlineRelDom = readInputOrState(deadlineRelRef, deadlineRel);
+    const batDeadlineDom = readInputOrState(batDeadlineRef, batDeadline);
+
+    if (deadlineDom === '' && deadlineRelDom === '') {
+      setSaveError('Renseigne au moins une "Départ atelier" ou un "Délai (J+)".');
+      return;
+    }
+
     const body: JobTestRecipeInput = {
       baseJobId,
       quantity: quantity.trim() === '' ? null : Number(quantity),
-      workshopExitDate: deadline.trim() === '' ? null : deadline,
-      deadlineRelativeWorkingDays: deadlineRel.trim() === '' ? null : Number(deadlineRel),
-      batDeadline: batDeadline.trim() === '' ? null : batDeadline,
+      workshopExitDate: deadlineDom === '' ? null : deadlineDom,
+      deadlineRelativeWorkingDays: deadlineRelDom === '' ? null : Number(deadlineRelDom),
+      batDeadline: batDeadlineDom === '' ? null : batDeadlineDom,
       deadlinePriority: priority,
     };
 
@@ -186,15 +234,20 @@ export function JobTestRecipeEditor({ initial, baseJobs, onClose, onSaved }: Job
                 <div>
                   <label className="block text-xs text-flux-text-tertiary mb-1">Départ atelier</label>
                   <input
+                    ref={deadlineRef}
                     type="datetime-local"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
+                    onBlur={(e) => {
+                      if (e.target.value !== deadline) setDeadline(e.target.value);
+                    }}
                     className={`${INPUT_CLASS} font-mono [color-scheme:dark]`}
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-flux-text-tertiary mb-1">Délai (J+)</label>
                   <input
+                    ref={deadlineRelRef}
                     type="text"
                     inputMode="numeric"
                     value={deadlineRel}
@@ -217,13 +270,34 @@ export function JobTestRecipeEditor({ initial, baseJobs, onClose, onSaved }: Job
               </div>
 
               <div>
-                <label className="block text-xs text-flux-text-tertiary mb-1">Date limite BAT</label>
-                <input
-                  type="datetime-local"
-                  value={batDeadline}
-                  onChange={(e) => setBatDeadline(e.target.value)}
-                  className={`${INPUT_CLASS} font-mono [color-scheme:dark]`}
-                />
+                <label className="block text-xs text-flux-text-tertiary mb-1">
+                  Date limite BAT <span className="text-flux-text-muted font-normal">(optionnel)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={batDeadlineRef}
+                    type="datetime-local"
+                    value={batDeadline}
+                    onChange={(e) => setBatDeadline(e.target.value)}
+                    onBlur={(e) => {
+                      if (e.target.value !== batDeadline) setBatDeadline(e.target.value);
+                    }}
+                    className={`${INPUT_CLASS} font-mono [color-scheme:dark]`}
+                  />
+                  {batDeadline !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => setBatDeadline('')}
+                      className="px-2 py-1 text-[11px] text-flux-text-tertiary hover:text-flux-text-primary bg-flux-active hover:bg-flux-hover rounded shrink-0"
+                      aria-label="Effacer la date limite BAT"
+                    >
+                      Effacer
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-flux-text-muted">
+                  Vide = pas d'échéance BAT contractuelle. Sinon, fait office de plancher d'ordo pour les tâches concernées.
+                </p>
               </div>
 
               <div>
@@ -236,13 +310,21 @@ export function JobTestRecipeEditor({ initial, baseJobs, onClose, onSaved }: Job
               <div className="text-[10px] uppercase tracking-wider text-flux-text-tertiary mb-2 font-semibold">
                 Aperçu de la prochaine génération
               </div>
-              {!baseJob ? (
+              {baseLiveMissing && (
+                <div className="mb-2 px-2 py-1.5 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded flex items-start gap-1.5">
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={2.5} />
+                  <span>
+                    Le job de base a été supprimé (RAZ jobs). La recette continue de fonctionner grâce au snapshot pris à sa création.
+                  </span>
+                </div>
+              )}
+              {!baseAvailable ? (
                 <div className="text-flux-text-muted italic">Sélectionne un job de base pour voir l'aperçu.</div>
               ) : (
                 <>
                   <div className="mb-2">
                     <div className="text-[10px] text-flux-text-tertiary">Désignation</div>
-                    <div className="font-mono text-blue-400 font-semibold">{baseJob.description} N</div>
+                    <div className="font-mono text-blue-400 font-semibold">{baseDescription} N</div>
                     <div className="text-[10px] text-flux-text-muted">N = compteur per-base (continu)</div>
                   </div>
                   <div className="border-t border-flux-border my-2" />

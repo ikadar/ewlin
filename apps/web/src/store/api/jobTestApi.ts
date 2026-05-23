@@ -23,10 +23,18 @@ import { baseQueryWithFixtureSupport } from './baseApi';
 export interface JobTestRecipeResponse {
   id: string;
   baseJobId: string;
+  /** Reference / description / quantity from the snapshot (or live base if snapshot empty). */
   baseJobReference: string | null;
   baseJobDescription: string | null;
   baseJobQuantity: number | null;
+  /** True when the live base job no longer exists in the jobs table (e.g. after RAZ). */
   baseJobMissing: boolean;
+  /** True when the recipe has no usable snapshot — generation will refuse. */
+  snapshotEmpty: boolean;
+  /** Number of elements captured in the snapshot (0 when empty). */
+  snapshotElementCount: number;
+  /** ATOM-format datetime when the snapshot was taken, or null for legacy / orphaned recipes. */
+  snapshotAt: string | null;
   quantity: number | null;
   workshopExitDate: string | null;
   deadlineRelativeWorkingDays: number | null;
