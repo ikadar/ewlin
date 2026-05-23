@@ -197,12 +197,40 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
     }
   }, [acomptesData, totalQuantity, job.workshopExitDate]);
 
-  /* ── Build element groups + tasks (seeded by declarations) ───────── */
+  /* ── Build element groups + tasks (seeded by BOTH progress channels) ─
+   * Progress can land in the system via two separate channels :
+   *   1. AcompteProgressDeclaration table — written by THIS form's
+   *      flushDeclarations and read here directly.
+   *   2. Task.recordedProgressPct — written by ProgressTickService,
+   *      ProgressCaptureService, clic-droit « saisir l'avancement », and
+   *      the silent-push from ClockService. Reflects what the operator
+   *      actually declared via the tile-level UIs.
+   *
+   * The Acomptes tab MUST reflect both, otherwise a user who declared
+   * progress via a clic-droit (or had it pushed by silence-is-consent)
+   * opens this tab and sees zero — yet the wall shows the tile in
+   * progress / completed. That's the « avancement invisible » bug
+   * reported on job 202601.0162 / 754 PAP1.
+   *
+   * Precedence : an explicit declaration wins over the derived wall
+   * value (the declaration is the more authoritative form-side state).
+   * Derived = round(recordedProgressPct * totalQuantity / 100). */
   useEffect(() => {
     const declByLogical = new Map(
       (declarationsData?.declarations ?? []).map((d) => [d.logicalTaskId, d.declaredTotalCopiesDone]),
     );
-    setPreviouslyDeclaredTaskIds(new Set(declByLogical.keys()));
+    // Tasks that already carry non-zero progress from EITHER source must
+    // trigger a 0-write on save when the user resets the slider — otherwise
+    // resetting silently leaves the engine still seeing the prior value
+    // (the declaration table acts as the override layer).
+    const priorIds = new Set<string>(declByLogical.keys());
+    for (const t of job.tasks) {
+      if ((t.recordedProgressPct ?? 0) > 0) {
+        priorIds.add(t.logicalTaskId);
+      }
+    }
+    setPreviouslyDeclaredTaskIds(priorIds);
+
     const groups: ElementGroupDraft[] = [];
     const tasksById = new Map(job.tasks.map((t) => [t.id, t]));
     for (const el of job.elements) {
@@ -211,11 +239,21 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
         const t = tasksById.get(tid);
         if (!t || t.taskType !== 'internal') continue;
         const stationLabel = t.stationId ? (stationNameById.get(t.stationId) ?? 'Tâche') : 'Tâche';
+        // Prefer the explicit declaration value ; fall back to the wall-
+        // layer derived value when no declaration exists.
+        let copiesDone: number;
+        if (declByLogical.has(t.logicalTaskId)) {
+          copiesDone = declByLogical.get(t.logicalTaskId) ?? 0;
+        } else if (totalQuantity > 0 && (t.recordedProgressPct ?? 0) > 0) {
+          copiesDone = Math.round(((t.recordedProgressPct ?? 0) / 100) * totalQuantity);
+        } else {
+          copiesDone = 0;
+        }
         tasks.push({
           logicalTaskId: t.logicalTaskId,
           taskLabel: stationLabel,
           sequenceOrder: t.sequenceOrder,
-          copiesDone: declByLogical.get(t.logicalTaskId) ?? 0,
+          copiesDone,
         });
       }
       tasks.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
@@ -230,7 +268,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
       if (prev && groups.some((g) => g.elementId === prev)) return prev;
       return groups[0].elementId;
     });
-  }, [declarationsData, job.elements, job.tasks, stationNameById]);
+  }, [declarationsData, job.elements, job.tasks, stationNameById, totalQuantity]);
 
   /* ── Notify parent of draft delivery count (always ≥ 1). ──────────── */
   useEffect(() => {
