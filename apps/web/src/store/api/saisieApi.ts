@@ -133,15 +133,28 @@ export const saisieApi = createApi({
     /**
      * Set Task.recordedProgressPct directly to an explicit percentage.
      * Used by the Acomptes tab to write progress through the unified
-     * wall-layer channel (replaces the legacy AcompteProgressDeclaration
-     * write — see project_progress_seeds_not_pins memory).
-     */
+     * wall-layer channel.
+     *
+     * IMPORTANT — does NOT override X-Flux-Scenario to 'prod' (unlike
+     * the sibling mutations above). Reason : the Acomptes tab is opened
+     * from the JCF Modifier modal which is Préprod-only (the « no edit
+     * in Prod » rule). The Task UUID known to the FE is therefore the
+     * Préprod-scoped one. Sending an explicit prod header would (a) be
+     * blocked by ProdReadOnlyGuardSubscriber and (b) cause the
+     * ScenarioFilter to look for a Prod-scoped Task with that UUID and
+     * return 404.
+     *
+     * Letting the FE's current scenario (Préprod) flow through means
+     * the controller finds the Préprod-scoped Task, calls
+     * Task::recordProgress which delegates to the SHARED TaskWall row
+     * (keyed by logical_task_id, single row per logical task, common
+     * to all scenarios — see TaskWall entity). Net effect : the wall
+     * value is written once and visible in both Préprod and Prod. */
     recordProgressDirect: builder.mutation<{ taskId: string; recordedProgressPct: number; recordedAt: string }, { taskId: string; progressPct: number }>({
       query: ({ taskId, progressPct }) => ({
         url: `/scenarios/prod/record-progress/${encodeURIComponent(taskId)}`,
         method: 'POST',
         body: { progressPct },
-        headers: { 'X-Flux-Scenario': 'prod' },
       }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
