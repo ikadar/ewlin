@@ -29,9 +29,8 @@ import {
   useGetAcomptesQuery,
   useReplaceAcomptesMutation,
   useDeleteAcomptesMutation,
-  useGetAcompteProgressDeclarationsQuery,
-  useWriteAcompteProgressDeclarationMutation,
 } from '../../store/api/acompteApi';
+import { useRecordProgressDirectMutation } from '../../store/api/saisieApi';
 import { useGetStationsQuery } from '../../store/api/stationApi';
 import { cascadeFifo, type AcompteForCascade } from './cascadeFifo';
 
@@ -58,6 +57,9 @@ interface DeliveryDraft {
 }
 
 interface TaskDraft {
+  /** Task entity UUID — used as the saisie write target. */
+  taskId: string;
+  /** Stable cross-scenario id — used to dedupe / look up wall-layer state. */
   logicalTaskId: string;
   taskLabel: string;
   sequenceOrder: number;
@@ -156,11 +158,10 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
   const totalQuantity = job.quantity ?? 0;
 
   const { data: acomptesData } = useGetAcomptesQuery(job.id);
-  const { data: declarationsData } = useGetAcompteProgressDeclarationsQuery(job.id);
   const { data: stations = [] } = useGetStationsQuery();
   const [replaceAcomptes] = useReplaceAcomptesMutation();
   const [deleteAcomptes] = useDeleteAcomptesMutation();
-  const [writeDeclaration] = useWriteAcompteProgressDeclarationMutation();
+  const [recordProgressDirect] = useRecordProgressDirectMutation();
 
   const stationNameById = useMemo(
     () => new Map(stations.map((s) => [s.id, s.name])),
@@ -197,33 +198,23 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
     }
   }, [acomptesData, totalQuantity, job.workshopExitDate]);
 
-  /* ── Build element groups + tasks (seeded by BOTH progress channels) ─
-   * Progress can land in the system via two separate channels :
-   *   1. AcompteProgressDeclaration table — written by THIS form's
-   *      flushDeclarations and read here directly.
-   *   2. Task.recordedProgressPct — written by ProgressTickService,
-   *      ProgressCaptureService, clic-droit « saisir l'avancement », and
-   *      the silent-push from ClockService. Reflects what the operator
-   *      actually declared via the tile-level UIs.
+  /* ── Build element groups + tasks (single source: Task.recordedProgressPct) ─
+   * The Acomptes tab now writes progress through the canonical wall-layer
+   * channel (POST /scenarios/prod/record-progress/{taskId}) — same channel as
+   * clic-droit « saisir l'avancement », IA palette and the silent-push from
+   * ClockService. Task.recordedProgressPct is the single source of truth.
    *
-   * The Acomptes tab MUST reflect both, otherwise a user who declared
-   * progress via a clic-droit (or had it pushed by silence-is-consent)
-   * opens this tab and sees zero — yet the wall shows the tile in
-   * progress / completed. That's the « avancement invisible » bug
-   * reported on job 202601.0162 / 754 PAP1.
-   *
-   * Precedence : an explicit declaration wins over the derived wall
-   * value (the declaration is the more authoritative form-side state).
-   * Derived = round(recordedProgressPct * totalQuantity / 100). */
+   * Previously the form maintained its own per-job AcompteProgressDeclaration
+   * table : two write paths, two read paths, no shared semantics — the
+   * « avancement invisible » bug on job 202601.0162 / 754 PAP1 was the proof.
+   * That table is now dead-code on read (engine reads recordedProgressPct
+   * from the task payload directly, see AcompteSnapshotFanOutService). */
   useEffect(() => {
-    const declByLogical = new Map(
-      (declarationsData?.declarations ?? []).map((d) => [d.logicalTaskId, d.declaredTotalCopiesDone]),
-    );
-    // Tasks that already carry non-zero progress from EITHER source must
-    // trigger a 0-write on save when the user resets the slider — otherwise
-    // resetting silently leaves the engine still seeing the prior value
-    // (the declaration table acts as the override layer).
-    const priorIds = new Set<string>(declByLogical.keys());
+    // Tasks that already carry non-zero recordedProgressPct must trigger a
+    // 0-write on save when the user resets the slider — otherwise the
+    // reset is silently a no-op (the slider drops to 0 but the wall
+    // still shows the old value).
+    const priorIds = new Set<string>();
     for (const t of job.tasks) {
       if ((t.recordedProgressPct ?? 0) > 0) {
         priorIds.add(t.logicalTaskId);
@@ -239,17 +230,11 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
         const t = tasksById.get(tid);
         if (!t || t.taskType !== 'internal') continue;
         const stationLabel = t.stationId ? (stationNameById.get(t.stationId) ?? 'Tâche') : 'Tâche';
-        // Prefer the explicit declaration value ; fall back to the wall-
-        // layer derived value when no declaration exists.
-        let copiesDone: number;
-        if (declByLogical.has(t.logicalTaskId)) {
-          copiesDone = declByLogical.get(t.logicalTaskId) ?? 0;
-        } else if (totalQuantity > 0 && (t.recordedProgressPct ?? 0) > 0) {
-          copiesDone = Math.round(((t.recordedProgressPct ?? 0) / 100) * totalQuantity);
-        } else {
-          copiesDone = 0;
-        }
+        const copiesDone = totalQuantity > 0 && (t.recordedProgressPct ?? 0) > 0
+          ? Math.round(((t.recordedProgressPct ?? 0) / 100) * totalQuantity)
+          : 0;
         tasks.push({
+          taskId: t.id,
           logicalTaskId: t.logicalTaskId,
           taskLabel: stationLabel,
           sequenceOrder: t.sequenceOrder,
@@ -268,7 +253,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
       if (prev && groups.some((g) => g.elementId === prev)) return prev;
       return groups[0].elementId;
     });
-  }, [declarationsData, job.elements, job.tasks, stationNameById, totalQuantity]);
+  }, [job.elements, job.tasks, stationNameById, totalQuantity]);
 
   /* ── Notify parent of draft delivery count (always ≥ 1). ──────────── */
   useEffect(() => {
@@ -373,25 +358,27 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
       acomptesData,
       replaceAcomptes,
       deleteAcomptes,
-      writeDeclaration,
+      recordProgressDirect,
     ],
   );
 
   async function flushDeclarations() {
-    // Write the declaration when EITHER (a) the user has saisi > 0 copies,
-    // OR (b) the server already had a declaration for this task — in which
-    // case we must upsert (potentially to 0) so the user can undo a prior
-    // saisie. Without (b), a slider drag back to 0 leaves the old value
-    // alive in DB and the engine keeps reading in-progress (silent state
-    // divergence — the form ships clean, the wall doesn't update).
+    // Write progress through the canonical wall-layer channel
+    // (POST /scenarios/prod/record-progress/{taskId}). Same endpoint
+    // as clic-droit / IA palette — one source of truth.
+    //
+    // Write when EITHER (a) copies > 0, OR (b) the task had non-zero
+    // recordedProgressPct on load — in case (b) we must upsert to 0 so
+    // the user can undo a prior saisie. Without that guard a slider
+    // drag back to 0 would silently no-op (the wall keeps the prior pct).
     for (const g of elementGroups) {
       for (const t of g.tasks) {
         const hadPrior = previouslyDeclaredTaskIds.has(t.logicalTaskId);
         if (t.copiesDone > 0 || hadPrior) {
-          await writeDeclaration({
-            jobId: job.id,
-            logical_task_id: t.logicalTaskId,
-            declared_total_copies_done: t.copiesDone,
+          const pct = totalQuantity > 0 ? (t.copiesDone / totalQuantity) * 100 : 0;
+          await recordProgressDirect({
+            taskId: t.taskId,
+            progressPct: Math.max(0, Math.min(100, pct)),
           }).unwrap();
         }
       }

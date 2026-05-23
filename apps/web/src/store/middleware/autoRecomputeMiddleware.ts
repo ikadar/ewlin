@@ -75,7 +75,7 @@ type AutoRecomputeEndpointName =
   // V2 progress capture — operator saisie d'avancement persists a new
   // productivityRatio + scheduledEnd on the assignment ; the engine then
   // propagates the run-only ratio to the remaining fragments of the job.
-  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie'>
+  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie' | 'recordProgressDirect'>
   // V2 progress capture — parameterized pin moves a tile to a target
   // start. Not a toggle (cf. legacy isPinned flip): the start changes,
   // so the engine resolves slide-to-nearest on the next replan and
@@ -125,6 +125,7 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updateFormeLeadTime',
   'updatePlateLeadTime',
   'reportSaisie',
+  'recordProgressDirect',
   'pinAtTime',
   'addStationException',
   'addOperatorAbsence',

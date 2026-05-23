@@ -130,6 +130,29 @@ export const saisieApi = createApi({
         }
       },
     }),
+    /**
+     * Set Task.recordedProgressPct directly to an explicit percentage.
+     * Used by the Acomptes tab to write progress through the unified
+     * wall-layer channel (replaces the legacy AcompteProgressDeclaration
+     * write — see project_progress_seeds_not_pins memory).
+     */
+    recordProgressDirect: builder.mutation<{ taskId: string; recordedProgressPct: number; recordedAt: string }, { taskId: string; progressPct: number }>({
+      query: ({ taskId, progressPct }) => ({
+        url: `/scenarios/prod/record-progress/${encodeURIComponent(taskId)}`,
+        method: 'POST',
+        body: { progressPct },
+        headers: { 'X-Flux-Scenario': 'prod' },
+      }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+        } catch {
+          // No optimistic patch.
+        }
+      },
+    }),
     clearRecordedProgress: builder.mutation<ClearRecordedProgressResult, void>({
       query: () => ({
         url: '/scenarios/prod/clear-recorded-progress',
@@ -150,4 +173,4 @@ export const saisieApi = createApi({
   }),
 });
 
-export const { useReportSaisieMutation, useMarkNotCompletedMutation, useClearRecordedProgressMutation } = saisieApi;
+export const { useReportSaisieMutation, useMarkNotCompletedMutation, useClearRecordedProgressMutation, useRecordProgressDirectMutation } = saisieApi;
