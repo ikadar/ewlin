@@ -8,9 +8,11 @@ import type {
   FormeStatus,
   PaperLeadTimeConfig,
   FormeLeadTimeConfig,
+  PlateLeadTimeConfig,
 } from '@flux/types';
 import { computePaperEarliestStart } from '../../utils/paperGate';
 import { computeFormeEarliestStart } from '../../utils/formeGate';
+import { computePlateEarliestStart } from '../../utils/plateGate';
 
 export interface ElementSectionProps {
   /** The element to display */
@@ -36,6 +38,11 @@ export interface ElementSectionProps {
    * Forme pill tooltip.
    */
   formeLeadTime?: FormeLeadTimeConfig;
+  /**
+   * Plate lead-time configuration (shop-wide). Drives the date shown in
+   * the Plaques pill tooltip for `to_make` state.
+   */
+  plateLeadTime?: PlateLeadTimeConfig;
   /** Children (task tiles) */
   children: React.ReactNode;
 }
@@ -185,6 +192,15 @@ function formeMeta(element: Element, config: FormeLeadTimeConfig | undefined): s
   return null;
 }
 
+function plateMeta(element: Element, config: PlateLeadTimeConfig | undefined): string | null {
+  if (element.plateStatus === 'ready') return null;
+  const earliest = computePlateEarliestStart(element, config);
+  if (earliest) {
+    return `Démarrage possible : ${formatShortDateTime(earliest)}`;
+  }
+  return null;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // GatePill — portaled tooltip with hover-driven positioning + delay.
 // ────────────────────────────────────────────────────────────────────────────
@@ -290,6 +306,7 @@ function buildBadges(
   batDeadline: string | null | undefined,
   paperLeadTime: PaperLeadTimeConfig | undefined,
   formeLeadTime: FormeLeadTimeConfig | undefined,
+  plateLeadTime: PlateLeadTimeConfig | undefined,
 ): BadgeSpec[] {
   const badges: BadgeSpec[] = [];
   // 'none' status means "not applicable to this element" (e.g., no BAT
@@ -328,7 +345,7 @@ function buildBadges(
       label: 'PLQ',
       tone: plateTone(element.plateStatus),
       tipTitle: `Plaques · ${PLATE_LABEL[element.plateStatus]}`,
-      tipMeta: null,
+      tipMeta: plateMeta(element, plateLeadTime),
     });
   }
   return badges;
@@ -357,9 +374,10 @@ export function ElementSection({
   batDeadline,
   paperLeadTime,
   formeLeadTime,
+  plateLeadTime,
   children,
 }: ElementSectionProps) {
-  const badges = buildBadges(element, batDeadline, paperLeadTime, formeLeadTime);
+  const badges = buildBadges(element, batDeadline, paperLeadTime, formeLeadTime, plateLeadTime);
 
   const precedenceElements = element.prerequisiteElementIds
     .map((id) => allElements.find((e) => e.id === id))
