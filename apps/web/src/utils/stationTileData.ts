@@ -9,6 +9,7 @@ import type {
 } from '@flux/types';
 import { isInternalTask } from '@flux/types';
 import { compareSimilarity, computeTileState } from '../components/Tile';
+import { isCompletedEffective } from '../components/Tile/colorUtils';
 import { timeToYPosition } from '../components/TimelineColumn';
 import type { Collapse } from '../components/SchedulingGrid/collapseConfig';
 import { getPrerequisiteBlockingInfo } from './prerequisites';
@@ -243,10 +244,18 @@ export function computeTileDataCache(input: ComputeTileDataCacheInput): Map<stri
 
       const isJobShipped = shippedJobIds?.has(job.id) ?? false;
       const isJobLate = lateJobIds?.has(job.id) ?? false;
-      const isTaskOverdue = !assignment.isCompleted && new Date(assignment.scheduledEnd) < now;
-      const isLate = isJobLate || isTaskOverdue;
+      // No-news = good-news: a tile crossing into the past without being
+      // explicitly flagged otherwise is presumed completed. This makes
+      // green outrank late/conflict on past tiles, which is the only sane
+      // default — there's nothing left to act on.
+      const isCompletedNow = isCompletedEffective(
+        assignment.isCompleted,
+        assignment.scheduledEnd,
+        now.getTime(),
+      );
+      const isLate = !isCompletedNow && isJobLate;
       const hasConflict = conflictTaskIds.has(task.id);
-      const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, assignment.isCompleted);
+      const tileState = computeTileState(isJobShipped, isLate, hasConflict, blocking?.blocked ?? false, isCompletedNow);
 
       let operatorNames: string | undefined;
       if (assignment.operators && assignment.operators.length > 0 && operatorNameMap.size > 0) {
