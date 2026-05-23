@@ -1,0 +1,2502 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux — Prod / Préprod : guide pédagogique avec visualisations</title>
+<style>
+  :root {
+    --bg:           rgb(20 20 22);
+    --bg-elev-1:    rgb(28 28 30);
+    --bg-elev-2:    rgb(39 39 42);
+    --bg-elev-3:    rgb(52 52 56);
+    --border:       rgb(39 39 42);
+    --border-soft:  rgb(63 63 70);
+
+    --text-1: rgb(244 244 245);
+    --text-2: rgb(212 212 216);
+    --text-3: rgb(161 161 170);
+    --text-4: rgb(113 113 122);
+    --text-5: rgb(82 82 91);
+
+    --prod:        rgb(59 130 246);
+    --prod-soft:   rgba(59, 130, 246, 0.12);
+    --prod-border: rgba(59, 130, 246, 0.40);
+
+    --preprod:        rgb(168 85 247);
+    --preprod-soft:   rgba(168, 85, 247, 0.12);
+    --preprod-border: rgba(168, 85, 247, 0.40);
+
+    --user:         rgb(16 185 129);
+    --user-soft:    rgba(16, 185, 129, 0.10);
+    --user-border:  rgba(16, 185, 129, 0.30);
+
+    --chef:         rgb(245 158 11);
+    --chef-soft:    rgba(245, 158, 11, 0.10);
+    --chef-border:  rgba(245, 158, 11, 0.30);
+
+    --archi:        rgb(217 70 239);
+    --archi-soft:   rgba(217, 70, 239, 0.10);
+    --archi-border: rgba(217, 70, 239, 0.30);
+
+    --warn:         rgb(239 68 68);
+    --warn-soft:    rgba(239, 68, 68, 0.10);
+    --warn-border:  rgba(239, 68, 68, 0.30);
+
+    --info:         rgb(56 189 248);
+    --info-soft:    rgba(56, 189, 248, 0.10);
+    --info-border:  rgba(56, 189, 248, 0.30);
+
+    /* États planning */
+    --t-planned:   rgb(63 63 70);          /* gris : pas encore là */
+    --t-running:   rgb(59 130 246);        /* bleu : en cours */
+    --t-saisi:     rgb(16 185 129);        /* vert plein : terminé saisi */
+    --t-silent:    rgba(16, 185, 129, 0.45);  /* vert pâle : silence-is-consent */
+    --t-setup:     rgb(245 158 11);        /* ambre : calage */
+    --t-late:      rgb(239 68 68);
+    --t-conflict:  rgb(250 204 21);
+
+    --radius-sm: 4px;
+    --radius-md: 7px;
+    --radius-lg: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; scroll-behavior: smooth; scroll-padding-top: 70px; }
+  body {
+    background: var(--bg);
+    color: var(--text-2);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.55;
+  }
+
+  /* ─────── Top nav ─────── */
+  nav.topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(20, 20, 22, 0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; gap: 16px; align-items: center;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  nav.topnav .brand { color: var(--text-1); font-weight: 600; font-size: 14px; margin-right: 12px; }
+  nav.topnav .brand .dot { color: var(--prod); }
+  nav.topnav a { color: var(--text-3); text-decoration: none; font-size: 12.5px; padding: 6px 10px; border-radius: var(--radius-sm); transition: 0.15s; }
+  nav.topnav a:hover { color: var(--text-1); background: var(--bg-elev-2); }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px 96px; }
+  .hero { padding: 28px 0 36px; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+  .hero h1 { color: var(--text-1); font-size: 28px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 8px; }
+  .hero .subtitle { color: var(--text-3); font-size: 15px; max-width: 820px; }
+  .hero .meta { margin-top: 16px; font-size: 12px; color: var(--text-4); display: flex; gap: 18px; flex-wrap: wrap; }
+  .hero .meta b { color: var(--text-2); font-weight: 500; }
+
+  section { margin: 56px 0; scroll-margin-top: 80px; }
+  section > h2 {
+    color: var(--text-1); font-size: 21px; font-weight: 600;
+    padding-bottom: 8px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  section > h2 .num { color: var(--text-5); font-weight: 400; margin-right: 8px; }
+  section > .lede { color: var(--text-3); font-size: 14px; max-width: 900px; margin-bottom: 24px; }
+
+  h3 { color: var(--text-1); font-size: 16.5px; font-weight: 600; margin: 32px 0 10px; }
+  h4 { color: var(--text-2); font-size: 14px; font-weight: 600; margin: 22px 0 6px; }
+
+  p { margin-bottom: 12px; max-width: 820px; }
+  p code, li code, td code { background: var(--bg-elev-2); padding: 1px 5px; border-radius: 3px; font-size: 12.5px; color: var(--text-1); font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+  ul, ol { margin: 0 0 14px 22px; max-width: 820px; }
+  li { margin-bottom: 6px; }
+
+  /* ─────── 3-voie cards ─────── */
+  .voies { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 16px 0; }
+  @media (max-width: 980px) { .voies { grid-template-columns: 1fr; } }
+  .voie {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    background: var(--bg-elev-1);
+    border-left-width: 3px;
+  }
+  .voie .head { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+  .voie p { font-size: 13px; margin-bottom: 8px; max-width: 100%; }
+  .voie ul, .voie ol { margin: 6px 0 8px 18px; }
+  .voie li { font-size: 13px; }
+  .voie.user   { border-left-color: var(--user); background: linear-gradient(180deg, var(--user-soft) 0%, var(--bg-elev-1) 30%); }
+  .voie.user   .head { color: var(--user); }
+  .voie.chef   { border-left-color: var(--chef); background: linear-gradient(180deg, var(--chef-soft) 0%, var(--bg-elev-1) 30%); }
+  .voie.chef   .head { color: var(--chef); }
+  .voie.archi  { border-left-color: var(--archi); background: linear-gradient(180deg, var(--archi-soft) 0%, var(--bg-elev-1) 30%); }
+  .voie.archi  .head { color: var(--archi); }
+  .voie code { font-size: 12px; background: rgba(0,0,0,0.35); }
+
+  /* ─────── Mode badges ─────── */
+  .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--border-soft);
+    color: var(--text-3);
+  }
+  .badge.prod    { color: var(--prod);    background: var(--prod-soft);    border-color: var(--prod-border); }
+  .badge.preprod { color: var(--preprod); background: var(--preprod-soft); border-color: var(--preprod-border); }
+  .badge.both    { color: var(--text-2);  background: var(--bg-elev-2); border-color: var(--border-soft); }
+
+  /* ─────── Callouts ─────── */
+  .callout {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 13.5px;
+    background: var(--bg-elev-1);
+    border-left-width: 3px;
+  }
+  .callout p { font-size: 13.5px; max-width: 100%; }
+  .callout .lbl { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .callout.info  { border-left-color: var(--info); }
+  .callout.info  .lbl { color: var(--info); }
+  .callout.warn  { border-left-color: var(--warn); }
+  .callout.warn  .lbl { color: var(--warn); }
+  .callout.tip   { border-left-color: var(--user); }
+  .callout.tip   .lbl { color: var(--user); }
+
+  /* ─────── Code blocks ─────── */
+  pre {
+    background: rgb(12 12 14);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-2);
+    margin: 12px 0;
+  }
+  pre .k { color: rgb(244 114 182); }
+  pre .s { color: rgb(134 239 172); }
+  pre .c { color: var(--text-5); font-style: italic; }
+  pre .n { color: rgb(147 197 253); }
+  pre .v { color: rgb(252 211 77); }
+  pre .pp { color: rgb(196 181 253); }
+
+  /* ─────── Tables ─────── */
+  .table-wrap { overflow-x: auto; margin: 14px 0; }
+  table.flux-tab {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    background: var(--bg-elev-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  table.flux-tab th, table.flux-tab td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  table.flux-tab th { background: var(--bg-elev-2); color: var(--text-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  table.flux-tab tr:last-child td { border-bottom: none; }
+  table.flux-tab td.center { text-align: center; }
+  table.flux-tab td.dim { color: var(--text-4); }
+
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 11px; font-family: 'JetBrains Mono', 'SF Mono', monospace; background: var(--bg-elev-3); color: var(--text-2); border: 1px solid var(--border-soft); }
+  .pill.green { background: rgba(16,185,129,0.15); color: rgb(110 231 183); border-color: rgba(16,185,129,0.3); }
+  .pill.red   { background: rgba(239,68,68,0.15); color: rgb(252 165 165); border-color: rgba(239,68,68,0.3); }
+  .pill.amber { background: rgba(245,158,11,0.15); color: rgb(252 211 77); border-color: rgba(245,158,11,0.3); }
+  .pill.gray  { background: rgba(82,82,91,0.30); color: var(--text-3); }
+  .pill.blue  { background: rgba(59,130,246,0.18); color: rgb(147 197 253); border-color: rgba(59,130,246,0.35); }
+
+  .kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--bg-elev-3);
+    color: var(--text-2);
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 1px 0 0 rgba(0,0,0,0.4);
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 11px;
+  }
+
+  /* ─────── Job sample card ─────── */
+  .job-card {
+    background: rgb(12 12 14);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 12px;
+  }
+  .job-card .field { display: flex; gap: 8px; margin: 2px 0; }
+  .job-card .field .key { color: var(--text-4); width: 160px; flex-shrink: 0; }
+  .job-card .field .val { color: var(--text-1); }
+  .job-card .field .val.dim { color: var(--text-4); }
+
+  /* ════════════════════════════════════════════════════════════════════════ */
+  /*  SCÉNARIOS                                                                */
+  /* ════════════════════════════════════════════════════════════════════════ */
+  .scenario {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px 26px;
+    background: var(--bg-elev-1);
+    margin: 36px 0;
+  }
+  .scenario .ribbon { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .scenario .name { color: var(--text-1); font-size: 15.5px; font-weight: 600; }
+  .scenario .summary { color: var(--text-3); font-size: 13.5px; margin-bottom: 14px; }
+
+  /* ─────── Step (action + visualisation) ─────── */
+  .step-block {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin: 14px 0;
+    background: rgb(15 15 17);
+  }
+  .step-block .step-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .step-block .step-time {
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 12px;
+    color: var(--text-1);
+    background: var(--bg-elev-3);
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+  .step-block .step-actor {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid var(--border-soft);
+    color: var(--text-4);
+  }
+  .step-block.act  .step-actor  { color: var(--user); border-color: var(--user-border); background: var(--user-soft); }
+  .step-block.sys  .step-actor  { color: var(--archi); border-color: var(--archi-border); background: var(--archi-soft); }
+  .step-block.flag .step-actor  { color: var(--chef); border-color: var(--chef-border); background: var(--chef-soft); }
+  .step-block.warn .step-actor  { color: var(--warn); border-color: var(--warn-border); background: var(--warn-soft); }
+  .step-block .step-action {
+    font-size: 13.5px;
+    color: var(--text-2);
+    flex: 1;
+    min-width: 200px;
+  }
+  .step-block .step-action b { color: var(--text-1); }
+
+  /* ─────── Snapshot pair (Prod | Préprod) ─────── */
+  .snapshot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .snapshot.merged { grid-template-columns: 1fr; }
+  @media (max-width: 980px) { .snapshot { grid-template-columns: 1fr; } }
+
+  .screen {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: rgb(11 11 13);
+    overflow: hidden;
+  }
+  .screen.prod    { border-top: 3px solid var(--prod); }
+  .screen.preprod { border-top: 3px solid var(--preprod); }
+  .screen.merged  { border-top: 3px solid var(--text-3); }
+
+  .screen-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .screen.prod    .screen-head { color: var(--prod); }
+  .screen.preprod .screen-head { color: var(--preprod); }
+  .screen.merged  .screen-head { color: var(--text-2); }
+  .screen-head .hint { color: var(--text-4); font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 10.5px; }
+
+  /* ─────── Mini-Flux row ─────── */
+  .mini-flux {
+    padding: 6px 10px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev-1);
+  }
+  .mini-flux-row {
+    display: grid;
+    grid-template-columns: 70px 110px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 11.5px;
+    background: var(--bg-elev-2);
+  }
+  .mini-flux-row.late      { background: rgba(239,68,68,0.13); }
+  .mini-flux-row.conflict  { background: rgba(250,204,21,0.13); }
+  .mini-flux-row.shipped   { background: rgba(16,185,129,0.18); }
+  .mini-flux-row.ready     { background: rgba(16,185,129,0.10); }
+  .mini-flux-row .id { font-family: 'JetBrains Mono', 'SF Mono', monospace; color: var(--text-1); font-weight: 600; }
+  .mini-flux-row .client { color: var(--text-3); font-size: 11px; }
+  .mini-flux-row .gates { display: flex; gap: 4px; align-items: center; }
+  .mini-flux-row .stations { display: flex; gap: 5px; }
+  .gate-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--text-5);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 8px;
+    color: rgb(20 20 22);
+    border: 1px solid rgba(0,0,0,0.35);
+  }
+  .gate-dot.ok    { background: rgb(16 185 129); }
+  .gate-dot.wait  { background: rgb(245 158 11); }
+  .gate-dot.miss  { background: rgb(239 68 68); }
+  .gate-dot.none  { background: rgba(82,82,91,0.4); }
+  .gate-dot.delta { box-shadow: 0 0 0 2px var(--prod), 0 0 0 3px rgb(11 11 13); }
+  .station-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--t-planned);
+    border: 1px solid rgba(0,0,0,0.35);
+  }
+  .station-dot.run     { background: var(--t-running); }
+  .station-dot.setup   { background: var(--t-setup); }
+  .station-dot.done    { background: var(--t-saisi); }
+  .station-dot.silent  { background: var(--t-silent); }
+
+  /* ─────── Mini-Planning grid ─────── */
+  .mini-planning {
+    padding: 8px 10px 10px;
+    background: rgb(11 11 13);
+  }
+  .mp-clock {
+    display: grid;
+    grid-template-columns: 70px repeat(var(--cols, 8), 1fr);
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 9.5px;
+    color: var(--text-5);
+    margin-bottom: 3px;
+    padding-left: 2px;
+  }
+  .mp-clock div { padding: 0 2px; }
+  .mp-row {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    align-items: center;
+    gap: 0;
+    margin: 2px 0;
+  }
+  .mp-row .mp-label {
+    font-size: 11px;
+    color: var(--text-3);
+    padding-right: 8px;
+    text-align: right;
+    line-height: 1;
+  }
+  .mp-row .mp-track {
+    position: relative;
+    height: 18px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 8), 1fr);
+  }
+  .mp-tick {
+    border-left: 1px dotted rgba(82,82,91,0.25);
+    height: 100%;
+  }
+  .mp-tile {
+    position: absolute;
+    top: 1px; bottom: 1px;
+    left: calc((var(--start, 0) / var(--cols, 8)) * 100%);
+    width: calc((var(--span, 1) / var(--cols, 8)) * 100%);
+    border-radius: 2px;
+    color: rgb(20 20 22);
+    font-size: 9.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    border: 1px solid rgba(0,0,0,0.4);
+  }
+  .mp-tile.planned { background: var(--t-planned); color: var(--text-2); }
+  .mp-tile.setup   { background: var(--t-setup); }
+  .mp-tile.run     { background: var(--t-running); color: rgb(255 255 255); }
+  .mp-tile.done    { background: var(--t-saisi); }
+  .mp-tile.silent  { background: var(--t-silent); color: rgb(20 20 22); border-style: dashed; }
+  .mp-tile.cancel  { background: transparent; border: 1px dashed var(--text-5); color: var(--text-5); }
+  .mp-tile.late    { background: var(--t-late); color: rgb(255 255 255); }
+  .mp-tile.delta {
+    box-shadow: 0 0 0 2px var(--prod), 0 0 0 3px rgb(11 11 13);
+    z-index: 5;
+  }
+  .mp-tile.delta-pp {
+    box-shadow: 0 0 0 2px var(--preprod), 0 0 0 3px rgb(11 11 13);
+    z-index: 5;
+  }
+  .mp-now {
+    position: absolute;
+    top: -2px; bottom: -2px;
+    left: calc((var(--at, 0) / var(--cols, 8)) * 100%);
+    width: 2px;
+    background: var(--warn);
+    z-index: 4;
+  }
+  .mp-now::after {
+    content: 'NOW';
+    position: absolute;
+    top: -10px; left: 2px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    color: var(--warn);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  /* ─────── Mini-Wall ─────── */
+  .mini-wall {
+    padding: 6px 10px;
+    background: var(--bg-elev-1);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    align-items: center;
+  }
+  .mini-wall .wall-lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-5);
+    margin-right: 6px;
+  }
+  .wall-fact {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    background: var(--bg-elev-2);
+    color: var(--text-2);
+    font-size: 10.5px;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    border: 1px solid var(--border-soft);
+  }
+  .wall-fact.ok    { background: rgba(16,185,129,0.13); color: rgb(110 231 183); border-color: rgba(16,185,129,0.3); }
+  .wall-fact.wait  { background: rgba(245,158,11,0.13); color: rgb(252 211 77);  border-color: rgba(245,158,11,0.3); }
+  .wall-fact.miss  { background: rgba(239,68,68,0.13);  color: rgb(252 165 165); border-color: rgba(239,68,68,0.3); }
+  .wall-fact.fresh { box-shadow: 0 0 0 2px var(--prod), 0 0 0 3px var(--bg-elev-1); }
+
+  /* ─────── Modal previews ─────── */
+  .modal-preview {
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    background: rgb(15 15 17);
+    margin: 8px 0;
+    max-width: 100%;
+  }
+  .modal-preview .mp-title {
+    font-size: 11.5px;
+    color: var(--text-1);
+    font-weight: 600;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .field-row {
+    display: flex; gap: 6px; align-items: center;
+    margin: 3px 0;
+    font-size: 11.5px;
+  }
+  .field-row .lbl-mini { width: 90px; color: var(--text-4); font-size: 10.5px; }
+  .field-row .input-mini {
+    flex: 1;
+    padding: 2px 6px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 2px;
+    color: var(--text-1);
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 11px;
+  }
+  .field-row .input-mini.disabled {
+    background: rgba(82,82,91,0.18);
+    color: var(--text-4);
+    text-decoration: line-through;
+    text-decoration-color: rgba(255,255,255,0.15);
+  }
+  .field-row .input-mini.editable.delta {
+    border-color: var(--preprod);
+    box-shadow: 0 0 0 2px var(--preprod-soft);
+  }
+
+  /* ─────── Done panel preview ─────── */
+  .done-panel {
+    background: rgba(39,39,42,0.45);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 6px 8px;
+    margin: 4px 0;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  .done-panel .dp-head {
+    font-size: 9.5px;
+    color: var(--text-5);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    border-bottom: 1px dashed rgba(82,82,91,0.4);
+    padding-bottom: 3px;
+    margin-bottom: 3px;
+  }
+  .done-panel .dp-row { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+  .done-panel .dp-row.completed { color: var(--text-4); }
+  .done-panel .dp-row.in-progress { color: var(--text-1); font-weight: 500; }
+  .done-panel .dp-pastille {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 14px;
+    font-size: 8.5px;
+    color: rgb(20 20 22);
+  }
+  .done-panel .dp-pastille.completed { background: rgba(82,82,91,0.6); color: var(--text-3); }
+  .done-panel .dp-pastille.in-progress { background: var(--t-setup); }
+  .done-panel .dp-meta { font-size: 10px; color: var(--text-3); }
+  .done-panel .dp-meta .pct { color: var(--t-setup); font-weight: 700; }
+
+  .textarea-preview {
+    background: rgb(8 8 10);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    padding: 6px 8px;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 11px;
+    color: var(--text-1);
+    white-space: pre;
+    line-height: 1.5;
+  }
+  .textarea-preview.delta {
+    border-color: var(--preprod);
+    box-shadow: 0 0 0 2px var(--preprod-soft);
+  }
+
+  /* ─────── Légende ─────── */
+  .legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 18px 0 8px;
+  }
+  @media (max-width: 980px) { .legend { grid-template-columns: 1fr; } }
+  .legend-block {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    background: var(--bg-elev-1);
+  }
+  .legend-block h5 {
+    font-size: 11px;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .legend-block .leg-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-3);
+    margin: 4px 0;
+  }
+
+  a { color: rgb(96 165 250); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <span class="brand">Flux <span class="dot">●</span> Guide pédagogique</span>
+  <a href="#principes">1 · Principes</a>
+  <a href="#voies">2 · Trois voies</a>
+  <a href="#flux">3 · La page Flux</a>
+  <a href="#flux-prod">4 · Flux Prod</a>
+  <a href="#flux-preprod">5 · Flux Préprod</a>
+  <a href="#planning">6 · Planning</a>
+  <a href="#jcf">7 · JCF de modification</a>
+  <a href="#legende">8 · Légende</a>
+  <a href="#scenarios">9 · Scénarios</a>
+  <a href="#glossaire">Glossaire</a>
+</nav>
+
+<div class="container">
+
+<header class="hero">
+  <h1>Comment Flux fonctionne en Prod et en Préprod</h1>
+  <p class="subtitle">
+    Un guide pédagogique pour comprendre ce que l'on peut faire (ou pas), où, et ce
+    que cela déclenche derrière. Chaque scénario montre, étape par étape, ce que
+    voient en parallèle la Prod et la Préprod, avec mise en évidence de ce qui change.
+    Trois voies de lecture sont proposées : l'opérateur qui agit, le chef de projet
+    qui interprète, l'architecte qui code. <b>Hypothèse :</b> tout est planifié de
+    manière optimiste et les jobs finissent <b>en temps et en heure</b>.
+  </p>
+  <div class="hero meta">
+    <span><b>Branche :</b> multi-person-stations-encarteuse-travail-table</span>
+    <span><b>Date :</b> 2026-05-07</span>
+    <span><b>Audience :</b> opérateurs · chefs d'atelier · devs</span>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 1 · PRINCIPES GÉNÉRAUX                                                    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="principes">
+  <h2><span class="num">1.</span>Principes généraux : Prod, Préprod et le mur</h2>
+  <p class="lede">
+    Avant de descendre dans les écrans, fixons trois mots qui reviennent partout :
+    <b>Prod</b>, <b>Préprod</b> et <b>le mur</b>. Si on les confond, plus rien n'a de sens.
+  </p>
+
+  <h3>1.1 — Prod, c'est la réalité de l'atelier</h3>
+  <p>
+    La <span class="badge prod">Prod</span> est la vue qui décrit ce qui est <b>vraiment
+    en train de se passer</b> dans l'atelier : papier reçu, BAT validé, presse en
+    train de tirer, chauffeur parti. C'est la photo en mouvement. En Prod, on ne
+    <b>simule</b> rien : chaque clic enregistre un fait. Cliquer sur « Papier reçu »
+    signifie « le papier est posé sur la palette à l'instant ». Si on se trompe, on
+    corrige le fait, on ne « teste » pas.
+  </p>
+
+  <h3>1.2 — Préprod, c'est l'antichambre où on tripote</h3>
+  <p>
+    La <span class="badge preprod">Préprod</span> est l'<b>antichambre de la prod où l'on
+    construit ce qui ira sur le mur</b>. C'est là qu'on saisit les nouveaux jobs, qu'on
+    revoit le séquençage, qu'on ajuste les délais avant que la commande ne soit lancée.
+    On y manipule la <b>forme</b> du travail à venir, pas la réalité courante.
+  </p>
+  <div class="callout warn">
+    <div class="lbl">À ne pas confondre — Scénarios</div>
+    <p>
+      Les <b>scénarios</b> (forks UUID) sont une couche technique de la Préprod, pas
+      du vocabulaire métier. On ne dit pas « bascule en scénario X » à un utilisateur ;
+      on dit « bascule en Préprod ».
+    </p>
+  </div>
+
+  <h3>1.3 — Le mur, c'est la couche partagée</h3>
+  <p>
+    Certaines données sont <b>physiques et indivisibles</b> : un papier livré ou
+    pas, un BAT validé ou pas, une plaque gravée ou pas. Ces données vivent
+    <b>au mur</b> — elles sont communes à la Prod et à toutes les Préprod, parce
+    qu'elles ne dépendent pas de la simulation, mais de la réalité. Dans le code,
+    elles sont portées par l'entité <code>ElementWall</code>, clé <code>logical_element_id</code>
+    partagée. Une seule source de vérité par élément logique.
+  </p>
+
+  <div class="voies">
+    <div class="voie user">
+      <div class="head">L'opérateur</div>
+      <p>Tu vois deux modes en haut à droite : <b>Prod</b> ou <b>Préprod</b>. En Prod,
+      tu enregistres ce qui se passe. En Préprod, tu testes des changements. Le bouton
+      « Papier reçu » fonctionne <b>uniquement</b> en Prod — en Préprod il est grisé,
+      parce que le papier n'arrive qu'une fois.</p>
+    </div>
+    <div class="voie chef">
+      <div class="head">Le chef de projet</div>
+      <p>La Préprod te sert à <b>tester</b> : « si je glisse cette deadline, est-ce
+      que ça tient encore ? ». La Prod te sert à <b>constater</b> : « le papier est
+      arrivé à 9h12 ». Tu ne dois jamais corriger un retard en Préprod : la Préprod
+      ne sait pas qu'il y en a un, parce que le mur ne l'a pas vu.</p>
+    </div>
+    <div class="voie archi">
+      <div class="head">L'architecte</div>
+      <p>Le mur est porté par <code>ElementWall</code>. La distinction Prod/Préprod
+      passe par le header HTTP <code>X-Flux-Scenario</code>, calculé depuis l'URL
+      (<code>?env=prod</code> ou <code>/scenarios/:uuid/*</code>). Côté PHP,
+      <code>ScenarioFilter</code> applique un <code>WHERE scenario_id = ?</code> sur
+      tout sauf les tables-mur. Les écritures gates sont gardées par
+      <code>FluxProdOnlyGuardSubscriber</code>.</p>
+    </div>
+  </div>
+
+  <h3>1.4 — Le planning optimiste</h3>
+  <p>
+    Pour ce guide, on retient le principe : <b>silence vaut consentement</b>.
+    Si une tâche planifiée pour finir à 11h n'a fait l'objet d'aucune saisie à 11h05,
+    le système la considère <b>terminée à l'heure</b>. Pas en retard par défaut.
+  </p>
+  <div class="callout info">
+    <div class="lbl">Référence code</div>
+    <p>
+      Logique précise dans <code>FluxElementResponse::computeTaskState()</code> :
+      si <code>scheduledEnd &lt; now</code> et qu'aucune saisie n'a été faite
+      (<code>lastSaisieAt === null</code>), l'état renvoyé est <code>'done'</code>,
+      pas <code>'late'</code>.
+    </p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 2 · TROIS VOIES DE LECTURE                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="voies">
+  <h2><span class="num">2.</span>Les trois voies de lecture</h2>
+  <p class="lede">Tout le reste du document propose, à chaque cas, trois angles. Voici la grille.</p>
+  <div class="voies">
+    <div class="voie user">
+      <div class="head">L'opérateur / le chef d'atelier</div>
+      <p><b>Question :</b> qu'est-ce que je clique, qu'est-ce que je vois changer ?</p>
+      <p>Voie pratique. Boutons, couleurs, raccourcis. Pas de jargon.</p>
+    </div>
+    <div class="voie chef">
+      <div class="head">Le chef de projet</div>
+      <p><b>Question :</b> à quel moment cela doit se passer, et pourquoi ?</p>
+      <p>Voie métier. Le déroulé d'un job, qui doit faire quoi quand, ce qui change la prochaine décision.</p>
+    </div>
+    <div class="voie archi">
+      <div class="head">L'architecte / le dev</div>
+      <p><b>Question :</b> qu'est-ce que ça change dans le code, le replan, la base ?</p>
+      <p>Voie technique. Fichiers, règles, invariants.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 3 · LA PAGE FLUX                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="flux">
+  <h2><span class="num">3.</span>La page Flux : la vue commune</h2>
+  <p class="lede">
+    Flux est l'<b>écran de pilotage</b>. Il montre les jobs, les pré-requis qui les
+    bloquent, l'avancement par poste, les expéditions. Il existe en Prod et en
+    Préprod, mais ce qu'on peut <b>cliquer</b> diffère selon le mode.
+  </p>
+
+  <h3>3.1 — Anatomie d'une ligne</h3>
+  <div class="table-wrap">
+    <table class="flux-tab">
+      <thead>
+        <tr>
+          <th style="width: 22%;">Colonne</th>
+          <th>Ce que ça montre</th>
+          <th style="width: 14%;">Éditable en Prod ?</th>
+          <th style="width: 14%;">Éditable en Préprod ?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>ID, Client, Désignation</td><td>Identité du job</td><td class="center"><span class="pill gray">non</span></td><td class="center"><span class="pill amber">via JCF</span></td></tr>
+        <tr><td>Référent, Sortie atelier, Deadline BAT</td><td>Engagements externes</td><td class="center"><span class="pill gray">non</span></td><td class="center"><span class="pill amber">via JCF</span></td></tr>
+        <tr><td>Papier · Formes · Plaques · BAT</td><td>Les 4 <b>gates</b> (mur partagé)</td><td class="center"><span class="pill green">oui</span></td><td class="center"><span class="pill gray">non</span></td></tr>
+        <tr><td>Stations (par catégorie)</td><td>Avancement à la machine, points colorés</td><td class="center"><span class="pill gray">lecture</span></td><td class="center"><span class="pill gray">lecture</span></td></tr>
+        <tr><td>ST (sous-traitance)</td><td>État des tâches déléguées</td><td class="center"><span class="pill green">oui</span></td><td class="center"><span class="pill gray">non</span></td></tr>
+        <tr><td>Transporteur</td><td>Affecté pour expédition</td><td class="center"><span class="pill green">oui</span></td><td class="center"><span class="pill green">oui</span></td></tr>
+        <tr><td>Parti, Facturé</td><td>Coches finales d'expédition</td><td class="center"><span class="pill green">oui</span></td><td class="center"><span class="pill gray">non</span></td></tr>
+        <tr><td>Actions</td><td>Supprimer (toujours), <b>Modifier</b> (Préprod uniquement)</td><td class="center"><span class="pill gray">supprimer</span></td><td class="center"><span class="pill amber">modifier+suppr.</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.2 — Les 8 états visuels d'une ligne</h3>
+  <p>
+    La ligne entière prend une couleur de fond qui résume le job. Grammaire fixée
+    le 2026-05-06 : huit combinaisons de deux axes — statut (en retard, conflit,
+    planifié, expédié) × prêt à expédier ?.
+  </p>
+  <div class="table-wrap">
+    <table class="flux-tab">
+      <thead><tr><th>État</th><th>Couleur fond</th><th>Sens</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Late · pas prêt</td><td><span class="pill red">rouge plein</span></td><td>Job en retard, pas tout fini</td></tr>
+        <tr><td>2 · Late · prêt à partir</td><td><span class="pill red">rouge↔vert hachuré</span></td><td>Tout fini mais sortie déjà passée</td></tr>
+        <tr><td>3 · Conflit · pas prêt</td><td><span class="pill amber">jaune plein</span></td><td>Le scheduler n'arrive pas à caser</td></tr>
+        <tr><td>4 · Conflit · prêt à partir</td><td><span class="pill amber">jaune↔vert hachuré</span></td><td>Conflit + déjà fini</td></tr>
+        <tr><td>5 · Planifié · pas prêt</td><td><span class="pill gray">plat</span></td><td>Cas nominal, en cours</td></tr>
+        <tr><td>6 · Planifié · prêt à partir</td><td><span class="pill green">vert pâle hachuré</span></td><td>Tout fini, attend le départ</td></tr>
+        <tr><td>7 · Expédié</td><td><span class="pill green">vert plein</span></td><td>Parti</td></tr>
+        <tr><td>8 · Non planifié</td><td><span class="pill gray">plat</span></td><td>Pas encore dans le scheduler</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 4 · FLUX EN PROD                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="flux-prod">
+  <h2><span class="num">4.</span>Ce que l'on fait sur Flux en <span class="badge prod">Prod</span></h2>
+  <p class="lede">
+    En Prod, Flux écrit la <b>réalité</b> au mur. Quatre familles d'actions sont
+    permises : changer un gate, mettre à jour une ST, basculer Parti/Facturé,
+    affecter un transporteur. Pas de modification de la forme du job.
+  </p>
+
+  <h3>4.1 — Cliquer un gate</h3>
+  <div class="voies">
+    <div class="voie user">
+      <div class="head">L'opérateur</div>
+      <p>Tu cliques sur le badge « Papier ». Une liste s'ouvre : <b>en attente · commandé · livré · en stock</b>.
+      Tu choisis, le badge change de couleur, c'est sauvé. Si la liste est inerte (gris à 47 %),
+      le job n'a pas besoin de papier — utilise le JCF de modif si ce n'est pas le cas.</p>
+    </div>
+    <div class="voie chef">
+      <div class="head">Le chef de projet</div>
+      <p>Ce que tu fais ici, c'est <b>témoigner d'un fait</b>. Le mur l'enregistre
+      avec un horodatage. Le planning va se recalculer juste après.</p>
+    </div>
+    <div class="voie archi">
+      <div class="head">L'architecte</div>
+      <p>Le clic appelle <code>handleUpdatePrerequisite()</code> dans <code>FluxPage.tsx</code>,
+      qui envoie un <code>PATCH /api/v1/flux/elements/{id}</code>. Le subscriber
+      <code>FluxProdOnlyGuardSubscriber</code> rejette la requête si le header
+      <code>X-Flux-Scenario</code> n'est pas <code>prod</code>. L'écriture va dans
+      <code>element_walls</code>.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="lbl">Invariant — Prod recompute on reality</div>
+    <p>
+      La Prod n'est pas une photo figée, c'est un live. Toute mutation dérivée du réel
+      (Flux, saisie d'avancement, ST) doit déclencher un replan. Si une ligne ne bouge
+      plus après un changement, c'est un bug de propagation, pas un comportement attendu.
+    </p>
+  </div>
+
+  <h3>4.2 — Ce qu'on ne peut pas faire en Prod</h3>
+  <ul>
+    <li>Modifier la forme du job (déplacer une étape, changer un setup, ajouter un élément) — passer en Préprod via le JCF de modification.</li>
+    <li>Ajouter un nouveau job — bouton « Créer un job » masqué.</li>
+    <li>Changer la deadline ou la priorité — engagement externe, c'est en Préprod.</li>
+    <li>Tester un scénario alternatif — c'est l'objet même de la Préprod.</li>
+  </ul>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 5 · FLUX EN PRÉPROD                                                       -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="flux-preprod">
+  <h2><span class="num">5.</span>Ce que l'on fait sur Flux en <span class="badge preprod">Préprod</span></h2>
+  <p class="lede">
+    En Préprod, Flux est une <b>surface d'aiguillage</b> : on y ouvre le JCF de
+    modification (bouton « Modifier »), on crée des nouveaux jobs, on affecte un
+    transporteur. Les gates sont gris parce qu'ils sont sur le mur — la Préprod ne
+    peut pas les toucher.
+  </p>
+
+  <h3>5.1 — Le bouton « Modifier »</h3>
+  <p>
+    Visible uniquement quand <code>ctx.canEditJobShape === true</code>
+    (<code>FluxTable.tsx:671</code>). Il ouvre <code>JobModificationContainer</code> :
+    fetch <code>GET /jobs/{id}</code>, partition des tâches via <code>computeRemainingDsl()</code>,
+    rendu via <code>JcfModificationModal</code>. Voir la section 7.
+  </p>
+
+  <h3>5.2 — Le bouton « Créer un job »</h3>
+  <p>
+    Préprod uniquement (raccourci <span class="kbd">Alt</span>+<span class="kbd">N</span>).
+    Mode <b>création</b> de la même modale, avec tous les champs éditables.
+  </p>
+
+  <h3>5.3 — Les gates en Préprod</h3>
+  <p>
+    Les badges Papier, Formes, Plaques, BAT s'affichent comme en Prod (couleur lue
+    au mur), mais le clic est désactivé. Tooltip : « Saisie réservée à Prod (mur) ».
+  </p>
+
+  <div class="callout info">
+    <div class="lbl">Pourquoi cette asymétrie ?</div>
+    <p>
+      Une feuille de papier n'arrive pas deux fois. Si la Préprod pouvait dire
+      « papier reçu » sans que ce soit le cas, on perdrait l'information de réalité
+      qui sert à arbitrer le planning. Règle : <b>la Préprod modèle ce qui pourrait
+      être, le mur enregistre ce qui est</b>.
+    </p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 6 · LE PLANNING                                                           -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="planning">
+  <h2><span class="num">6.</span>Le planning : Prod et Préprod</h2>
+  <p class="lede">
+    À côté de Flux, le planning montre le « quand » : qui passe sur quelle machine,
+    à quelle heure, dans quel ordre.
+  </p>
+
+  <h3>6.1 — Le planning en <span class="badge prod">Prod</span></h3>
+  <div class="voies">
+    <div class="voie user">
+      <div class="head">L'opérateur</div>
+      <p>Tu vois les tuiles posées sur la grille. Clic-droit sur une tuile en cours :
+      « Saisir l'avancement ». Tu indiques l'heure de fin réelle ou un pourcentage.
+      Le planning se met à jour tout seul.</p>
+    </div>
+    <div class="voie chef">
+      <div class="head">Le chef de projet</div>
+      <p>Le planning Prod est un live. Si rien n'est saisi, tout va bien — c'est le
+      <b>silence vaut consentement</b>. Tu ne saisis que ce qui diverge.</p>
+    </div>
+    <div class="voie archi">
+      <div class="head">L'architecte</div>
+      <p>Saisie = écriture sur le mur (<code>recordedProgressPct</code>,
+      <code>recordedAt</code>, <code>lastSetupAt</code>) qui <b>seede</b> le moteur
+      à <code>NOW</code>. Pas de pin auto. Le moteur Rust traite le passé verbatim,
+      reflow le post-<code>NOW</code>.</p>
+    </div>
+  </div>
+
+  <h3>6.2 — Le planning en <span class="badge preprod">Préprod</span></h3>
+  <p>
+    Visuellement identique. Mais le clic-droit « Saisir l'avancement » est <b>caché</b> :
+    la Préprod ne reflète pas la réalité, elle modélise. On y modifie la séquence (via
+    JCF modif depuis Flux) ou on pin une tâche pour tester.
+  </p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 7 · JCF DE MODIFICATION                                                   -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="jcf">
+  <h2><span class="num">7.</span>Le JCF de modification</h2>
+  <p class="lede">
+    La <b>variante de modification</b> du JCF réutilise les composants
+    (<code>JcfModal</code> + <code>JcfJobHeader</code> + <code>JcfElementsTable</code>)
+    avec deux différences : certains champs sont verrouillés, et un panneau
+    « Déjà fait » apparaît au-dessus de chaque cellule Sequence.
+  </p>
+
+  <h3>7.1 — Les 4 champs verrouillés du header</h3>
+  <p>ID Job, Client, Template, Quantité. L'<b>Intitulé</b> reste éditable.</p>
+
+  <h3>7.2 — Les 10 cellules verrouillées du tableau</h3>
+  <p>Quantité, Pagination, Format, Papier, Impression, Surfaçage, Imposition, Qté feuilles, Autres, Commentaires.<br>
+  <b>Restent éditables :</b> Précédences et Sequence.</p>
+
+  <div class="callout warn">
+    <div class="lbl">Discrepancy historique</div>
+    <p>
+      Le <code>playground-jcf-modification.html</code> annote « Restent éditables :
+      Précédences, Autres, Commentaires, Sequence ». Le code de
+      <code>JcfModificationModal.tsx:267-278</code> verrouille en pratique
+      <code>autres</code> et <code>commentaires</code>. Le code est la source de
+      vérité — l'annotation du playground est datée.
+    </p>
+  </div>
+
+  <h3>7.3 — Le panneau « Déjà fait »</h3>
+  <p>
+    Au-dessus de la cellule Sequence d'un élément, encadré qui apparaît si au
+    moins une tâche est terminée ou en cours :
+  </p>
+  <ul>
+    <li><b>Tâches terminées</b> — pastille grise <span class="pill gray">✓</span>, lecture seule.</li>
+    <li><b>Tâche en cours</b> — pastille ambre <span class="pill amber">⏳</span>, % actuel, minutes restantes / totales, heure de calage si <code>lastSetupAt</code>.</li>
+  </ul>
+
+  <h3>7.4 — Comment <code>computeRemainingDsl()</code> partitionne</h3>
+  <pre><span class="c">// Pour chaque tâche, ordonnée par sequenceOrder :</span>
+<span class="k">if</span> (status === <span class="s">'cancelled'</span>) <span class="c">// → ignorée</span>
+<span class="k">else if</span> (status === <span class="s">'completed'</span>) <span class="c">// → panneau Déjà fait</span>
+<span class="k">else if</span> (recordedProgressPct &gt; 0 || lastSetupAt != <span class="k">null</span>)
+  <span class="c">// → tâche en cours, ligne ambre + run réduit dans le textarea</span>
+<span class="k">else</span> <span class="c">// → tâche future, ligne nominale dans le textarea</span></pre>
+  <pre><span class="n">remainingRun</span> = <span class="v">round</span>(runMinutes × (1 − recordedProgressPct / <span class="v">100</span>))
+<span class="c">// Setup inchangé. Floored à 0.</span></pre>
+
+  <h3>7.5 — Chemin de soumission</h3>
+  <pre><span class="pp">PUT</span>    /elements/{id}/sequence    <span class="c">// par élément modifié</span>
+<span class="pp">DELETE</span> /elements/{id}             <span class="c">// par élément retiré</span>
+<span class="pp">PUT</span>    /jobs/{id}                 <span class="c">// header diff</span></pre>
+  <p>Une invalidation RTK Query (tag « FluxJobs » + snapshot) refresh la page Flux et le planning.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 8 · LÉGENDE des visualisations                                            -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="legende">
+  <h2><span class="num">8.</span>Comment lire les visualisations</h2>
+  <p class="lede">
+    Chaque scénario montre, à chaque étape, deux mini-écrans : <span class="badge prod">Prod</span>
+    à gauche, <span class="badge preprod">Préprod</span> à droite. Chaque écran contient
+    trois bandes empilées : la <b>ligne Flux</b>, le <b>planning</b>, et le <b>mur</b>.
+    Voici la grammaire.
+  </p>
+
+  <div class="legend">
+    <div class="legend-block">
+      <h5>Gates (sur la ligne Flux)</h5>
+      <div class="leg-item"><span class="gate-dot ok"></span> passé · vert</div>
+      <div class="leg-item"><span class="gate-dot wait"></span> en attente · ambre</div>
+      <div class="leg-item"><span class="gate-dot miss"></span> bloqué · rouge</div>
+      <div class="leg-item"><span class="gate-dot none"></span> pas requis · gris</div>
+      <div class="leg-item"><span class="gate-dot ok delta"></span> vient de changer (contour bleu)</div>
+    </div>
+    <div class="legend-block">
+      <h5>Tuiles planning</h5>
+      <div class="leg-item"><span style="display:inline-block;width:32px;height:10px;background:var(--t-planned);border-radius:2px;"></span> planifié, futur</div>
+      <div class="leg-item"><span style="display:inline-block;width:32px;height:10px;background:var(--t-setup);border-radius:2px;"></span> calage</div>
+      <div class="leg-item"><span style="display:inline-block;width:32px;height:10px;background:var(--t-running);border-radius:2px;"></span> run en cours</div>
+      <div class="leg-item"><span style="display:inline-block;width:32px;height:10px;background:var(--t-saisi);border-radius:2px;"></span> terminé saisi</div>
+      <div class="leg-item"><span style="display:inline-block;width:32px;height:10px;background:var(--t-silent);border:1px dashed rgba(0,0,0,0.5);border-radius:2px;"></span> terminé par silence-is-consent</div>
+      <div class="leg-item"><span style="display:inline-block;width:32px;height:2px;background:var(--warn);"></span> ligne « NOW »</div>
+    </div>
+    <div class="legend-block">
+      <h5>Mur (faits enregistrés)</h5>
+      <div class="leg-item"><span class="wall-fact ok">Papier·livré</span> fait passé</div>
+      <div class="leg-item"><span class="wall-fact wait">Papier·attendu</span> fait en attente</div>
+      <div class="leg-item"><span class="wall-fact miss">Papier·rupture</span> fait défaillant</div>
+      <div class="leg-item"><span class="wall-fact ok fresh">Papier·livré</span> fait fraîchement enregistré (contour bleu)</div>
+    </div>
+  </div>
+
+  <p style="margin-top: 14px;">
+    Quand une cellule, une tuile ou un fait <b>vient de changer à l'étape courante</b>,
+    elle prend un contour bleu (côté Prod) ou violet (côté Préprod). Si Prod et Préprod
+    sont strictement identiques, on n'affiche qu'un seul écran avec le bandeau gris
+    « Prod = Préprod » — pour ne pas dupliquer l'œil.
+  </p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- 9 · SCÉNARIOS                                                             -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="scenarios">
+  <h2><span class="num">9.</span>Scénarios concrets</h2>
+  <p class="lede">
+    Du général au pointu. La base seed du repo n'a pas de jobs <code>1000-1002</code> —
+    elle utilise une numérotation <code>04400+</code>. On prend donc <b>04400, 04401,
+    04402</b> (Carrefour / Renault / Danone, flyers mono-élément standards) comme
+    inspiration canonique, puis on étire vers des cas plus complexes.
+  </p>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO A — Job 04400 nominal                                            -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge prod">Prod</span>
+      <span class="name">Scénario A — Job 04400 démarré et terminé en temps et en heure</span>
+    </div>
+    <p class="summary">
+      Le cas absolument nominal. Flyer mono-élément, 3 tâches : Heidelberg, Massicot, Pliage.
+      Tous les gates passés. Le job va de bout en bout sans incident, sans aucune saisie
+      à l'atelier (silence vaut consentement).
+    </p>
+
+    <div class="job-card">
+      <div class="field"><span class="key">reference</span><span class="val">04400 · Carrefour · Flyer A5</span></div>
+      <div class="field"><span class="key">workshopExitDate</span><span class="val">2026-05-08 17:00</span></div>
+      <div class="field"><span class="key">tasks</span><span class="val">Heidelberg(30+90), Massicot(20), Pliage(15)</span></div>
+      <div class="field"><span class="key">gates</span><span class="val">paper=in_stock · bat=approved · plate=ready · forme=none</span></div>
+    </div>
+
+    <!-- Étape 1 : 8h00, planifié -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">08:00</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">État initial : Heidelberg démarre dans le planning. Aucune saisie demandée tant que ça roule.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span><span class="hint">vues identiques</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04400</span>
+              <span class="client">Carrefour</span>
+              <span class="gates">
+                <span class="gate-dot ok" title="papier en stock">P</span>
+                <span class="gate-dot ok" title="BAT approuvé">B</span>
+                <span class="gate-dot ok" title="plaques OK">L</span>
+                <span class="gate-dot none" title="pas de forme">F</span>
+              </span>
+              <span class="stations">
+                <span class="station-dot run" title="Heidelberg en cours"></span>
+                <span class="station-dot" title="Massicot à venir"></span>
+                <span class="station-dot" title="Pliage à venir"></span>
+              </span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;">
+              <div class="mp-label">Heidelberg</div>
+              <div class="mp-track" style="--cols: 8;">
+                <div class="mp-tile setup" style="--start: 0; --span: 0.5;">cal</div>
+                <div class="mp-tile run delta" style="--start: 0.5; --span: 1.5;">04400</div>
+                <div class="mp-now" style="--at: 0;"></div>
+              </div>
+            </div>
+            <div class="mp-row" style="--cols: 8;">
+              <div class="mp-label">Massicot</div>
+              <div class="mp-track" style="--cols: 8;">
+                <div class="mp-tile planned" style="--start: 2; --span: 0.33;">04400</div>
+              </div>
+            </div>
+            <div class="mp-row" style="--cols: 8;">
+              <div class="mp-label">Pliage</div>
+              <div class="mp-track" style="--cols: 8;">
+                <div class="mp-tile planned" style="--start: 2.33; --span: 0.25;">04400</div>
+              </div>
+            </div>
+          </div>
+          <div class="mini-wall">
+            <span class="wall-lbl">Mur :</span>
+            <span class="wall-fact ok">Papier·in_stock</span>
+            <span class="wall-fact ok">BAT·approved</span>
+            <span class="wall-fact ok">Plaques·ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Étape 2 : 11h05, silence-is-consent -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">11:05</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">Heidelberg, Massicot et Pliage planifiés terminés. <b>Aucune saisie reçue</b> : par silence-is-consent, l'état devient <code>done</code> sur les trois.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span><span class="hint">tout en silent-done</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row ready">
+              <span class="id">04400</span>
+              <span class="client">Carrefour</span>
+              <span class="gates">
+                <span class="gate-dot ok">P</span>
+                <span class="gate-dot ok">B</span>
+                <span class="gate-dot ok">L</span>
+                <span class="gate-dot none">F</span>
+              </span>
+              <span class="stations">
+                <span class="station-dot silent" title="Heidelberg silence-is-consent"></span>
+                <span class="station-dot silent" title="Massicot silence-is-consent"></span>
+                <span class="station-dot silent" title="Pliage silence-is-consent"></span>
+              </span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;">
+              <div class="mp-label">Heidelberg</div>
+              <div class="mp-track" style="--cols: 8;">
+                <div class="mp-tile silent" style="--start: 0; --span: 2;">04400 ✓</div>
+              </div>
+            </div>
+            <div class="mp-row" style="--cols: 8;">
+              <div class="mp-label">Massicot</div>
+              <div class="mp-track" style="--cols: 8;">
+                <div class="mp-tile silent" style="--start: 2; --span: 0.33;">04400</div>
+              </div>
+            </div>
+            <div class="mp-row" style="--cols: 8;">
+              <div class="mp-label">Pliage</div>
+              <div class="mp-track" style="--cols: 8;">
+                <div class="mp-tile silent delta" style="--start: 2.33; --span: 0.25;">04400</div>
+                <div class="mp-now" style="--at: 3.08;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mini-wall">
+            <span class="wall-lbl">Mur :</span>
+            <span class="wall-fact ok">Papier·in_stock</span>
+            <span class="wall-fact ok">BAT·approved</span>
+            <span class="wall-fact ok">Plaques·ready</span>
+            <span class="wall-fact" style="color: var(--text-4)">aucune saisie</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Étape 3 : Parti -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">15:30</span>
+        <span class="step-actor">Opér.</span>
+        <span class="step-action">Sur Flux <b>Prod</b>, l'opérateur sélectionne le transporteur, coche « Parti ». La ligne passe en vert plein.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">ligne expédiée</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row shipped">
+              <span class="id">04400</span>
+              <span class="client">Carrefour ✈</span>
+              <span class="gates">
+                <span class="gate-dot ok">P</span>
+                <span class="gate-dot ok">B</span>
+                <span class="gate-dot ok">L</span>
+                <span class="gate-dot none">F</span>
+              </span>
+              <span class="stations">
+                <span class="station-dot silent"></span>
+                <span class="station-dot silent"></span>
+                <span class="station-dot silent"></span>
+              </span>
+            </div>
+          </div>
+          <div class="mini-wall">
+            <span class="wall-lbl">Mur :</span>
+            <span class="wall-fact ok">Papier·in_stock</span>
+            <span class="wall-fact ok">BAT·approved</span>
+            <span class="wall-fact ok fresh">Job·shipped@15:30</span>
+          </div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">lit le mur, voit le shipped</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row shipped">
+              <span class="id">04400</span>
+              <span class="client">Carrefour ✈</span>
+              <span class="gates">
+                <span class="gate-dot ok">P</span>
+                <span class="gate-dot ok">B</span>
+                <span class="gate-dot ok">L</span>
+                <span class="gate-dot none">F</span>
+              </span>
+              <span class="stations">
+                <span class="station-dot silent"></span>
+                <span class="station-dot silent"></span>
+                <span class="station-dot silent"></span>
+              </span>
+            </div>
+          </div>
+          <div class="mini-wall">
+            <span class="wall-lbl">Mur :</span>
+            <span class="wall-fact ok">Papier·in_stock</span>
+            <span class="wall-fact ok">BAT·approved</span>
+            <span class="wall-fact ok">Job·shipped</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="voies">
+      <div class="voie user">
+        <div class="head">L'opérateur</div>
+        <p>Tu n'as <b>rien à cliquer</b> tant que tout va bien. Tu ne touches que la fin de cycle (transporteur, Parti).</p>
+      </div>
+      <div class="voie chef">
+        <div class="head">Le chef de projet</div>
+        <p>Le job traverse les 8 états comme prévu : <i>planifié-pas-prêt</i> → <i>planifié-prêt-à-partir</i> → <i>expédié</i>. Aucun replan.</p>
+      </div>
+      <div class="voie archi">
+        <div class="head">L'architecte</div>
+        <p>Aucun appel API pendant la production. Seules requêtes : coches finales (<code>shipped</code>, <code>invoiced</code>) et SSE qui rafraîchit l'état planifié-vs-réel. Le DTO calcule <code>computeTaskState() === 'done'</code> sur foi de <code>scheduledEnd &lt; now &amp;&amp; lastSaisieAt === null</code>.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO B — Job 04401 saisie d'avance                                    -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge prod">Prod</span>
+      <span class="name">Scénario B — Job 04401 : opérateur saisit une avance sur Heidelberg</span>
+    </div>
+    <p class="summary">
+      Le job tourne, le calage va plus vite. L'opérateur saisit, ce qui décale la suite plus tôt.
+      On voit la Préprod refléter l'effet du replan (elle lit le mur en lecture).
+    </p>
+
+    <div class="job-card">
+      <div class="field"><span class="key">reference</span><span class="val">04401 · Renault · Flyer A4</span></div>
+      <div class="field"><span class="key">tasks</span><span class="val">Heidelberg(40+120), Massicot(15), Pliage(20)</span></div>
+    </div>
+
+    <!-- Étape 1 -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">08:00</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">Heidelberg planifié 8h00 → 10h40 (40' calage + 2h run).</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span><span class="hint">démarrage</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot setup"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup delta" style="--start: 0; --span: 0.66;">cal</div>
+              <div class="mp-tile run" style="--start: 0.66; --span: 2;">04401</div>
+              <div class="mp-now" style="--at: 0;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.66; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.91; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">tous gates ok</span><span class="wall-fact" style="color: var(--text-4)">aucune saisie</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Étape 2 : calage fini en avance -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">08:35</span>
+        <span class="step-actor">Opér.</span>
+        <span class="step-action">Calage fini. Clic-droit → « Calage terminé ». <code>lastSetupAt = 08:35</code>. Le moteur reflow : Heidelberg fin recalculée à 10h35.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">après saisie calage</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot run"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal ✓</div>
+              <div class="mp-tile run delta" style="--start: 0.58; --span: 2;">04401 (en cours)</div>
+              <div class="mp-now" style="--at: 0.58;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta" style="--start: 2.58; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta" style="--start: 2.83; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok fresh">lastSetupAt·08:35</span></div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">reflète le mur, replan local</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot run"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal ✓</div>
+              <div class="mp-tile run delta-pp" style="--start: 0.58; --span: 2;">04401</div>
+              <div class="mp-now" style="--at: 0.58;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.58; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.83; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">lastSetupAt·08:35</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Étape 3 : saisie 80 % -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">10:00</span>
+        <span class="step-actor">Opér.</span>
+        <span class="step-action">Saisie d'avancement : « <b>80 %</b> à 10h00 ». Modale capture progrès, bouton bleu « Enregistrer ». Le mur enregistre <code>recordedProgressPct=80</code>, <code>recordedAt=10:00</code>.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">replan post-saisie</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot run"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal</div>
+              <div class="mp-tile run" style="--start: 0.58; --span: 1.42;">04401 80%</div>
+              <div class="mp-tile run delta" style="--start: 2; --span: 0.46;">~10h28</div>
+              <div class="mp-now" style="--at: 2;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta" style="--start: 2.46; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta" style="--start: 2.71; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok fresh">recordedProgressPct·80</span><span class="wall-fact ok fresh">recordedAt·10:00</span></div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">absorbe le seed, recalcule</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot run"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal</div>
+              <div class="mp-tile run" style="--start: 0.58; --span: 1.42;">04401</div>
+              <div class="mp-tile run delta-pp" style="--start: 2; --span: 0.46;"></div>
+              <div class="mp-now" style="--at: 2;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.46; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.71; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">recordedProgressPct·80</span><span class="wall-fact ok">recordedAt·10:00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Étape 4 : tout terminé silencieusement -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">11:03</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">Plus aucune saisie. Heidelberg, Massicot, Pliage passés. Tout en silence-is-consent. Job prêt à expédier.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span><span class="hint">prêt à partir</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row ready">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot done"></span><span class="station-dot silent"></span><span class="station-dot silent"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile done" style="--start: 0; --span: 2.46;">04401 ✓ saisi</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile silent" style="--start: 2.46; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile silent delta" style="--start: 2.71; --span: 0.33;">04401</div>
+              <div class="mp-now" style="--at: 3.05;"></div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">tous gates ok</span><span class="wall-fact ok">recordedProgressPct·80</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="voies">
+      <div class="voie user">
+        <div class="head">L'opérateur</div>
+        <p>Tu saisis quand c'est <b>en avance ou en retard</b>. Quand c'est dans le plan, tu ne saisis pas. La modale est rapide : un curseur, l'heure de fin, deux boutons.</p>
+      </div>
+      <div class="voie chef">
+        <div class="head">Le chef de projet</div>
+        <p>Cette saisie <b>seede</b> l'algo : elle nourrit aussi le ratio de productivité de l'opérateur sur cette station, qui sera réutilisé pour affiner les estimations futures. Pas un pin.</p>
+      </div>
+      <div class="voie archi">
+        <div class="head">L'architecte</div>
+        <p>Le ratio est calculé dans PHP (autorité formule), l'engine consomme passivement via <code>effective_run_minutes()</code>. Voir <code>project_productivity_ratio_wiring.md</code>.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO C — Papier en rupture                                             -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge prod">Prod</span>
+      <span class="name">Scénario C — Job 04401 : papier en rupture découvert au matin</span>
+    </div>
+    <p class="summary">
+      Le papier qui devait arriver n'est pas là. L'opérateur change le gate Papier
+      en Prod ; le moteur repousse le job au lendemain.
+    </p>
+
+    <!-- Avant -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">07:30</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">État avant constat. Heidelberg sur le point de démarrer.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span><span class="hint">avant constat</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 0; --span: 2.66;">04401</div>
+              <div class="mp-now" style="--at: -0.5;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.66; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.91; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">Papier·in_stock</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Après changement gate -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">07:30</span>
+        <span class="step-actor">Opér.</span>
+        <span class="step-action">Sur Flux <b>Prod</b>, clique le badge Papier de la ligne 04401 → choisit « commandé ». <code>PATCH /flux/elements/{id}</code>, replan déclenché.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">job repoussé J+1</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row late">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot wait delta">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile cancel" style="--start: 0; --span: 2.66;">04401 reporté →</div>
+              <div class="mp-now" style="--at: -0.5;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile cancel" style="--start: 2.66; --span: 0.25;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile cancel" style="--start: 2.91; --span: 0.33;"></div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact wait fresh">Papier·ordered</span></div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">aligné sur la nouvelle réalité</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row late">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot wait">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile cancel" style="--start: 0; --span: 2.66;">04401 reporté</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;"></div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;"></div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact wait">Papier·ordered</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <div class="lbl">Pourquoi en Prod et pas en Préprod ?</div>
+      <p>
+        Parce que le papier est physique et indivisible. La rupture est un fait. La
+        Préprod ne peut pas dire « papier reçu » ; elle peut seulement explorer
+        « si on le recevait demain, ça donnerait quoi ? », mais c'est l'engine qui
+        le simulera, pas un clic sur le mur.
+      </p>
+    </div>
+
+    <div class="voies">
+      <div class="voie user">
+        <div class="head">L'opérateur</div>
+        <p>Tu cliques le gate Papier dès que tu vois la rupture. Pas besoin de
+        prévenir le chef en plus — le replan le fera apparaître.</p>
+      </div>
+      <div class="voie chef">
+        <div class="head">Le chef de projet</div>
+        <p>La ligne change de fond visuel : <i>conflit-pas-prêt</i> ou <i>late</i>
+        selon la nouvelle date. Tu décides ensuite : appeler le client, cannibaliser
+        un autre stock, ou refuser la commande.</p>
+      </div>
+      <div class="voie archi">
+        <div class="head">L'architecte</div>
+        <p>Écriture sur <code>element_walls.paper_status</code>. La Préprod (qui partage le
+        même mur) le voit immédiatement à la prochaine requête, sans qu'on ait à
+        propager côté scénario.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO D — JCF modif sur job pas démarré                                -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge preprod">Préprod</span>
+      <span class="name">Scénario D — JCF modif d'un job pas encore démarré</span>
+    </div>
+    <p class="summary">
+      Cas le plus simple côté JCF modif : aucune tâche n'est commencée, le panneau
+      « Déjà fait » n'apparaît pas, le textarea Sequence est éditable avec son contenu
+      d'origine.
+    </p>
+
+    <!-- Avant -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">14:00 J-1</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">Le job a été créé, planifié pour J. Pas encore lancé.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span><span class="hint">avant modif</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04404</span><span class="client">Total</span>
+              <span class="gates"><span class="gate-dot wait">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>J 8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 0.5; --span: 2;">04404 H(30+90)</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.5; --span: 0.25;">04404</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact wait">Papier·ordered</span><span class="wall-fact" style="color: var(--text-4)">aucune saisie</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale ouverte -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">14:01 J-1</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Sur Flux <b>Préprod</b>, clic « Modifier ». La modale JCF modification s'ouvre. <code>computeRemainingDsl()</code> ne trouve aucune tâche en cours ni terminée → pas de panneau Déjà fait.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen preprod" style="grid-column: span 2;">
+          <div class="screen-head"><span>Préprod — modale JCF modification</span><span class="hint">aucune tâche débutée → panneau « Déjà fait » absent</span></div>
+          <div class="modal-preview">
+            <div class="mp-title">Modifier le Job 04404 · Total</div>
+            <div class="field-row"><span class="lbl-mini">ID Job</span><span class="input-mini disabled">04404</span></div>
+            <div class="field-row"><span class="lbl-mini">Client</span><span class="input-mini disabled">Total</span></div>
+            <div class="field-row"><span class="lbl-mini">Template</span><span class="input-mini disabled">—</span></div>
+            <div class="field-row"><span class="lbl-mini">Quantité</span><span class="input-mini disabled">5000</span></div>
+            <div class="field-row"><span class="lbl-mini">Intitulé</span><span class="input-mini">Flyer A5 Total octobre</span></div>
+            <div class="field-row"><span class="lbl-mini">Deadline</span><span class="input-mini editable">2026-05-08 17:00</span></div>
+            <div class="field-row"><span class="lbl-mini">Priorité</span><span class="input-mini editable">2</span></div>
+            <div style="margin-top: 8px; font-size: 10.5px; color: var(--text-5); text-transform: uppercase; letter-spacing: 0.06em;">Élément · Flyer A5</div>
+            <div class="textarea-preview">Heidelberg(30+90)
+Pliage(15)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Après save -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">14:02 J-1</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Modifie le textarea : <code>Heidelberg(30+90)</code> → <code>Heidelberg(40+120)</code> (changement de format). Priorité 2 → 0 (urgent). Enregistre.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">non impacté tant que pas publié</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04404</span><span class="client">Total</span>
+              <span class="gates"><span class="gate-dot wait">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>J 8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 0.5; --span: 2;">04404 H(30+90)</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.5; --span: 0.25;">04404</div>
+            </div></div>
+          </div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">replan local</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04404</span><span class="client">Total</span>
+              <span class="gates"><span class="gate-dot wait">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>J 8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta-pp" style="--start: 0.5; --span: 2.66;">04404 H(40+120)</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta-pp" style="--start: 3.16; --span: 0.25;">04404</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact wait">Papier·ordered</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="voies">
+      <div class="voie user">
+        <div class="head">L'opérateur</div>
+        <p>Pas de panneau Déjà fait : le textarea contient toute la séquence d'origine,
+        tu peux retoucher chaque ligne.</p>
+      </div>
+      <div class="voie chef">
+        <div class="head">Le chef de projet</div>
+        <p>La modif reste en Préprod tant que tu ne publies pas. Tu peux la jeter à
+        la corbeille si elle ne tient pas. Idéal pour itérer.</p>
+      </div>
+      <div class="voie archi">
+        <div class="head">L'architecte</div>
+        <p>Diff dispatché : <code>PUT /elements/{id}/sequence</code> (DSL nouveau)
+        + <code>PUT /jobs/{id}</code> (priorité). RTK Query invalide les tags FluxJobs
+        + snapshot, le replan Préprod se déclenche en chaîne.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO E — JCF modif avec une tâche en cours                            -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge preprod">Préprod</span>
+      <span class="name">Scénario E — JCF modif sur un job avec une tâche en cours</span>
+    </div>
+    <p class="summary">
+      Le cœur du JCF de modification. Heidelberg en cours, on découvre qu'il faut
+      ajouter une étape de pelliculage. On modifie en Préprod pour ne pas casser
+      la prod en train de tourner.
+    </p>
+
+    <div class="job-card">
+      <div class="field"><span class="key">reference</span><span class="val">04401 · Renault</span></div>
+      <div class="field"><span class="key">tasks</span><span class="val">Heidelberg(40+120) <span class="val dim">en cours, 60%, calage 8h35</span>, Massicot(15) <span class="val dim">à venir</span>, Pliage(20) <span class="val dim">à venir</span></span></div>
+    </div>
+
+    <!-- Avant -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">10:14</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">État avant ouverture de la modale.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04401</span><span class="client">Renault</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot run"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal</div>
+              <div class="mp-tile run" style="--start: 0.58; --span: 1.42;">04401 60%</div>
+              <div class="mp-tile run" style="--start: 2; --span: 0.46;"></div>
+              <div class="mp-now" style="--at: 2.25;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.46; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.71; --span: 0.33;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">tous gates ok</span><span class="wall-fact ok">recordedProgressPct·60</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale ouverte -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">10:15</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Préprod → Flux → Modifier. La modale s'ouvre, le panneau « Déjà fait » apparaît avec Heidelberg en ambre.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen preprod" style="grid-column: span 2;">
+          <div class="screen-head"><span>Préprod — modale JCF modification</span><span class="hint">tâche en cours détectée par <code>recordedProgressPct &gt; 0</code></span></div>
+          <div class="modal-preview">
+            <div class="mp-title">Modifier le Job 04401 · Renault</div>
+            <div class="field-row"><span class="lbl-mini">ID Job</span><span class="input-mini disabled">04401</span></div>
+            <div class="field-row"><span class="lbl-mini">Client</span><span class="input-mini disabled">Renault</span></div>
+            <div class="field-row"><span class="lbl-mini">Quantité</span><span class="input-mini disabled">10000</span></div>
+            <div class="field-row"><span class="lbl-mini">Priorité</span><span class="input-mini editable">2</span></div>
+            <div style="margin-top: 8px; font-size: 10.5px; color: var(--text-5); text-transform: uppercase; letter-spacing: 0.06em;">Élément · Flyer A4</div>
+            <div class="done-panel">
+              <div class="dp-head">Déjà fait</div>
+              <div class="dp-row in-progress">
+                <span class="dp-pastille in-progress">⏳</span>
+                <span>Heidelberg(40+120)</span>
+                <span class="dp-meta"><span class="pct">60%</span> · 48 / 120 min · calage 08:35</span>
+              </div>
+              <div style="font-size: 10px; color: var(--text-5); font-style: italic; margin-top: 3px; padding-left: 21px;">↳ Run réduit ci-dessous ; setup conservé.</div>
+            </div>
+            <div class="textarea-preview">Heidelberg(40+48)
+Massicot(15)
+Pliage(20)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Après save -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">10:16</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Ajoute une ligne dans le textarea sous Pliage : <code>Pelliculage(10+30)</code>. Enregistre.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">inchangé tant que pas publié</span></div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal</div>
+              <div class="mp-tile run" style="--start: 0.58; --span: 1.42;">04401</div>
+              <div class="mp-tile run" style="--start: 2; --span: 0.46;"></div>
+              <div class="mp-now" style="--at: 2.27;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.46; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.71; --span: 0.33;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pelliculage</div><div class="mp-track" style="--cols: 8;"></div></div>
+          </div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">+ Pelliculage en aval</span></div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>8h</div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile setup" style="--start: 0; --span: 0.58;">cal</div>
+              <div class="mp-tile run" style="--start: 0.58; --span: 1.42;">04401</div>
+              <div class="mp-tile run" style="--start: 2; --span: 0.46;"></div>
+              <div class="mp-now" style="--at: 2.27;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.46; --span: 0.25;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.71; --span: 0.33;">04401</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pelliculage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta-pp" style="--start: 3.04; --span: 0.66;">04401</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">tous gates ok</span><span class="wall-fact ok">recordedProgressPct·60</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="voies">
+      <div class="voie user">
+        <div class="head">L'opérateur</div>
+        <p>Le panneau Déjà fait te dit clairement « cette ligne ambre, j'y touche
+        pas ». Tu travailles uniquement sur le textarea du dessous.</p>
+      </div>
+      <div class="voie chef">
+        <div class="head">Le chef de projet</div>
+        <p>Le calage en cours est <b>conservé en setup</b> mais pas comme un pin :
+        l'engine décide s'il honore le calage selon le placement final.</p>
+      </div>
+      <div class="voie archi">
+        <div class="head">L'architecte</div>
+        <p>Sur la ligne en cours, le DSL régénéré utilise <code>setupMinutes</code>
+        d'origine (40) et <code>runMinutes × (1 − pct/100)</code> (48). L'engine reçoit
+        ce nouveau DSL et applique sa propre logique de carry-over via
+        <code>lastSetupAt</code> / <code>lastSetupStationId</code>.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO F — JCF modif : 2 finies + 1 en cours + 2 à venir                -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge preprod">Préprod</span>
+      <span class="name">Scénario F — JCF modif : 2 tâches finies + 1 en cours + 2 à venir</span>
+    </div>
+    <p class="summary">
+      Le scénario qui résume la mécanique du panneau « Déjà fait ». Job en plein
+      milieu de cycle, on doit insérer une étape supplémentaire avant la fin.
+    </p>
+
+    <div class="job-card">
+      <div class="field"><span class="key">reference</span><span class="val">04402 · Danone</span></div>
+      <div class="field"><span class="key">tasks (avant modif)</span><span class="val">
+        Heidelberg(30+60) <span class="val dim">terminée 9h-10h</span>,
+        Massicot(20) <span class="val dim">terminée 10h-10h20</span>,
+        Pliage(15) <span class="val dim">en cours, 33%, calage 10h22</span>,
+        Encarteuse(20+40) <span class="val dim">à venir</span>,
+        Filmage(10) <span class="val dim">à venir</span>
+      </span></div>
+    </div>
+
+    <!-- État avant -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">10:44</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">État avant ouverture. Heidelberg et Massicot finies (silence-is-consent), Pliage en cours.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04402</span><span class="client">Danone</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations">
+                <span class="station-dot silent" title="Heidelberg done"></span>
+                <span class="station-dot silent" title="Massicot done"></span>
+                <span class="station-dot run" title="Pliage en cours"></span>
+                <span class="station-dot" title="Encarteuse à venir"></span>
+                <span class="station-dot" title="Filmage à venir"></span>
+              </span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div><div>16h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile silent" style="--start: 0; --span: 1.5;">04402 ✓</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Massicot</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile silent" style="--start: 1; --span: 0.33;">04402</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile run" style="--start: 1.36; --span: 0.25;">04402 33%</div>
+              <div class="mp-now" style="--at: 1.73;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Encarteuse</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 1.6; --span: 1;">04402</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Filmage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.6; --span: 0.16;">04402</div>
+            </div></div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">recordedProgressPct·33</span><span class="wall-fact ok">lastSetupAt·10:22</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">10:45</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Préprod → Flux → Modifier. <code>computeRemainingDsl()</code> partitionne en deux completed + une in-progress + deux à venir.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen preprod" style="grid-column: span 2;">
+          <div class="screen-head"><span>Préprod — modale JCF modification</span><span class="hint">2 ✓ + 1 en cours + 2 dans le textarea</span></div>
+          <div class="modal-preview">
+            <div class="mp-title">Modifier le Job 04402 · Danone</div>
+            <div style="margin-top: 6px; font-size: 10.5px; color: var(--text-5); text-transform: uppercase; letter-spacing: 0.06em;">Élément · Plaquette A5</div>
+            <div class="done-panel">
+              <div class="dp-head">Déjà fait</div>
+              <div class="dp-row completed">
+                <span class="dp-pastille completed">✓</span>
+                <span>Heidelberg(30+60)</span>
+                <span class="dp-meta">terminée</span>
+              </div>
+              <div class="dp-row completed">
+                <span class="dp-pastille completed">✓</span>
+                <span>Massicot(20)</span>
+                <span class="dp-meta">terminée</span>
+              </div>
+              <div class="dp-row in-progress">
+                <span class="dp-pastille in-progress">⏳</span>
+                <span>Pliage(20+15)</span>
+                <span class="dp-meta"><span class="pct">33%</span> · 10 / 15 min · calage 10:22</span>
+              </div>
+            </div>
+            <div class="textarea-preview">Pliage(20+10)
+Encarteuse(20+40)
+Filmage(10)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Après save -->
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">10:46</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Insère <code>Vernis(5+25)</code> entre Pliage et Encarteuse dans le textarea. Enregistre.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">non publié, planning d'origine</span></div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div><div>16h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile run" style="--start: 1.36; --span: 0.25;">04402</div>
+              <div class="mp-now" style="--at: 1.76;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Vernis</div><div class="mp-track" style="--cols: 8;"></div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Encarteuse</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 1.6; --span: 1;">04402</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Filmage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2.6; --span: 0.16;">04402</div>
+            </div></div>
+          </div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">+ Vernis injecté, l'aval glisse</span></div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>9h</div><div>10h</div><div>11h</div><div>12h</div><div>13h</div><div>14h</div><div>15h</div><div>16h</div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile run" style="--start: 1.36; --span: 0.25;">04402</div>
+              <div class="mp-now" style="--at: 1.76;"></div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Vernis</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta-pp" style="--start: 1.6; --span: 0.5;">04402</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Encarteuse</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta-pp" style="--start: 2.1; --span: 1;">04402</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Filmage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned delta-pp" style="--start: 3.1; --span: 0.16;">04402</div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <div class="lbl">À retenir</div>
+      <p>
+        Heidelberg et Massicot ne sont <b>pas</b> dans le DSL envoyé. Leur trace
+        reste sur le mur (statut <code>completed</code>, timestamps). Le moteur
+        Rust traite ce passé verbatim en <code>pre_place</code> ; le futur, lui,
+        c'est le contenu du textarea.
+      </p>
+    </div>
+
+    <div class="voies">
+      <div class="voie user">
+        <div class="head">L'opérateur</div>
+        <p>Tu vois en un coup d'œil ce qui est verrouillé (en haut, gris) et ce
+        que tu peux toucher (en bas, textarea).</p>
+      </div>
+      <div class="voie chef">
+        <div class="head">Le chef de projet</div>
+        <p>Le DSL contient ce qui reste à faire. Le run réduit de la tâche en cours
+        évite la double-comptabilisation.</p>
+      </div>
+      <div class="voie archi">
+        <div class="head">L'architecte</div>
+        <p>L'<code>elementSequence</code> persisté représente la suite future
+        (incluant la in-progress avec run réduit). Le passé reste sur les entités
+        <code>Task</code> avec leur statut <code>completed</code>.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO G — Changement deadline + conflit                                -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge preprod">Préprod</span>
+      <span class="name">Scénario G — JCF modif : changement de deadline, conflit qui apparaît</span>
+    </div>
+    <p class="summary">
+      Le client appelle pour avancer la sortie atelier de J+3 à J+1. Le chef
+      pré-teste l'impact en Préprod avant d'accepter au téléphone.
+    </p>
+
+    <!-- Avant -->
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">10:59</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">État courant : 04402 planifié à J+3, deux autres jobs (04405, 04406) déjà sur les créneaux J+1.</span>
+      </div>
+      <div class="snapshot merged">
+        <div class="screen merged">
+          <div class="screen-head"><span>Prod = Préprod</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04405</span><span class="client">Bouygues</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04406</span><span class="client">Orange</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04402</span><span class="client">Danone</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>J+1 8h</div><div>10h</div><div>12h</div><div>14h</div><div>16h</div><div>J+2</div><div>J+3</div><div></div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 0; --span: 2;">04405</div>
+              <div class="mp-tile planned" style="--start: 2; --span: 2;">04406</div>
+              <div class="mp-tile planned" style="--start: 5.5; --span: 1.5;">04402</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 2; --span: 0.5;">04405</div>
+              <div class="mp-tile planned" style="--start: 4; --span: 0.5;">04406</div>
+              <div class="mp-tile planned" style="--start: 7; --span: 0.5;">04402</div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Après save : conflit -->
+    <div class="step-block warn">
+      <div class="step-head">
+        <span class="step-time">11:00</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Modifier 04402 → <code>workshopExitDate</code> J+3 → J+1, priorité 2 → 0. Enregistre. Replan : conflit, le moteur ne peut pas tasser.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">non publié</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04405</span><span class="client">Bouygues</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04406</span><span class="client">Orange</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04402</span><span class="client">Danone</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">3 lignes en conflit jaune</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row conflict">
+              <span class="id">04405</span><span class="client">Bouygues</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+            <div class="mini-flux-row conflict">
+              <span class="id">04406</span><span class="client">Orange</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+            <div class="mini-flux-row conflict">
+              <span class="id">04402</span><span class="client">Danone <b>★</b></span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-planning">
+            <div class="mp-clock" style="--cols: 8;"><div></div><div>J+1 8h</div><div>10h</div><div>12h</div><div>14h</div><div>16h</div><div>J+2</div><div>J+3</div><div></div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Heidelberg</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 0; --span: 1.5;">04402 ★</div>
+              <div class="mp-tile late" style="--start: 1.5; --span: 1.5;">04405 !</div>
+              <div class="mp-tile late" style="--start: 3; --span: 1.5;">04406 !</div>
+            </div></div>
+            <div class="mp-row" style="--cols: 8;"><div class="mp-label">Pliage</div><div class="mp-track" style="--cols: 8;">
+              <div class="mp-tile planned" style="--start: 1.5; --span: 0.5;">04402</div>
+              <div class="mp-tile late" style="--start: 3; --span: 0.5;">04405</div>
+              <div class="mp-tile late" style="--start: 4.5; --span: 0.5;">04406</div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <div class="lbl">L'intérêt de la Préprod ici</div>
+      <p>
+        Si le chef avait fait ce changement directement en Prod, l'atelier aurait vu
+        trois lignes passer en jaune sans avertissement. La Préprod sert précisément
+        à <b>contenir la perturbation</b> tant qu'on n'a pas pris la décision.
+      </p>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO H — Multi-éléments                                               -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge preprod">Préprod</span>
+      <span class="name">Scénario H — JCF modif sur job multi-éléments</span>
+    </div>
+    <p class="summary">
+      Un job avec deux éléments (couverture + intérieur d'une plaquette). On modifie
+      la séquence d'un seul élément ; l'autre reste intact.
+    </p>
+
+    <div class="job-card">
+      <div class="field"><span class="key">reference</span><span class="val">04403 · Editions Cap</span></div>
+      <div class="field"><span class="key">elements</span><span class="val">Couverture A4 + Intérieur A4</span></div>
+      <div class="field"><span class="key">cover tasks</span><span class="val">Heidelberg(35+90), Massicot(25), Pelliculage(10+45) <span class="val dim">en cours, 50%</span></span></div>
+      <div class="field"><span class="key">intérieur tasks</span><span class="val">Heidelberg(30+150) <span class="val dim">terminée</span>, Massicot(20) <span class="val dim">terminée</span>, Pliage(15) <span class="val dim">à venir</span></span></div>
+    </div>
+
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">14:00</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Modifier sur 04403 → modale ouverte. Deux colonnes d'éléments. Chacun a son panneau Déjà fait calculé indépendamment.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen preprod" style="grid-column: span 2;">
+          <div class="screen-head"><span>Préprod — modale JCF modification (multi-éléments)</span><span class="hint">deux panneaux Déjà fait distincts</span></div>
+          <div class="modal-preview" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <div class="mp-title" style="margin-bottom: 4px;">Couverture A4</div>
+              <div class="done-panel">
+                <div class="dp-head">Déjà fait</div>
+                <div class="dp-row in-progress">
+                  <span class="dp-pastille in-progress">⏳</span>
+                  <span>Pelliculage(10+45)</span>
+                  <span class="dp-meta"><span class="pct">50%</span> · 23 / 45 min</span>
+                </div>
+              </div>
+              <div class="textarea-preview">Pelliculage(10+22)</div>
+            </div>
+            <div>
+              <div class="mp-title" style="margin-bottom: 4px;">Intérieur A4</div>
+              <div class="done-panel">
+                <div class="dp-head">Déjà fait</div>
+                <div class="dp-row completed">
+                  <span class="dp-pastille completed">✓</span>
+                  <span>Heidelberg(30+150)</span>
+                  <span class="dp-meta">terminée</span>
+                </div>
+                <div class="dp-row completed">
+                  <span class="dp-pastille completed">✓</span>
+                  <span>Massicot(20)</span>
+                  <span class="dp-meta">terminée</span>
+                </div>
+              </div>
+              <div class="textarea-preview delta">Pliage(15)
+Reliure(10+30)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-block sys">
+      <div class="step-head">
+        <span class="step-time">14:01</span>
+        <span class="step-actor">Système</span>
+        <span class="step-action">Save : un seul <code>PUT /elements/{intérieur_id}/sequence</code> dispatché. La couverture n'est pas re-publiée — son DSL n'a pas bougé.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">Reliure absente</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · cov</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot run"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · int</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">Reliure ajoutée à l'intérieur</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · cov</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot run"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · int</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCÉNARIO I — Suppression d'un élément                                     -->
+  <!-- ════════════════════════════════════════════════════════════════════════ -->
+  <article class="scenario">
+    <div class="ribbon">
+      <span class="badge preprod">Préprod</span>
+      <span class="name">Scénario I — JCF modif : suppression d'un élément (cas limite)</span>
+    </div>
+    <p class="summary">
+      On enlève un élément d'un job déjà partiellement produit. Que se passe-t-il
+      pour les tâches déjà faites ?
+    </p>
+
+    <div class="step-block act">
+      <div class="step-head">
+        <span class="step-time">15:00</span>
+        <span class="step-actor">Chef</span>
+        <span class="step-action">Job 04403, le client annule l'élément « Couverture pelliculée ». Modifier → clic « × » à côté du nom de la couverture. Enregistre.</span>
+      </div>
+      <div class="snapshot">
+        <div class="screen prod">
+          <div class="screen-head"><span>Prod</span><span class="hint">non publié, couverture toujours présente</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · cov</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot run"></span></span>
+            </div>
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · int</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">cover tasks done</span><span class="wall-fact ok">interior tasks partial</span></div>
+        </div>
+        <div class="screen preprod">
+          <div class="screen-head"><span>Préprod</span><span class="hint">couverture supprimée, mur conservé</span></div>
+          <div class="mini-flux">
+            <div class="mini-flux-row">
+              <span class="id">04403</span><span class="client">Cap · int</span>
+              <span class="gates"><span class="gate-dot ok">P</span><span class="gate-dot ok">B</span><span class="gate-dot ok">L</span><span class="gate-dot none">F</span></span>
+              <span class="stations"><span class="station-dot silent"></span><span class="station-dot silent"></span><span class="station-dot"></span></span>
+            </div>
+          </div>
+          <div class="mini-wall"><span class="wall-lbl">Mur :</span><span class="wall-fact ok">cover tasks done <span style="color:var(--text-5)">(neutralisé)</span></span><span class="wall-fact ok">interior tasks partial</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <div class="lbl">Risque pédagogique</div>
+      <p>
+        Supprimer un élément ne « rembobine » pas la production déjà faite. C'est
+        une décision à prendre côté facturation séparément. Règle code : le mur
+        garde tout, l'élément est neutralisé pour la suite.
+      </p>
+    </div>
+  </article>
+
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- GLOSSAIRE                                                                  -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section id="glossaire">
+  <h2>Glossaire</h2>
+  <div class="table-wrap">
+    <table class="flux-tab">
+      <thead><tr><th style="width: 22%;">Terme</th><th>Sens</th></tr></thead>
+      <tbody>
+        <tr><td><b>Prod</b></td><td>Vue qui décrit la réalité de l'atelier. Écritures de faits autorisées.</td></tr>
+        <tr><td><b>Préprod</b></td><td>Antichambre de la Prod. On y manipule la forme du travail.</td></tr>
+        <tr><td><b>Mur</b></td><td>Couche partagée entre Prod et Préprod, porte les faits indivisibles.</td></tr>
+        <tr><td><b>Gate</b></td><td>L'un des 4 prérequis : Papier, BAT, Plaques, Forme.</td></tr>
+        <tr><td><b>JCF</b></td><td>Job Creation Form. La modale qui sert à créer ou modifier un job.</td></tr>
+        <tr><td><b>JCF de modification</b></td><td>Variante avec 4 champs verrouillés en header, 10 cellules verrouillées dans le tableau, et le panneau Déjà fait.</td></tr>
+        <tr><td><b>Panneau Déjà fait</b></td><td>Encadré au-dessus de chaque cellule Sequence dans la JCF modif.</td></tr>
+        <tr><td><b>Sequence DSL</b></td><td>Mini-langage texte : <code>Heidelberg(setup+run)</code>, <code>ST:Provider(Nj):description</code>.</td></tr>
+        <tr><td><b>Calage</b></td><td>Phase de préparation. Mesurée en <code>setupMinutes</code>, suivie via <code>lastSetupAt</code>.</td></tr>
+        <tr><td><b>Saisie d'avancement</b></td><td>Clic-droit sur tuile. Met à jour <code>recordedProgressPct</code>, <code>recordedAt</code>, <code>lastSaisieAt</code>.</td></tr>
+        <tr><td><b>Silence vaut consentement</b></td><td>Tâche planifiée passée + aucune saisie ⇒ terminée à l'heure.</td></tr>
+        <tr><td><b>Replan</b></td><td>Recalcul du planning par le moteur Rust, déclenché par toute mutation.</td></tr>
+        <tr><td><b>X-Flux-Scenario</b></td><td>Header HTTP qui dit au backend si la requête est en Prod, en Préprod par défaut, ou dans un fork UUID.</td></tr>
+        <tr><td><b>ScenarioFilter</b></td><td>Filtre Doctrine qui ajoute <code>WHERE scenario_id = ?</code>.</td></tr>
+        <tr><td><b>ElementWall</b></td><td>Entité PHP qui porte gates et faits du mur. Clé <code>logical_element_id</code>.</td></tr>
+        <tr><td><b>computeRemainingDsl</b></td><td>Fonction TS qui partitionne les tâches en finies / en cours / à venir.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer style="margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--text-5); font-size: 11.5px;">
+  Document de référence — Flux Print Shop Scheduling System ·
+  branche multi-person-stations-encarteuse-travail-table ·
+  prochaines étapes : valider scénario par scénario auprès du code et de Julien.
+</footer>
+
+</div>
+</body>
+</html>
