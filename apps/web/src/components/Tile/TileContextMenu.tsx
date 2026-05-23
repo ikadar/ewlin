@@ -11,41 +11,30 @@ export interface TileContextMenuProps {
   isCompleted: boolean;
   /** Whether tile is currently pinned */
   isPinned: boolean;
-  /** Callback for "Toggle pin" action. Optional — operator views without
-   *  a pin mutation may omit it ; the item then disappears. */
+  /**
+   * Scenario mode. Drives the prod/préprod separation:
+   * - prod   → reality-capture actions only (saisie, marquer terminé)
+   * - préprod → planning actions only (pin, définir, rappel, diviser, fusionner)
+   * "Voir détails" is navigation and shows in both.
+   */
+  scenarioMode: 'prod' | 'preprod';
+  /** Callback for "Toggle pin" action (préprod-only). */
   onTogglePin?: () => void;
-  /** Callback for "View details" action. Optional — surfaces without a
-   *  JDP target may omit it. */
+  /** Callback for "View details" action (both modes). */
   onViewDetails?: () => void;
-  /**
-   * Callback for "Toggle completion" action. Optional in V2 — the
-   * progress-capture refactor derives completion from `scheduledEnd < now`
-   * so admin views may stop exposing this toggle. Existing callers pass it
-   * unchanged.
-   */
+  /** Callback for "Toggle completion" action (prod-only). */
   onToggleComplete?: () => void;
-  /**
-   * Callback for "Recall" (unassign) action. Optional — typically only
-   * passed in admin/préprod views ; prod operators don't unassign.
-   */
+  /** Callback for "Recall" (unassign) action (préprod-only). */
   onRecall?: () => void;
-  /** Callback for "Split" action */
+  /** Callback for "Split" action (préprod-only). */
   onSplit?: () => void;
-  /** Callback for "Fuse" action */
+  /** Callback for "Fuse" action (préprod-only). */
   onFuse?: () => void;
   /** Whether this task is part of a split group */
   isSplit?: boolean;
-  /**
-   * V2 progress capture — opens the saisie modal. When provided, a
-   * "Saisir l'avancement" menu item is rendered. Optional so existing
-   * callers (admin/preprod views that don't expose saisie) stay unchanged.
-   */
+  /** Callback for "Saisir l'avancement" (prod-only, past-started callers). */
   onSaisirAvancement?: () => void;
-  /**
-   * V2 progress capture — opens the SetStartTimeDialog (compact calendar +
-   * 15-min time picker + live faisabilité). Creates a parameterized pin on
-   * confirm. Optional, like onSaisirAvancement.
-   */
+  /** Callback for "Définir heure de début…" (préprod-only, future-start callers). */
   onDefinirDebut?: () => void;
   /** Callback to close the menu */
   onClose: () => void;
@@ -100,6 +89,7 @@ export function TileContextMenu({
   y,
   isCompleted,
   isPinned,
+  scenarioMode,
   onTogglePin,
   onViewDetails,
   onToggleComplete,
@@ -111,6 +101,17 @@ export function TileContextMenu({
   onDefinirDebut,
   onClose,
 }: TileContextMenuProps) {
+  const isProd = scenarioMode === 'prod';
+
+  const showVoirDetails = !!onViewDetails;
+  const showSaisir = !!onSaisirAvancement && isProd;
+  const showTerminer = !!onToggleComplete && isProd;
+  const showPin = !!onTogglePin && !isProd;
+  const showDefinir = !!onDefinirDebut && !isProd;
+  const showRecall = !!onRecall && !isProd;
+  const showSplit = !!onSplit && !isProd && !isCompleted;
+  const showFuse = !!onFuse && !isProd && isSplit;
+  const showSeparator = (showSplit || showFuse) && (showVoirDetails || showSaisir || showTerminer || showPin || showDefinir || showRecall);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Calculate position with viewport edge detection
@@ -234,7 +235,7 @@ export function TileContextMenu({
       data-testid="tile-context-menu"
       role="menu"
     >
-      {onViewDetails && (
+      {showVoirDetails && (
         <MenuItem
           icon={<Eye className="w-4 h-4" />}
           label="Voir détails"
@@ -242,7 +243,7 @@ export function TileContextMenu({
           testId="context-menu-view-details"
         />
       )}
-      {onSaisirAvancement && (
+      {showSaisir && (
         <MenuItem
           icon={<Clock className="w-4 h-4" />}
           label="Saisir l'avancement"
@@ -250,7 +251,7 @@ export function TileContextMenu({
           testId="context-menu-saisir-avancement"
         />
       )}
-      {onToggleComplete && (
+      {showTerminer && (
         <MenuItem
           icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
           label={isCompleted ? 'Marquer non terminé' : 'Marquer terminé'}
@@ -258,7 +259,7 @@ export function TileContextMenu({
           testId="context-menu-toggle-complete"
         />
       )}
-      {onTogglePin && (
+      {showPin && (
         <MenuItem
           icon={<Pin className="w-4 h-4" />}
           label={isPinned ? 'Désépingler' : 'Épingler'}
@@ -266,7 +267,7 @@ export function TileContextMenu({
           testId="context-menu-toggle-pin"
         />
       )}
-      {onDefinirDebut && (
+      {showDefinir && (
         <MenuItem
           icon={<CalendarDays className="w-4 h-4" />}
           label="Définir heure de début…"
@@ -274,7 +275,7 @@ export function TileContextMenu({
           testId="context-menu-definir-debut"
         />
       )}
-      {onRecall && (
+      {showRecall && (
         <MenuItem
           icon={<Undo2 className="w-4 h-4" />}
           label="Rappeler (désassigner)"
@@ -283,8 +284,8 @@ export function TileContextMenu({
           testId="context-menu-recall"
         />
       )}
-      {((onSplit && !isCompleted) || (isSplit && onFuse)) && <Separator />}
-      {onSplit && !isCompleted && (
+      {showSeparator && <Separator />}
+      {showSplit && (
         <MenuItem
           icon={<Scissors className="w-4 h-4" />}
           label={isSplit ? 'Diviser encore' : 'Diviser'}
@@ -292,7 +293,7 @@ export function TileContextMenu({
           testId="context-menu-split"
         />
       )}
-      {isSplit && onFuse && (
+      {showFuse && (
         <MenuItem
           icon={<Merge className="w-4 h-4" />}
           label="Fusionner"

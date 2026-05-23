@@ -12,59 +12,119 @@ const baseProps = {
   onClose: vi.fn(),
 };
 
-describe('TileContextMenu (V2 — optional items)', () => {
-  it('renders only the items whose callbacks are provided', () => {
-    render(<TileContextMenu {...baseProps} />);
-
-    // Always-present items
-    expect(screen.getByTestId('context-menu-view-details')).toBeInTheDocument();
-    expect(screen.getByTestId('context-menu-toggle-pin')).toBeInTheDocument();
-
-    // Optional items absent without callbacks
-    expect(screen.queryByTestId('context-menu-toggle-complete')).toBeNull();
-    expect(screen.queryByTestId('context-menu-recall')).toBeNull();
-    expect(screen.queryByTestId('context-menu-saisir-avancement')).toBeNull();
-    expect(screen.queryByTestId('context-menu-definir-debut')).toBeNull();
-  });
-
-  it('renders the legacy toggle-complete + recall when those callbacks are passed', () => {
+describe('TileContextMenu — mode-gated rendering', () => {
+  it('Préprod : shows planning items (Voir / Pin / Définir / Rappeler / Diviser / Fusionner)', () => {
     render(
       <TileContextMenu
         {...baseProps}
-        onToggleComplete={vi.fn()}
+        scenarioMode="preprod"
+        onDefinirDebut={vi.fn()}
         onRecall={vi.fn()}
+        onSplit={vi.fn()}
+        onFuse={vi.fn()}
+        isSplit={true}
+        onSaisirAvancement={vi.fn()}
+        onToggleComplete={vi.fn()}
       />,
     );
-    expect(screen.getByTestId('context-menu-toggle-complete')).toBeInTheDocument();
+
+    expect(screen.getByTestId('context-menu-view-details')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-toggle-pin')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-definir-debut')).toBeInTheDocument();
     expect(screen.getByTestId('context-menu-recall')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-split')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-fuse')).toBeInTheDocument();
+
+    // Capture-only items hidden in préprod even when callbacks are provided
+    expect(screen.queryByTestId('context-menu-saisir-avancement')).toBeNull();
+    expect(screen.queryByTestId('context-menu-toggle-complete')).toBeNull();
   });
 
-  it('renders Saisir l\'avancement when onSaisirAvancement is provided', () => {
-    const onSaisirAvancement = vi.fn();
+  it('Prod : shows capture items (Voir / Saisir / Marquer terminé)', () => {
     render(
-      <TileContextMenu {...baseProps} onSaisirAvancement={onSaisirAvancement} />,
+      <TileContextMenu
+        {...baseProps}
+        scenarioMode="prod"
+        onDefinirDebut={vi.fn()}
+        onRecall={vi.fn()}
+        onSplit={vi.fn()}
+        onFuse={vi.fn()}
+        isSplit={true}
+        onSaisirAvancement={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
     );
-    const item = screen.getByTestId('context-menu-saisir-avancement');
-    expect(item).toBeInTheDocument();
-    expect(item.textContent).toContain('Saisir l\'avancement');
+
+    expect(screen.getByTestId('context-menu-view-details')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-saisir-avancement')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-toggle-complete')).toBeInTheDocument();
+
+    // Planning items hidden in prod even when callbacks are provided
+    expect(screen.queryByTestId('context-menu-toggle-pin')).toBeNull();
+    expect(screen.queryByTestId('context-menu-definir-debut')).toBeNull();
+    expect(screen.queryByTestId('context-menu-recall')).toBeNull();
+    expect(screen.queryByTestId('context-menu-split')).toBeNull();
+    expect(screen.queryByTestId('context-menu-fuse')).toBeNull();
   });
 
-  it('renders Définir heure de début… when onDefinirDebut is provided', () => {
-    const onDefinirDebut = vi.fn();
+  it('Préprod : hides items whose callbacks are not provided', () => {
+    render(<TileContextMenu {...baseProps} scenarioMode="preprod" />);
+    // baseProps only has onTogglePin + onViewDetails
+    expect(screen.getByTestId('context-menu-view-details')).toBeInTheDocument();
+    expect(screen.getByTestId('context-menu-toggle-pin')).toBeInTheDocument();
+    expect(screen.queryByTestId('context-menu-definir-debut')).toBeNull();
+    expect(screen.queryByTestId('context-menu-recall')).toBeNull();
+    expect(screen.queryByTestId('context-menu-split')).toBeNull();
+  });
+
+  it('Prod : hides items whose callbacks are not provided', () => {
+    render(<TileContextMenu {...baseProps} scenarioMode="prod" />);
+    expect(screen.getByTestId('context-menu-view-details')).toBeInTheDocument();
+    expect(screen.queryByTestId('context-menu-saisir-avancement')).toBeNull();
+    expect(screen.queryByTestId('context-menu-toggle-complete')).toBeNull();
+  });
+
+  it('Préprod : Diviser hidden when task is completed even with callback + mode', () => {
     render(
-      <TileContextMenu {...baseProps} onDefinirDebut={onDefinirDebut} />,
+      <TileContextMenu
+        {...baseProps}
+        scenarioMode="preprod"
+        isCompleted={true}
+        onSplit={vi.fn()}
+      />,
     );
-    const item = screen.getByTestId('context-menu-definir-debut');
-    expect(item).toBeInTheDocument();
-    expect(item.textContent).toContain('Définir heure de début');
+    expect(screen.queryByTestId('context-menu-split')).toBeNull();
   });
 
-  it('fires onSaisirAvancement on click and closes the menu', () => {
+  it('Préprod : Fusionner shown only when isSplit + onFuse', () => {
+    const { rerender } = render(
+      <TileContextMenu
+        {...baseProps}
+        scenarioMode="preprod"
+        onFuse={vi.fn()}
+        isSplit={false}
+      />,
+    );
+    expect(screen.queryByTestId('context-menu-fuse')).toBeNull();
+
+    rerender(
+      <TileContextMenu
+        {...baseProps}
+        scenarioMode="preprod"
+        onFuse={vi.fn()}
+        isSplit={true}
+      />,
+    );
+    expect(screen.getByTestId('context-menu-fuse')).toBeInTheDocument();
+  });
+
+  it('fires onSaisirAvancement in prod and closes the menu', () => {
     const onSaisirAvancement = vi.fn();
     const onClose = vi.fn();
     render(
       <TileContextMenu
         {...baseProps}
+        scenarioMode="prod"
         onClose={onClose}
         onSaisirAvancement={onSaisirAvancement}
       />,
@@ -74,12 +134,13 @@ describe('TileContextMenu (V2 — optional items)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('fires onDefinirDebut on click and closes the menu', () => {
+  it('fires onDefinirDebut in préprod and closes the menu', () => {
     const onDefinirDebut = vi.fn();
     const onClose = vi.fn();
     render(
       <TileContextMenu
         {...baseProps}
+        scenarioMode="preprod"
         onClose={onClose}
         onDefinirDebut={onDefinirDebut}
       />,
@@ -87,25 +148,5 @@ describe('TileContextMenu (V2 — optional items)', () => {
     fireEvent.click(screen.getByTestId('context-menu-definir-debut'));
     expect(onDefinirDebut).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('matches the V2 prod menu shape (Voir / Saisir / Pin / Définir, no legacy items)', () => {
-    render(
-      <TileContextMenu
-        {...baseProps}
-        onSaisirAvancement={vi.fn()}
-        onDefinirDebut={vi.fn()}
-      />,
-    );
-    // Present
-    expect(screen.getByTestId('context-menu-view-details')).toBeInTheDocument();
-    expect(screen.getByTestId('context-menu-saisir-avancement')).toBeInTheDocument();
-    expect(screen.getByTestId('context-menu-toggle-pin')).toBeInTheDocument();
-    expect(screen.getByTestId('context-menu-definir-debut')).toBeInTheDocument();
-    // Absent
-    expect(screen.queryByTestId('context-menu-toggle-complete')).toBeNull();
-    expect(screen.queryByTestId('context-menu-recall')).toBeNull();
-    expect(screen.queryByTestId('context-menu-split')).toBeNull();
-    expect(screen.queryByTestId('context-menu-fuse')).toBeNull();
   });
 });

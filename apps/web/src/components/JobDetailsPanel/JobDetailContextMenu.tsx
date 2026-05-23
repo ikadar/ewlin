@@ -1,12 +1,18 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Square, CheckSquare, Undo2, Scissors, Merge, Pin } from 'lucide-react';
+import { Square, CheckSquare, Undo2, Scissors, Merge, Pin, Clock, CalendarDays } from 'lucide-react';
 
 export interface JobDetailContextMenuProps {
   x: number;
   y: number;
   isCompleted: boolean;
   isPinned: boolean;
+  /**
+   * Scenario mode. Drives the prod/préprod separation:
+   * - prod    → reality-capture only (saisie, marquer terminé)
+   * - préprod → planning only (pin, définir, rappel, diviser, fusionner)
+   */
+  scenarioMode: 'prod' | 'preprod';
   onTogglePin: () => void;
   onToggleComplete: () => void;
   onRecall: () => void;
@@ -15,8 +21,10 @@ export interface JobDetailContextMenuProps {
   isSplit?: boolean;
   /** Whether this is an unassigned task (hides recall/completion) */
   isUnassigned?: boolean;
-  /** Hide the "Marquer terminée" option (V1 versioning: completion editable from prod view only). */
-  hideCompletionToggle?: boolean;
+  /** Saisir l'avancement (prod-only, past-started). */
+  onSaisirAvancement?: () => void;
+  /** Définir heure de début (préprod-only, future-start). */
+  onDefinirDebut?: () => void;
   onClose: () => void;
 }
 
@@ -54,6 +62,7 @@ export function JobDetailContextMenu({
   y,
   isCompleted,
   isPinned,
+  scenarioMode,
   onTogglePin,
   onToggleComplete,
   onRecall,
@@ -61,9 +70,19 @@ export function JobDetailContextMenu({
   onFuse,
   isSplit = false,
   isUnassigned = false,
-  hideCompletionToggle = false,
+  onSaisirAvancement,
+  onDefinirDebut,
   onClose,
 }: JobDetailContextMenuProps) {
+  const isProd = scenarioMode === 'prod';
+
+  const showSaisir = !!onSaisirAvancement && isProd && !isUnassigned;
+  const showTerminer = isProd && !isUnassigned;
+  const showPin = !isProd && !isUnassigned;
+  const showDefinir = !!onDefinirDebut && !isProd && !isUnassigned;
+  const showRecall = !isProd && !isUnassigned;
+  const showSplit = !!onSplit && !isProd && !isCompleted;
+  const showFuse = !!onFuse && !isProd && isSplit;
   const menuRef = useRef<HTMLDivElement>(null);
 
   const getPosition = useCallback(() => {
@@ -156,6 +175,16 @@ export function JobDetailContextMenu({
     onClose();
   };
 
+  const handleSaisirAvancement = () => {
+    onSaisirAvancement?.();
+    onClose();
+  };
+
+  const handleDefinirDebut = () => {
+    onDefinirDebut?.();
+    onClose();
+  };
+
   return createPortal(
     <div
       ref={menuRef}
@@ -164,32 +193,48 @@ export function JobDetailContextMenu({
       data-testid="job-detail-context-menu"
       role="menu"
     >
-      {!isUnassigned && (
-        <>
-          {!hideCompletionToggle && (
-            <MenuItem
-              icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-              label={isCompleted ? 'Marquer à faire' : 'Marquer terminée'}
-              onClick={handleToggleComplete}
-              testId="job-detail-context-toggle-complete"
-            />
-          )}
-          <MenuItem
-            icon={<Pin className="w-4 h-4" />}
-            label={isPinned ? 'Désépingler' : 'Épingler'}
-            onClick={handleTogglePin}
-            testId="job-detail-context-toggle-pin"
-          />
-          <MenuItem
-            icon={<Undo2 className="w-4 h-4" />}
-            label="Rappeler (désassigner)"
-            onClick={handleRecall}
-            disabled={isCompleted || isPinned}
-            testId="job-detail-context-recall"
-          />
-        </>
+      {showSaisir && (
+        <MenuItem
+          icon={<Clock className="w-4 h-4" />}
+          label="Saisir l'avancement"
+          onClick={handleSaisirAvancement}
+          testId="job-detail-context-saisir-avancement"
+        />
       )}
-      {onSplit && !isCompleted && (
+      {showTerminer && (
+        <MenuItem
+          icon={isCompleted ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+          label={isCompleted ? 'Marquer à faire' : 'Marquer terminée'}
+          onClick={handleToggleComplete}
+          testId="job-detail-context-toggle-complete"
+        />
+      )}
+      {showPin && (
+        <MenuItem
+          icon={<Pin className="w-4 h-4" />}
+          label={isPinned ? 'Désépingler' : 'Épingler'}
+          onClick={handleTogglePin}
+          testId="job-detail-context-toggle-pin"
+        />
+      )}
+      {showDefinir && (
+        <MenuItem
+          icon={<CalendarDays className="w-4 h-4" />}
+          label="Définir heure de début…"
+          onClick={handleDefinirDebut}
+          testId="job-detail-context-definir-debut"
+        />
+      )}
+      {showRecall && (
+        <MenuItem
+          icon={<Undo2 className="w-4 h-4" />}
+          label="Rappeler (désassigner)"
+          onClick={handleRecall}
+          disabled={isCompleted || isPinned}
+          testId="job-detail-context-recall"
+        />
+      )}
+      {showSplit && (
         <MenuItem
           icon={<Scissors className="w-4 h-4" />}
           label={isSplit ? 'Diviser encore' : 'Diviser'}
@@ -197,7 +242,7 @@ export function JobDetailContextMenu({
           testId="job-detail-context-split"
         />
       )}
-      {isSplit && onFuse && (
+      {showFuse && (
         <MenuItem
           icon={<Merge className="w-4 h-4" />}
           label="Fusionner"
