@@ -331,7 +331,8 @@ Chaque règle est numérotée et conçue pour être référençable individuelle
 
 ```
 pct_affiché          = minutes_effort_done / runMinutes_actuel × 100
-temps_wall_clock     = minutes_effort / ratio_productivité
+minutes_effort       = temps_wall_clock × ratio_productivité    (sens naturel : observé → stocké)
+temps_wall_clock     = minutes_effort / ratio_productivité      (sens inverse)
 realisticRunMinutes  = (runMinutes_JCF − minutes_effort_done) / ratio_productivité
 ratio_productivité   = temps_planifié_JCF / temps_wall_clock_réel
 ```
@@ -400,10 +401,11 @@ ratio_productivité   = temps_planifié_JCF / temps_wall_clock_réel
 
 5.1. L'avancement est stocké en **minutes-effort consommées**, c'est-à-dire en minutes-référence-JCF (équivalent productivité 1).
 
-5.2. La conversion vers le wall-clock dépend du ratio de productivité de l'opérateur qui exécute :
-`temps_wall_clock = minutes_effort / ratio_opérateur`.
+5.2. La conversion entre wall-clock et minutes-effort dépend du ratio de productivité de l'opérateur qui exécute :
+`minutes_effort = temps_wall_clock × ratio_opérateur`
+(formule inverse : `temps_wall_clock = minutes_effort / ratio_opérateur`).
 
-Exemple : 30 minutes-effort consommées par un opérateur de productivité 1,5 (= plus rapide) → 30 / 1,5 = 20 minutes wall-clock écoulées.
+Exemple : 30 minutes wall-clock consommées par un opérateur de productivité 1,5 (= plus rapide) → 30 × 1,5 = **45 minutes-effort** enregistrées sur le mur (l'opérateur produit 1,5× plus de travail effectif par minute wall-clock que la référence productivité 1).
 
 5.3. Les minutes-effort consommées restent **invariantes** quand :
    - La durée JCF de la tâche change par modification (le 30 min-effort fait reste 30 min-effort fait, peu importe que runMinutes passe de 90 à 120)
@@ -422,15 +424,19 @@ Exemple : 30 minutes-effort consommées par un opérateur de productivité 1,5 (
 
 6.3. Le mur stocke `last_setup_at` (instant de fin du calage) et `last_setup_station_id` (station du calage) pour chaque tâche.
 
-6.4. Le calage **peut expirer** au bout d'un certain temps (péremption). La règle de péremption est globale au système.
+6.4. **Le calage est binaire sur le mur** : `last_setup_at = NULL` (pas encore terminé) ou daté (terminé). **Aucune progression partielle n'est persistée** pour un calage commencé mais non terminé.
+   - Trois voies stamp `last_setup_at` : (a) tick automatique à la fin planifiée (`scheduledStart + setupMinutes`, silence vaut consentement) ; (b) première saisie d'avancement run > 0 (le run ne peut pas démarrer sans calage fait, donc stamp implicite) ; (c) back-date à `scheduledStart + setupMinutes` lors de la finalisation silencieuse d'une tâche passée non saisie.
+   - À la replanification déclenchée *pendant* un calage en cours, la tâche est envoyée à l'engine avec `is_in_progress=true` et `task_elapsed_ticks` (durée wall-clock écoulée depuis le début planifié). L'engine traite le passé verbatim et simule la suite du calage à partir de NOW — l'opérateur ne refait pas la portion déjà effectuée. Cet état intermédiaire n'est jamais écrit sur le mur ; il est recalculé à chaque compute.
 
-6.5. Le calage **peut être volé** par une autre tâche : si une autre tâche fait un calage sur la même station entre-temps, l'ancien calage n'est plus valide même s'il n'est pas périmé.
+6.5. Le calage **peut expirer** au bout d'un certain temps (péremption). La règle de péremption est globale au système.
 
-6.6. Au moment de la replanification d'une tâche dont le calage a été constaté :
+6.6. Le calage **peut être volé** par une autre tâche : si une autre tâche fait un calage sur la même station entre-temps, l'ancien calage n'est plus valide même s'il n'est pas périmé.
+
+6.7. Au moment de la replanification d'une tâche dont le calage a été constaté :
    - Si le calage est sur la même station ET non périmé ET non volé → **conservé**, pas de nouveau calage planifié.
    - Sinon → **nouveau calage planifié** (durée complète du calage à refaire).
 
-6.7. Le calage hérité conservé n'apparaît pas dans la planification future (la tuile commence directement par le run restant).
+6.8. Le calage hérité conservé n'apparaît pas dans la planification future (la tuile commence directement par le run restant).
 
 ## 7. La modification JCF (JCF modif)
 

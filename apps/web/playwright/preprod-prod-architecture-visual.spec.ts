@@ -41,7 +41,9 @@ const API = 'http://localhost:8080/api/v1';
 // stale credentials that no longer authenticate.)
 const TEST_EMAIL = 'pwtest@flux.local';
 const TEST_PASSWORD = 'PwTestPass123!';
-const VISUAL_PAUSE_MS = 1500;
+// Gate via env so CI runs at 1.5 s default (fast) and local demo/screencast
+// runs can bump to 10 s with `VISUAL_PAUSE_MS=10000 npx playwright test ...`.
+const VISUAL_PAUSE_MS = Number.parseInt(process.env.VISUAL_PAUSE_MS ?? '', 10) || 1500;
 
 let api: APIRequestContext;
 let token: string;
@@ -233,7 +235,7 @@ test.describe('Préprod/Prod architecture — VISUAL audit', () => {
     const prodRowUnchanged = await findRowFor(page, testJobRef);
     await prodRowUnchanged.scrollIntoViewIfNeeded();
     console.log('[scene 4] Prod still shows ORIGINAL deadline + 2 elements — isolation visible');
-    await page.waitForTimeout(VISUAL_PAUSE_MS * 2);
+    await page.waitForTimeout(VISUAL_PAUSE_MS);
 
     // -------------------------------------------------------------
     // Scene 5 — Publish materialization via UI : Promouvoir + dwell.
@@ -267,7 +269,7 @@ test.describe('Préprod/Prod architecture — VISUAL audit', () => {
     const prodRowAfterPublish = await findRowFor(page, testJobRef);
     await prodRowAfterPublish.scrollIntoViewIfNeeded();
     console.log('[scene 5] Prod now shows the new deadline + 1 element — materialization visible');
-    await page.waitForTimeout(VISUAL_PAUSE_MS * 2);
+    await page.waitForTimeout(VISUAL_PAUSE_MS);
 
     // -------------------------------------------------------------
     // Scene 6 — Publish reversibility via UI : click Annuler on toast.
@@ -283,7 +285,7 @@ test.describe('Préprod/Prod architecture — VISUAL audit', () => {
     const prodRowAfterUndo = await findRowFor(page, testJobRef);
     await prodRowAfterUndo.scrollIntoViewIfNeeded();
     console.log('[scene 6] Prod reverted to original deadline + 2 elements — reversibility visible');
-    await page.waitForTimeout(VISUAL_PAUSE_MS * 2);
+    await page.waitForTimeout(VISUAL_PAUSE_MS);
 
     // -------------------------------------------------------------
     // DOM assertions to make the test fail loudly if something breaks.
