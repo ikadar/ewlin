@@ -250,10 +250,17 @@ export function JcfModificationModal({
         setTabError(msg);
         throw e;
       }
+      // Acomptes path persisted via RTK mutations + autoRecomputeMiddleware
+      // already kicks off a fresh compute on writeAcompteProgressDeclaration.
+      // We just need to mirror the Dossier branch's close behaviour — without
+      // this, the modal stayed open after a successful save (the data was on
+      // the server, but the user had no UX signal of completion and was
+      // tempted to click again).
+      onClose();
       return;
     }
     await handleSaveDossier();
-  }, [activeTab, handleSaveDossier]);
+  }, [activeTab, handleSaveDossier, onClose]);
 
   const title = useMemo(
     () => `Modifier le Job ${job.reference} · ${job.client}`,
