@@ -642,8 +642,8 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                                 aria-label={`Exemplaires produits — ${task.taskLabel}`}
                               />
                             </div>
-                            <span className="text-[13px] text-zinc-300 tabular-nums w-[40px] text-right">
-                              {Math.round(pct)} %
+                            <span className="text-[13px] text-zinc-300 tabular-nums w-[52px] text-right whitespace-nowrap">
+                              {Math.round(pct)}&nbsp;%
                             </span>
                           </div>
                           {/* Cascade segments */}
