@@ -62,16 +62,20 @@ export function computeRemainingDsl(tasks: TaskForRemainingDsl[]): RemainingDslR
       continue;
     }
 
-    // In-progress detection : non-terminal status with progress > 0
-    // OR with a calage timestamp recorded.
-    const isInProgress =
-      (task.recordedProgressPct ?? 0) > 0 || task.lastSetupAt != null;
+    const pct = task.recordedProgressPct ?? 0;
+    const isEffectivelyComplete = pct >= 100;
+
+    if (isEffectivelyComplete) {
+      completedTasks.push(task);
+      continue;
+    }
+
+    const isInProgress = pct > 0 || task.lastSetupAt != null;
 
     if (isInProgress && inProgressTask === null) {
       inProgressTask = task;
       remainingLines.push(taskToDslLineWithRemainingRun(task));
     } else {
-      // Future task
       remainingLines.push(taskToDslLine(task));
     }
   }

@@ -107,6 +107,22 @@ describe('computeRemainingDsl', () => {
     expect(r.dsl).toBe('ST:Clement(2j):Pelliculage');
   });
 
+  it('task at 100% progress treated as completed, excluded from DSL', () => {
+    const r = computeRemainingDsl([
+      task({
+        id: '1', sequenceOrder: 0, status: 'assigned',
+        stationName: 'G37', setupMinutes: 10, runMinutes: 60,
+        recordedProgressPct: 100, lastSetupAt: '2026-05-06T07:55:00Z',
+      }),
+      task({ id: '2', sequenceOrder: 1, status: 'defined', stationName: 'P137', setupMinutes: 0, runMinutes: 10 }),
+      task({ id: '3', sequenceOrder: 2, status: 'defined', stationName: 'MBO', setupMinutes: 30, runMinutes: 240 }),
+    ]);
+    expect(r.dsl).toBe('P137(0+10)\nMBO(30+240)');
+    expect(r.completedTasks).toHaveLength(1);
+    expect(r.completedTasks[0].id).toBe('1');
+    expect(r.inProgressTask).toBeNull();
+  });
+
   it('orders by sequenceOrder regardless of input order', () => {
     const r = computeRemainingDsl([
       task({ id: 'b', sequenceOrder: 2, status: 'defined', stationName: 'B', setupMinutes: 0, runMinutes: 5 }),
