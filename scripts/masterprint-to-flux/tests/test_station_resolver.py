@@ -174,7 +174,7 @@ def _tirage_g(gramm: int) -> Tirage:
 
 
 def _eleme_pag(pag: int) -> ElementInfo:
-    return ElementInfo(numdo_base="XX", nusec=None, nopap="1", cid="Inté.", pag=pag, libel=None)
+    return ElementInfo(numdo_base="XX", nusec=None, nopap="1", cid="Inté.", pag=pag, libel=None, nbpas=None)
 
 
 def test_pliag_16_pages_stahl_always():

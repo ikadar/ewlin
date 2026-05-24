@@ -69,15 +69,35 @@ def _build_element(
             spec["pagination"] = element_info.pag
         if db.devis_by_nodev.get(dossier.nodev) and db.devis_by_nodev[dossier.nodev].nbfeu:
             spec["qteFeuilles"] = db.devis_by_nodev[dossier.nodev].nbfeu
+        # quantite élément = quantité dossier (MasterPrint ne porte pas de quantité
+        # distincte par papier dans ce qu'on charge ; mieux vaut dupliquer que de
+        # laisser '1' par défaut côté JCF).
+        devis = db.devis_by_nodev.get(dossier.nodev)
+        if devis and devis.qtdev_1:
+            spec["quantite"] = devis.qtdev_1
         # inkingSpec : metadata lecture seule depuis dv_cximp (couleurs/vernis/lavages).
         # Aujourd'hui 1 ligne dv_cximp par (NODEV, NOPAP) → objet unique. Si on
         # rencontre des NREPI multiples plus tard, basculer en liste sera trivial.
         impressions = db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), [])
         if impressions:
-            spec["inkingSpec"] = impressions[0].to_inking_spec_dict()
-            impression_dsl = impressions[0].to_impression_dsl()
+            imp0 = impressions[0]
+            spec["inkingSpec"] = imp0.to_inking_spec_dict()
+            impression_dsl = imp0.to_impression_dsl()
             if impression_dsl:
                 spec["impression"] = impression_dsl
+            # imposition : DSL "<largeurCm>x<hauteurCm>(<nbPoses>)" — cf. mock JCF FE
+            # (templateApi.ts) qui utilise par ex. "50x70(8)". FTIMP1/FTIMP2 sont
+            # déjà en cm dans MasterPrint ; NBPAS vient de di_eleme. Si l'un manque
+            # on n'émet rien plutôt qu'un DSL bancal que le FE ne saurait reparser.
+            nbpas = element_info.nbpas if element_info else None
+            if imp0.ftimp1 and imp0.ftimp2 and nbpas:
+                spec["imposition"] = f"{imp0.ftimp1}x{imp0.ftimp2}({nbpas})"
+            # surfaçage : DSL "recto/verso" — MasterPrint code O/N par face sans
+            # distinction mat/brillant, on émet le token générique "vernis".
+            if imp0.vernir or imp0.verniv:
+                recto = "vernis" if imp0.vernir else ""
+                verso = "vernis" if imp0.verniv else ""
+                spec["surfacage"] = f"{recto}/{verso}"
 
     # Résolution opération par opération
     ctx = ResolverContext(
