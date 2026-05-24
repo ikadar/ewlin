@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Trash2, FolderOpen } from 'lucide-react';
 import { SortChevron, FluxToggle } from '@/components/FluxStyledTable';
 import {
@@ -9,6 +9,9 @@ import {
   type PrerequisiteStatus,
 } from './fluxTypes';
 import { STCell } from './STCell';
+import { FluxAdvancementCell } from './FluxAdvancementCell';
+import { buildAssignmentIndex, buildElementCategoryTaskIndex } from './fluxAdvancement';
+import type { ScheduleSnapshot } from '@flux/types';
 import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
 import {
   worstPrerequisiteStatus,
@@ -143,6 +146,20 @@ interface FluxTableProps {
   lateJobIds?: Set<string>;
   /** Job IDs (internal UUIDs) that have scheduling conflicts (excluding DeadlineConflict). */
   conflictJobIds?: Set<string>;
+  /**
+   * Mode avancement toggle from the FluxToolbar. When true, station cells
+   * render bi-state rounds (○/✓) keyed off the schedule snapshot instead
+   * of the FluxStationIndicator / FluxStackedDots planning indicators.
+   */
+  advancementMode?: boolean;
+  /** Set or clear TaskWall.manuallyCompletedAt for one task. */
+  onSetTaskCompletion?: (taskId: string, completed: boolean) => void;
+  /**
+   * Schedule snapshot — source of the per-cell task list (placed +
+   * unplaced) and assignment lookup for the past-tile gate. Required
+   * when advancementMode is true ; ignored otherwise.
+   */
+  snapshot?: ScheduleSnapshot | null;
 }
 
 // Frozen zone shadow styles (spec 3.6) — uses CSS variable for theme adaptability
@@ -532,7 +549,17 @@ const FluxTableRow = memo(function FluxTableRow({
       {/* Station cells — dynamic from API */}
       {ctx.categories.map(cat => {
         const singleTaskId = !isMulti && el0 ? el0.stations[cat.id]?.taskId : undefined;
-        const clickable = singleTaskId && ctx.onStationClick;
+        const clickable = !ctx.advancementMode && singleTaskId && ctx.onStationClick;
+        // Mode avancement : aggregate tasks across all elements of the job
+        // for this category. Cascade toggle in parent row (multi-element)
+        // or single round (single-element).
+        let advTasks: Parameters<typeof FluxAdvancementCell>[0]['tasks'] = [];
+        if (ctx.advancementMode) {
+          for (const el of job.elements) {
+            const t = ctx.elementCategoryTasks.get(el.id)?.get(cat.id);
+            if (t) advTasks = advTasks.concat(t);
+          }
+        }
         return (
           <td
             key={cat.id}
@@ -541,7 +568,15 @@ const FluxTableRow = memo(function FluxTableRow({
             data-testid={`flux-station-${cat.id}`}
             onClick={clickable ? () => ctx.onStationClick!(singleTaskId) : undefined}
           >
-            {isMulti && !isExpanded ? (
+            {ctx.advancementMode ? (
+              <FluxAdvancementCell
+                tasks={advTasks}
+                assignmentsByTaskId={ctx.assignmentsByTaskId}
+                now={ctx.now}
+                aggregate={isMulti}
+                onSetTaskCompletion={ctx.onSetTaskCompletion}
+              />
+            ) : isMulti && !isExpanded ? (
               <FluxStackedDots
                 data={sortStationDataBySeverity(
                   getMultiElementStationData(job.elements, cat.id)
@@ -715,7 +750,10 @@ function FluxSubRow({
       {/* Station cells — dynamic from API */}
       {ctx.categories.map(cat => {
         const taskId = element.stations[cat.id]?.taskId;
-        const clickable = taskId && ctx.onStationClick;
+        const clickable = !ctx.advancementMode && taskId && ctx.onStationClick;
+        const advTasks = ctx.advancementMode
+          ? ctx.elementCategoryTasks.get(element.id)?.get(cat.id) ?? []
+          : [];
         return (
           <td
             key={cat.id}
@@ -723,10 +761,20 @@ function FluxSubRow({
             style={{ lineHeight: 0, verticalAlign: 'middle' }}
             onClick={clickable ? () => ctx.onStationClick!(taskId) : undefined}
           >
-            <FluxStationIndicator
-              data={element.stations[cat.id]}
-              stationName={cat.name}
-            />
+            {ctx.advancementMode ? (
+              <FluxAdvancementCell
+                tasks={advTasks}
+                assignmentsByTaskId={ctx.assignmentsByTaskId}
+                now={ctx.now}
+                aggregate={false}
+                onSetTaskCompletion={ctx.onSetTaskCompletion}
+              />
+            ) : (
+              <FluxStationIndicator
+                data={element.stations[cat.id]}
+                stationName={cat.name}
+              />
+            )}
           </td>
         );
       })}
@@ -787,9 +835,26 @@ export const FluxTable = memo(function FluxTable({
   onStationClick,
   lateJobIds = new Set<string>(),
   conflictJobIds = new Set<string>(),
+  advancementMode = false,
+  onSetTaskCompletion,
+  snapshot,
 }: FluxTableProps) {
   // openListboxId is managed here to coordinate "only one listbox open at a time"
   const [openListboxId, setOpenListboxId] = useState<string | null>(null);
+
+  // Pre-compute snapshot lookups once per render — every station cell would
+  // otherwise scan tasks[] + assignments[] linearly (O(n²) per row).
+  const elementCategoryTasks = useMemo(
+    () => buildElementCategoryTaskIndex(snapshot ?? null),
+    [snapshot],
+  );
+  const assignmentsByTaskId = useMemo(
+    () => buildAssignmentIndex(snapshot ?? null),
+    [snapshot],
+  );
+  // Stable instant per render — every advancement cell uses the same one,
+  // so flicker between cells is impossible (and tests can mock it).
+  const now = useMemo(() => new Date(), [snapshot?.generatedAt]);
 
   const ctxValue = {
     categories,
@@ -813,6 +878,11 @@ export const FluxTable = memo(function FluxTable({
     onStationClick,
     lateJobIds,
     conflictJobIds,
+    advancementMode,
+    onSetTaskCompletion: onSetTaskCompletion ?? (() => {}),
+    elementCategoryTasks,
+    assignmentsByTaskId,
+    now,
   };
 
   return (

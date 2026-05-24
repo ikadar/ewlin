@@ -1,5 +1,5 @@
 import { memo, useRef } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, CheckSquare } from 'lucide-react';
 import type { FluxFilters } from '@/components/FluxTable/fluxFilters';
 import type { FluxJob } from '@/components/FluxTable/fluxTypes';
 import { FluxFilterBar } from './FluxFilterBar';
@@ -29,6 +29,14 @@ interface FluxToolbarProps {
   jobs: ReadonlyArray<FluxJob>;
   filters: FluxFilters;
   onFiltersChange: (next: FluxFilters) => void;
+  /**
+   * Mode avancement state. When true, the FluxTable replaces the station
+   * cell content with bi-state round checkboxes (○/✓) so the operator
+   * can bulk-mark tasks done. Prod-only — the toggle is hidden in
+   * Préprod (wall mutations are forbidden there).
+   */
+  advancementMode?: boolean;
+  onAdvancementModeChange?: (next: boolean) => void;
 }
 
 /**
@@ -46,7 +54,13 @@ export const FluxToolbar = memo(function FluxToolbar({
   jobs,
   filters,
   onFiltersChange,
+  advancementMode = false,
+  onAdvancementModeChange,
 }: FluxToolbarProps) {
+  // Toggle visible in Prod only — Préprod doesn't write to the wall
+  // (where manuallyCompletedAt lives). Hidden rather than disabled to
+  // keep the H1 row tight when the toggle would be a no-op.
+  const showAdvancementToggle = scenarioMode === 'prod' && onAdvancementModeChange !== undefined;
   const internalRef = useRef<HTMLInputElement>(null);
   const ref = searchInputRef ?? internalRef;
 
@@ -61,17 +75,37 @@ export const FluxToolbar = memo(function FluxToolbar({
           Flux de production
           {scenarioMode && <FluxModeBadge mode={scenarioMode} />}
         </h1>
-        {canCreateJob && (
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white text-base font-medium rounded-[0.25rem] transition-colors"
-            onClick={onNewJob}
-            data-testid="flux-new-job-button"
-            title="Nouveau job (Alt+N)"
-          >
-            <Plus className="w-4 h-4" strokeWidth={2} />
-            Nouveau job
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {showAdvancementToggle && (
+            <button
+              type="button"
+              className={
+                advancementMode
+                  ? 'flex items-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/60 text-emerald-200 text-sm font-medium rounded-[0.25rem] transition-colors'
+                  : 'flex items-center gap-2 px-3 py-2 bg-flux-hover hover:bg-flux-border border border-flux-border text-flux-text-secondary text-sm font-medium rounded-[0.25rem] transition-colors'
+              }
+              onClick={() => onAdvancementModeChange?.(!advancementMode)}
+              data-testid="flux-advancement-mode-toggle"
+              data-active={advancementMode}
+              aria-pressed={advancementMode}
+              title={advancementMode ? 'Quitter le mode avancement' : 'Activer le mode avancement (cocher les tâches faites)'}
+            >
+              <CheckSquare className="w-4 h-4" strokeWidth={2} />
+              Mode avancement
+            </button>
+          )}
+          {canCreateJob && (
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white text-base font-medium rounded-[0.25rem] transition-colors"
+              onClick={onNewJob}
+              data-testid="flux-new-job-button"
+              title="Nouveau job (Alt+N)"
+            >
+              <Plus className="w-4 h-4" strokeWidth={2} />
+              Nouveau job
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search bar */}

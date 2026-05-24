@@ -53,6 +53,17 @@ export interface ClearRecordedProgressResult {
   cleared: number;
 }
 
+export interface SetTaskCompletionRequest {
+  taskId: string;
+  completed: boolean;
+}
+
+export interface SetTaskCompletionResult {
+  taskId: string;
+  completed: boolean;
+  manuallyCompletedAt: string | null;
+}
+
 export const saisieApi = createApi({
   reducerPath: 'saisieApi',
   baseQuery: baseQueryWithFixtureSupport,
@@ -166,6 +177,52 @@ export const saisieApi = createApi({
         }
       },
     }),
+    /**
+     * Mode avancement (Flux) — toggle the "marqué fini" round checkbox
+     * on a task. Persists via TaskWall.manuallyCompletedAt ; the backend
+     * then drops the task from the next engine payload (same drop
+     * semantics as a saturated acompte). The autoRecomputeMiddleware
+     * fires the replan once the mutation fulfils.
+     *
+     * Optimistic patch on getSnapshot so the rond visually flips
+     * immediately ; rolled back on server error.
+     */
+    setTaskCompletion: builder.mutation<SetTaskCompletionResult, SetTaskCompletionRequest>({
+      query: ({ taskId, completed }) => ({
+        url: `/scenarios/prod/task-completion/${encodeURIComponent(taskId)}`,
+        method: 'POST',
+        body: { completed },
+        headers: { 'X-Flux-Scenario': 'prod' },
+      }),
+      async onQueryStarted({ taskId, completed }, { dispatch, queryFulfilled }) {
+        const optimisticAt = completed ? new Date().toISOString() : null;
+        const patchPreprod = dispatch(
+          scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
+            const t = draft.tasks.find((x) => x.id === taskId);
+            if (t && t.type === 'Internal') {
+              t.manuallyCompletedAt = optimisticAt;
+            }
+          }),
+        );
+        const patchProd = dispatch(
+          prodSnapshotApi.util.updateQueryData('getProdSnapshot', undefined, (draft) => {
+            if (!draft) return;
+            const t = draft.tasks.find((x) => x.id === taskId);
+            if (t && t.type === 'Internal') {
+              t.manuallyCompletedAt = optimisticAt;
+            }
+          }),
+        );
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+        } catch {
+          patchPreprod.undo();
+          patchProd.undo();
+        }
+      },
+    }),
     clearRecordedProgress: builder.mutation<ClearRecordedProgressResult, void>({
       query: () => ({
         url: '/scenarios/prod/clear-recorded-progress',
@@ -186,4 +243,10 @@ export const saisieApi = createApi({
   }),
 });
 
-export const { useReportSaisieMutation, useMarkNotCompletedMutation, useClearRecordedProgressMutation, useRecordProgressDirectMutation } = saisieApi;
+export const {
+  useReportSaisieMutation,
+  useMarkNotCompletedMutation,
+  useClearRecordedProgressMutation,
+  useRecordProgressDirectMutation,
+  useSetTaskCompletionMutation,
+} = saisieApi;

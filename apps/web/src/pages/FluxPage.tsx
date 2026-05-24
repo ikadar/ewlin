@@ -10,6 +10,7 @@ import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
 import { JobModificationContainer } from '@/components/JcfModificationModal/JobModificationContainer';
 import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
+import { useSetTaskCompletionMutation } from '@/store/api/saisieApi';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
@@ -103,6 +104,22 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
   const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<string | null>(null);
   const [editingJobInternalId, setEditingJobInternalId] = useState<string | null>(null);
+  // Mode avancement (Prod-only). When active, FluxTable replaces the
+  // station-cell content with bi-state round checkboxes that toggle
+  // TaskWall.manuallyCompletedAt via setTaskCompletion + autoRecompute.
+  const [advancementMode, setAdvancementMode] = useState(false);
+  // Auto-exit when leaving Prod — the toggle is hidden in Préprod
+  // anyway, but the state was kept across mode flips would surprise
+  // a user toggling back to Prod and finding the rounds still on.
+  useEffect(() => {
+    if (mode !== 'prod' && advancementMode) {
+      setAdvancementMode(false);
+    }
+  }, [mode, advancementMode]);
+  const [setTaskCompletion] = useSetTaskCompletionMutation();
+  const handleSetTaskCompletion = useCallback((taskId: string, completed: boolean) => {
+    void setTaskCompletion({ taskId, completed });
+  }, [setTaskCompletion]);
 
   // ── Search / keyboard state ──────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -394,6 +411,8 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               jobs={jobs}
               filters={filters}
               onFiltersChange={handleFiltersChange}
+              advancementMode={advancementMode}
+              onAdvancementModeChange={setAdvancementMode}
             />
 
             {/* Tab bar */}
@@ -429,6 +448,9 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               onStationClick={handleStationClick}
               lateJobIds={lateJobIds}
               conflictJobIds={conflictJobIds}
+              advancementMode={advancementMode}
+              onSetTaskCompletion={handleSetTaskCompletion}
+              snapshot={snapshot ?? null}
             />
             </div>
           </div>

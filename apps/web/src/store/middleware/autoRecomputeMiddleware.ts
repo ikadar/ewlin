@@ -75,7 +75,9 @@ type AutoRecomputeEndpointName =
   // V2 progress capture — operator saisie d'avancement persists a new
   // productivityRatio + scheduledEnd on the assignment ; the engine then
   // propagates the run-only ratio to the remaining fragments of the job.
-  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie' | 'recordProgressDirect'>
+  // setTaskCompletion drives the Flux's Mode avancement round checkbox :
+  // toggling a task to "done" drops it from the engine payload next replan.
+  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie' | 'recordProgressDirect' | 'setTaskCompletion'>
   // V2 progress capture — parameterized pin moves a tile to a target
   // start. Not a toggle (cf. legacy isPinned flip): the start changes,
   // so the engine resolves slide-to-nearest on the next replan and
@@ -126,6 +128,7 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'updatePlateLeadTime',
   'reportSaisie',
   'recordProgressDirect',
+  'setTaskCompletion',
   'pinAtTime',
   'addStationException',
   'addOperatorAbsence',

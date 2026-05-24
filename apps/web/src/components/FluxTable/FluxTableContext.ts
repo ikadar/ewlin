@@ -3,6 +3,7 @@ import type { PrerequisiteColumn, PrerequisiteStatus, FluxSTStatus } from './flu
 import type { StationCategoryResponse } from '@/store/api/stationCategoryApi';
 import type { ShipperResponse } from '@/store/api/shipperApi';
 import type { SortColumn, SortDirection } from './fluxSort';
+import type { Task, TaskAssignment } from '@flux/types';
 
 export interface FluxTableContextValue {
   /** Ordered station categories for dynamic column rendering. */
@@ -62,6 +63,24 @@ export interface FluxTableContextValue {
   lateJobIds: Set<string>;
   /** Job IDs (internal UUIDs) that have scheduling conflicts (excluding DeadlineConflict). */
   conflictJobIds: Set<string>;
+  /**
+   * Mode avancement — when true, station cells render bi-state rounds
+   * instead of FluxStationIndicator / FluxStackedDots. Computed at the
+   * page level (FluxPage), passed through here so every sub-row reads
+   * the same flag.
+   */
+  advancementMode: boolean;
+  /** Set or clear TaskWall.manuallyCompletedAt for one task. */
+  onSetTaskCompletion: (taskId: string, completed: boolean) => void;
+  /**
+   * Per-element / per-category task index, built once per snapshot in
+   * FluxTable. Empty map when snapshot is unavailable — caller checks.
+   */
+  elementCategoryTasks: Map<string, Map<string, Task[]>>;
+  /** taskId → assignment lookup for past-tile gate computation. */
+  assignmentsByTaskId: Map<string, TaskAssignment>;
+  /** Snapshot generation instant — captured once per render for stable cell rendering. */
+  now: Date;
 }
 
 export const FluxTableContext = createContext<FluxTableContextValue | null>(null);
