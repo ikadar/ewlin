@@ -16,7 +16,7 @@ avec fallback sur Machine.libma si absent.
 
 from __future__ import annotations
 
-from csv_loader import Impression, Launch, Machine
+from csv_loader import Impression, Launch, Machine, PressEstimate
 from station_resolver import Resolution
 
 
@@ -114,3 +114,44 @@ def get_launches_for_impression(impression: Impression, numdo_root: str, machine
     if press_nusec is None:
         return []
     return db.launches_by_numdo_root_nusec.get((numdo_root, press_nusec), [])
+
+
+def get_estimate_for_impression(impression: Impression, db) -> PressEstimate | None:
+    """Returns the dv_press_estimate row for this impression (fallback when
+    di_lance is missing — dossier pas encore lancé en prod)."""
+    if not impression.cdmac_1:
+        return None
+    return db.press_estimates_by_nodev_nopap_cdmac.get(
+        (impression.nodev, impression.nopap, impression.cdmac_1)
+    )
+
+
+def resolve_press_from_estimate(
+    impression: Impression,
+    machine: Machine | None,
+    estimate: PressEstimate,
+    config: dict,
+) -> Resolution | None:
+    """Build a Resolution from a dv_press_estimate row (no di_lance available).
+
+    Mirrors resolve_press but reads CALAGE_EST_H/ROULE_EST_H instead of
+    summing real launches. Returns None when the estimate has zero total
+    duration (degenerate, treat as no press task).
+    """
+    if machine is None:
+        return None
+    setup_min = round(estimate.calage_est_h * 60)
+    run_min = round(estimate.roule_est_h * 60)
+    if setup_min == 0 and run_min == 0:
+        return None
+
+    press_mapping: dict[str, str] = config.get("press_mapping", {})
+    station_name = press_mapping.get(impression.cdmac_1) or machine.libma
+
+    return Resolution(
+        kind="station",
+        station_name=station_name,
+        setup_min_override=setup_min,
+        run_min_override=run_min,
+        force_setup_run_format=True,
+    )

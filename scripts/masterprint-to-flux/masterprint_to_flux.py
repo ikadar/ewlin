@@ -56,7 +56,7 @@ def write_report(path: Path, payload: dict) -> None:
         json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
 
 
-_GATE_KEYS = {"needsBat", "needsPaper", "needsForme", "needsPlates", "batStatus"}
+_GATE_KEYS = {"needsBat", "needsPaper", "needsForme", "needsPlates", "batStatus", "paperStatus"}
 
 
 def _strip_gate_fields(request: dict) -> dict:

@@ -234,6 +234,28 @@ class Machine:
 
 
 @dataclass
+class PressEstimate:
+    """Ligne DV_PRESS_ESTIMATE : estimation upstream du temps presse,
+    utilisée en fallback quand di_lance est vide pour ce (nodev, nopap, cdmac).
+
+    Mêmes colonnes que Launch (calage + roule en heures) mais keyée par
+    (NODEV × NOPAP × CDMAC_1) — granularité device/papier/machine — au
+    lieu de (NUMDO × NUSEC) pour di_lance. Permet d'importer les dossiers
+    avant que le lancement réel n'ait été enregistré : la presse est
+    estimée par l'export upstream depuis NBCR/NBCV/NB_FEUILLES.
+    """
+    nodev: str
+    nopap: str
+    cdmac_1: str
+    nbcr: int
+    nbcv: int
+    nb_feuilles: int
+    calage_est_h: float
+    roule_est_h: float
+    total_est_h: float
+
+
+@dataclass
 class Db:
     dossiers: list[Dossier] = field(default_factory=list)
     clients_by_codec: dict[str, str] = field(default_factory=dict)  # CODEC -> RAISO
@@ -247,6 +269,8 @@ class Db:
     impressions_by_nodev_nopap: dict[tuple[str, str], list[Impression]] = field(default_factory=lambda: defaultdict(list))
     launches_by_numdo_root_nusec: dict[tuple[str, str], list[Launch]] = field(default_factory=lambda: defaultdict(list))
     machines_by_cdmac: dict[str, Machine] = field(default_factory=dict)
+    # Press estimate fallback (2026-05-24): dv_press_estimate
+    press_estimates_by_nodev_nopap_cdmac: dict[tuple[str, str, str], PressEstimate] = field(default_factory=dict)
 
     def nb_postes(self, nodev: str) -> int:
         """Nombre de papiers tirés sur ce devis = nb postes Duplo."""
@@ -468,5 +492,29 @@ def load_all(inbox: Path) -> Db:
                 tps_reel_h=tps_reel,
             )
             db.launches_by_numdo_root_nusec[(launch.numdo_root, nusec)].append(launch)
+
+    # 10. Press estimates (DV_PRESS_ESTIMATE — fallback synthétique pour les
+    # dossiers sans di_lance). Indexé par (NODEV × NOPAP × CDMAC_1) — la
+    # combinaison qui identifie une ligne d'impression dans dv_cximp.
+    estimate_path = inbox / "dv_press_estimate.csv"
+    if estimate_path.exists():
+        for row in _read_csv(estimate_path):
+            nodev = (row.get("NODEV") or "").strip()
+            nopap = (row.get("NOPAP") or "").strip()
+            cdmac_1 = (row.get("CDMAC_1") or "").strip()
+            if not nodev or not nopap or not cdmac_1:
+                continue
+            est = PressEstimate(
+                nodev=nodev,
+                nopap=nopap,
+                cdmac_1=cdmac_1,
+                nbcr=_opt_int(row.get("NBCR", "")) or 0,
+                nbcv=_opt_int(row.get("NBCV", "")) or 0,
+                nb_feuilles=_opt_int(row.get("NB_FEUILLES", "")) or 0,
+                calage_est_h=_opt_float(row.get("CALAGE_EST_H", "")) or 0.0,
+                roule_est_h=_opt_float(row.get("ROULE_EST_H", "")) or 0.0,
+                total_est_h=_opt_float(row.get("TOTAL_EST_H", "")) or 0.0,
+            )
+            db.press_estimates_by_nodev_nopap_cdmac[(nodev, nopap, cdmac_1)] = est
 
     return db

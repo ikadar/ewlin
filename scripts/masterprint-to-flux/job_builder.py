@@ -6,7 +6,13 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from csv_loader import Db, Dossier
-from press_resolver import get_launches_for_impression, get_machine_for_impression, resolve_press
+from press_resolver import (
+    get_estimate_for_impression,
+    get_launches_for_impression,
+    get_machine_for_impression,
+    resolve_press,
+    resolve_press_from_estimate,
+)
 from station_resolver import Resolution, ResolverContext, resolve, to_dsl_line
 
 
@@ -15,8 +21,11 @@ class ImportTrace:
     numdo: str
     skipped_operations: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    # Set to True when a press impression has no di_lance time → user decision is to
-    # reject the dossier entirely (cleaned at the bucket source but defensive here).
+    # Legacy flag — kept for back-compat with downstream readers. Since the
+    # 2026-05-24 isLanced-driven import, press_no_launch is no longer a
+    # dossier-level rejection : the dossier is still imported with degraded
+    # gate statuses (waiting_files / to_order) and the press task is built
+    # from dv_press_estimate when available, or skipped otherwise.
     rejected_for_missing_press_time: bool = False
 
 
@@ -166,6 +175,15 @@ def _build_element(
     )
 
     dsl_lines: list[str] = []
+    # element_is_lanced tracks whether EVERY press impression in this element
+    # has a real di_lance row. False as soon as one impression falls back to
+    # dv_press_estimate (or has no press info at all). Drives the per-element
+    # batStatus/paperStatus emission below: lanced → ready (bat_approved +
+    # delivered), not-lanced → blocking (waiting_files + to_order).
+    # GLOBAL elements skip press resolution entirely and keep their default
+    # (no-gate) state, so we start True even for them — the gate emission
+    # below short-circuits on is_global anyway.
+    element_is_lanced = True
 
     # 1. Press tasks (DV_CXIMP × DI_LANCE × DV_MACHF) — non-GLOBAL elements only.
     # Émises EN PREMIER pour qu'elles précèdent les ops de façonnage (massicot, etc.).
@@ -178,20 +196,31 @@ def _build_element(
                 trace.warnings.append(
                     f"press_machine_unknown CDMAC_1={impression.cdmac_1} NOPAP={nopap}"
                 )
+                element_is_lanced = False
                 continue
             launches = get_launches_for_impression(impression, dossier.numdo[:11], machine, db)
             press_res = resolve_press(impression, dossier.numdo[:11], machine, launches, config)
+            estimate_used = False
             if press_res is None:
-                # Pas de di_lance → le dossier ne devrait pas être dans Ordo (cf. décision
-                # utilisateur 2026-05-21 : filtrage côté bucket). Rejet défensif ici.
-                trace.rejected_for_missing_press_time = True
-                trace.warnings.append(
-                    f"press_no_launch CDMAC_1={impression.cdmac_1} NOPAP={nopap} NUMDO={dossier.numdo}"
-                )
-                return None
+                # Pas de di_lance — fallback sur dv_press_estimate (synthèse
+                # upstream sur NBCR/NBCV/NB_FEUILLES). Si pas d'estimate non
+                # plus, on saute la press task mais on garde le dossier.
+                # L'élément perd son statut "lancé" → batStatus/paperStatus
+                # tombent en blocking. Voir memory project_masterprint_no_press_ops.
+                element_is_lanced = False
+                estimate = get_estimate_for_impression(impression, db)
+                if estimate is not None:
+                    press_res = resolve_press_from_estimate(impression, machine, estimate, config)
+                if press_res is None:
+                    trace.warnings.append(
+                        f"press_no_launch CDMAC_1={impression.cdmac_1} NOPAP={nopap} NUMDO={dossier.numdo}"
+                    )
+                    continue
+                estimate_used = True
             press_token = press_res.station_name or "?"
+            source_tag = " [ESTIMATE]" if estimate_used else ""
             dsl_lines.append(
-                f"# Press {press_token} (CDMAC_1={impression.cdmac_1}, "
+                f"# Press {press_token}{source_tag} (CDMAC_1={impression.cdmac_1}, "
                 f"NBCR={impression.nbcr}/NBCV={impression.nbcv}, NREPI={impression.nrepi})"
             )
             # to_dsl_line lit op.setup_min / op.run_min uniquement quand l'override est None,
@@ -247,9 +276,21 @@ def _build_element(
         "needsPlates": needs_plates,
     }
     if not is_global:
-        # MasterPrint dossiers reach Ordo only after the upstream customer-approval
-        # workflow has signed off the proof — batStatus lands pre-approved.
-        element["batStatus"] = "bat_approved"
+        # Gate statuses derived from element_is_lanced :
+        #   - element_is_lanced=True (every press impression has a real
+        #     di_lance row) → upstream proof signed off AND paper physically
+        #     present, so batStatus = bat_approved + paperStatus = delivered.
+        #   - element_is_lanced=False (at least one press fell back to
+        #     dv_press_estimate or skipped entirely) → BAT awaits files,
+        #     paper still to order. The dossier is imported anyway so the
+        #     planner sees it ; gate state will flip when the upstream
+        #     workflow catches up and a di_lance row appears on next sync.
+        if element_is_lanced:
+            element["batStatus"] = "bat_approved"
+            element["paperStatus"] = "delivered"
+        else:
+            element["batStatus"] = "waiting_files"
+            element["paperStatus"] = "to_order"
         element["prerequisiteNames"] = []
     element.update(spec)
     return element
