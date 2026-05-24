@@ -1,10 +1,12 @@
 /**
  * Mode avancement helpers — derive checkbox state for the Flux's round
- * cells from the schedule snapshot. State is mostly derived ; the only
- * persisted bit is TaskWall.manuallyCompletedAt (exposed on each Task
- * as `manuallyCompletedAt`).
+ * cells from the schedule snapshot. The rond is now a shortcut over the
+ * unique effort-tracking channel : clicking the rond writes
+ * `recordedProgressPct = 100` (or 0 to uncheck) via recordProgressDirect.
+ * There's no separate "marqué fini" flag anymore (cf. avancement
+ * remise-à-plat Phase 2, 2026-05-24).
  *
- *   isChecked  = presumedDone OR manuallyMarkedDone
+ *   isChecked  = presumedDone OR (recordedProgressPct >= 100)
  *   isDisabled = presumedDone                 // silence-is-consent override
  *
  * presumedDone is intentionally simple : any tile whose scheduled window
@@ -51,7 +53,7 @@ export function computeCellState(
   }
   const isPastTile = assignment ? new Date(assignment.scheduledEnd) < now : false;
   const isManuallyDone =
-    task.type === 'Internal' && task.manuallyCompletedAt != null;
+    task.type === 'Internal' && (task.recordedProgressPct ?? 0) >= 100;
   return {
     isChecked: isPastTile || isManuallyDone,
     isDisabled: isPastTile,

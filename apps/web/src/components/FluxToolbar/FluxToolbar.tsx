@@ -57,9 +57,9 @@ export const FluxToolbar = memo(function FluxToolbar({
   advancementMode = false,
   onAdvancementModeChange,
 }: FluxToolbarProps) {
-  // Toggle visible in Prod only — Préprod doesn't write to the wall
-  // (where manuallyCompletedAt lives). Hidden rather than disabled to
-  // keep the H1 row tight when the toggle would be a no-op.
+  // Toggle visible in Prod only — Préprod doesn't write to the wall.
+  // Hidden rather than disabled to keep the H1 row tight when the toggle
+  // would be a no-op.
   const showAdvancementToggle = scenarioMode === 'prod' && onAdvancementModeChange !== undefined;
   const internalRef = useRef<HTMLInputElement>(null);
   const ref = searchInputRef ?? internalRef;

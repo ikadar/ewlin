@@ -152,7 +152,7 @@ interface FluxTableProps {
    * of the FluxStationIndicator / FluxStackedDots planning indicators.
    */
   advancementMode?: boolean;
-  /** Set or clear TaskWall.manuallyCompletedAt for one task. */
+  /** Set or clear the rond "marqué fini" (writes recordedProgressPct = 100/0). */
   onSetTaskCompletion?: (taskId: string, completed: boolean) => void;
   /**
    * Schedule snapshot — source of the per-cell task list (placed +

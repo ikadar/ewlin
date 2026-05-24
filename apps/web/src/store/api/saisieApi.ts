@@ -53,17 +53,6 @@ export interface ClearRecordedProgressResult {
   cleared: number;
 }
 
-export interface SetTaskCompletionRequest {
-  taskId: string;
-  completed: boolean;
-}
-
-export interface SetTaskCompletionResult {
-  taskId: string;
-  completed: boolean;
-  manuallyCompletedAt: string | null;
-}
-
 export const saisieApi = createApi({
   reducerPath: 'saisieApi',
   baseQuery: baseQueryWithFixtureSupport,
@@ -71,9 +60,11 @@ export const saisieApi = createApi({
   endpoints: (builder) => ({
     reportSaisie: builder.mutation<ReportSaisieResult, ReportSaisieRequest>({
       query: ({ taskId, estimatedEndTime }) => ({
-        url: `/scenarios/prod/saisie/${encodeURIComponent(taskId)}`,
+        // Unified saisie endpoint (Phase 4 of avancement remise-à-plat,
+        // 2026-05-24). Discriminated body : kind=endTime / kind=pct.
+        url: `/scenarios/prod/task-progress/${encodeURIComponent(taskId)}`,
         method: 'POST',
-        body: { estimatedEndTime },
+        body: { kind: 'endTime', endTime: estimatedEndTime },
         headers: { 'X-Flux-Scenario': 'prod' },
       }),
       async onQueryStarted({ taskId, estimatedEndTime }, { dispatch, queryFulfilled }) {
@@ -163,44 +154,25 @@ export const saisieApi = createApi({
      * value is written once and visible in both Préprod and Prod. */
     recordProgressDirect: builder.mutation<{ taskId: string; recordedProgressPct: number; recordedAt: string }, { taskId: string; progressPct: number }>({
       query: ({ taskId, progressPct }) => ({
-        url: `/scenarios/prod/record-progress/${encodeURIComponent(taskId)}`,
+        // Unified saisie endpoint (Phase 4 of avancement remise-à-plat,
+        // 2026-05-24). Discriminated body : kind=endTime / kind=pct.
+        url: `/scenarios/prod/task-progress/${encodeURIComponent(taskId)}`,
         method: 'POST',
-        body: { progressPct },
-      }),
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
-        } catch {
-          // No optimistic patch.
-        }
-      },
-    }),
-    /**
-     * Mode avancement (Flux) — toggle the "marqué fini" round checkbox
-     * on a task. Persists via TaskWall.manuallyCompletedAt ; the backend
-     * then drops the task from the next engine payload (same drop
-     * semantics as a saturated acompte). The autoRecomputeMiddleware
-     * fires the replan once the mutation fulfils.
-     *
-     * Optimistic patch on getSnapshot so the rond visually flips
-     * immediately ; rolled back on server error.
-     */
-    setTaskCompletion: builder.mutation<SetTaskCompletionResult, SetTaskCompletionRequest>({
-      query: ({ taskId, completed }) => ({
-        url: `/scenarios/prod/task-completion/${encodeURIComponent(taskId)}`,
-        method: 'POST',
-        body: { completed },
+        body: { kind: 'pct', pct: progressPct },
         headers: { 'X-Flux-Scenario': 'prod' },
       }),
-      async onQueryStarted({ taskId, completed }, { dispatch, queryFulfilled }) {
-        const optimisticAt = completed ? new Date().toISOString() : null;
+      async onQueryStarted({ taskId, progressPct }, { dispatch, queryFulfilled }) {
+        // Optimistic patch so the rond visually flips immediately when
+        // Mode avancement clicks fire (the rond is a shortcut over
+        // recordProgressDirect at pct=100/0 since Phase 2). Rolled back
+        // on server error.
+        const optimisticAt = new Date().toISOString();
         const patchPreprod = dispatch(
           scheduleApi.util.updateQueryData('getSnapshot', undefined, (draft) => {
             const t = draft.tasks.find((x) => x.id === taskId);
             if (t && t.type === 'Internal') {
-              t.manuallyCompletedAt = optimisticAt;
+              t.recordedProgressPct = progressPct;
+              t.recordedAt = optimisticAt;
             }
           }),
         );
@@ -209,7 +181,8 @@ export const saisieApi = createApi({
             if (!draft) return;
             const t = draft.tasks.find((x) => x.id === taskId);
             if (t && t.type === 'Internal') {
-              t.manuallyCompletedAt = optimisticAt;
+              t.recordedProgressPct = progressPct;
+              t.recordedAt = optimisticAt;
             }
           }),
         );
@@ -248,5 +221,4 @@ export const {
   useMarkNotCompletedMutation,
   useClearRecordedProgressMutation,
   useRecordProgressDirectMutation,
-  useSetTaskCompletionMutation,
 } = saisieApi;

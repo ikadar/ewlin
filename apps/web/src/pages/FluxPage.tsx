@@ -10,7 +10,7 @@ import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
 import { JobModificationContainer } from '@/components/JcfModificationModal/JobModificationContainer';
 import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
-import { useSetTaskCompletionMutation } from '@/store/api/saisieApi';
+import { useRecordProgressDirectMutation } from '@/store/api/saisieApi';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
 import {
@@ -105,8 +105,11 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<string | null>(null);
   const [editingJobInternalId, setEditingJobInternalId] = useState<string | null>(null);
   // Mode avancement (Prod-only). When active, FluxTable replaces the
-  // station-cell content with bi-state round checkboxes that toggle
-  // TaskWall.manuallyCompletedAt via setTaskCompletion + autoRecompute.
+  // station-cell content with bi-state round checkboxes that map to
+  // "saisie d'avancement 100% / 0%" via recordProgressDirect. The rond
+  // is no longer a separate flag — it's a shortcut over the unique
+  // effort-tracking channel (cf. avancement remise-à-plat Phase 2,
+  // 2026-05-24).
   const [advancementMode, setAdvancementMode] = useState(false);
   // Auto-exit when leaving Prod — the toggle is hidden in Préprod
   // anyway, but the state was kept across mode flips would surprise
@@ -116,10 +119,10 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
       setAdvancementMode(false);
     }
   }, [mode, advancementMode]);
-  const [setTaskCompletion] = useSetTaskCompletionMutation();
+  const [recordProgressDirect] = useRecordProgressDirectMutation();
   const handleSetTaskCompletion = useCallback((taskId: string, completed: boolean) => {
-    void setTaskCompletion({ taskId, completed });
-  }, [setTaskCompletion]);
+    void recordProgressDirect({ taskId, progressPct: completed ? 100 : 0 });
+  }, [recordProgressDirect]);
 
   // ── Search / keyboard state ──────────────────────────────────────────────
   const [search, setSearch] = useState('');

@@ -99,7 +99,7 @@ interface FluxAdvancementCellProps {
    * element jobs (the user's "cocher au niveau d'un job" verb).
    */
   aggregate: boolean;
-  /** Toggle handler — caller wires this to the setTaskCompletion mutation. */
+  /** Toggle handler — caller wires this to recordProgressDirect (pct=100/0). */
   onSetTaskCompletion: (taskId: string, completed: boolean) => void;
 }
 

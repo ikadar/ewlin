@@ -70,7 +70,7 @@ export interface FluxTableContextValue {
    * the same flag.
    */
   advancementMode: boolean;
-  /** Set or clear TaskWall.manuallyCompletedAt for one task. */
+  /** Set or clear the rond "marqué fini" (writes recordedProgressPct = 100/0). */
   onSetTaskCompletion: (taskId: string, completed: boolean) => void;
   /**
    * Per-element / per-category task index, built once per snapshot in
