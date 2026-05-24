@@ -161,24 +161,28 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
   // (the 'started' event upstream replaces it with "Recalcul en cours")
   // or when the user clicks the action.
   //
-  // Idempotent re-renders (toast id is stable, in-place updated). When
-  // a new mutation fires mid-countdown, the effect re-runs with the
-  // bumped pendingFireAt, the cleanup tears down the old interval, and
-  // the new render shows the bumped countdown — no flicker since we
-  // never dismiss between transitions (only on the null transition).
+  // CRITICAL: depend on the stable callback identities (show/dismiss are
+  // useCallback-stable inside useComputeToaster) — NOT on the
+  // `computeToaster` object literal, which is recreated on every render
+  // of the provider. Depending on the object would cause an infinite
+  // re-render loop (effect calls show → setState → re-render → new
+  // computeToaster ref → effect re-runs → ...). That loop swallowed
+  // every click in the app before the first deploy was reverted.
   const pendingFireAt = autoRecompute.pendingFireAt;
   const flushRecompute = autoRecompute.flush;
+  const toasterShow = computeToaster.show;
+  const toasterDismiss = computeToaster.dismiss;
   useEffect(() => {
     const toastId = 'auto-recompute-pending';
     if (pendingFireAt === null) {
-      computeToaster.dismiss(toastId);
+      toasterDismiss(toastId);
       return;
     }
 
     const render = () => {
       const remainingMs = Math.max(0, pendingFireAt - Date.now());
       const remainingS = Math.ceil(remainingMs / 1000);
-      computeToaster.show({
+      toasterShow({
         id: toastId,
         type: 'info',
         title: 'Recompute du planning dans ' + remainingS + ' s',
@@ -199,7 +203,7 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
     render();
     const interval = window.setInterval(render, 1000);
     return () => window.clearInterval(interval);
-  }, [pendingFireAt, flushRecompute, computeToaster]);
+  }, [pendingFireAt, flushRecompute, toasterShow, toasterDismiss]);
 
   const pendingOnDoneRef = useRef<((result: ComputeScheduleResult) => void) | null>(null);
 
