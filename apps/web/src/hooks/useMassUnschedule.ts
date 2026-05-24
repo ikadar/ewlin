@@ -92,10 +92,10 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
   }, [getClearableCount]);
 
   const confirm = useCallback(async () => {
-    if (!confirmState) return;
+    if (!confirmState) return undefined;
     const { includeInProgress, includePinned, includeFrozen, resetRecordedProgress, includeCompleted } = confirmState;
     setConfirmState(null);
-    await clearAllAssignments({
+    const result = await clearAllAssignments({
       includeInProgress,
       includePinned,
       includeFrozen,
@@ -104,6 +104,7 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
     if (resetRecordedProgress) {
       await clearRecordedProgress().unwrap();
     }
+    return result;
   }, [confirmState, clearAllAssignments, clearRecordedProgress]);
 
   const dismiss = useCallback(() => setConfirmState(null), []);
