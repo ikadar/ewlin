@@ -21,6 +21,7 @@ import { useAppDispatch } from '../store';
 import {
   addAutoRecomputeEventListener,
   bindAutoRecomputeRuntime,
+  flushAutoRecompute,
   getAutoRecomputeState,
   retryAutoRecompute,
   subscribeAutoRecomputeState,
@@ -34,10 +35,14 @@ export type { AutoRecomputeEvent } from './autoRecomputeRuntime';
 interface UseAutoRecomputeReturn {
   trigger: (reason?: string) => void;
   retry: () => void;
+  /** Fire the pending debounced compute immediately. No-op if none queued. */
+  flush: () => void;
   isComputing: boolean;
   hasFailed: boolean;
   lastError: string | null;
   lastRanAt: Date | null;
+  /** Wall-clock ms timestamp when the pending compute will fire, or null. */
+  pendingFireAt: number | null;
 }
 
 export function useAutoRecompute(onEvent?: OnEvent): UseAutoRecomputeReturn {
@@ -82,9 +87,11 @@ export function useAutoRecompute(onEvent?: OnEvent): UseAutoRecomputeReturn {
   return {
     trigger: triggerAutoRecompute,
     retry: retryAutoRecompute,
+    flush: flushAutoRecompute,
     isComputing: snapshot.isComputing,
     hasFailed: snapshot.hasFailed,
     lastError: snapshot.lastError,
     lastRanAt: snapshot.lastRanAt,
+    pendingFireAt: snapshot.pendingFireAt,
   };
 }

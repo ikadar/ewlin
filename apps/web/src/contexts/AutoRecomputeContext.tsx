@@ -155,6 +155,52 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
     return () => registerAutoRecomputeTrigger(null);
   }, [autoRecompute.trigger]);
 
+  // Pending-recompute indicator : while the 30-s debounce timer runs,
+  // surface a pinned toast with a live countdown + "Recompute maintenant"
+  // action that flushes the timer. Auto-dismissed when the timer fires
+  // (the 'started' event upstream replaces it with "Recalcul en cours")
+  // or when the user clicks the action.
+  //
+  // Idempotent re-renders (toast id is stable, in-place updated). When
+  // a new mutation fires mid-countdown, the effect re-runs with the
+  // bumped pendingFireAt, the cleanup tears down the old interval, and
+  // the new render shows the bumped countdown — no flicker since we
+  // never dismiss between transitions (only on the null transition).
+  const pendingFireAt = autoRecompute.pendingFireAt;
+  const flushRecompute = autoRecompute.flush;
+  useEffect(() => {
+    const toastId = 'auto-recompute-pending';
+    if (pendingFireAt === null) {
+      computeToaster.dismiss(toastId);
+      return;
+    }
+
+    const render = () => {
+      const remainingMs = Math.max(0, pendingFireAt - Date.now());
+      const remainingS = Math.ceil(remainingMs / 1000);
+      computeToaster.show({
+        id: toastId,
+        type: 'info',
+        title: 'Recompute du planning dans ' + remainingS + ' s',
+        detail: 'Plusieurs modifications récentes seront groupées en un seul recalcul.',
+        pinned: true,
+        progress: -1,
+        actions: [
+          {
+            id: 'flush',
+            label: 'Recompute maintenant',
+            variant: 'primary',
+            onClick: flushRecompute,
+          },
+        ],
+      });
+    };
+
+    render();
+    const interval = window.setInterval(render, 1000);
+    return () => window.clearInterval(interval);
+  }, [pendingFireAt, flushRecompute, computeToaster]);
+
   const pendingOnDoneRef = useRef<((result: ComputeScheduleResult) => void) | null>(null);
 
   const startComputeReport = useCallback(

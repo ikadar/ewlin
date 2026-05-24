@@ -52,6 +52,12 @@ export interface AutoRecomputeState {
   hasFailed: boolean;
   lastError: string | null;
   lastRanAt: Date | null;
+  /**
+   * Wall-clock timestamp (ms) at which the pending debounced compute
+   * will fire. `null` when no compute is queued. Lets the UI render a
+   * countdown + "recompute maintenant" shortcut while the timer runs.
+   */
+  pendingFireAt: number | null;
 }
 
 type RunFastFactory = () => Promise<ComputeScheduleResult>;
@@ -82,6 +88,7 @@ let state: AutoRecomputeState = {
   hasFailed: false,
   lastError: null,
   lastRanAt: null,
+  pendingFireAt: null,
 };
 
 function setState(patch: Partial<AutoRecomputeState>): void {
@@ -110,6 +117,7 @@ export function cancelAutoRecompute(): void {
   if (pendingTimer) {
     clearTimeout(pendingTimer);
     pendingTimer = null;
+    setState({ pendingFireAt: null });
   }
   if (abortCtrl) {
     abortCtrl.abort();
@@ -148,8 +156,25 @@ export function triggerAutoRecompute(reason?: string): void {
   if (pendingTimer) clearTimeout(pendingTimer);
   pendingTimer = setTimeout(() => {
     pendingTimer = null;
+    setState({ pendingFireAt: null });
     void runPhase1();
   }, DEBOUNCE_MS);
+  // Wall-clock fire time so consumers can render a countdown without
+  // duplicating the DEBOUNCE_MS constant.
+  setState({ pendingFireAt: Date.now() + DEBOUNCE_MS });
+}
+
+/**
+ * Fire the pending debounced compute immediately. Used by the
+ * "Recompute maintenant" button on the pending-recompute indicator.
+ * No-op if no compute is queued.
+ */
+export function flushAutoRecompute(): void {
+  if (!pendingTimer) return;
+  clearTimeout(pendingTimer);
+  pendingTimer = null;
+  setState({ pendingFireAt: null });
+  void runPhase1();
 }
 
 /**
@@ -177,6 +202,7 @@ export function retryAutoRecompute(): void {
   if (pendingTimer) {
     clearTimeout(pendingTimer);
     pendingTimer = null;
+    setState({ pendingFireAt: null });
   }
   void runPhase1();
 }
