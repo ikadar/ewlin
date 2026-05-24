@@ -96,6 +96,22 @@ function emit(
  * Bind the React-side factories. Called by the hook on every render
  * where mutation or dispatch identity changes. Last writer wins.
  */
+/**
+ * Abort any in-flight Phase 2 LNS and cancel a pending Phase 1
+ * debounce. Called before mass-unschedule so the background LNS
+ * doesn't re-create assignments that were just deleted.
+ */
+export function cancelAutoRecompute(): void {
+  if (pendingTimer) {
+    clearTimeout(pendingTimer);
+    pendingTimer = null;
+  }
+  if (abortCtrl) {
+    abortCtrl.abort();
+    abortCtrl = null;
+  }
+}
+
 export function bindAutoRecomputeRuntime(b: Bindings | null): void {
   bindings = b;
 }

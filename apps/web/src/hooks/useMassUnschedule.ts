@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { isInternalTask } from '@flux/types';
 import type { ScheduleSnapshot } from '@flux/types';
 import { useClearAllAssignmentsMutation, useClearRecordedProgressMutation } from '../store';
+import { cancelAutoRecompute } from './autoRecomputeRuntime';
 import {
   buildOverrideLookup,
   buildSequenceIndexLookup,
@@ -80,6 +81,8 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
     const { includeInProgress, includePinned, includeFrozen, resetRecordedProgress, includeCompleted } = confirmState;
 
     setConfirmState((prev) => prev ? { ...prev, phase: 'working' } : prev);
+
+    cancelAutoRecompute();
 
     try {
       const result = await clearAllAssignments({
