@@ -1175,15 +1175,9 @@ function AppContent() {
 
   // Handle mass unschedule confirm with toast
   const handleMassUnscheduleConfirm = useCallback(async () => {
-    try {
-      const result = await massUnschedule.confirm();
-      if (result) {
-        showToast(`${result.unassignedCount} effacé`, 'success');
-      }
-    } catch (error) {
-      showToast(getErrorMessage(error));
-    }
-  }, [massUnschedule, showToast]);
+    await massUnschedule.confirm();
+    refetch();
+  }, [massUnschedule, refetch]);
 
   // Auto-save schedule before any autoplace operation
   const autoSaveBeforeAutoplace = useCallback(async () => {
@@ -2353,6 +2347,7 @@ function AppContent() {
       {massUnschedule.confirmState && (
         <MassUnscheduleDialog
           state={massUnschedule.confirmState}
+          scenarioLabel={scenarioMode === 'prod' ? 'Production' : 'Préprod'}
           getClearableCount={massUnschedule.getClearableCount}
           onConfirm={handleMassUnscheduleConfirm}
           onDismiss={massUnschedule.dismiss}

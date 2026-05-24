@@ -10,28 +10,16 @@ import {
 } from '../utils/safetyZone';
 
 export interface MassUnscheduleState {
+  phase: 'options' | 'working' | 'result';
   count: number;
-  /** Default true on every modal open (opt-out). Uncheck to preserve. */
   includeInProgress: boolean;
-  /** Default true on every modal open (opt-out). Uncheck to preserve. */
   includePinned: boolean;
-  /** Default true on every modal open (opt-out). Uncheck to preserve.
-   *  Mirrors the `includeFrozen` flag on the clearAllAssignments endpoint. */
   includeFrozen: boolean;
-  /**
-   * Default **false** on every modal open (opt-IN). Saisies d'avancement
-   * represent real recorded work ; the chef must explicitly tick this box
-   * to discard them. When true, the confirm action also fires the
-   * clear-recorded-progress endpoint after the mass unschedule resolves.
-   */
   resetRecordedProgress: boolean;
-  /**
-   * Default **false** on every modal open (opt-IN). Completed tiles are real
-   * done work and are normally preserved ; ticking this makes CTRL+ALT+Z a
-   * true "table rase" that also removes them. Without it a board whose tiles
-   * are all completed (e.g. a Préprod copy) can never be cleared.
-   */
   includeCompleted: boolean;
+  unassignedCount?: number;
+  clearedProgress?: boolean;
+  error?: string;
 }
 
 export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
@@ -62,8 +50,6 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
       if (!includeCompleted && a.isCompleted) return false;
       if (!includePinned && a.isPinned) return false;
       if (!includeInProgress && a.scheduledStart <= nowStr && (!a.scheduledEnd || a.scheduledEnd > nowStr)) return false;
-      // Safety-zone filter: skipped entirely when `includeFrozen` is on
-      // (the user opted in to lift active-flocon tiles).
       if (!includeFrozen && seqByTask && isInSafetyZone(a.scheduledStart, frozenUntil, now)) {
         const jobId = jobByTask.get(a.taskId);
         const seqIdx = seqByTask.get(a.taskId);
@@ -78,33 +64,53 @@ export function useMassUnschedule(snapshotData: ScheduleSnapshot | undefined) {
   }, [snapshotData]);
 
   const trigger = useCallback(() => {
-    // Always open the modal — even when nothing is currently clearable.
-    // The user explicitly wants the entry point to be unconditional;
-    // the dialog just shows "0 tuile(s) à effacer" in that case.
     setConfirmState({
+      phase: 'options',
       count: getClearableCount(true, true, true, false),
       includeInProgress: true,
       includePinned: true,
       includeFrozen: true,
-      resetRecordedProgress: false, // opt-in : never on by default.
-      includeCompleted: false, // opt-in : completed = real done work.
+      resetRecordedProgress: false,
+      includeCompleted: false,
     });
   }, [getClearableCount]);
 
   const confirm = useCallback(async () => {
-    if (!confirmState) return undefined;
+    if (!confirmState || confirmState.phase !== 'options') return;
     const { includeInProgress, includePinned, includeFrozen, resetRecordedProgress, includeCompleted } = confirmState;
-    setConfirmState(null);
-    const result = await clearAllAssignments({
-      includeInProgress,
-      includePinned,
-      includeFrozen,
-      includeCompleted,
-    }).unwrap();
-    if (resetRecordedProgress) {
-      await clearRecordedProgress().unwrap();
+
+    setConfirmState((prev) => prev ? { ...prev, phase: 'working' } : prev);
+
+    try {
+      const result = await clearAllAssignments({
+        includeInProgress,
+        includePinned,
+        includeFrozen,
+        includeCompleted,
+      }).unwrap();
+
+      let didClearProgress = false;
+      if (resetRecordedProgress) {
+        await clearRecordedProgress().unwrap();
+        didClearProgress = true;
+      }
+
+      setConfirmState((prev) => prev ? {
+        ...prev,
+        phase: 'result',
+        unassignedCount: result.unassignedCount,
+        clearedProgress: didClearProgress,
+      } : prev);
+    } catch (err) {
+      const message = err && typeof err === 'object' && 'data' in err
+        ? String((err as { data?: { error?: string } }).data?.error ?? 'Erreur inconnue')
+        : 'Erreur réseau';
+      setConfirmState((prev) => prev ? {
+        ...prev,
+        phase: 'result',
+        error: message,
+      } : prev);
     }
-    return result;
   }, [confirmState, clearAllAssignments, clearRecordedProgress]);
 
   const dismiss = useCallback(() => setConfirmState(null), []);
