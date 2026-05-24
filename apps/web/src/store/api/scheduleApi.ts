@@ -522,9 +522,13 @@ export const scheduleApi = createApi({
         const qs = params.toString();
         return { url: `/schedule/assignments${qs ? `?${qs}` : ''}`, method: 'DELETE' };
       },
-      // No optimistic update — let the refetch handle UI update to avoid
-      // flicker on in-progress tiles (client/server NOW can differ slightly)
       invalidatesTags: ['Snapshot'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+        } catch { /* handled by caller */ }
+      },
     }),
 
     /**
