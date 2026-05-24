@@ -1087,6 +1087,7 @@ pub fn run_forward_pass(
         operator_availability,
         operator_groups,
         now_tick,
+        precedence_min_gap_ticks,
         warnings,
     );
 
@@ -2047,6 +2048,18 @@ pub fn run_forward_pass(
                     let today_midnight_d = start_date
                         .and_hms_opt(0, 0, 0)
                         .expect("midnight is always valid");
+                    // Symmetric with the pre-placement loop at line ~1400 :
+                    // cross-element / cross-job edges are always strict-gap
+                    // governed (the `additional_predecessors` vector only
+                    // carries non-chunk-internal edges, see comment at
+                    // pre_split.rs and the corresponding push in
+                    // wire_cross_cutting_edges). Without `+ strict_gap` here
+                    // a successor could legitimately start at the predecessor's
+                    // last tick, violating the configured
+                    // ComputeOptions.precedence_min_gap_ticks for the cross-cutting
+                    // edges (intra-element edges through `predecessor_idx` are
+                    // handled separately at line ~1340).
+                    let strict_gap = precedence_min_gap_ticks as usize;
                     let addl_done = action.additional_predecessors.iter().all(|(p, gap, chain)| {
                         actions[*p].end_tick.map_or(false, |e| {
                             let effective_end = if chain.is_empty() {
@@ -2059,7 +2072,7 @@ pub fn run_forward_pass(
                                     tick_minutes,
                                 ) as usize
                             };
-                            effective_end <= t
+                            effective_end + strict_gap <= t
                         })
                     });
                     if !addl_done {
@@ -3602,6 +3615,7 @@ fn pre_place_pinned_actions(
     operator_availability: &OperatorAvailability,
     operator_groups: &[Vec<PreparedConcurrentGroup>],
     now_tick: usize,
+    precedence_min_gap_ticks: u32,
     warnings: &mut Vec<Warning>,
 ) {
     for i in 0..actions.len() {
@@ -3891,6 +3905,80 @@ fn pre_place_pinned_actions(
                         "Pin utilisateur retiré pour {} : la tâche ne peut démarrer avant {} (contrainte BAT/earliest-start). La tâche sera replanifiée par le moteur.",
                         super::format_minutes(pin_minutes, start_date),
                         super::format_minutes(est_minutes, start_date),
+                    )
+                };
+                warnings.push(Warning {
+                    task_id: Some(actions[i].task_id.clone()),
+                    message,
+                });
+                actions[i].is_pinned = false;
+                actions[i].is_frozen_by_safety_zone = false;
+                actions[i].pinned_start_tick = None;
+                actions[i].pinned_end_tick = None;
+                continue;
+            }
+        }
+
+        // Cross-element / intra-job predecessor guard for pins.
+        //
+        // pre_place commits start_tick / end_tick directly. The scoring
+        // loop later skips any action with `start_tick.is_some()`, so
+        // its `predecessor_idx` check (line ~1336) and its
+        // `additional_predecessors` check (lines ~1372 / 2050, wired by
+        // `pre_split::wire_cross_cutting_edges` for cross-element and
+        // cross-job edges) never run for pinned actions. A pin sitting
+        // before a predecessor's end (intra-element OR cross-element)
+        // would otherwise land verbatim and the post-compute validator
+        // at `mod.rs:442` would be the only signal.
+        //
+        // Resolution mirrors the BAT-deadline / chunk-mini guards above:
+        // compute the highest predecessor end_tick (skipping those still
+        // unplaced — their floor is unknown at this point, the validator
+        // catches any residual violation), add the strict gap, and
+        // degrade the pin when start_t falls below the resulting floor.
+        // The outsourced tail-ST chain refinement used at line 1390 is
+        // intentionally omitted here: this is a defensive guard, the
+        // gross-violation case (days of mis-wiring) doesn't need
+        // chain-effective ends.
+        //
+        // In-progress pins were intercepted by the split-at-NOW branch
+        // at the top of the loop and are no longer in scope.
+        let primary_pred = actions[i].predecessor_idx;
+        let primary_gap = actions[i].predecessor_gap_ticks;
+        let addl_preds: Vec<(usize, u32)> = actions[i]
+            .additional_predecessors
+            .iter()
+            .map(|(p, g, _)| (*p, *g))
+            .collect();
+        let strict_gap = precedence_min_gap_ticks as usize;
+        let mut predecessor_floor: Option<usize> = None;
+        if let Some(pred_idx) = primary_pred {
+            if let Some(end) = actions[pred_idx].end_tick {
+                let floor = end + primary_gap as usize + strict_gap;
+                predecessor_floor = Some(predecessor_floor.map_or(floor, |f| f.max(floor)));
+            }
+        }
+        for (pred_idx, gap) in &addl_preds {
+            if let Some(end) = actions[*pred_idx].end_tick {
+                let floor = end + *gap as usize + strict_gap;
+                predecessor_floor = Some(predecessor_floor.map_or(floor, |f| f.max(floor)));
+            }
+        }
+        if let Some(floor) = predecessor_floor {
+            if start_t < floor {
+                let pin_minutes = start_t as u64 * tick_minutes as u64;
+                let floor_minutes = floor as u64 * tick_minutes as u64;
+                let message = if actions[i].is_frozen_by_safety_zone {
+                    format!(
+                        "Pin safety-zone retiré pour {} : un prédécesseur ne finit qu'à {}. Replanification.",
+                        super::format_minutes(pin_minutes, start_date),
+                        super::format_minutes(floor_minutes, start_date),
+                    )
+                } else {
+                    format!(
+                        "Pin utilisateur retiré pour {} : un prédécesseur ne finit qu'à {}. La tâche sera replanifiée par le moteur.",
+                        super::format_minutes(pin_minutes, start_date),
+                        super::format_minutes(floor_minutes, start_date),
                     )
                 };
                 warnings.push(Warning {
@@ -6056,6 +6144,7 @@ mod safety_zone_chunk_mini_tests {
             &availability,
             &groups,
             now_tick,
+            /*precedence_min_gap_ticks=*/ 0,
             &mut warnings,
         );
         (actions, assignments, warnings)
@@ -6470,6 +6559,7 @@ mod safety_zone_chunk_mini_tests {
             &availability,
             &groups,
             /*now_tick=*/ 101,
+            /*precedence_min_gap_ticks=*/ 0,
             &mut warnings,
         );
 
@@ -6559,6 +6649,7 @@ mod safety_zone_chunk_mini_tests {
             &availability,
             &groups,
             /*now_tick=*/ 101,
+            /*precedence_min_gap_ticks=*/ 0,
             &mut warnings,
         );
 
