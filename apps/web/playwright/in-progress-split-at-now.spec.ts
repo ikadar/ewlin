@@ -76,8 +76,8 @@ test('engine accepts in-progress split-at-NOW assignments without crashing', asy
   // takes the split-at-NOW branch on the next replan.
   const futureEnd = new Date(nowMs + 30 * 60 * 1000).toISOString();
   const saisieRes = await apiContext.post(
-    `${API_BASE_URL}/scenarios/prod/saisie/${taskId}`,
-    { headers: authHeaders, data: { estimatedEndTime: futureEnd } },
+    `${API_BASE_URL}/scenarios/prod/task-progress/${taskId}`,
+    { headers: authHeaders, data: { kind: 'endTime', endTime: futureEnd } },
   );
   expect(saisieRes.ok(), `saisie failed: ${saisieRes.status()}`).toBeTruthy();
 

@@ -74,8 +74,8 @@ test('fond-vert renders on planning tile after saisie', async ({ page }) => {
   // drive scheduledEnd into the past and isCompleted would mask the fill.
   const estimatedEnd = new Date(nowMs + 60 * 60 * 1000).toISOString();
   const saisieRes = await apiContext.post(
-    `${API_BASE_URL}/scenarios/prod/saisie/${taskId}`,
-    { headers: authHeaders, data: { estimatedEndTime: estimatedEnd } },
+    `${API_BASE_URL}/scenarios/prod/task-progress/${taskId}`,
+    { headers: authHeaders, data: { kind: 'endTime', endTime: estimatedEnd } },
   );
   expect(saisieRes.ok(), `saisie failed: ${saisieRes.status()}`).toBeTruthy();
   const saisie = await saisieRes.json();

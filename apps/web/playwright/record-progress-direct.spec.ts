@@ -53,8 +53,8 @@ test('record-progress-direct endpoint anchors a task and rejects bad input', asy
 
   // 1. Happy path : POST { progressPct: 65 } → echoes the value + an ISO at.
   const recordRes = await apiContext.post(
-    `${API_BASE_URL}/scenarios/prod/record-progress/${taskId}`,
-    { headers: authHeaders, data: { progressPct: 65 } },
+    `${API_BASE_URL}/scenarios/prod/task-progress/${taskId}`,
+    { headers: authHeaders, data: { kind: 'pct', pct: 65 } },
   );
   expect(recordRes.ok()).toBeTruthy();
   const record = await recordRes.json();
@@ -83,8 +83,8 @@ test('record-progress-direct endpoint anchors a task and rejects bad input', asy
 
   // 4. Out-of-bounds pct → HTTP 400.
   const bad = await apiContext.post(
-    `${API_BASE_URL}/scenarios/prod/record-progress/${taskId}`,
-    { headers: authHeaders, data: { progressPct: 150 } },
+    `${API_BASE_URL}/scenarios/prod/task-progress/${taskId}`,
+    { headers: authHeaders, data: { kind: 'pct', pct: 150 } },
   );
   expect(bad.status()).toBe(400);
 

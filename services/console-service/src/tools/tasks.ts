@@ -130,9 +130,11 @@ export const reportProgressTool: ToolDefinition = {
     if (ctx.dryRun) {
       return { ok: true, preview, data: { dryRun: true, estimatedEndTime, ...input } };
     }
+    // Unified saisie endpoint (Phase 4 of avancement remise-à-plat,
+    // 2026-05-24) — discriminated body {kind, ...}.
     const result = await ctx.php.post<SaisieResult>(
-      `/api/v1/scenarios/prod/saisie/${input.taskId}`,
-      { estimatedEndTime },
+      `/api/v1/scenarios/prod/task-progress/${input.taskId}`,
+      { kind: 'endTime', endTime: estimatedEndTime },
     );
     const ratio = result.productivityRatio;
     const statusLabel =
@@ -663,9 +665,11 @@ export const recordTaskCompletionAtTool: ToolDefinition = {
     if (ctx.dryRun) {
       return { ok: true, preview, data: { dryRun: true, completedAtIso, ...input } };
     }
+    // Unified saisie endpoint (Phase 4 of avancement remise-à-plat,
+    // 2026-05-24) — discriminated body {kind, ...}.
     const result = await ctx.php.post<SaisieResult>(
-      `/api/v1/scenarios/prod/saisie/${input.taskId}`,
-      { estimatedEndTime: completedAtIso },
+      `/api/v1/scenarios/prod/task-progress/${input.taskId}`,
+      { kind: 'endTime', endTime: completedAtIso },
     );
     return {
       ok: true,

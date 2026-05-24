@@ -156,10 +156,18 @@ export const saisieApi = createApi({
       query: ({ taskId, progressPct }) => ({
         // Unified saisie endpoint (Phase 4 of avancement remise-à-plat,
         // 2026-05-24). Discriminated body : kind=endTime / kind=pct.
+        //
+        // IMPORTANT — do NOT override X-Flux-Scenario to 'prod' here.
+        // The Acomptes tab is opened from the Préprod-only JCF Modifier
+        // modal and the Task UUID is Préprod-scoped. Forcing prod would
+        // (a) be 403'd by ProdReadOnlyGuardSubscriber and (b) cause
+        // ScenarioFilter to 404 the Préprod UUID. Letting the FE's
+        // current scenario flow through lets the controller find the
+        // task in any scenario ; the write hits the shared TaskWall
+        // either way (single row per logical_task_id).
         url: `/scenarios/prod/task-progress/${encodeURIComponent(taskId)}`,
         method: 'POST',
         body: { kind: 'pct', pct: progressPct },
-        headers: { 'X-Flux-Scenario': 'prod' },
       }),
       async onQueryStarted({ taskId, progressPct }, { dispatch, queryFulfilled }) {
         // Optimistic patch so the rond visually flips immediately when

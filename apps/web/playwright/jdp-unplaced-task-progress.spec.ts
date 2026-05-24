@@ -104,8 +104,8 @@ test('unplaced task in JDP renders progress fill from recordedProgressPct', asyn
 
   const apiCtx2 = await request.newContext();
   const recordRes = await apiCtx2.post(
-    `${API_BASE_URL}/scenarios/prod/record-progress/${taskId}`,
-    { headers: authHeaders, data: { progressPct: 50 } },
+    `${API_BASE_URL}/scenarios/prod/task-progress/${taskId}`,
+    { headers: authHeaders, data: { kind: 'pct', pct: 50 } },
   );
   expect(recordRes.ok()).toBeTruthy();
   await apiCtx2.dispose();

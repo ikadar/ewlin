@@ -234,7 +234,14 @@ export async function apiSubmitProgressCapture(
   taskId: string,
   payload: { recordedProgressPct?: number; recordedAt?: string; productivityRatio?: number },
 ): Promise<unknown> {
-  return apiCall('POST', `/scenarios/prod/saisie/${taskId}`, { body: payload });
+  // Unified saisie endpoint since Phase 4 of avancement remise-à-plat
+  // (2026-05-24). Sends the pct branch ; the recordedAt /
+  // productivityRatio fields legacy callers passed are ignored
+  // server-side (they were never read by the old /saisie route either).
+  const pct = payload.recordedProgressPct ?? 0;
+  return apiCall('POST', `/scenarios/prod/task-progress/${taskId}`, {
+    body: { kind: 'pct', pct },
+  });
 }
 
 export async function apiPinAtTime(taskId: string, at: string): Promise<unknown> {
