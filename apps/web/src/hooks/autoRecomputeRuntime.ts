@@ -62,7 +62,12 @@ interface Bindings {
   invalidateSnapshot: InvalidateSnapshot;
 }
 
-const DEBOUNCE_MS = 300;
+// 30s debounce window — chains of mutations (saisies en rafale,
+// édition JCF, replan d'opérateur, etc.) en Prod ou Préprod sont
+// absorbées dans un seul recompute. Augmenté de 300ms à 30s le
+// 2026-05-24 pour réduire le bruit visuel + la charge serveur quand
+// l'utilisateur enchaîne plusieurs actions rapprochées.
+const DEBOUNCE_MS = 30_000;
 
 let bindings: Bindings | null = null;
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -131,10 +136,12 @@ export function getAutoRecomputeState(): AutoRecomputeState {
 }
 
 /**
- * Debounced trigger. Multiple calls within DEBOUNCE_MS collapse into
- * one. The factory captured at call time is the one bound at the
- * moment the timer fires (not when trigger was called) — that's fine
- * because bindings point to stable RTK Query references.
+ * Debounced trigger. Multiple calls within DEBOUNCE_MS (30 s) collapse
+ * into one. Each new mutation while the timer is pending resets it —
+ * the recompute fires only after 30 s of silence. The factory captured
+ * at call time is the one bound at the moment the timer fires (not
+ * when trigger was called) — that's fine because bindings point to
+ * stable RTK Query references.
  */
 export function triggerAutoRecompute(reason?: string): void {
   lastReason = reason;
