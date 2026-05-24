@@ -24,6 +24,73 @@ def _format_int(v: float) -> int:
     return int(round(v))
 
 
+def _derive_autres(impressions) -> str | None:
+    """Derive JCF "autres" free-text spec from dv_cximp ancillary flags.
+
+    Only emits tokens that represent a *product* spec the operator must not
+    forget (perforation). Process flags like MASSI / MONT are intentionally
+    excluded — they appear in 80% of elements as standard ops and would create
+    noise. NBNUM (numbering) is never set in the current bucket.
+    """
+    if not impressions:
+        return None
+    imp = impressions[0]
+    tokens: list[str] = []
+    if imp.nbper > 0:
+        tokens.append("perforation")
+    return ", ".join(tokens) or None
+
+
+def _derive_surfacage_dsl(impressions) -> str | None:
+    """Derive JCF surfacage DSL "recto/verso" from dv_cximp.VERNIR / VERNIV.
+
+    MasterPrint only flags press-side varnish presence (O/N) without specifying
+    the type (UV / acrylique / sélectif). We default to "UV" — the most common
+    press vernis — and surface the field so the operator can refine in the JCF.
+    Pelliculage (mat/satin/brillant) is a post-press operation not modelled in
+    dv_cximp, so we never infer it.
+    """
+    if not impressions:
+        return None
+    imp = impressions[0]
+    if not imp.vernir and not imp.verniv:
+        return None
+    recto = "UV" if imp.vernir else ""
+    verso = "UV" if imp.verniv else ""
+    return f"{recto}/{verso}"
+
+
+def _derive_imposition_dsl(impressions, tirage, trace, nopap: str) -> str | None:
+    """Derive JCF imposition DSL "LxH(poses)" from dv_cximp.FTIMP + dv_tirdv.FTFIN.
+
+    Poses = best axis-aligned tile-fit of the finished format inside the imposition
+    sheet (max over both orientations). Returns None when imposition or finished
+    format is missing, or when poses would be 0 (data inconsistency).
+    """
+    if not impressions:
+        return None
+    ftimp = next((imp.ftimp for imp in impressions if imp.ftimp), None)
+    if ftimp is None:
+        return None
+    sheet_w, sheet_h = min(ftimp), max(ftimp)
+    if tirage is None or not tirage.ftfin:
+        trace.warnings.append(f"imposition_no_finished_format NOPAP={nopap}")
+        return f"{_format_int(sheet_w)}x{_format_int(sheet_h)}(1)"
+    fin_w, fin_h = min(tirage.ftfin), max(tirage.ftfin)
+    if fin_w <= 0 or fin_h <= 0:
+        return None
+    poses_a = int(sheet_w // fin_w) * int(sheet_h // fin_h)
+    poses_b = int(sheet_w // fin_h) * int(sheet_h // fin_w)
+    poses = max(poses_a, poses_b)
+    if poses <= 0:
+        trace.warnings.append(
+            f"imposition_finished_larger_than_sheet NOPAP={nopap} "
+            f"sheet={sheet_w}x{sheet_h} fin={fin_w}x{fin_h}"
+        )
+        return None
+    return f"{_format_int(sheet_w)}x{_format_int(sheet_h)}({poses})"
+
+
 def _build_element(
     db: Db,
     dossier: Dossier,
@@ -49,7 +116,7 @@ def _build_element(
         name = defaults.get("element_paper_name_template", "PAP{n}").format(n=n)
         label = f"Papier {n}"
 
-    # Spec (papier, format, pagination, inkingSpec) — seulement pour les éléments papier
+    # Spec (papier, format, pagination, imposition, inkingSpec) — seulement pour les éléments papier
     spec: dict = {}
     tirage = None
     element_info = None
@@ -67,37 +134,29 @@ def _build_element(
         element_info = db.elements_by_numdo_nopap.get((dossier.numdo[:11], nopap))
         if element_info and element_info.pag:
             spec["pagination"] = element_info.pag
+        # Imposition : dv_cximp.FTIMP1 × FTIMP2 (cm) + poses calculées par fit géométrique
+        # du format fini dans la feuille d'impression. JCF DSL = "LxH(poses)".
+        impressions_for_imp = db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), [])
+        imp_dsl = _derive_imposition_dsl(impressions_for_imp, tirage, trace, nopap)
+        if imp_dsl:
+            spec["imposition"] = imp_dsl
+        surf_dsl = _derive_surfacage_dsl(impressions_for_imp)
+        if surf_dsl:
+            spec["surfacage"] = surf_dsl
+        autres = _derive_autres(impressions_for_imp)
+        if autres:
+            spec["autres"] = autres
         if db.devis_by_nodev.get(dossier.nodev) and db.devis_by_nodev[dossier.nodev].nbfeu:
             spec["qteFeuilles"] = db.devis_by_nodev[dossier.nodev].nbfeu
-        # quantite élément = quantité dossier (MasterPrint ne porte pas de quantité
-        # distincte par papier dans ce qu'on charge ; mieux vaut dupliquer que de
-        # laisser '1' par défaut côté JCF).
-        devis = db.devis_by_nodev.get(dossier.nodev)
-        if devis and devis.qtdev_1:
-            spec["quantite"] = devis.qtdev_1
         # inkingSpec : metadata lecture seule depuis dv_cximp (couleurs/vernis/lavages).
         # Aujourd'hui 1 ligne dv_cximp par (NODEV, NOPAP) → objet unique. Si on
         # rencontre des NREPI multiples plus tard, basculer en liste sera trivial.
         impressions = db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), [])
         if impressions:
-            imp0 = impressions[0]
-            spec["inkingSpec"] = imp0.to_inking_spec_dict()
-            impression_dsl = imp0.to_impression_dsl()
+            spec["inkingSpec"] = impressions[0].to_inking_spec_dict()
+            impression_dsl = impressions[0].to_impression_dsl()
             if impression_dsl:
                 spec["impression"] = impression_dsl
-            # imposition : DSL "<largeurCm>x<hauteurCm>(<nbPoses>)" — cf. mock JCF FE
-            # (templateApi.ts) qui utilise par ex. "50x70(8)". FTIMP1/FTIMP2 sont
-            # déjà en cm dans MasterPrint ; NBPAS vient de di_eleme. Si l'un manque
-            # on n'émet rien plutôt qu'un DSL bancal que le FE ne saurait reparser.
-            nbpas = element_info.nbpas if element_info else None
-            if imp0.ftimp1 and imp0.ftimp2 and nbpas:
-                spec["imposition"] = f"{imp0.ftimp1}x{imp0.ftimp2}({nbpas})"
-            # surfaçage : DSL "recto/verso" — MasterPrint code O/N par face sans
-            # distinction mat/brillant, on émet le token générique "vernis".
-            if imp0.vernir or imp0.verniv:
-                recto = "vernis" if imp0.vernir else ""
-                verso = "vernis" if imp0.verniv else ""
-                spec["surfacage"] = f"{recto}/{verso}"
 
     # Résolution opération par opération
     ctx = ResolverContext(

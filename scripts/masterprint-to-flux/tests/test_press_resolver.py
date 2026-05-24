@@ -21,7 +21,6 @@ def _impression(cdmac_1: str | None = "G37") -> Impression:
         cdmac_alternates=[], nbcr=4, nbcv=4, quadr=True, quadv=True,
         noir_r=True, noir_v=True, nbchr=0, nblavr=0, nbchv=0, nblavv=0,
         vernir=False, verniv=False, nbper=0, nbnum=0, massi=False, mont=False,
-        ftimp1=0, ftimp2=0,
     )
 
 

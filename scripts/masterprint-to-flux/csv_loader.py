@@ -107,7 +107,6 @@ class ElementInfo:
     cid: str | None         # "Couv.", "Inté.", "Enc.", "Dépl."
     pag: int | None         # pagination cahier (0 si non applicable)
     libel: str | None
-    nbpas: int | None       # nombre de poses par feuille (alimente la DSL imposition)
 
 
 # HFSQL UInt32.MaxValue sentinel surfaced by the driver in place of NULL.
@@ -144,8 +143,7 @@ class Impression:
     nbnum: int
     massi: bool
     mont: bool
-    ftimp1: int             # largeur feuille d'impression (cm) — alimente DSL imposition
-    ftimp2: int             # hauteur feuille d'impression (cm)
+    ftimp: tuple[float, float] | None = None  # (FTIMP1, FTIMP2) cm — printing sheet imposition format
 
     @staticmethod
     def _side_tokens(nb_colors: int, quadri: bool, noir: bool) -> list[str]:
@@ -381,7 +379,6 @@ def load_all(inbox: Path) -> Db:
                 cid=_opt_str(row.get("CID", "")),
                 pag=_opt_int(row.get("PAG", "")),
                 libel=_opt_str(row.get("LIBEL", "")),
-                nbpas=_opt_int(row.get("NBPAS", "")),
             )
 
     # 7. Impressions (DV_CXIMP — la presse retenue + caractéristiques encre/vernis/format)
@@ -419,8 +416,13 @@ def load_all(inbox: Path) -> Db:
                 nbnum=_opt_int(row.get("NBNUM", "")) or 0,
                 massi=(row.get("MASSI") or "").strip().upper() == "O",
                 mont=(row.get("MONT") or "").strip().upper() == "O",
-                ftimp1=_opt_int(row.get("FTIMP1", "")) or 0,
-                ftimp2=_opt_int(row.get("FTIMP2", "")) or 0,
+                ftimp=(
+                    (_opt_float(row.get("FTIMP1", "")) or 0.0,
+                     _opt_float(row.get("FTIMP2", "")) or 0.0)
+                    if (_opt_float(row.get("FTIMP1", "")) or 0) > 0
+                    and (_opt_float(row.get("FTIMP2", "")) or 0) > 0
+                    else None
+                ),
             )
             db.impressions_by_nodev_nopap[(nodev, nopap)].append(imp)
 
