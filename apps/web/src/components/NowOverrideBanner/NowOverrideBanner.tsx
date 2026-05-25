@@ -13,6 +13,7 @@
 import { Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNowOverride, useNow } from '../../contexts/NowContext';
+import { useScenarioMode } from '../../contexts/ScenarioContext';
 
 function formatOffsetCompact(seconds: number): string {
   if (seconds === 0) return '0';
@@ -30,9 +31,14 @@ function formatOffsetCompact(seconds: number): string {
 
 export function NowOverrideBanner() {
   const { isOverridden, offsetSeconds } = useNowOverride();
+  const { mode } = useScenarioMode();
   const now = useNow();
 
   if (!isOverridden) return null;
+  // Préprod has its own temporal anchor (the freshness counter); the
+  // global now() override is a Prod-only test/debug mechanism going
+  // forward. See project_preprod_freshness_counter.md memory.
+  if (mode === 'preprod') return null;
 
   return (
     <Link
