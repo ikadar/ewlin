@@ -58,6 +58,12 @@ Thumbs.db
 /services/api/var/
 /.phpunit.result.cache
 
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
 # Testing
 coverage/
 .nyc_output/
