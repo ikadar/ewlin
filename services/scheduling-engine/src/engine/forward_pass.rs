@@ -1920,6 +1920,7 @@ pub fn run_forward_pass(
                 grid,
                 tick_minutes,
                 start_date,
+                now_tick,
             );
 
             // Release stale virtual-reservation cells beyond the action's
@@ -3440,6 +3441,7 @@ fn emit_in_progress_assignment(
     start_t: usize,
     tick_minutes: u32,
     start_date: NaiveDate,
+    now_tick: usize,
     station_attrs: &[StationAttrs],
     operator_skills: &[Vec<SkillEntry>],
     operator_availability: &OperatorAvailability,
@@ -3457,7 +3459,7 @@ fn emit_in_progress_assignment(
         actions[i].end_tick = Some(start_t);
         actions[i].art = 0;
         actions[i].eat = 0;
-        let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
+        let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date, now_tick);
         assignments.push(assignment);
         return true;
     }
@@ -3598,7 +3600,7 @@ fn emit_in_progress_assignment(
         actions[i].setup_end_tick = setup_completion_tick.map(|t| t as u32);
     }
 
-    let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
+    let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date, now_tick);
     assignments.push(assignment);
     true
 }
@@ -3786,6 +3788,7 @@ fn pre_place_pinned_actions(
                 start_t,
                 tick_minutes,
                 start_date,
+                now_tick,
                 station_attrs,
                 operator_skills,
                 operator_availability,
@@ -4341,7 +4344,7 @@ fn pre_place_pinned_actions(
         // produced a roster above, `build_assignment_for` will include
         // them. PHP decides whether to adopt them (repair empty-DB
         // state) or keep its own (user's explicit choice).
-        let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date);
+        let assignment = build_assignment_for(actions, i, grid, tick_minutes, start_date, now_tick);
         assignments.push(assignment);
     }
 }
@@ -4353,11 +4356,39 @@ fn build_assignment_for(
     grid: &ScheduleGrid,
     tick_minutes: u32,
     start_date: NaiveDate,
+    now_tick: usize,
 ) -> ComputedAssignment {
     let action = &actions[action_idx];
     let station_idx = action.station_idx;
-    let start_t = action.start_tick.unwrap_or(0);
-    let end_t = action.end_tick.unwrap_or(start_t);
+    // Hard floor at now_tick: no assignment may be emitted with a
+    // scheduled_start before "now" (= referenceTime sent by PHP). The
+    // main forward loop already starts at now_tick (see line 1116), but
+    // auxiliary paths (pre_place, zero-duration helpers, LNS) write
+    // start_tick directly and don't always clamp. This single sentinel
+    // at the emission boundary guarantees the invariant regardless of
+    // upstream bugs.
+    //
+    // Exceptions where a past start is legitimate :
+    //   - `is_in_progress` : the task was placed before now and is
+    //     still running ; the FE renders "started X ago, finishing in Y".
+    //   - `is_pinned`      : the user (or the safety-zone) explicitly
+    //     pinned the task to a past tick — we honour the pin verbatim.
+    //   - `is_frozen_by_safety_zone` : same intent as a user pin from
+    //     the engine's POV.
+    // Clamping any of these would collapse the duration to zero and
+    // lose the historical anchor.
+    let raw_start_t = action.start_tick.unwrap_or(now_tick);
+    let raw_end_t = action.end_tick.unwrap_or(raw_start_t);
+    let allow_past =
+        action.is_in_progress || action.is_pinned || action.is_frozen_by_safety_zone;
+    let start_t = if allow_past { raw_start_t } else { raw_start_t.max(now_tick) };
+    let end_t = raw_end_t.max(start_t);
+    if !allow_past && raw_start_t < now_tick {
+        eprintln!(
+            "[FORWARD-PASS] start_tick={} < now_tick={} for task {} (clamped to now)",
+            raw_start_t, now_tick, action.task_id,
+        );
+    }
     let setup_ticks = action.setup_ticks;
 
     let avg_productivity = if action.ticks_counted > 0 {
