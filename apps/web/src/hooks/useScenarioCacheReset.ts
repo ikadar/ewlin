@@ -7,7 +7,6 @@ import { scheduleApi } from '../store/api/scheduleApi';
 import { pinApi } from '../store/api/pinApi';
 import { saisieApi } from '../store/api/saisieApi';
 import { prodSnapshotApi } from '../store/api/prodSnapshotApi';
-import { prodCompletionApi } from '../store/api/prodCompletionApi';
 import { archiveApi } from '../store/api/archiveApi';
 import { consoleApi } from '../store/api/consoleApi';
 import { logisticsApi } from '../store/api/logisticsApi';
@@ -45,7 +44,6 @@ export function useScenarioCacheReset(): void {
       dispatch(pinApi.util.resetApiState());
       dispatch(saisieApi.util.resetApiState());
       dispatch(prodSnapshotApi.util.resetApiState());
-      dispatch(prodCompletionApi.util.resetApiState());
       dispatch(archiveApi.util.resetApiState());
       dispatch(consoleApi.util.resetApiState());
       dispatch(logisticsApi.util.resetApiState());

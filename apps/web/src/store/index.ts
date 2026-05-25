@@ -30,7 +30,6 @@ import { adminUserApi } from './api/adminUserApi';
 import { adminUserGroupApi } from './api/adminUserGroupApi';
 import { consoleApi } from './api/consoleApi';
 import { promotionApi } from './api/promotionApi';
-import { prodCompletionApi } from './api/prodCompletionApi';
 import { saisieApi } from './api/saisieApi';
 import { pinApi } from './api/pinApi';
 import { prodSnapshotApi } from './api/prodSnapshotApi';
@@ -70,7 +69,6 @@ export const store = configureStore({
     [adminUserGroupApi.reducerPath]: adminUserGroupApi.reducer,
     [consoleApi.reducerPath]: consoleApi.reducer,
     [promotionApi.reducerPath]: promotionApi.reducer,
-    [prodCompletionApi.reducerPath]: prodCompletionApi.reducer,
     [saisieApi.reducerPath]: saisieApi.reducer,
     [pinApi.reducerPath]: pinApi.reducer,
     [prodSnapshotApi.reducerPath]: prodSnapshotApi.reducer,
@@ -110,7 +108,6 @@ export const store = configureStore({
       .concat(adminUserGroupApi.middleware)
       .concat(consoleApi.middleware)
       .concat(promotionApi.middleware)
-      .concat(prodCompletionApi.middleware)
       .concat(saisieApi.middleware)
       .concat(pinApi.middleware)
       .concat(prodSnapshotApi.middleware)
@@ -342,12 +339,6 @@ export type {
   PromotionResult,
   PromotionUndoResult,
 } from './api/promotionApi';
-
-export {
-  useToggleProdCompletionMutation,
-  prodCompletionApi,
-} from './api/prodCompletionApi';
-export type { ProdCompletionToggleResult } from './api/prodCompletionApi';
 
 export {
   useReportSaisieMutation,
