@@ -69,19 +69,34 @@ def _derive_surfacage_dsl(impressions) -> str | None:
     return f"{recto}/{verso}"
 
 
-def _derive_imposition_dsl(impressions, tirage, trace, nopap: str) -> str | None:
-    """Derive JCF imposition DSL "LxH(poses)" from dv_cximp.FTIMP + dv_tirdv.FTFIN.
+def _derive_imposition_dsl(impressions, tirage, element_info, trace, nopap: str) -> str | None:
+    """Derive JCF imposition DSL "LxH(poses)" from MasterPrint sources.
 
-    Poses = best axis-aligned tile-fit of the finished format inside the imposition
-    sheet (max over both orientations). Returns None when imposition or finished
-    format is missing, or when poses would be 0 (data inconsistency).
+    Poses precedence (most authoritative first):
+      1. `di_eleme.NBPAS` — operator-entered poses count, source canonique
+         (92% coverage on real data, vs 33% for FTIMP).
+      2. Geometric tile-fit of `dv_tirdv.FTFIN` inside `dv_cximp.FTIMP`
+         — fallback when NBPAS is missing.
+
+    Sheet size precedence:
+      1. `dv_cximp.FTIMP` — actual printing sheet (post-cut for press).
+      2. `dv_tirdv.FTFOU` — supplier paper sheet, used when FTIMP is empty
+         (covers the 67% of press rows where MasterPrint didn't fill FTIMP).
+
+    Returns None when no usable sheet size + poses combination is available.
     """
-    if not impressions:
+    ftimp = None
+    if impressions:
+        ftimp = next((imp.ftimp for imp in impressions if imp.ftimp), None)
+    sheet = ftimp or (tirage.ftfou if tirage and tirage.ftfou else None)
+    if sheet is None:
         return None
-    ftimp = next((imp.ftimp for imp in impressions if imp.ftimp), None)
-    if ftimp is None:
-        return None
-    sheet_w, sheet_h = min(ftimp), max(ftimp)
+    sheet_w, sheet_h = min(sheet), max(sheet)
+
+    nbpas = element_info.nbpas if element_info else None
+    if nbpas and nbpas > 0:
+        return f"{_format_int(sheet_w)}x{_format_int(sheet_h)}({nbpas})"
+
     if tirage is None or not tirage.ftfin:
         trace.warnings.append(f"imposition_no_finished_format NOPAP={nopap}")
         return f"{_format_int(sheet_w)}x{_format_int(sheet_h)}(1)"
@@ -143,10 +158,12 @@ def _build_element(
         element_info = db.elements_by_numdo_nopap.get((dossier.numdo[:11], nopap))
         if element_info and element_info.pag:
             spec["pagination"] = element_info.pag
-        # Imposition : dv_cximp.FTIMP1 × FTIMP2 (cm) + poses calculées par fit géométrique
-        # du format fini dans la feuille d'impression. JCF DSL = "LxH(poses)".
+        # Imposition : `di_eleme.NBPAS` est la source canonique des poses (saisie
+        # opérateur, 92% de couverture). Fallback fit géométrique FTIMP × FTFIN
+        # quand NBPAS manque. Pour la taille de feuille on prend FTIMP en priorité,
+        # FTFOU si FTIMP est vide (67% des lignes presse). JCF DSL = "LxH(poses)".
         impressions_for_imp = db.impressions_by_nodev_nopap.get((dossier.nodev, nopap), [])
-        imp_dsl = _derive_imposition_dsl(impressions_for_imp, tirage, trace, nopap)
+        imp_dsl = _derive_imposition_dsl(impressions_for_imp, tirage, element_info, trace, nopap)
         if imp_dsl:
             spec["imposition"] = imp_dsl
         surf_dsl = _derive_surfacage_dsl(impressions_for_imp)

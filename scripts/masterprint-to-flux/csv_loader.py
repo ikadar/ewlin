@@ -107,6 +107,8 @@ class ElementInfo:
     cid: str | None         # "Couv.", "Inté.", "Enc.", "Dépl."
     pag: int | None         # pagination cahier (0 si non applicable)
     libel: str | None
+    nbfor: int | None = None  # nombre de formes (1 par défaut, >1 pour cahiers cassés)
+    nbpas: int | None = None  # poses par feuille (saisi à la main dans MasterPrint, source canonique)
 
 
 # HFSQL UInt32.MaxValue sentinel surfaced by the driver in place of NULL.
@@ -403,6 +405,8 @@ def load_all(inbox: Path) -> Db:
                 cid=_opt_str(row.get("CID", "")),
                 pag=_opt_int(row.get("PAG", "")),
                 libel=_opt_str(row.get("LIBEL", "")),
+                nbfor=_opt_int(row.get("NBFOR", "")),
+                nbpas=_opt_int(row.get("NBPAS", "")),
             )
 
     # 7. Impressions (DV_CXIMP — la presse retenue + caractéristiques encre/vernis/format)
