@@ -58,18 +58,19 @@ def _exec_sql(sql: str) -> str:
     return out.stdout
 
 
-def load_existing_jobs() -> dict[str, ExistingJob]:
-    """Returns {reference: ExistingJob} of all jobs currently in Flux's Prod scenario.
+def load_existing_jobs(scenario_type: str = "prod") -> dict[str, ExistingJob]:
+    """Returns {reference: ExistingJob} of all jobs in the given scenario type.
 
-    Scoped to Prod because the import targets the canonical wall — Préprod and
-    Archive forks share references and would otherwise collide in the dict
-    (last-row wins, half the IDs end up pointing to the wrong scenario → 404
-    on the subsequent PUT /jobs/{id} which resolves jobs scenario-scoped).
+    The import propagates MasterPrint facts to both Prod and Préprod, so the
+    caller iterates per scenario and looks up the right IDs. Without the
+    scenario filter, the dict comprehension keys by reference and overwrites
+    rows across forks — half the IDs end up pointing to the wrong scenario
+    → 404 on the subsequent PUT /jobs/{id} which is scenario-scoped.
     """
     # has_started = any task of the job has a TaskWall progress entry
     # (effort_minutes_done > 0, or last_saisie_at / last_setup_at set).
     # TaskWall is keyed by logical_task_id (shared across scenario forks).
-    sql = """
+    sql = f"""
     SELECT j.id, j.reference, IFNULL(j.masterprint_hash, ''),
       IFNULL(j.masterprint_structure_hash, ''),
       IF(EXISTS(
@@ -83,7 +84,7 @@ def load_existing_jobs() -> dict[str, ExistingJob]:
       ), 1, 0) AS has_started
     FROM jobs j
     INNER JOIN scenarios s ON s.id = j.scenario_id
-    WHERE s.type = 'prod';
+    WHERE s.type = '{_sql_escape(scenario_type)}';
     """
     result: dict[str, ExistingJob] = {}
     for line in _exec_sql(sql).split("\n"):

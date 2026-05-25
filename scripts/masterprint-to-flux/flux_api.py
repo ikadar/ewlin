@@ -19,11 +19,11 @@ class ApiError(RuntimeError):
         self.body = body
 
 
-def _request(method: str, url: str, *, token: str | None = None, body: dict | None = None, timeout: int = 30):
-    # X-Flux-Scenario: prod — MasterPrint is the canonical wall source.
-    # Without this header the API resolves jobs in the default scenario
-    # (which is not necessarily Prod), so PUT /jobs/{prodId} would 404.
-    headers = {"Accept": "application/json", "X-Flux-Scenario": "prod"}
+def _request(method: str, url: str, *, token: str | None = None, body: dict | None = None, timeout: int = 30, scenario: str = "prod"):
+    # X-Flux-Scenario explicit — MasterPrint is a fact-on-the-wall source
+    # that propagates to every scenario (Prod canonical + Préprod sandbox).
+    # The API's default scenario is not deterministic, so we always pin.
+    headers = {"Accept": "application/json", "X-Flux-Scenario": scenario}
     data = None
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -76,26 +76,26 @@ def list_existing_references(base_url: str, token: str) -> set[str]:
     return refs
 
 
-def create_job(base_url: str, token: str, request: dict, *, retry_5xx: int = 1) -> tuple[int, dict | None]:
+def create_job(base_url: str, token: str, request: dict, *, retry_5xx: int = 1, scenario: str = "prod") -> tuple[int, dict | None]:
     """POST /jobs, renvoie (status, body). Retry 1× sur 5xx (configurable)."""
-    return _action_with_retry("POST", f"{base_url}/jobs", token, request, retry_5xx)
+    return _action_with_retry("POST", f"{base_url}/jobs", token, request, retry_5xx, scenario)
 
 
-def update_job(base_url: str, token: str, job_id: str, request: dict, *, retry_5xx: int = 1) -> tuple[int, dict | None]:
+def update_job(base_url: str, token: str, job_id: str, request: dict, *, retry_5xx: int = 1, scenario: str = "prod") -> tuple[int, dict | None]:
     """PUT /jobs/{id}, renvoie (status, body). Retry 1× sur 5xx."""
-    return _action_with_retry("PUT", f"{base_url}/jobs/{job_id}", token, request, retry_5xx)
+    return _action_with_retry("PUT", f"{base_url}/jobs/{job_id}", token, request, retry_5xx, scenario)
 
 
-def delete_job(base_url: str, token: str, job_id: str, *, retry_5xx: int = 1) -> tuple[int, dict | None]:
+def delete_job(base_url: str, token: str, job_id: str, *, retry_5xx: int = 1, scenario: str = "prod") -> tuple[int, dict | None]:
     """DELETE /jobs/{id}, renvoie (status, body). Retry 1× sur 5xx."""
-    return _action_with_retry("DELETE", f"{base_url}/jobs/{job_id}", token, None, retry_5xx)
+    return _action_with_retry("DELETE", f"{base_url}/jobs/{job_id}", token, None, retry_5xx, scenario)
 
 
-def _action_with_retry(method: str, url: str, token: str, body: dict | None, retry_5xx: int) -> tuple[int, dict | None]:
+def _action_with_retry(method: str, url: str, token: str, body: dict | None, retry_5xx: int, scenario: str = "prod") -> tuple[int, dict | None]:
     attempts = 1 + retry_5xx
     last: tuple[int, dict | None] = (0, None)
     for i in range(attempts):
-        status, response = _request(method, url, token=token, body=body)
+        status, response = _request(method, url, token=token, body=body, scenario=scenario)
         last = (status, response)
         if status < 500:
             return last

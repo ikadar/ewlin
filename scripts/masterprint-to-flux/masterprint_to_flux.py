@@ -102,8 +102,13 @@ def main() -> int:
     log.info(f"Loaded CSV: {len(csv_db.dossiers)} dossiers, "
              f"{sum(len(o) for o in csv_db.ops_by_nodev.values())} operations")
 
+    # MasterPrint = fact-on-the-wall : propagate to both Prod (canonical wall)
+    # and Préprod (sandbox antichambre). Each scenario keeps its own job IDs
+    # and masterprint_hash → we run the diff+push loop once per scenario.
+    SCENARIOS = ("prod", "preprod")
+
     token: str | None = None
-    existing_jobs: dict[str, db_mod.ExistingJob] = {}
+    existing_jobs_by_scenario: dict[str, dict[str, db_mod.ExistingJob]] = {s: {} for s in SCENARIOS}
     if not args.dry_run:
         api_cfg = config["api"]
         password = os.environ.get(api_cfg["auth"]["password_env"], "")
@@ -115,13 +120,16 @@ def main() -> int:
         except flux_api.AuthError as e:
             log.error(f"API auth failed: {e}")
             return 4
-        try:
-            existing_jobs = db_mod.load_existing_jobs()
-        except RuntimeError as e:
-            log.error(f"DB load failed: {e}")
-            return 5
-        log.info(f"Flux DB: {len(existing_jobs)} jobs ({sum(1 for j in existing_jobs.values() if j.has_started)} started, "
-                 f"{sum(1 for j in existing_jobs.values() if j.masterprint_hash)} with mp_hash)")
+        for scenario in SCENARIOS:
+            try:
+                existing_jobs_by_scenario[scenario] = db_mod.load_existing_jobs(scenario)
+            except RuntimeError as e:
+                log.error(f"DB load failed for scenario={scenario}: {e}")
+                return 5
+            jobs = existing_jobs_by_scenario[scenario]
+            log.info(f"Flux DB [{scenario}]: {len(jobs)} jobs "
+                     f"({sum(1 for j in jobs.values() if j.has_started)} started, "
+                     f"{sum(1 for j in jobs.values() if j.masterprint_hash)} with mp_hash)")
 
     # =============== Phase 2 — Transform ===============
     dossiers = csv_db.dossiers[: args.limit] if args.limit else csv_db.dossiers
@@ -142,129 +150,146 @@ def main() -> int:
 
     log.info(f"Transformed: {len(built)} jobs built, {len(rejected_dossiers)} dossiers rejected")
 
-    # =============== Phase 3 — Diff ===============
-    new_refs = {r["reference"] for r, _, _, _ in built}
-    actions = {"create": [], "update_structure": [], "update_metadata": [], "unchanged": [], "backfill": [], "delete": []}
-    for req, trace, mp_hash, mp_struct_hash in built:
-        ref = req["reference"]
-        if ref not in existing_jobs:
-            actions["create"].append((req, trace, mp_hash, mp_struct_hash))
-        else:
-            existing = existing_jobs[ref]
-            if existing.masterprint_hash is None:
-                actions["backfill"].append((req, trace, mp_hash, mp_struct_hash, existing))
-            elif existing.masterprint_hash == mp_hash:
-                actions["unchanged"].append((req, existing))
-            elif (existing.masterprint_structure_hash is not None
-                  and existing.masterprint_structure_hash == mp_struct_hash):
-                actions["update_metadata"].append((req, trace, mp_hash, mp_struct_hash, existing))
-            else:
-                actions["update_structure"].append((req, trace, mp_hash, mp_struct_hash, existing))
-    for ref, info in existing_jobs.items():
-        if info.masterprint_hash is not None and ref not in new_refs:
-            actions["delete"].append(info)
-
-    struct_no_hash = sum(
-        1 for _, _, _, _, ex in actions["update_structure"]
-        if ex.masterprint_structure_hash is None
-    )
-    log.info(f"Diff: +{len(actions['create'])} new, "
-             f"~{len(actions['update_structure'])} struct ({struct_no_hash} legacy/no-hash), "
-             f"~{len(actions['update_metadata'])} meta, "
-             f"={len(actions['unchanged'])} unchanged, "
-             f"backfill={len(actions['backfill'])}, -{len(actions['delete'])} deleted")
-
-    # =============== Phase 4 — Push ===============
-    push_stats: Counter = Counter()
+    # =============== Phase 3+4 — Diff + Push (per scenario) ===============
+    push_stats_by_scenario: dict[str, Counter] = {}
+    diff_stats_by_scenario: dict[str, dict] = {}
     detail = {"created": [], "updated_structure": [], "updated_metadata": [], "deleted": [], "modified_after_start": [], "errors": []}
 
-    if args.dry_run:
-        push_stats["dry_run_create"] = len(actions["create"])
-        push_stats["dry_run_update_structure"] = len(actions["update_structure"])
-        push_stats["dry_run_update_metadata"] = len(actions["update_metadata"])
-        push_stats["dry_run_delete"] = len(actions["delete"])
-        push_stats["dry_run_backfill"] = len(actions["backfill"])
-    else:
-        assert token is not None
-        api_url = config["api"]["base_url"]
+    new_refs = {r["reference"] for r, _, _, _ in built}
 
-        # CREATE — full payload including gates (first import, Ordo has nothing to preserve)
-        for req, trace, mp_hash, mp_struct_hash in actions["create"]:
+    for scenario in SCENARIOS:
+        existing_jobs = existing_jobs_by_scenario[scenario]
+
+        actions = {"create": [], "update_structure": [], "update_metadata": [], "unchanged": [], "backfill": [], "delete": []}
+        for req, trace, mp_hash, mp_struct_hash in built:
             ref = req["reference"]
-            try:
-                status, body = flux_api.create_job(api_url, token, req)
-                if status == 201 and body and "id" in body:
-                    db_mod.update_tracking(body["id"], mp_hash, mp_struct_hash, changed_after_start=False)
-                    push_stats["created"] += 1
-                    detail["created"].append({"reference": ref})
+            if ref not in existing_jobs:
+                actions["create"].append((req, trace, mp_hash, mp_struct_hash))
+            else:
+                existing = existing_jobs[ref]
+                if existing.masterprint_hash is None:
+                    actions["backfill"].append((req, trace, mp_hash, mp_struct_hash, existing))
+                elif existing.masterprint_hash == mp_hash:
+                    actions["unchanged"].append((req, existing))
+                elif (existing.masterprint_structure_hash is not None
+                      and existing.masterprint_structure_hash == mp_struct_hash):
+                    actions["update_metadata"].append((req, trace, mp_hash, mp_struct_hash, existing))
                 else:
-                    push_stats["create_error"] += 1
-                    detail["errors"].append({"reference": ref, "phase": "create", "status": status, "body": body})
-            except Exception as e:
-                push_stats["create_exception"] += 1
-                detail["errors"].append({"reference": ref, "phase": "create", "error": str(e)})
+                    actions["update_structure"].append((req, trace, mp_hash, mp_struct_hash, existing))
+        for ref, info in existing_jobs.items():
+            if info.masterprint_hash is not None and ref not in new_refs:
+                actions["delete"].append(info)
 
-        # UPDATE (structural) — send elements but strip gate fields so PHP preserves Ordo gates
-        for req, trace, mp_hash, mp_struct_hash, existing in actions["update_structure"]:
-            ref = req["reference"]
-            try:
-                payload = _strip_gate_fields(req)
-                status, body = flux_api.update_job(api_url, token, existing.id, payload)
-                if status in (200, 204):
-                    db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=existing.has_started)
-                    push_stats["updated_structure"] += 1
-                    entry = {"reference": ref, "was_started": existing.has_started}
-                    detail["updated_structure"].append(entry)
-                    if existing.has_started:
-                        detail["modified_after_start"].append(entry)
-                else:
-                    push_stats["update_structure_error"] += 1
-                    detail["errors"].append({"reference": ref, "phase": "update_structure", "status": status, "body": body})
-            except Exception as e:
-                push_stats["update_structure_exception"] += 1
-                detail["errors"].append({"reference": ref, "phase": "update_structure", "error": str(e)})
+        struct_no_hash = sum(
+            1 for _, _, _, _, ex in actions["update_structure"]
+            if ex.masterprint_structure_hash is None
+        )
+        log.info(f"Diff [{scenario}]: +{len(actions['create'])} new, "
+                 f"~{len(actions['update_structure'])} struct ({struct_no_hash} legacy/no-hash), "
+                 f"~{len(actions['update_metadata'])} meta, "
+                 f"={len(actions['unchanged'])} unchanged, "
+                 f"backfill={len(actions['backfill'])}, -{len(actions['delete'])} deleted")
 
-        # UPDATE (metadata only) — send WITHOUT elements so PHP doesn't touch tasks/gates
-        for req, trace, mp_hash, mp_struct_hash, existing in actions["update_metadata"]:
-            ref = req["reference"]
-            try:
-                payload = {k: v for k, v in req.items() if k != "elements"}
-                status, body = flux_api.update_job(api_url, token, existing.id, payload)
-                if status in (200, 204):
+        diff_stats_by_scenario[scenario] = {
+            "new": len(actions["create"]),
+            "changed_structure": len(actions["update_structure"]),
+            "changed_metadata": len(actions["update_metadata"]),
+            "unchanged": len(actions["unchanged"]),
+            "backfill": len(actions["backfill"]),
+            "deleted": len(actions["delete"]),
+        }
+
+        push_stats: Counter = Counter()
+
+        if args.dry_run:
+            push_stats["dry_run_create"] = len(actions["create"])
+            push_stats["dry_run_update_structure"] = len(actions["update_structure"])
+            push_stats["dry_run_update_metadata"] = len(actions["update_metadata"])
+            push_stats["dry_run_delete"] = len(actions["delete"])
+            push_stats["dry_run_backfill"] = len(actions["backfill"])
+        else:
+            assert token is not None
+            api_url = config["api"]["base_url"]
+
+            # CREATE — full payload including gates (first import, Ordo has nothing to preserve)
+            for req, trace, mp_hash, mp_struct_hash in actions["create"]:
+                ref = req["reference"]
+                try:
+                    status, body = flux_api.create_job(api_url, token, req, scenario=scenario)
+                    if status == 201 and body and "id" in body:
+                        db_mod.update_tracking(body["id"], mp_hash, mp_struct_hash, changed_after_start=False)
+                        push_stats["created"] += 1
+                        detail["created"].append({"reference": ref, "scenario": scenario})
+                    else:
+                        push_stats["create_error"] += 1
+                        detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "create", "status": status, "body": body})
+                except Exception as e:
+                    push_stats["create_exception"] += 1
+                    detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "create", "error": str(e)})
+
+            # UPDATE (structural) — send elements but strip gate fields so PHP preserves Ordo gates
+            for req, trace, mp_hash, mp_struct_hash, existing in actions["update_structure"]:
+                ref = req["reference"]
+                try:
+                    payload = _strip_gate_fields(req)
+                    status, body = flux_api.update_job(api_url, token, existing.id, payload, scenario=scenario)
+                    if status in (200, 204):
+                        db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=existing.has_started)
+                        push_stats["updated_structure"] += 1
+                        entry = {"reference": ref, "scenario": scenario, "was_started": existing.has_started}
+                        detail["updated_structure"].append(entry)
+                        if existing.has_started:
+                            detail["modified_after_start"].append(entry)
+                    else:
+                        push_stats["update_structure_error"] += 1
+                        detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_structure", "status": status, "body": body})
+                except Exception as e:
+                    push_stats["update_structure_exception"] += 1
+                    detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_structure", "error": str(e)})
+
+            # UPDATE (metadata only) — send WITHOUT elements so PHP doesn't touch tasks/gates
+            for req, trace, mp_hash, mp_struct_hash, existing in actions["update_metadata"]:
+                ref = req["reference"]
+                try:
+                    payload = {k: v for k, v in req.items() if k != "elements"}
+                    status, body = flux_api.update_job(api_url, token, existing.id, payload, scenario=scenario)
+                    if status in (200, 204):
+                        db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=False)
+                        push_stats["updated_metadata"] += 1
+                        detail["updated_metadata"].append({"reference": ref, "scenario": scenario})
+                    else:
+                        push_stats["update_metadata_error"] += 1
+                        detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_metadata", "status": status, "body": body})
+                except Exception as e:
+                    push_stats["update_metadata_exception"] += 1
+                    detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_metadata", "error": str(e)})
+
+            # BACKFILL (no PUT, just persist current hashes)
+            for req, trace, mp_hash, mp_struct_hash, existing in actions["backfill"]:
+                try:
                     db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=False)
-                    push_stats["updated_metadata"] += 1
-                    detail["updated_metadata"].append({"reference": ref})
-                else:
-                    push_stats["update_metadata_error"] += 1
-                    detail["errors"].append({"reference": ref, "phase": "update_metadata", "status": status, "body": body})
-            except Exception as e:
-                push_stats["update_metadata_exception"] += 1
-                detail["errors"].append({"reference": ref, "phase": "update_metadata", "error": str(e)})
+                    push_stats["backfilled"] += 1
+                except Exception as e:
+                    push_stats["backfill_exception"] += 1
+                    detail["errors"].append({"reference": req["reference"], "scenario": scenario, "phase": "backfill", "error": str(e)})
 
-        # BACKFILL (no PUT, just persist current hashes)
-        for req, trace, mp_hash, mp_struct_hash, existing in actions["backfill"]:
-            try:
-                db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=False)
-                push_stats["backfilled"] += 1
-            except Exception as e:
-                push_stats["backfill_exception"] += 1
-                detail["errors"].append({"reference": req["reference"], "phase": "backfill", "error": str(e)})
-
-        # DELETE
-        for info in actions["delete"]:
-            try:
-                status, body = flux_api.delete_job(api_url, token, info.id)
-                if status in (200, 204):
-                    push_stats["deleted"] += 1
-                    detail["deleted"].append({"reference": info.reference, "was_started": info.has_started})
-                else:
-                    push_stats["delete_error"] += 1
-                    detail["errors"].append({"reference": info.reference, "phase": "delete", "status": status, "body": body})
-            except Exception as e:
-                push_stats["delete_exception"] += 1
-                detail["errors"].append({"reference": info.reference, "phase": "delete", "error": str(e)})
+            # DELETE
+            for info in actions["delete"]:
+                try:
+                    status, body = flux_api.delete_job(api_url, token, info.id, scenario=scenario)
+                    if status in (200, 204):
+                        push_stats["deleted"] += 1
+                        detail["deleted"].append({"reference": info.reference, "scenario": scenario, "was_started": info.has_started})
+                    else:
+                        push_stats["delete_error"] += 1
+                        detail["errors"].append({"reference": info.reference, "scenario": scenario, "phase": "delete", "status": status, "body": body})
+                except Exception as e:
+                    push_stats["delete_exception"] += 1
+                    detail["errors"].append({"reference": info.reference, "scenario": scenario, "phase": "delete", "error": str(e)})
 
         push_stats["unchanged"] = len(actions["unchanged"])
+        push_stats_by_scenario[scenario] = push_stats
+        log.info(f"Stats [{scenario}]: {dict(push_stats)}")
 
     # =============== Phase 5 — Report ===============
     report = {
@@ -281,15 +306,8 @@ def main() -> int:
         },
         "skipped_operations_by_reason": dict(skipped_ops_counter),
         "rejected_dossiers": rejected_dossiers,
-        "diff": {
-            "new": len(actions["create"]),
-            "changed_structure": len(actions["update_structure"]),
-            "changed_metadata": len(actions["update_metadata"]),
-            "unchanged": len(actions["unchanged"]),
-            "backfill": len(actions["backfill"]),
-            "deleted": len(actions["delete"]),
-        },
-        "posted": dict(push_stats),
+        "diff_by_scenario": diff_stats_by_scenario,
+        "posted_by_scenario": {s: dict(c) for s, c in push_stats_by_scenario.items()},
         "detail": {
             "created": detail["created"],
             "updated_structure": detail["updated_structure"],
@@ -302,7 +320,6 @@ def main() -> int:
     }
     write_report(report_path, report)
     log.info(f"Report written to {report_path}")
-    log.info(f"Stats: {dict(push_stats)}")
     log.info("=== Run end ===")
     return 0
 
