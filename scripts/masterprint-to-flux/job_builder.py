@@ -172,8 +172,11 @@ def _build_element(
         autres = _derive_autres(impressions_for_imp)
         if autres:
             spec["autres"] = autres
-        if db.devis_by_nodev.get(dossier.nodev) and db.devis_by_nodev[dossier.nodev].nbfeu:
-            spec["qteFeuilles"] = db.devis_by_nodev[dossier.nodev].nbfeu
+        # qteFeuilles : laissé vide pour que le JCF auto-calcule
+        # `ceil(jobQty × elementQty / poses)`. dv_entdv.NBFEU est devis-level
+        # (identique pour tous les éléments du même devis) et ne représente
+        # pas la quantité de feuilles à imprimer, malgré son nom — voir
+        # inbox/masterprint/jcf-element-mapping.md §Qté feuilles.
         # inkingSpec : metadata lecture seule depuis dv_cximp (couleurs/vernis/lavages).
         # Aujourd'hui 1 ligne dv_cximp par (NODEV, NOPAP) → objet unique. Si on
         # rencontre des NREPI multiples plus tard, basculer en liste sera trivial.
