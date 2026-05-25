@@ -196,8 +196,12 @@ export const saisieApi = createApi({
         );
         try {
           await queryFulfilled;
-          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
-          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
+          // No invalidateTags : the server response carries the same
+          // three fields the optimistic patch already wrote
+          // (taskId / recordedProgressPct / recordedAt) and Mode
+          // avancement clicks fire in rapid bursts. Forcing a full
+          // Snapshot+ProdSnapshot refetch per click was the dominant
+          // cause of UI latency between successive ronds.
         } catch {
           patchPreprod.undo();
           patchProd.undo();
