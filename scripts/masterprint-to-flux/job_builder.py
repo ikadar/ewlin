@@ -54,18 +54,18 @@ def _derive_surfacage_dsl(impressions) -> str | None:
     """Derive JCF surfacage DSL "recto/verso" from dv_cximp.VERNIR / VERNIV.
 
     MasterPrint only flags press-side varnish presence (O/N) without specifying
-    the type (UV / acrylique / sélectif). We default to "UV" — the most common
-    press vernis — and surface the field so the operator can refine in the JCF.
-    Pelliculage (mat/satin/brillant) is a post-press operation not modelled in
-    dv_cximp, so we never infer it.
+    the type (UV / acrylique / sélectif). We emit the generic "V" token — the
+    operator refines (UV / mat / sélectif…) in the JCF if needed. Pelliculage
+    (mat/satin/brillant) is a post-press operation not modelled in dv_cximp,
+    so we never infer it.
     """
     if not impressions:
         return None
     imp = impressions[0]
     if not imp.vernir and not imp.verniv:
         return None
-    recto = "UV" if imp.vernir else ""
-    verso = "UV" if imp.verniv else ""
+    recto = "V" if imp.vernir else ""
+    verso = "V" if imp.verniv else ""
     return f"{recto}/{verso}"
 
 
