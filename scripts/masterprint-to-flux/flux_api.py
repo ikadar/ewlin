@@ -20,7 +20,10 @@ class ApiError(RuntimeError):
 
 
 def _request(method: str, url: str, *, token: str | None = None, body: dict | None = None, timeout: int = 30):
-    headers = {"Accept": "application/json"}
+    # X-Flux-Scenario: prod — MasterPrint is the canonical wall source.
+    # Without this header the API resolves jobs in the default scenario
+    # (which is not necessarily Prod), so PUT /jobs/{prodId} would 404.
+    headers = {"Accept": "application/json", "X-Flux-Scenario": "prod"}
     data = None
     if body is not None:
         headers["Content-Type"] = "application/json"
