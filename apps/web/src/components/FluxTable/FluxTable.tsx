@@ -622,6 +622,7 @@ const FluxTableRow = memo(function FluxTableRow({
               ? job.elements.flatMap(e => e.outsourcing)
               : el0?.outsourcing ?? []}
             onUpdateSTStatus={ctx.onUpdateSTStatus}
+            advancementMode={ctx.advancementMode}
           />
         )}
       </td>
@@ -813,6 +814,7 @@ function FluxSubRow({
         <STCell
           tasks={element.outsourcing}
           onUpdateSTStatus={ctx.onUpdateSTStatus}
+          advancementMode={ctx.advancementMode}
         />
       </td>
 

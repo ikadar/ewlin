@@ -88,9 +88,10 @@ export function DoneIcon() {
 interface STCellProps {
   tasks: FluxOutsourcingTask[];
   onUpdateSTStatus: (taskId: string, status: FluxSTStatus) => void;
+  advancementMode?: boolean;
 }
 
-export const STCell = memo(function STCell({ tasks, onUpdateSTStatus }: STCellProps) {
+export const STCell = memo(function STCell({ tasks, onUpdateSTStatus, advancementMode }: STCellProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const showTooltip = useCallback((text: string, x: number, y: number) => {
@@ -130,21 +131,33 @@ export const STCell = memo(function STCell({ tasks, onUpdateSTStatus }: STCellPr
             onMouseLeave={hideTooltip}
             data-testid={`st-line-${task.taskId}`}
           >
-            {/* Read-only status indicator (clickability removed per UX decision).
-                Status is now driven exclusively by upstream signals — schedule
-                completion, manual logistics flow — not by direct toggling
-                from the Flux dashboard. */}
-            <span
-              className={`st-${task.status}`}
-              style={{ display: 'flex', flexShrink: 0 }}
-              aria-label={`${label}: ${task.status}`}
-              data-testid={`st-toggle-${task.taskId}`}
-              data-status={task.status}
-            >
-              {task.status === 'pending'  && <PendingIcon />}
-              {task.status === 'progress' && <ProgressIcon />}
-              {task.status === 'done'     && <DoneIcon />}
-            </span>
+            {advancementMode ? (
+              <button
+                type="button"
+                className={`st-${task.status} cursor-pointer hover:opacity-80`}
+                style={{ display: 'flex', flexShrink: 0 }}
+                aria-label={`${label}: ${task.status}`}
+                data-testid={`st-toggle-${task.taskId}`}
+                data-status={task.status}
+                onClick={() => onUpdateSTStatus(task.taskId, nextSTStatus(task.status))}
+              >
+                {task.status === 'pending'  && <PendingIcon />}
+                {task.status === 'progress' && <ProgressIcon />}
+                {task.status === 'done'     && <DoneIcon />}
+              </button>
+            ) : (
+              <span
+                className={`st-${task.status}`}
+                style={{ display: 'flex', flexShrink: 0 }}
+                aria-label={`${label}: ${task.status}`}
+                data-testid={`st-toggle-${task.taskId}`}
+                data-status={task.status}
+              >
+                {task.status === 'pending'  && <PendingIcon />}
+                {task.status === 'progress' && <ProgressIcon />}
+                {task.status === 'done'     && <DoneIcon />}
+              </span>
+            )}
             <span className="st-label">{label}</span>
           </div>
         );
