@@ -143,15 +143,10 @@ export function JobDetailsPanel({
   const emptyJobData = { jobTasks: [] as Task[], jobElements: [] as Element[], jobAssignments: [] as TaskAssignment[] };
   const { jobTasks, jobElements, jobAssignments } = useMemo(() => {
     if (!job) return emptyJobData;
-    const isAc = '_isAcompteCard' in job && (job as Record<string, unknown>)._isAcompteCard === true;
-    const realJobId = isAc ? (job as Record<string, unknown>)._parentJobId as string : job.id;
-    const acompteId = isAc ? (job as Record<string, unknown>)._acompteId as string : null;
-    const jt = getTasksForJob(realJobId, tasks, elements);
+    const jt = getTasksForJob(job.id, tasks, elements);
     const je = elements.filter((e) => job.elementIds.includes(e.id));
     const jtIds = new Set(jt.map((t) => t.id));
-    const ja = acompteId
-      ? assignments.filter((a) => jtIds.has(a.taskId) && a.id.includes(`#${acompteId}`))
-      : assignments.filter((a) => jtIds.has(a.taskId));
+    const ja = assignments.filter((a) => jtIds.has(a.taskId));
     return { jobTasks: jt, jobElements: je, jobAssignments: ja };
   }, [job, tasks, elements, assignments]);
 

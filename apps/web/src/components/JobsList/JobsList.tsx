@@ -4,7 +4,6 @@ import { getDeadlineDate } from '@flux/types';
 import { JobsListHeader, type JobTab, type JobChip } from './JobsListHeader';
 import { JobCard, type JobProblemType } from './JobCard';
 import { getJobIdForTask, groupTasksByJob, createTaskToJobMap } from '../../utils/taskHelpers';
-import { expandJobsForDisplay, isAcompteJob, getParentJobId, buildAcompteAssignmentMap } from '../../utils/acompteFanOut';
 
 export interface JobsListProps {
   jobs: Job[];
@@ -35,28 +34,10 @@ export function JobsList({
   const peekRef = useRef<HTMLDivElement>(null);
   const [peekPosition, setPeekPosition] = useState<'above' | 'below' | null>(null);
 
-  const expandedJobs = useMemo(() => expandJobsForDisplay(jobs), [jobs]);
-
-  const parentToSyntheticIds = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const job of expandedJobs) {
-      if (isAcompteJob(job)) {
-        const existing = map.get(job._parentJobId) || [];
-        existing.push(job.id);
-        map.set(job._parentJobId, existing);
-      }
-    }
-    return map;
-  }, [expandedJobs]);
-
-  const lateJobIds = useMemo(() => {
-    const ids = new Set(lateJobs.map((lj) => lj.jobId));
-    for (const parentId of [...ids]) {
-      const synthetics = parentToSyntheticIds.get(parentId);
-      if (synthetics) synthetics.forEach(id => ids.add(id));
-    }
-    return ids;
-  }, [lateJobs, parentToSyntheticIds]);
+  const lateJobIds = useMemo(
+    () => new Set(lateJobs.map((lj) => lj.jobId)),
+    [lateJobs]
+  );
 
   const conflictJobIds = useMemo(() => {
     const ids = new Set<string>();
@@ -65,29 +46,19 @@ export function JobsList({
       const task = tasks.find((t) => t.id === c.taskId);
       if (task) {
         const jobId = getJobIdForTask(task, elements);
-        if (jobId) {
-          ids.add(jobId);
-          const synthetics = parentToSyntheticIds.get(jobId);
-          if (synthetics) synthetics.forEach(id => ids.add(id));
-        }
+        if (jobId) ids.add(jobId);
       }
     });
     return ids;
-  }, [conflicts, tasks, elements, parentToSyntheticIds]);
+  }, [conflicts, tasks, elements]);
 
   const tasksByJob = useMemo(() => groupTasksByJob(tasks, elements), [tasks, elements]);
-
-  const acompteAssignmentMap = useMemo(
-    () => buildAcompteAssignmentMap(assignments, jobs),
-    [assignments, jobs]
-  );
 
   const assignmentsByJob = useMemo(() => {
     const taskJobMap = createTaskToJobMap(tasks, elements);
     const map = new Map<string, TaskAssignment[]>();
     assignments.forEach((assignment) => {
-      const syntheticJobId = acompteAssignmentMap.get(assignment.id);
-      const jobId = syntheticJobId ?? taskJobMap.get(assignment.taskId);
+      const jobId = taskJobMap.get(assignment.taskId);
       if (jobId) {
         const existing = map.get(jobId) || [];
         existing.push(assignment);
@@ -95,7 +66,7 @@ export function JobsList({
       }
     });
     return map;
-  }, [tasks, elements, assignments, acompteAssignmentMap]);
+  }, [tasks, elements, assignments]);
 
   const isJobPlanified = useCallback(
     (jobId: string): boolean => (assignmentsByJob.get(jobId)?.length ?? 0) > 0,
@@ -104,15 +75,13 @@ export function JobsList({
 
   const isJobCompleted = useCallback(
     (jobId: string): boolean => {
-      const job = expandedJobs.find(j => j.id === jobId);
-      const parentId = job ? getParentJobId(job) : jobId;
-      const jobTasks = tasksByJob.get(parentId) ?? [];
+      const jobTasks = tasksByJob.get(jobId) ?? [];
       if (jobTasks.length === 0) return false;
       const jobAssignments = assignmentsByJob.get(jobId) ?? [];
       const assignmentByTask = new Map(jobAssignments.map((a) => [a.taskId, a]));
       return jobTasks.every((t) => assignmentByTask.get(t.id)?.isCompleted === true);
     },
-    [tasksByJob, assignmentsByJob, expandedJobs]
+    [tasksByJob, assignmentsByJob]
   );
 
   const getProblemType = useCallback(
@@ -125,15 +94,15 @@ export function JobsList({
   );
 
   const filteredJobs = useMemo(() => {
-    if (!searchQuery.trim()) return expandedJobs;
+    if (!searchQuery.trim()) return jobs;
     const query = searchQuery.toLowerCase();
-    return expandedJobs.filter(
+    return jobs.filter(
       (job) =>
         job.reference.toLowerCase().includes(query) ||
         job.client.toLowerCase().includes(query) ||
         job.description.toLowerCase().includes(query)
     );
-  }, [expandedJobs, searchQuery]);
+  }, [jobs, searchQuery]);
 
   const { planifiedJobs, unplanifiedJobs } = useMemo(() => {
     const p: Job[] = [];
@@ -281,8 +250,7 @@ export function JobsList({
   };
 
   const getJobCardProps = (job: Job) => {
-    const parentId = getParentJobId(job);
-    const jobTasks = tasksByJob.get(parentId) || [];
+    const jobTasks = tasksByJob.get(job.id) || [];
     const jobAssignments = assignmentsByJob.get(job.id) || [];
     return {
       id: job.id,
@@ -310,8 +278,8 @@ export function JobsList({
   );
 
   const selectedJob = useMemo(
-    () => expandedJobs.find((j) => j.id === selectedJobId) ?? null,
-    [expandedJobs, selectedJobId]
+    () => jobs.find((j) => j.id === selectedJobId) ?? null,
+    [jobs, selectedJobId]
   );
 
   // Re-check peek position on selection change and whenever the visible list

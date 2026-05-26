@@ -45,7 +45,6 @@ import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory 
 import { getDeadlineDate } from '@flux/types';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
-import { expandJobsForDisplay, isAcompteJob, getParentJobId } from './utils/acompteFanOut';
 import { transformJcfToRequest, transformJcfElementToRequest, hasOffsetPressInSequence, hasTypoPressInSequence } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
@@ -735,21 +734,18 @@ function AppContent() {
     });
   }, [pixelsPerHour]);
 
-  // Expand acompted jobs into N synthetic entries for the job list
-  const expandedJobs = useMemo(() => expandJobsForDisplay(snapshot.jobs), [snapshot.jobs]);
-
-  // Create lookup maps (includes both real and synthetic acompte jobs)
+  // Create lookup maps
   const jobMap = useMemo(() => {
     const map = new Map<string, Job>();
-    expandedJobs.forEach((job) => map.set(job.id, job));
+    snapshot.jobs.forEach((job) => map.set(job.id, job));
     return map;
-  }, [expandedJobs]);
+  }, [snapshot.jobs]);
 
-  // Find selected job (may be a synthetic acompte job)
+  // Find selected job
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
 
-  // Resolve to the real parent UUID for mutations (delete, compute, edit)
-  const selectedRealJobId = selectedJob ? getParentJobId(selectedJob) : selectedJobId;
+  // For acompte synthetic jobs, resolve to the real parent UUID for mutations
+  const selectedRealJobId = selectedJob?.parentJobId ?? selectedJobId;
 
   // Populate JCF form fields from a Job object (shared by scheduler edit + Flux edit)
   const populateJcfFromJob = useCallback((job: Job) => {
@@ -854,8 +850,8 @@ function AppContent() {
       showToast('Bascule en Préprod pour modifier un job.', 'info');
       return;
     }
-    setEditingJobInternalId(getParentJobId(selectedJob));
-  }, [selectedJob, scenarioMode, showToast]);
+    setEditingJobInternalId(selectedRealJobId!);
+  }, [selectedJob, selectedRealJobId, scenarioMode, showToast]);
 
   // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
   useEffect(() => {
@@ -951,11 +947,11 @@ function AppContent() {
       taskMarkersPerDay: new Map<string, TaskMarker[]>(),
       earliestTaskDate: null as Date | null,
     };
-    if (!selectedRealJobId) return emptyResult;
+    if (!selectedJobId) return emptyResult;
 
     const now = getNow();
     const jobTaskIds = new Set(
-      getTasksForJob(selectedRealJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
+      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
 
     const days = new Set<string>();
@@ -998,7 +994,7 @@ function AppContent() {
     }
 
     return { scheduledDays: days, taskMarkersPerDay: markers, earliestTaskDate: earliest };
-  }, [selectedRealJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(() => getNow());
@@ -1106,7 +1102,7 @@ function AppContent() {
     const problems: Job[] = [];
     const normal: Job[] = [];
 
-    expandedJobs.forEach((job) => {
+    snapshot.jobs.forEach((job) => {
       if (lateJobIds.has(job.id) || conflictJobIds.has(job.id)) {
         problems.push(job);
       } else {
@@ -1124,7 +1120,7 @@ function AppContent() {
     });
 
     return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
-  }, [expandedJobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
+  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
 
   // Handle clear all tiles for selected job (ALT+Z)
   const handleClearJobAssignments = useCallback(async () => {
@@ -1139,9 +1135,9 @@ function AppContent() {
 
   // Handle pin/unpin all placed tiles for selected job (Alt+F)
   const handlePinAllJobTiles = useCallback(async () => {
-    if (!selectedRealJobId) return;
+    if (!selectedJobId) return;
     const jobTaskIds = new Set(
-      getTasksForJob(selectedRealJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
+      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
     const jobAssignments = snapshot.assignments.filter((a) => jobTaskIds.has(a.taskId));
     if (jobAssignments.length === 0) return;
@@ -1166,7 +1162,7 @@ function AppContent() {
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedRealJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
+  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
 
   // Handle compute schedule (full recalculation via ComputeModal)
   const handleComputeSchedule = useCallback(() => {
