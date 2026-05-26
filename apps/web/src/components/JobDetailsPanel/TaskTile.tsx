@@ -65,6 +65,7 @@ export interface TaskTileProps {
 const TILE_STYLES: Record<TileState, {
   borderColor: string;
   bg: string;
+  bgRaw: string;
   outline?: string;
   nameColor: string;
   opacity?: string;
@@ -72,32 +73,38 @@ const TILE_STYLES: Record<TileState, {
   unplaced: {
     borderColor: '#3b82f6',
     bg: 'bg-[rgba(59,130,246,0.12)]',
+    bgRaw: 'rgba(59,130,246,0.12)',
     nameColor: 'text-blue-300',
   },
   shipped: {
     borderColor: '#10b981',
     bg: 'bg-[rgba(16,185,129,0.09)]',
+    bgRaw: 'rgba(16,185,129,0.09)',
     nameColor: 'text-emerald-300',
   },
   default: {
     borderColor: '#3b82f6',
     bg: 'bg-transparent',
+    bgRaw: 'transparent',
     outline: 'outline outline-1 outline-[rgba(59,130,246,0.25)]',
     nameColor: 'text-blue-400',
   },
   completed: {
     borderColor: '#22c55e',
     bg: 'bg-[rgba(34,197,94,0.09)]',
+    bgRaw: 'rgba(34,197,94,0.09)',
     nameColor: 'text-green-300',
   },
   late: {
     borderColor: '#ef4444',
     bg: 'bg-[rgba(239,68,68,0.09)]',
+    bgRaw: 'rgba(239,68,68,0.09)',
     nameColor: 'text-red-300',
   },
   conflict: {
     borderColor: '#f59e0b',
     bg: 'bg-[rgba(245,158,11,0.09)]',
+    bgRaw: 'rgba(245,158,11,0.09)',
     nameColor: 'text-amber-300',
   },
 };
@@ -242,8 +249,6 @@ export const TaskTile = memo(function TaskTile({
     }
     return Math.round(total);
   })();
-  const hasEffDelta = effMinutes !== null && effMinutes !== theoMinutes;
-
   // Get display name (station name for internal tasks)
   const displayName = station?.name || 'Unknown';
 
@@ -266,6 +271,34 @@ export const TaskTile = memo(function TaskTile({
     ...activePlacementStyle,
   };
 
+  const cappedPct = (() => {
+    const rawPct = task.type === 'Internal' ? ((task as InternalTask).recordedProgressPct ?? 0) : 0;
+    if (rawPct <= 0) return 0;
+    let capped = rawPct;
+    if (operatorAssignments && operatorAssignments.length > 1) {
+      const nowMs = now.getTime();
+      let completedMin = 0;
+      let totalMin = 0;
+      for (const op of operatorAssignments) {
+        if (!op.from || !op.to) continue;
+        const fromMs = new Date(op.from).getTime();
+        const toMs = new Date(op.to).getTime();
+        const windowMin = (toMs - fromMs) / 60_000;
+        totalMin += windowMin;
+        if (nowMs >= toMs) completedMin += windowMin;
+        else if (nowMs > fromMs) completedMin += (nowMs - fromMs) / 60_000;
+      }
+      if (totalMin > 0) {
+        capped = Math.min(rawPct, (completedMin / totalMin) * 100);
+      }
+    }
+    return capped > 0 ? Math.round(capped) : 0;
+  })();
+  const hasProgress = cappedPct > 0;
+  const tileBg = hasProgress
+    ? computeProgressBgGradient(cappedPct, false, 'horizontal', style.bgRaw)
+    : undefined;
+
   if (isScheduled) {
     // Scheduled (placed) task
     const handleClick = () => {
@@ -285,13 +318,16 @@ export const TaskTile = memo(function TaskTile({
     return (
       <button
         type="button"
-        className={`border-l-4 ${style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2`}
-        style={tileInlineStyle}
+        className={`border-l-4 ${hasProgress ? '' : style.bg} ${style.outline ?? ''} ${style.opacity ?? ''} cursor-pointer hover:brightness-125 transition-all text-left w-full focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2 relative`}
+        style={{ ...tileInlineStyle, ...(tileBg ? { background: tileBg } : {}) }}
         data-testid={`task-tile-${task.id}`}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         {...crosslink}
       >
+        {hasProgress && (
+          <ProgressFill pct={cappedPct} isLate={false} direction="horizontal" />
+        )}
         <div className="flex items-center justify-between gap-2 min-h-[32px] pt-[7px] pb-[7px] pl-[11px] pr-[10px] text-[12.5px]">
           <div className="flex items-center gap-1.5 min-w-0">
             <span
@@ -312,78 +348,17 @@ export const TaskTile = memo(function TaskTile({
                 </span>
               </>
             )}
-            {/* Setup-inheritance signals on a re-placed partially-progressed
-                task. The "déjà fait" chip surfaces the saisie anchor that
-                explains the shorter run-only duration ; the "recalage" chip
-                appears when the engine offered to inherit but rejected it
-                (peremption, intercalation, mismatch) so the operator
-                understands a fresh setup is included.
-                Multi-operator cap: the wall is cross-scenario, so Prod
-                may have finalized at 100 % while this scenario's operator
-                windows haven't all started. Cap the badge by the proportion
-                of operator-window time that is actually past. */}
-            {(() => {
-              const rawPct = task.type === 'Internal' ? ((task as InternalTask).recordedProgressPct ?? 0) : 0;
-              if (rawPct <= 0) return null;
-              let cappedPct = rawPct;
-              if (operatorAssignments && operatorAssignments.length > 1) {
-                const nowMs = now.getTime();
-                let completedMin = 0;
-                let totalMin = 0;
-                for (const op of operatorAssignments) {
-                  if (!op.from || !op.to) continue;
-                  const fromMs = new Date(op.from).getTime();
-                  const toMs = new Date(op.to).getTime();
-                  const windowMin = (toMs - fromMs) / 60_000;
-                  totalMin += windowMin;
-                  if (nowMs >= toMs) completedMin += windowMin;
-                  else if (nowMs > fromMs) completedMin += (nowMs - fromMs) / 60_000;
-                }
-                if (totalMin > 0) {
-                  cappedPct = Math.min(rawPct, (completedMin / totalMin) * 100);
-                }
-              }
-              if (cappedPct <= 0) return null;
-              return (
-                <span
-                  className="text-[10.5px] tabular-nums text-emerald-300 bg-emerald-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
-                  title="Avancement déjà enregistré sur cette tâche — la durée affichée correspond au reste à produire."
-                >
-                  {Math.round(cappedPct)}% déjà fait
-                </span>
-              );
-            })()}
-            {task.type === 'Internal'
-              && ((task as InternalTask).recordedProgressPct ?? 0) > 0
-              && assignment?.setupInherited === false && (
+            {hasProgress && (
               <span
-                className="text-[10.5px] text-amber-300 bg-amber-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
-                title={(() => {
-                  switch (assignment?.setupLostReason) {
-                    case 'peremption':
-                      return 'Calage périmé : le délai depuis le dernier calage dépasse la péremption de la station — un nouveau calage est inclus dans la planification.';
-                    case 'intercalated_setup':
-                      return 'Calage perdu : une autre tâche a été calée sur la station entre-temps — un nouveau calage est inclus.';
-                    case 'station_mismatch':
-                      return 'Calage indisponible : la tâche a changé de station — un calage complet est inclus.';
-                    default:
-                      return 'Recalage requis sur cette replanification.';
-                  }
-                })()}
+                className="text-[10.5px] tabular-nums text-emerald-300 bg-emerald-500/15 rounded-[3px] px-[5px] py-px font-medium tracking-[0.02em] shrink-0"
+                title="Avancement déjà enregistré sur cette tâche"
               >
-                recalage
+                {cappedPct}%
               </span>
             )}
           </div>
-          <span className="text-[11px] shrink-0 font-mono">
-            {hasEffDelta ? (
-              <>
-                <span className="text-zinc-600 line-through">{formatMinutes(theoMinutes)}</span>
-                <span className="text-amber-400 font-semibold"> → {formatMinutes(effMinutes!)}</span>
-              </>
-            ) : (
-              <span className="text-zinc-400">{formatMinutes(theoMinutes)}</span>
-            )}
+          <span className="text-[11px] shrink-0 font-mono text-zinc-400">
+            {formatMinutes(effMinutes ?? theoMinutes)}
           </span>
         </div>
         {operatorAssignments && operatorAssignments.length > 0 && (() => {

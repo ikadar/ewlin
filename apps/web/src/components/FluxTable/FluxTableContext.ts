@@ -11,6 +11,8 @@ export interface FluxTableContextValue {
   /** ID of the currently open listbox, or null. Format: `${jobId}-${elementId}-${column}`. */
   openListboxId: string | null;
   setOpenListboxId: (id: string | null) => void;
+  /** Update a job's deadline priority (0=Vital … 4=Flexible). */
+  onUpdatePriority: (jobInternalId: string, deadlinePriority: number) => void;
   /** Update a single element's prerequisite status (sub-row re-aggregates parent). */
   onUpdatePrerequisite: (
     jobId: string,

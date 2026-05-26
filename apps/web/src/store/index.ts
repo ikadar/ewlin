@@ -308,7 +308,7 @@ export {
 } from './api/shipperApi';
 export type { ShipperResponse, ShipperInput } from './api/shipperApi';
 
-export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, fluxApi } from './api/fluxApi';
+export { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useUpdateJobPriorityMutation, fluxApi } from './api/fluxApi';
 
 export {
   useGetLogisticsNotesQuery,

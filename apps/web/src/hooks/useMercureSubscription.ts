@@ -85,7 +85,7 @@ export function useMercureSubscription(): MercureSubscription {
         if (payload.type === 'JobBecamePlannable' && payload.reference) {
           setToastMessage(`+1 nouveau job ajouté à la préprod : ${payload.reference}`);
         } else {
-          setToastMessage('Planning mis à jour');
+          setToastMessage('Données mises à jour (externe)');
         }
       } catch {
         // Ignore malformed messages

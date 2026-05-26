@@ -9,7 +9,7 @@ import { FluxToolbar } from '@/components/FluxToolbar';
 import { FluxTabBar } from '@/components/FluxTabBar';
 import { FluxDeleteConfirmDialog } from '@/components/FluxTable/FluxDeleteConfirmDialog';
 import { JobModificationContainer } from '@/components/JcfModificationModal/JobModificationContainer';
-import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
+import { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useUpdateJobPriorityMutation, useGetShippersQuery, useAppDispatch, useDeleteJobMutation, fluxApi, setError, useGetSnapshotQuery } from '@/store';
 import { useRecordProgressDirectMutation } from '@/store/api/saisieApi';
 import { useGetStationCategoriesQuery } from '@/store/api/stationCategoryApi';
 import type { FluxSTStatus, PrerequisiteColumn, PrerequisiteStatus } from '@/components/FluxTable/fluxTypes';
@@ -61,6 +61,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   const [updateJobShipper] = useUpdateJobShipperMutation();
   const [toggleJobShipped] = useToggleJobShippedMutation();
   const [toggleJobInvoiced] = useToggleJobInvoicedMutation();
+  const [updateJobPriority] = useUpdateJobPriorityMutation();
   const [deleteJob] = useDeleteJobMutation();
   const { data: shippers = [] } = useGetShippersQuery();
   const { data: snapshot } = useGetSnapshotQuery();
@@ -253,6 +254,14 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
     }
     void toggleJobInvoiced({ jobInternalId, invoiced });
   }, [toggleJobInvoiced, canEditFluxReality, showToast]);
+
+  const handleUpdatePriority = useCallback((jobInternalId: string, deadlinePriority: number) => {
+    if (!canEditFluxReality) {
+      showToast('Bascule en mode Prod pour modifier la priorité.', 'info');
+      return;
+    }
+    void updateJobPriority({ jobInternalId, deadlinePriority });
+  }, [updateJobPriority, canEditFluxReality, showToast]);
 
   /** Toggle expanded state for a multi-element job. */
   const handleToggleExpand = useCallback((jobId: string) => {
@@ -478,6 +487,7 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
               sortColumn={sortColumn}
               sortDirection={sortDirection}
               onSortChange={handleSortChange}
+              onUpdatePriority={handleUpdatePriority}
               onUpdatePrerequisite={handleUpdatePrerequisite}
               onUpdateSTStatus={handleUpdateSTStatus}
               onToggleExpand={handleToggleExpand}

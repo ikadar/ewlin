@@ -94,7 +94,7 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
       computeToaster.show({
         id: toastId,
         type: 'progress',
-        title: 'Recalcul du planning',
+        title: 'Recalcul en cours',
         detail: reason,
         progress: -1,
         pinned: true,
@@ -103,8 +103,8 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
       computeToaster.show({
         id: toastId,
         type: 'success',
-        title: 'Planning à jour',
-        detail: 'Optimisation en arrière-plan en cours…',
+        title: 'Recalcul terminé',
+        detail: 'Optimisation en arrière-plan…',
       });
     } else if (event === 'failed') {
       computeToaster.show({
@@ -185,8 +185,8 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
       toasterShow({
         id: toastId,
         type: 'info',
-        title: 'Recompute du planning dans ' + remainingS + ' s',
-        detail: 'Plusieurs modifications récentes seront groupées en un seul recalcul.',
+        title: 'Recalcul dans ' + remainingS + ' s',
+        detail: 'Les modifications récentes seront groupées.',
         pinned: true,
         progress: -1,
         actions: [

@@ -105,6 +105,37 @@ type AutoRecomputeEndpointName =
  * engine's view of the problem, either because the safety zone already
  * protects them or because they're localised to a single task.
  */
+const ENDPOINT_LABELS: Record<AutoRecomputeEndpointName, string> = {
+  createOperator: 'Ajout opérateur',
+  updateOperator: 'Modification opérateur',
+  deleteOperator: 'Suppression opérateur',
+  restoreOperator: 'Restauration opérateur',
+  replaceSkills: 'Modification compétences',
+  replaceConcurrentGroups: 'Modification groupes concurrents',
+  createStation: 'Ajout station',
+  updateStation: 'Modification station',
+  deleteStation: 'Suppression station',
+  createStationCategory: 'Ajout catégorie station',
+  updateStationCategory: 'Modification catégorie station',
+  deleteStationCategory: 'Suppression catégorie station',
+  createProvider: 'Ajout sous-traitant',
+  updateProvider: 'Modification sous-traitant',
+  deleteProvider: 'Suppression sous-traitant',
+  updateElementPrerequisite: 'Changement prérequis élément',
+  updateElementSequence: 'Modification séquence',
+  updatePaperLeadTime: 'Modification délai papier',
+  updateFormeLeadTime: 'Modification délai forme',
+  updatePlateLeadTime: 'Modification délai plaque',
+  reportSaisie: 'Saisie d\'avancement',
+  pinAtTime: 'Épinglage de tâche',
+  addStationException: 'Incident station',
+  addOperatorAbsence: 'Absence opérateur',
+  replaceAcomptes: 'Modification acomptes',
+  deleteAcomptes: 'Suppression acomptes',
+  writeAcompteProgressDeclaration: 'Déclaration avancement acompte',
+  recordProgressDirect: 'Marquage avancement',
+};
+
 const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set<AutoRecomputeEndpointName>([
   'createOperator',
   'updateOperator',
@@ -154,7 +185,7 @@ export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {
     // Runtime membership check; the cast narrows the value to the
     // union type once the Set confirms it.
     if (endpointName && AUTO_RECOMPUTE_ENDPOINTS.has(endpointName as AutoRecomputeEndpointName)) {
-      registeredTrigger?.(`mutation: ${endpointName}`);
+      registeredTrigger?.(ENDPOINT_LABELS[endpointName as AutoRecomputeEndpointName] ?? endpointName);
     }
   }
 
