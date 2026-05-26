@@ -56,6 +56,7 @@ import { useRecordProgressDirectMutation } from '../../store/api/saisieApi';
 import { useGetStationsQuery } from '../../store/api/stationApi';
 import { useNow } from '../../contexts/NowContext';
 import { cascadeFifo, type AcompteForCascade } from './cascadeFifo';
+import { JcfPrioritySelect } from '../JcfJobHeader/JcfPrioritySelect';
 
 export interface AcompteTabProps {
   job: JobDetailsResponse;
@@ -77,6 +78,8 @@ interface DeliveryDraft {
   quantityShare: number;
   /** datetime-local format "YYYY-MM-DDTHH:MM". */
   deadline: string;
+  /** 0-4 or null (inherit from parent). */
+  deadlinePriority: number | null;
 }
 
 interface TaskDraft {
@@ -235,6 +238,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
         key: a.id,
         quantityShare: a.quantityShare,
         deadline: isoToDatetimeLocal(a.deadline),
+        deadlinePriority: a.deadlinePriority,
       }));
       setDeliveries(withAutoSolde(loaded, totalQuantity));
     } else {
@@ -243,6 +247,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
           key: 'single',
           quantityShare: totalQuantity,
           deadline: job.workshopExitDate ? isoToDatetimeLocal(job.workshopExitDate) : '',
+          deadlinePriority: null,
         },
       ]);
     }
@@ -336,6 +341,10 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
     setDeliveries((prev) => prev.map((d, i) => (i === idx ? { ...d, deadline } : d)));
   }
 
+  function setDeliveryPriority(idx: number, priority: number | null) {
+    setDeliveries((prev) => prev.map((d, i) => (i === idx ? { ...d, deadlinePriority: priority } : d)));
+  }
+
   /** Insert a new acompte BEFORE the current Solde (which stays last and is
    *  recomputed to absorb the difference). */
   function addDelivery() {
@@ -351,7 +360,7 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
       } else if (job.workshopExitDate) {
         nextDeadline = isoToDatetimeLocal(job.workshopExitDate);
       }
-      const newAcompte: DeliveryDraft = { key: nextKey(), quantityShare: 0, deadline: nextDeadline };
+      const newAcompte: DeliveryDraft = { key: nextKey(), quantityShare: 0, deadline: nextDeadline, deadlinePriority: null };
       const inserted = [...prev.slice(0, -1), newAcompte, solde ?? newAcompte];
       return withAutoSolde(inserted, totalQuantity);
     });
@@ -400,7 +409,11 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
         }
         await replaceAcomptes({
           jobId: job.id,
-          splits: deliveries.map((s) => ({ quantity_share: s.quantityShare, deadline: s.deadline })),
+          splits: deliveries.map((s) => ({
+            quantity_share: s.quantityShare,
+            deadline: s.deadline,
+            deadline_priority: s.deadlinePriority,
+          })),
         }).unwrap();
         await flushDeclarations();
       },
@@ -533,6 +546,15 @@ export const AcompteTab = forwardRef<AcompteTabHandle, AcompteTabProps>(function
                       className="w-full bg-zinc-950 border border-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300 [color-scheme:dark] focus:outline-none focus:border-indigo-500"
                     />
                   </div>
+                  {!isSingleDelivery && (
+                    <div className="mt-1.5">
+                      <JcfPrioritySelect
+                        value={d.deadlinePriority ?? job.deadlinePriority}
+                        onChange={(v) => setDeliveryPriority(i, v)}
+                        inputBaseClass="w-full bg-zinc-950 border border-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
                   {isLast && deliveries.length >= 2 && (
                     <div className="mt-2 text-[10px] text-zinc-600 italic">
                       = {fmt(totalQuantity)} − Σ(autres acomptes)

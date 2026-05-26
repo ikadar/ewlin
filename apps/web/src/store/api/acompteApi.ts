@@ -20,6 +20,8 @@ export interface AcompteResponse {
   quantityShare: number;
   /** ISO 8601 with timezone. */
   deadline: string;
+  /** 0=Vital, 1=Impératif, 2=Important, 3=Standard, 4=Flexible. null = inherit from parent. */
+  deadlinePriority: number | null;
   createdAt: string;
   createdBy: string | null;
 }
@@ -35,6 +37,8 @@ export interface AcompteSplitInput {
   quantity_share: number;
   /** ISO 8601 datetime (with or without timezone — backend parses both). */
   deadline: string;
+  /** 0-4 or null (inherit from parent). */
+  deadline_priority?: number | null;
 }
 
 export interface AcompteReplaceInput {

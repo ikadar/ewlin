@@ -647,11 +647,11 @@ impl OperatorAvailability {
     }
 }
 
-/// Deadline priority tier weights. Tier 0 = Vital is operator-only (never set by
-/// FBI/Moore/LNS) and weighted 10M× so it lexicographically dominates any pile-up
-/// of late lower-tier jobs. Tiers 1-4 follow the previous urgency hierarchy.
+/// Deadline priority tier weights — geometric 3× progression with a 10M× wall
+/// at Vital. Each tier is 3× the one below; Vital is 10M× Imperative to
+/// lexicographically dominate any pile-up of late lower-tier jobs.
 /// Index → tier: 0=Vital, 1=Imperative, 2=Important, 3=Standard, 4=Flexible.
-const TIER_WEIGHT: [f64; 5] = [10_000_000.0, 4.0, 2.0, 1.0, 0.5];
+const TIER_WEIGHT: [f64; 5] = [270_000_000.0, 27.0, 9.0, 3.0, 1.0];
 
 /// Scored action for priority sorting
 struct ScoredAction {
