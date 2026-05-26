@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Pipeline d'import : MasterPrint CSV -> Flux API avec gestion du diff.
+"""Pipeline d'import : MasterPrint CSV -> Flux API (create + lance).
 
-Phases :
-1. Load     : lit les CSV, login Flux, charge l'état existant (id+hash+has_started)
-2. Transform : construit les CreateJobRequest en mémoire
-3. Diff     : pour chaque dossier — nouveau / inchangé / modifié / disparu
-4. Push     : POST / PUT / DELETE selon le cas (sauf --dry-run)
-5. Report   : JSON détaillé par job
+Transitional sync — MasterPrint is an event source, not a continuous authority.
+Two operations only:
+  - New dossier in bucket  → CREATE job in Flux
+  - isLanced transition    → flip BAT gate to bat_approved (direct DB)
+
+No structure updates, no metadata updates, no deletes.
 
 Usage :
     FLUX_API_PASSWORD=... python3 masterprint_to_flux.py [--dry-run] [--config FILE]
@@ -56,22 +56,13 @@ def write_report(path: Path, payload: dict) -> None:
         json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
 
 
-_GATE_KEYS = {"needsBat", "needsPaper", "needsForme", "needsPlates", "batStatus", "paperStatus"}
-
-
-def _strip_gate_fields(request: dict) -> dict:
-    """Return a copy of request with gate fields removed from elements.
-
-    On structural re-imports, gate ownership belongs to Ordo. Stripping
-    these fields causes PHP to skip gate reconciliation, so the existing
-    Ordo gate statuses survive the element rebuild.
-    """
-    result = dict(request)
-    result["elements"] = [
-        {k: v for k, v in e.items() if k not in _GATE_KEYS}
-        for e in request["elements"]
-    ]
-    return result
+def _request_has_lanced_elements(request: dict) -> bool:
+    """True if any non-GLOBAL element in the request has batStatus=bat_approved."""
+    return any(
+        e.get("batStatus") == "bat_approved"
+        for e in request.get("elements", [])
+        if e.get("name") != "GLOBAL"
+    )
 
 
 def main() -> int:
@@ -127,13 +118,12 @@ def main() -> int:
                 log.error(f"DB load failed for scenario={scenario}: {e}")
                 return 5
             jobs = existing_jobs_by_scenario[scenario]
-            log.info(f"Flux DB [{scenario}]: {len(jobs)} jobs "
-                     f"({sum(1 for j in jobs.values() if j.has_started)} started, "
-                     f"{sum(1 for j in jobs.values() if j.masterprint_hash)} with mp_hash)")
+            lanced = sum(1 for j in jobs.values() if j.all_elements_lanced)
+            log.info(f"Flux DB [{scenario}]: {len(jobs)} jobs ({lanced} fully lanced)")
 
     # =============== Phase 2 — Transform ===============
     dossiers = csv_db.dossiers[: args.limit] if args.limit else csv_db.dossiers
-    built: list[tuple[dict, job_builder.ImportTrace, str, str]] = []  # (request, trace, hash, structure_hash)
+    built: list[tuple[dict, job_builder.ImportTrace, str]] = []
     rejected_dossiers: list[dict] = []
     skipped_ops_counter: Counter = Counter()
 
@@ -145,79 +135,55 @@ def main() -> int:
             rejected_dossiers.append({"numdo": d.numdo, "warnings": trace.warnings})
             continue
         mp_hash = db_mod.compute_mp_hash(req)
-        mp_struct_hash = db_mod.compute_mp_structure_hash(req)
-        built.append((req, trace, mp_hash, mp_struct_hash))
+        built.append((req, trace, mp_hash))
 
     log.info(f"Transformed: {len(built)} jobs built, {len(rejected_dossiers)} dossiers rejected")
 
     # =============== Phase 3+4 — Diff + Push (per scenario) ===============
     push_stats_by_scenario: dict[str, Counter] = {}
     diff_stats_by_scenario: dict[str, dict] = {}
-    detail = {"created": [], "updated_structure": [], "updated_metadata": [], "deleted": [], "modified_after_start": [], "errors": []}
-
-    new_refs = {r["reference"] for r, _, _, _ in built}
+    detail: dict[str, list] = {"created": [], "lanced": [], "errors": []}
 
     for scenario in SCENARIOS:
         existing_jobs = existing_jobs_by_scenario[scenario]
 
-        actions = {"create": [], "update_structure": [], "update_metadata": [], "unchanged": [], "backfill": [], "delete": []}
-        for req, trace, mp_hash, mp_struct_hash in built:
+        actions: dict[str, list] = {"create": [], "lance": [], "skip": []}
+        for req, trace, mp_hash in built:
             ref = req["reference"]
             if ref not in existing_jobs:
-                actions["create"].append((req, trace, mp_hash, mp_struct_hash))
+                actions["create"].append((req, trace, mp_hash))
             else:
                 existing = existing_jobs[ref]
-                if existing.masterprint_hash is None:
-                    actions["backfill"].append((req, trace, mp_hash, mp_struct_hash, existing))
-                elif existing.masterprint_hash == mp_hash:
-                    actions["unchanged"].append((req, existing))
-                elif (existing.masterprint_structure_hash is not None
-                      and existing.masterprint_structure_hash == mp_struct_hash):
-                    actions["update_metadata"].append((req, trace, mp_hash, mp_struct_hash, existing))
+                if not existing.all_elements_lanced and _request_has_lanced_elements(req):
+                    actions["lance"].append((req, trace, existing))
                 else:
-                    actions["update_structure"].append((req, trace, mp_hash, mp_struct_hash, existing))
-        for ref, info in existing_jobs.items():
-            if info.masterprint_hash is not None and ref not in new_refs:
-                actions["delete"].append(info)
+                    actions["skip"].append(ref)
 
-        struct_no_hash = sum(
-            1 for _, _, _, _, ex in actions["update_structure"]
-            if ex.masterprint_structure_hash is None
-        )
         log.info(f"Diff [{scenario}]: +{len(actions['create'])} new, "
-                 f"~{len(actions['update_structure'])} struct ({struct_no_hash} legacy/no-hash), "
-                 f"~{len(actions['update_metadata'])} meta, "
-                 f"={len(actions['unchanged'])} unchanged, "
-                 f"backfill={len(actions['backfill'])}, -{len(actions['delete'])} deleted")
+                 f"^{len(actions['lance'])} lance, "
+                 f"={len(actions['skip'])} skip")
 
         diff_stats_by_scenario[scenario] = {
             "new": len(actions["create"]),
-            "changed_structure": len(actions["update_structure"]),
-            "changed_metadata": len(actions["update_metadata"]),
-            "unchanged": len(actions["unchanged"]),
-            "backfill": len(actions["backfill"]),
-            "deleted": len(actions["delete"]),
+            "lance": len(actions["lance"]),
+            "skip": len(actions["skip"]),
         }
 
         push_stats: Counter = Counter()
 
         if args.dry_run:
             push_stats["dry_run_create"] = len(actions["create"])
-            push_stats["dry_run_update_structure"] = len(actions["update_structure"])
-            push_stats["dry_run_update_metadata"] = len(actions["update_metadata"])
-            push_stats["dry_run_delete"] = len(actions["delete"])
-            push_stats["dry_run_backfill"] = len(actions["backfill"])
+            push_stats["dry_run_lance"] = len(actions["lance"])
         else:
             assert token is not None
             api_url = config["api"]["base_url"]
 
-            # CREATE — full payload including gates (first import, Ordo has nothing to preserve)
-            for req, trace, mp_hash, mp_struct_hash in actions["create"]:
+            for req, trace, mp_hash in actions["create"]:
                 ref = req["reference"]
                 try:
                     status, body = flux_api.create_job(api_url, token, req, scenario=scenario)
                     if status == 201 and body and "id" in body:
-                        db_mod.update_tracking(body["id"], mp_hash, mp_struct_hash, changed_after_start=False)
+                        db_mod.update_tracking(body["id"], mp_hash)
                         push_stats["created"] += 1
                         detail["created"].append({"reference": ref, "scenario": scenario})
                     else:
@@ -227,67 +193,24 @@ def main() -> int:
                     push_stats["create_exception"] += 1
                     detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "create", "error": str(e)})
 
-            # UPDATE (structural) — send elements but strip gate fields so PHP preserves Ordo gates
-            for req, trace, mp_hash, mp_struct_hash, existing in actions["update_structure"]:
+            for req, trace, existing in actions["lance"]:
                 ref = req["reference"]
                 try:
-                    payload = _strip_gate_fields(req)
-                    status, body = flux_api.update_job(api_url, token, existing.id, payload, scenario=scenario)
-                    if status in (200, 204):
-                        db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=existing.has_started)
-                        push_stats["updated_structure"] += 1
-                        entry = {"reference": ref, "scenario": scenario, "was_started": existing.has_started}
-                        detail["updated_structure"].append(entry)
-                        if existing.has_started:
-                            detail["modified_after_start"].append(entry)
-                    else:
-                        push_stats["update_structure_error"] += 1
-                        detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_structure", "status": status, "body": body})
+                    flipped = db_mod.flip_elements_to_lanced(existing.id)
+                    push_stats["lanced"] += 1
+                    detail["lanced"].append({"reference": ref, "scenario": scenario, "elements_flipped": flipped})
                 except Exception as e:
-                    push_stats["update_structure_exception"] += 1
-                    detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_structure", "error": str(e)})
+                    push_stats["lance_exception"] += 1
+                    detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "lance", "error": str(e)})
 
-            # UPDATE (metadata only) — send WITHOUT elements so PHP doesn't touch tasks/gates
-            for req, trace, mp_hash, mp_struct_hash, existing in actions["update_metadata"]:
-                ref = req["reference"]
+            if push_stats["lanced"] > 0 or push_stats["created"] > 0:
                 try:
-                    payload = {k: v for k, v in req.items() if k != "elements"}
-                    status, body = flux_api.update_job(api_url, token, existing.id, payload, scenario=scenario)
-                    if status in (200, 204):
-                        db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=False)
-                        push_stats["updated_metadata"] += 1
-                        detail["updated_metadata"].append({"reference": ref, "scenario": scenario})
-                    else:
-                        push_stats["update_metadata_error"] += 1
-                        detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_metadata", "status": status, "body": body})
+                    flux_api.trigger_recompute(api_url, token, scenario=scenario)
+                    log.info(f"Recompute triggered [{scenario}]")
                 except Exception as e:
-                    push_stats["update_metadata_exception"] += 1
-                    detail["errors"].append({"reference": ref, "scenario": scenario, "phase": "update_metadata", "error": str(e)})
+                    log.warning(f"Recompute trigger failed [{scenario}]: {e}")
 
-            # BACKFILL (no PUT, just persist current hashes)
-            for req, trace, mp_hash, mp_struct_hash, existing in actions["backfill"]:
-                try:
-                    db_mod.update_tracking(existing.id, mp_hash, mp_struct_hash, changed_after_start=False)
-                    push_stats["backfilled"] += 1
-                except Exception as e:
-                    push_stats["backfill_exception"] += 1
-                    detail["errors"].append({"reference": req["reference"], "scenario": scenario, "phase": "backfill", "error": str(e)})
-
-            # DELETE
-            for info in actions["delete"]:
-                try:
-                    status, body = flux_api.delete_job(api_url, token, info.id, scenario=scenario)
-                    if status in (200, 204):
-                        push_stats["deleted"] += 1
-                        detail["deleted"].append({"reference": info.reference, "scenario": scenario, "was_started": info.has_started})
-                    else:
-                        push_stats["delete_error"] += 1
-                        detail["errors"].append({"reference": info.reference, "scenario": scenario, "phase": "delete", "status": status, "body": body})
-                except Exception as e:
-                    push_stats["delete_exception"] += 1
-                    detail["errors"].append({"reference": info.reference, "scenario": scenario, "phase": "delete", "error": str(e)})
-
-        push_stats["unchanged"] = len(actions["unchanged"])
+        push_stats["skip"] = len(actions["skip"])
         push_stats_by_scenario[scenario] = push_stats
         log.info(f"Stats [{scenario}]: {dict(push_stats)}")
 
@@ -310,10 +233,7 @@ def main() -> int:
         "posted_by_scenario": {s: dict(c) for s, c in push_stats_by_scenario.items()},
         "detail": {
             "created": detail["created"],
-            "updated_structure": detail["updated_structure"],
-            "updated_metadata": detail["updated_metadata"],
-            "deleted": detail["deleted"],
-            "modified_after_start": detail["modified_after_start"],
+            "lanced": detail["lanced"],
         },
         "errors": detail["errors"][:50],
         "errors_total": len(detail["errors"]),

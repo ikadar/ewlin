@@ -91,6 +91,11 @@ def delete_job(base_url: str, token: str, job_id: str, *, retry_5xx: int = 1, sc
     return _action_with_retry("DELETE", f"{base_url}/jobs/{job_id}", token, None, retry_5xx, scenario)
 
 
+def trigger_recompute(base_url: str, token: str, *, scenario: str = "prod") -> tuple[int, dict | None]:
+    """POST /schedule/compute to pick up gate changes after LANCE actions."""
+    return _action_with_retry("POST", f"{base_url}/schedule/compute", token, {"mode": "full"}, 1, scenario)
+
+
 def _action_with_retry(method: str, url: str, token: str, body: dict | None, retry_5xx: int, scenario: str = "prod") -> tuple[int, dict | None]:
     attempts = 1 + retry_5xx
     last: tuple[int, dict | None] = (0, None)
