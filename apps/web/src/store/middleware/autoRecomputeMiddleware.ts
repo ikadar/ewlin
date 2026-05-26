@@ -75,7 +75,9 @@ type AutoRecomputeEndpointName =
   // V2 progress capture — operator saisie d'avancement persists a new
   // productivityRatio + scheduledEnd on the assignment ; the engine then
   // propagates the run-only ratio to the remaining fragments of the job.
-  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie'>
+  // recordProgressDirect (Flux mode avancement pct=100/0) marks the task
+  // as completed on the wall — the engine must replan to free the station.
+  | Extract<keyof typeof saisieApi.endpoints, 'reportSaisie' | 'recordProgressDirect'>
   // V2 progress capture — parameterized pin moves a tile to a target
   // start. Not a toggle (cf. legacy isPinned flip): the start changes,
   // so the engine resolves slide-to-nearest on the next replan and
@@ -99,11 +101,9 @@ type AutoRecomputeEndpointName =
  * actual compute.
  *
  * Not included (intentional): pin/completion/override toggles, split/
- * fuse, auto-place, outsourcing-date updates, recordProgressDirect
- * (Flux mode avancement round ⇒ pct=100/0) — these don't change the
+ * fuse, auto-place, outsourcing-date updates — these don't change the
  * engine's view of the problem, either because the safety zone already
- * protects them or because they're localised to a single task. The
- * wall-layer write is picked up by the next ambient recompute.
+ * protects them or because they're localised to a single task.
  */
 const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set<AutoRecomputeEndpointName>([
   'createOperator',
@@ -133,6 +133,7 @@ const AUTO_RECOMPUTE_ENDPOINTS: ReadonlySet<AutoRecomputeEndpointName> = new Set
   'replaceAcomptes',
   'deleteAcomptes',
   'writeAcompteProgressDeclaration',
+  'recordProgressDirect',
 ]);
 
 export const autoRecomputeMiddleware: Middleware = () => (next) => (action) => {

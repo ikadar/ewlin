@@ -3,6 +3,7 @@
  * Spec: docs/production-flow-dashboard-spec/tableau-de-flux.md, sections 6.1–6.3
  */
 
+import type { Task } from '@flux/types';
 import {
   PREREQUISITE_STATUS_COLOR,
   type FluxElement,
@@ -132,7 +133,44 @@ export function isReadyToShip(job: FluxJob): boolean {
   let hasAnyDoneSignal = false;
   for (const el of job.elements) {
     for (const station of Object.values(el.stations)) {
-      if (!station || station.state === 'empty') continue;
+      if (!station) continue;
+      if (station.state === 'done') { hasAnyDoneSignal = true; continue; }
+      // 'empty' = unscheduled task that still needs work — blocks readiness.
+      return false;
+    }
+    for (const ot of el.outsourcing) {
+      if (ot.status === 'done') { hasAnyDoneSignal = true; continue; }
+      return false;
+    }
+  }
+  return hasAnyDoneSignal;
+}
+
+/**
+ * Optimistic variant of isReadyToShip that uses the snapshot's live
+ * recordedProgressPct (patched immediately by the RTK optimistic update).
+ * Falls back to the Flux API station states for tasks without snapshot data.
+ */
+export function isOptimisticallyReady(
+  job: FluxJob,
+  elementCategoryTasks: Map<string, Map<string, Task[]>>,
+): boolean {
+  if (job.parti.shipped) return false;
+  let hasAnyDoneSignal = false;
+  for (const el of job.elements) {
+    const catMap = elementCategoryTasks.get(el.id);
+    for (const [catId, station] of Object.entries(el.stations)) {
+      if (!station) continue;
+      const tasks = catMap?.get(catId);
+      if (tasks && tasks.length > 0) {
+        const allDone = tasks.every((t) =>
+          t.type === 'Internal'
+            && ((t.recordedProgressPct ?? 0) >= 100 || t.duration.runMinutes <= 0),
+        );
+        if (allDone) { hasAnyDoneSignal = true; continue; }
+        return false;
+      }
+      // No snapshot tasks for this category — fall back to Flux API state
       if (station.state === 'done') { hasAnyDoneSignal = true; continue; }
       return false;
     }

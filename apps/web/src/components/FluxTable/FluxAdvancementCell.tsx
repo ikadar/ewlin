@@ -13,7 +13,7 @@
  *                     square (◧-ish).
  */
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState, useRef, useEffect } from 'react';
 import type { Task, TaskAssignment } from '@flux/types';
 import { PendingIcon, DoneIcon } from './STCell';
 import {
@@ -26,19 +26,40 @@ import {
 interface RoundButtonProps {
   state: 'checked' | 'unchecked' | 'mixed';
   disabled: boolean;
-  onClick: () => void;
+  /** Called with the NEW target state after toggling. */
+  onToggle: (targetChecked: boolean) => void;
   title: string;
   testId?: string;
 }
 
-function RoundButton({ state, disabled, onClick, title, testId }: RoundButtonProps) {
+function RoundButton({ state, disabled, onToggle, title, testId }: RoundButtonProps) {
+  const [localOverride, setLocalOverride] = useState<'checked' | 'unchecked' | null>(null);
+  const prevStateRef = useRef(state);
+
+  useEffect(() => {
+    if (prevStateRef.current !== state) {
+      prevStateRef.current = state;
+      setLocalOverride(null);
+    }
+  }, [state]);
+
+  const effectiveState = localOverride ?? state;
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (disabled) return;
+    const targetChecked = effectiveState !== 'checked';
+    setLocalOverride(targetChecked ? 'checked' : 'unchecked');
+    onToggle(targetChecked);
+  }, [disabled, effectiveState, onToggle]);
+
   const className = [
     'inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors',
     disabled
       ? 'cursor-default text-emerald-500/60'
-      : state === 'checked'
+      : effectiveState === 'checked'
         ? 'cursor-pointer text-emerald-400 hover:text-emerald-300'
-        : state === 'mixed'
+        : effectiveState === 'mixed'
           ? 'cursor-pointer text-amber-300 hover:text-amber-200'
           : 'cursor-pointer text-flux-text-muted hover:text-flux-text-secondary',
   ].join(' ');
@@ -46,21 +67,18 @@ function RoundButton({ state, disabled, onClick, title, testId }: RoundButtonPro
     <button
       type="button"
       disabled={disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!disabled) onClick();
-      }}
+      onClick={handleClick}
       className={className}
       data-testid={testId}
-      data-state={state}
+      data-state={effectiveState}
       data-disabled={disabled ? 'true' : undefined}
       title={title}
-      aria-pressed={state === 'checked'}
+      aria-pressed={effectiveState === 'checked'}
       aria-label={title}
     >
-      {state === 'checked' ? (
+      {effectiveState === 'checked' ? (
         <DoneIcon />
-      ) : state === 'mixed' ? (
+      ) : effectiveState === 'mixed' ? (
         <MixedIcon />
       ) : (
         <PendingIcon />
@@ -117,12 +135,7 @@ export const FluxAdvancementCell = memo(function FluxAdvancementCell({
   const states: AdvancementCellState[] = tasks.map((t) =>
     computeCellState(t, assignmentsByTaskId.get(t.id), now),
   );
-  const handleCascadeToggle = useCallback(() => {
-    const agg = aggregateCellStates(states);
-    // Cascade direction : if any unchecked enabled tasks exist, set
-    // them all to done ; otherwise un-check every enabled task. Mirrors
-    // the conventional master-checkbox UX.
-    const targetChecked = agg !== 'all';
+  const handleCascadeToggle = useCallback((targetChecked: boolean) => {
     for (let i = 0; i < tasks.length; i++) {
       const t = tasks[i]!;
       const s = states[i]!;
@@ -145,7 +158,7 @@ export const FluxAdvancementCell = memo(function FluxAdvancementCell({
         <RoundButton
           state={visual}
           disabled={allDisabled}
-          onClick={handleCascadeToggle}
+          onToggle={handleCascadeToggle}
           title={
             visual === 'checked'
               ? `Décocher les ${tasks.length} tâches`
@@ -169,7 +182,7 @@ export const FluxAdvancementCell = memo(function FluxAdvancementCell({
             key={t.id}
             state={visual}
             disabled={s.isDisabled}
-            onClick={() => onSetTaskCompletion(t.id, !s.isChecked)}
+            onToggle={(checked) => onSetTaskCompletion(t.id, checked)}
             title={
               s.isDisabled
                 ? 'Tâche passée — considérée comme terminée'

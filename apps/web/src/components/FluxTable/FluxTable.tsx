@@ -19,6 +19,7 @@ import {
   sortStationDataBySeverity,
   getFluxJobStatus,
   isReadyToShip,
+  isOptimisticallyReady,
 } from './fluxAggregation';
 import { FluxJobStatusDot } from './FluxJobStatusDot';
 import { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
@@ -364,7 +365,9 @@ const FluxTableRow = memo(function FluxTableRow({
   // Job-level status for dot + row tint
   const jobStatus = getFluxJobStatus(job, ctx.lateJobIds, ctx.conflictJobIds);
   const isShipped = job.parti.shipped;
-  const isReady = !isShipped && isReadyToShip(job);
+  const isReady = !isShipped && (
+    isOptimisticallyReady(job, ctx.elementCategoryTasks) || isReadyToShip(job)
+  );
 
   // Row background — 8-state grammar (locked 2026-05-06, see project_flux_row_colors.md):
   //   shipped (any status) → green solid
