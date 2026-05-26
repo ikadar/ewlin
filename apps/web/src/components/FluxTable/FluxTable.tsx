@@ -654,10 +654,11 @@ const FluxTableRow = memo(function FluxTableRow({
       <td className="px-2 py-0 whitespace-nowrap">
         <FluxToggle
           active={job.facture.invoiced}
-          onToggle={() => ctx.onToggleInvoiced?.(job.internalId, !job.facture.invoiced)}
+          onToggle={job.parti.shipped ? () => ctx.onToggleInvoiced?.(job.internalId, !job.facture.invoiced) : undefined}
           activeDate={job.facture.date}
           activeTitle="Marquer comme non facturé"
-          inactiveTitle="Marquer comme facturé"
+          inactiveTitle={job.parti.shipped ? 'Marquer comme facturé' : 'Cocher Parti d’abord'}
+          readOnly={!job.parti.shipped}
         />
       </td>
 

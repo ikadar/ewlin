@@ -200,6 +200,13 @@ export interface ToggleJobInvoicedArg {
   invoiced: boolean;
 }
 
+export interface UpdateJobPriorityArg {
+  /** Job GUID (used in the PUT URL) */
+  jobInternalId: string;
+  /** New priority value (0=Vital … 4=Flexible) */
+  deadlinePriority: number;
+}
+
 // ============================================================================
 // API Slice
 // ============================================================================
@@ -388,7 +395,29 @@ export const fluxApi = createApi({
         );
         try {
           await queryFulfilled;
-          dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    updateJobPriority: builder.mutation<void, UpdateJobPriorityArg>({
+      query: ({ jobInternalId, deadlinePriority }) => ({
+        url: `/jobs/${jobInternalId}`,
+        method: 'PUT',
+        body: { deadlinePriority },
+      }),
+      async onQueryStarted({ jobInternalId, deadlinePriority }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          fluxApi.util.updateQueryData('getFluxJobs', undefined, (draft) => {
+            const job = draft.find((j) => j.internalId === jobInternalId);
+            if (job) job.deadlinePriority = deadlinePriority;
+          }),
+        );
+        try {
+          await queryFulfilled;
+          dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
+          dispatch(prodSnapshotApi.util.invalidateTags(['ProdSnapshot']));
         } catch {
           patchResult.undo();
         }
@@ -397,4 +426,4 @@ export const fluxApi = createApi({
   }),
 });
 
-export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation } = fluxApi;
+export const { useGetFluxJobsQuery, useUpdateSTStatusMutation, useUpdateElementPrerequisiteMutation, useUpdateJobShipperMutation, useToggleJobShippedMutation, useToggleJobInvoicedMutation, useUpdateJobPriorityMutation } = fluxApi;
