@@ -52,6 +52,7 @@ interface FluxElementApiResponse {
   paperDeliveredAt?: string | null;
   formeOrderedAt?: string | null;
   formeDeliveredAt?: string | null;
+  paperSpec?: string | null;
 }
 
 /**
@@ -132,6 +133,7 @@ function transformFluxJobsResponse(
         paperDeliveredAt: el.paperDeliveredAt ?? null,
         formeOrderedAt: el.formeOrderedAt ?? null,
         formeDeliveredAt: el.formeDeliveredAt ?? null,
+        paperSpec: el.paperSpec ?? null,
       })),
       batDeadline: job.batDeadline ?? null,
       transporteur: job.shipper,

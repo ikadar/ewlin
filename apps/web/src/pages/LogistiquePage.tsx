@@ -106,6 +106,8 @@ interface Movement {
   elementId?: string;
   /** Prerequisite column name — paper/forme movements only */
   prerequisiteColumn?: 'papier' | 'formes';
+  /** For grouped paper movements: all element+job pairs in this group */
+  groupEntries?: Array<{ elementId: string; jobInternalId: string }>;
 }
 
 interface ProviderTimes {
@@ -220,6 +222,15 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
   } = ctx;
   const movements: Movement[] = [];
 
+  interface PaperGroupEntry {
+    spec: string | null | undefined;
+    scheduledAt: Date | null;
+    deliveredAt: Date | null;
+    allDelivered: boolean;
+    entries: Array<{ elementId: string; jobInternalId: string; jobRef: string }>;
+  }
+  const paperGroups = new Map<string, PaperGroupEntry>();
+
   for (const job of jobs) {
     const jobLabel = job.designation ? `${job.client} · ${job.designation}` : job.client;
     const internalJob = job.internalId !== undefined ? jobsByInternalId.get(job.internalId) : undefined;
@@ -319,7 +330,7 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
         }
       }
 
-      // ── Paper arrival ────────────────────────────────────────────────
+      // ── Paper arrival — collect for post-loop grouping ────────────────
       if (element.papier === 'ordered' && element.paperOrderedAt && ctx.paperLeadTime) {
         const orderedAt = parseDDMM(element.paperOrderedAt, ctx.now.getFullYear());
         const arrivalDate = computePaperEarliestStart(
@@ -327,47 +338,40 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
           ctx.paperLeadTime,
           ctx.now,
         );
-        movements.push({
-          id: `element-paper-${element.id}`,
-          kind: 'arrival',
-          type: 'paper',
-          refType: 'element',
-          refId: element.id,
-          scheduledAt: arrivalDate,
-          actualAt: null,
-          time: arrivalDate ? formatTimeOfDay(arrivalDate, '') : `${String(ctx.paperLeadTime.arrivalHour).padStart(2, '0')}:00`,
-          title: 'Réception papier',
-          subtitle: `Job #${job.id} — ${element.label}`,
-          counterparty: 'Fournisseur',
-          jobRef: `#${job.id}`,
-          jobInternalId: job.internalId,
-          elementId: element.id,
-          prerequisiteColumn: 'papier',
-          isCompleted: false,
-          action: 'paper_deliver',
-        });
+        const specKey = element.paperSpec ?? `__ungrouped__${element.id}`;
+        const entry = paperGroups.get(specKey);
+        if (entry) {
+          entry.entries.push({ elementId: element.id, jobInternalId: job.internalId ?? '', jobRef: job.id });
+          entry.allDelivered = false;
+          if (arrivalDate && (!entry.scheduledAt || arrivalDate < entry.scheduledAt)) {
+            entry.scheduledAt = arrivalDate;
+          }
+        } else {
+          paperGroups.set(specKey, {
+            spec: element.paperSpec,
+            scheduledAt: arrivalDate,
+            deliveredAt: null,
+            allDelivered: false,
+            entries: [{ elementId: element.id, jobInternalId: job.internalId ?? '', jobRef: job.id }],
+          });
+        }
       } else if (element.papier === 'delivered' && element.paperDeliveredAt) {
         const deliveredDate = parseDDMM(element.paperDeliveredAt, ctx.now.getFullYear());
         if (isSameDay(deliveredDate, ctx.now)) {
-          movements.push({
-            id: `element-paper-${element.id}`,
-            kind: 'arrival',
-            type: 'paper',
-            refType: 'element',
-            refId: element.id,
-            scheduledAt: deliveredDate,
-            actualAt: deliveredDate,
-            time: formatTimeOfDay(deliveredDate, ''),
-            title: 'Réception papier',
-            subtitle: `Job #${job.id} — ${element.label}`,
-            counterparty: 'Fournisseur',
-            jobRef: `#${job.id}`,
-            jobInternalId: job.internalId,
-            elementId: element.id,
-            prerequisiteColumn: 'papier',
-            isCompleted: true,
-            action: 'paper_deliver',
-          });
+          const specKey = element.paperSpec ?? `__ungrouped__${element.id}`;
+          const entry = paperGroups.get(specKey);
+          if (entry) {
+            entry.entries.push({ elementId: element.id, jobInternalId: job.internalId ?? '', jobRef: job.id });
+            if (!entry.deliveredAt || deliveredDate > entry.deliveredAt) entry.deliveredAt = deliveredDate;
+          } else {
+            paperGroups.set(specKey, {
+              spec: element.paperSpec,
+              scheduledAt: deliveredDate,
+              deliveredAt: deliveredDate,
+              allDelivered: true,
+              entries: [{ elementId: element.id, jobInternalId: job.internalId ?? '', jobRef: job.id }],
+            });
+          }
         }
       }
 
@@ -464,6 +468,52 @@ function deriveMovements(ctx: DeriveContext): Movement[] {
       jobInternalId: job.internalId,
       isCompleted: internalJob.shipped,
       action: 'client_ship',
+    });
+  }
+
+  // ── Emit grouped paper movements ──────────────────────────────────
+  for (const [specKey, group] of paperGroups) {
+    const isCompleted = group.allDelivered && group.deliveredAt !== null;
+    const uniqueJobRefs = [...new Set(group.entries.map((e) => e.jobRef))];
+    const jobList = uniqueJobRefs.length <= 3
+      ? uniqueJobRefs.map((r) => `#${r}`).join(', ')
+      : `${uniqueJobRefs.slice(0, 2).map((r) => `#${r}`).join(', ')} +${uniqueJobRefs.length - 2}`;
+    const subtitle = `${uniqueJobRefs.length === 1 ? 'Job' : 'Jobs'} ${jobList}`;
+
+    let title: string;
+    if (group.spec) {
+      const [type, grammage] = group.spec.split(':');
+      title = grammage ? `${type} ${grammage}g` : type;
+    } else {
+      title = 'Réception papier';
+    }
+
+    const firstEntry = group.entries[0];
+    const displayTime = group.scheduledAt
+      ? formatTimeOfDay(group.scheduledAt, '')
+      : ctx.paperLeadTime
+        ? `${String(ctx.paperLeadTime.arrivalHour).padStart(2, '0')}:00`
+        : '';
+
+    movements.push({
+      id: `paper-group-${specKey}`,
+      kind: 'arrival',
+      type: 'paper',
+      refType: 'element',
+      refId: firstEntry.elementId,
+      scheduledAt: group.scheduledAt,
+      actualAt: isCompleted ? group.deliveredAt : null,
+      time: displayTime,
+      title,
+      subtitle,
+      counterparty: 'Fournisseur',
+      jobRef: `#${uniqueJobRefs[0]}`,
+      jobInternalId: firstEntry.jobInternalId,
+      elementId: firstEntry.elementId,
+      prerequisiteColumn: 'papier',
+      isCompleted,
+      action: 'paper_deliver',
+      groupEntries: group.entries.map((e) => ({ elementId: e.elementId, jobInternalId: e.jobInternalId })),
     });
   }
 
@@ -747,14 +797,28 @@ export function LogistiquePage() {
         await updateSTStatus({ taskId: m.refId, status: transition.status });
       } else if (m.type === 'client' && m.jobInternalId !== undefined) {
         await toggleJobShipped({ jobInternalId: m.jobInternalId, shipped: !m.isCompleted });
-      } else if ((m.type === 'paper' || m.type === 'forme') && m.elementId && m.prerequisiteColumn) {
-        const parentJob = jobs.find((j) => j.elements.some((e) => e.id === m.elementId));
-        await updateElementPrerequisite({
-          elementId: m.elementId,
-          jobId: parentJob?.internalId ?? '',
-          column: m.prerequisiteColumn,
-          value: m.isCompleted ? 'ordered' : 'delivered',
-        });
+      } else if ((m.type === 'paper' || m.type === 'forme') && m.prerequisiteColumn) {
+        const targetValue = m.isCompleted ? 'ordered' : 'delivered';
+        if (m.groupEntries && m.groupEntries.length > 0) {
+          await Promise.all(
+            m.groupEntries.map((entry) =>
+              updateElementPrerequisite({
+                elementId: entry.elementId,
+                jobId: entry.jobInternalId,
+                column: m.prerequisiteColumn!,
+                value: targetValue,
+              }),
+            ),
+          );
+        } else if (m.elementId) {
+          const parentJob = jobs.find((j) => j.elements.some((e) => e.id === m.elementId));
+          await updateElementPrerequisite({
+            elementId: m.elementId,
+            jobId: parentJob?.internalId ?? '',
+            column: m.prerequisiteColumn,
+            value: targetValue,
+          });
+        }
       }
       await createAudit({
         refType: m.refType,

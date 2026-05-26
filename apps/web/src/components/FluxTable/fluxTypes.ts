@@ -163,6 +163,8 @@ export interface FluxElement {
   paperDeliveredAt?: string | null;
   formeOrderedAt?: string | null;
   formeDeliveredAt?: string | null;
+  /** Paper spec DSL from JCF, e.g. "Couché mat:135" (Type:Grammage). */
+  paperSpec?: string | null;
 }
 
 /** A print job row in the Flux dashboard (spec 5.1). */
