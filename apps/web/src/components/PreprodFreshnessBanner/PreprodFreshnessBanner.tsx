@@ -9,10 +9,10 @@
  * - Every business trigger that goes through AutoRecompute (saisie, JCF
  *   modif, add job, gate flip, etc.) bumps `lastRanAt` and the counter
  *   resets automatically — no per-site wiring needed.
- * - The "Rafraîchir maintenant" button calls `trigger()` and also
- *   optimistically resets the local anchor so the UI feedback is
- *   immediate (the debounce/compute would otherwise add a perceptible
- *   delay).
+ * - The "Rafraîchir maintenant" button calls `retry()` which fires
+ *   the compute immediately (no debounce). The local anchor is also
+ *   optimistically reset for instant UI feedback before the compute
+ *   round-trips.
  *
  * Thresholds (clock-brut, not working hours — intentional to surface
  * weekend/overnight drift):
@@ -52,7 +52,7 @@ const STATE_CLASSES: Record<FreshnessState, string> = {
 
 export function PreprodFreshnessBanner() {
   const { mode } = useScenarioMode();
-  const { trigger, lastRanAt, isComputing } = useAutoRecomputeCtx();
+  const { retry, lastRanAt, isComputing } = useAutoRecomputeCtx();
   const now = useNow();
 
   // Anchor = most recent of:
@@ -60,7 +60,7 @@ export function PreprodFreshnessBanner() {
   //     business trigger that runs a compute)
   //   - localAnchor: optimistic stamp set when the user clicks
   //     "Rafraîchir maintenant" — gives immediate UI feedback before
-  //     the debounced trigger actually fires + compute completes.
+  //     the compute completes.
   // Falls back to mount time so the counter starts at 0 in a session
   // with no compute yet.
   const [mountMs] = useState<number>(() => Date.now());
@@ -70,8 +70,8 @@ export function PreprodFreshnessBanner() {
 
   const handleRefresh = useCallback(() => {
     setLocalAnchor(Date.now());
-    trigger('Manual freshness refresh');
-  }, [trigger]);
+    retry();
+  }, [retry]);
 
   if (mode !== 'preprod') return null;
 
