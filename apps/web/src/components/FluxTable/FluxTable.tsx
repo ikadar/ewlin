@@ -539,7 +539,7 @@ const FluxTableRow = memo(function FluxTableRow({
         ) : el0 ? (
           <td key={col} className="p-0">
             <FluxPrerequisiteListbox
-              jobId={job.id}
+              jobId={job.internalId}
               elementId={el0.id}
               column={col}
               status={status}
@@ -762,7 +762,7 @@ function FluxSubRow({
         const cell = (
           <td key={col} className="p-0">
             <FluxPrerequisiteListbox
-              jobId={job.id}
+              jobId={job.internalId}
               elementId={element.id}
               column={col}
               status={element[col]}
