@@ -65,8 +65,8 @@ function buildFormesKanbanJobs(
 }
 
 export function FormesPage() {
-  const { data: fluxJobs = [] } = useGetFluxJobsQuery();
-  const { data: snapshot } = useGetProdSnapshotQuery();
+  const { data: fluxJobs = [], isLoading: fluxLoading } = useGetFluxJobsQuery();
+  const { data: snapshot, isLoading: snapLoading } = useGetProdSnapshotQuery();
   const [updatePrereq] = useUpdateElementPrerequisiteMutation();
   const [sortKey, setSortKey] = useState<'deadline' | 'client'>('deadline');
 
@@ -103,6 +103,17 @@ export function FormesPage() {
       }),
     );
   }, [kanbanJobs, updatePrereq]);
+
+  if (fluxLoading || snapLoading) {
+    return (
+      <div className="min-h-screen bg-flux-base flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-flux-text-muted border-t-flux-text-primary rounded-full animate-spin" />
+          <span className="text-flux-text-muted text-sm">Chargement…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <PrerequisKanbanBoard
