@@ -40,6 +40,7 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
   const dragRef = useRef<DragData | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   const filteredJobs = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -52,15 +53,70 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     });
   }, [jobs, search]);
 
-  const handleDragStart = useCallback((e: React.DragEvent, data: DragData) => {
-    dragRef.current = data;
+  function cardKey(jobUuid: string, paperKey?: string): string {
+    return paperKey ? `${jobUuid}::${paperKey}` : jobUuid;
+  }
+
+  function allElementIds(job: KanbanJob): string[] {
+    return job.groups.flatMap((g) => g.elements.map((e) => e.elementId));
+  }
+
+  function groupElementIds(group: PaperGroup): string[] {
+    return group.elements.map((e) => e.elementId);
+  }
+
+  function handleCardClick(e: React.MouseEvent, key: string) {
+    if (e.shiftKey) {
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    } else {
+      setSelectedKeys((prev) => (prev.size === 1 && prev.has(key) ? new Set() : new Set([key])));
+    }
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deps cover the state collectSelectedIds reads
+  const handleDragStart = useCallback((e: React.DragEvent, data: DragData, key: string) => {
+    const isSelected = selectedKeys.has(key);
+    if (isSelected && selectedKeys.size > 1) {
+      const ids: string[] = [];
+      for (const k of selectedKeys) {
+        const sep = k.indexOf('::');
+        if (sep === -1) {
+          const job = filteredJobs.find((j) => j.jobUuid === k);
+          if (job) ids.push(...job.groups.flatMap((g) => g.elements.map((el) => el.elementId)));
+        } else {
+          const jobUuid = k.slice(0, sep);
+          const pk = k.slice(sep + 2);
+          const group = filteredJobs.find((j) => j.jobUuid === jobUuid)?.groups.find((g) => g.paperKey === pk);
+          if (group) ids.push(...group.elements.map((el) => el.elementId));
+        }
+      }
+      dragRef.current = { type: 'job', jobUuid: '', elementIds: [...new Set(ids)] };
+      const badge = document.createElement('div');
+      badge.textContent = String(selectedKeys.size);
+      Object.assign(badge.style, {
+        position: 'fixed', left: '-9999px', top: '0',
+        padding: '2px 8px', background: '#3b82f6', color: 'white',
+        borderRadius: '4px', fontSize: '12px', fontWeight: '600',
+      });
+      document.body.appendChild(badge);
+      e.dataTransfer.setDragImage(badge, 16, 12);
+      setTimeout(() => badge.remove(), 0);
+    } else {
+      dragRef.current = data;
+      if (!isSelected) setSelectedKeys(new Set());
+    }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', '');
-  }, []);
+  }, [selectedKeys, filteredJobs]);
 
-  const handleGroupDragStart = useCallback((e: React.DragEvent, data: DragData) => {
+  const handleGroupDragStart = useCallback((e: React.DragEvent, data: DragData, key: string) => {
     e.stopPropagation();
-    handleDragStart(e, data);
+    handleDragStart(e, data, key);
   }, [handleDragStart]);
 
   const handleDragOver = useCallback((e: React.DragEvent, col: string) => {
@@ -83,12 +139,25 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
       onDrop(drag.elementIds, col);
     }
     dragRef.current = null;
+    setSelectedKeys(new Set());
   }, [onDrop]);
 
   const handleDragEnd = useCallback(() => {
     setDragOverCol(null);
     dragRef.current = null;
   }, []);
+
+  const hasSelection = selectedKeys.size > 0;
+  useEffect(() => {
+    if (!hasSelection) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !(e.target as HTMLElement)?.closest('[role=dialog]')) {
+        setSelectedKeys(new Set());
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [hasSelection]);
 
   function buildColumnContent(colId: string) {
     const jobCards: KanbanJob[] = [];
@@ -110,15 +179,9 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     return { jobCards, standaloneGroups };
   }
 
-  function allElementIds(job: KanbanJob): string[] {
-    return job.groups.flatMap((g) => g.elements.map((e) => e.elementId));
-  }
-
-  function groupElementIds(group: PaperGroup): string[] {
-    return group.elements.map((e) => e.elementId);
-  }
-
   function renderJobCard(job: KanbanJob, colId: string) {
+    const key = cardKey(job.jobUuid);
+    const isSelected = selectedKeys.has(key);
     const groupsHere = job.groups.filter((g) => g.column === colId);
     const groupsAway = job.groups.filter((g) => g.column !== colId);
     const isSingleGroup = job.groups.length === 1 && groupsAway.length === 0;
@@ -126,9 +189,12 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     return (
       <div
         key={job.jobUuid}
-        className="bg-white/[0.015] border border-white/5 p-2.5 cursor-grab hover:border-white/10 transition-colors"
+        className={`bg-white/[0.015] border p-2.5 cursor-grab transition-colors ${
+          isSelected ? 'border-blue-500/60 ring-1 ring-blue-500/40' : 'border-white/5 hover:border-white/10'
+        }`}
         draggable
-        onDragStart={(e) => handleDragStart(e, { type: 'job', jobUuid: job.jobUuid, elementIds: allElementIds(job) })}
+        onClick={(e) => handleCardClick(e, key)}
+        onDragStart={(e) => handleDragStart(e, { type: 'job', jobUuid: job.jobUuid, elementIds: allElementIds(job) }, key)}
         onDragEnd={handleDragEnd}
       >
         <div className="flex items-center justify-between mb-2">
@@ -170,13 +236,19 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
   }
 
   function renderGroupCard(group: PaperGroup, job: KanbanJob) {
+    const key = cardKey(job.jobUuid, group.paperKey);
+    const isSelected = selectedKeys.has(key);
+
     return (
       <div
         key={group.paperKey}
-        className="bg-white/[0.04] border-l-4 border-zinc-500 py-[7px] px-[11px] min-h-[32px] flex items-center justify-between gap-2 cursor-grab hover:brightness-125 transition-all"
+        className={`bg-white/[0.04] border-l-4 py-[7px] px-[11px] min-h-[32px] flex items-center justify-between gap-2 cursor-grab transition-all ${
+          isSelected ? 'border-l-blue-500/60 ring-1 ring-blue-500/40' : 'border-zinc-500 hover:brightness-125'
+        }`}
         draggable
+        onClick={(e) => { e.stopPropagation(); handleCardClick(e, key); }}
         onDragStart={(e) =>
-          handleGroupDragStart(e, { type: 'group', jobUuid: job.jobUuid, elementIds: groupElementIds(group) })
+          handleGroupDragStart(e, { type: 'group', jobUuid: job.jobUuid, elementIds: groupElementIds(group) }, key)
         }
         onDragEnd={handleDragEnd}
       >
@@ -220,13 +292,19 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
   }
 
   function renderStandalone(group: PaperGroup, job: KanbanJob) {
+    const key = cardKey(job.jobUuid, group.paperKey);
+    const isSelected = selectedKeys.has(key);
+
     return (
       <div
         key={`${job.jobUuid}-${group.paperKey}`}
-        className="bg-white/[0.015] border border-white/5 overflow-hidden cursor-grab hover:border-white/10 transition-colors"
+        className={`bg-white/[0.015] border overflow-hidden cursor-grab transition-colors ${
+          isSelected ? 'border-blue-500/60 ring-1 ring-blue-500/40' : 'border-white/5 hover:border-white/10'
+        }`}
         draggable
+        onClick={(e) => handleCardClick(e, key)}
         onDragStart={(e) =>
-          handleGroupDragStart(e, { type: 'group', jobUuid: job.jobUuid, elementIds: groupElementIds(group) })
+          handleGroupDragStart(e, { type: 'group', jobUuid: job.jobUuid, elementIds: groupElementIds(group) }, key)
         }
         onDragEnd={handleDragEnd}
       >
@@ -258,6 +336,11 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     <div className="flex flex-col flex-1 overflow-hidden bg-flux-base">
       <div className="border-b border-flux-border px-6 py-3.5 flex items-center gap-4 shrink-0">
         <h1 className="text-xl font-semibold text-flux-text-primary shrink-0">{title}</h1>
+        {selectedKeys.size > 0 && (
+          <span className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-full font-medium tabular-nums">
+            {selectedKeys.size} sélectionné{selectedKeys.size > 1 ? 's' : ''}
+          </span>
+        )}
         <div className="relative flex-1 max-w-[360px]">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-flux-text-tertiary pointer-events-none"
@@ -300,6 +383,7 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
                 className={`p-2 pb-6 overflow-y-auto flex-1 flex flex-col gap-2.5 min-h-[60px] transition-colors rounded-b-[10px] ${
                   dragOverCol === col.id ? 'bg-white/[0.035]' : ''
                 }`}
+                onClick={(e) => { if (e.target === e.currentTarget) setSelectedKeys(new Set()); }}
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={(e) => handleDragLeave(e, col.id)}
                 onDrop={(e) => handleDrop(e, col.id)}

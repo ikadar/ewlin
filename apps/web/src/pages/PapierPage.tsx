@@ -102,15 +102,14 @@ export function PapierPage() {
 
   const handleDrop = useCallback(async (elementIds: string[], targetColId: string) => {
     const newStatus = columnToApiStatus(targetColId, PAPER_COLUMNS);
-    const job = kanbanJobs.find((j) =>
-      j.groups.some((g) => g.elements.some((e) => elementIds.includes(e.elementId))),
-    );
-    if (!job) return;
-
     await Promise.all(
-      elementIds.map((eid) =>
-        updatePrereq({ elementId: eid, jobId: job.jobUuid, column: 'papier', value: newStatus }),
-      ),
+      elementIds.map((eid) => {
+        const job = kanbanJobs.find((j) =>
+          j.groups.some((g) => g.elements.some((e) => e.elementId === eid)),
+        );
+        if (!job) return;
+        return updatePrereq({ elementId: eid, jobId: job.jobUuid, column: 'papier', value: newStatus });
+      }),
     );
   }, [kanbanJobs, updatePrereq]);
 
