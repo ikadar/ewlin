@@ -231,8 +231,8 @@ export const Tile = memo(function Tile({
           assignment.scheduledEnd,
           setupMinutes,
           task.duration.runMinutes ?? 0,
-          task.recordedProgressPct,
-          task.recordedAt,
+          assignment.recordedProgressPct ?? task.recordedProgressPct,
+          assignment.recordedAt ?? task.recordedAt,
           now.getTime(),
           optimisticAllowed,
         );
