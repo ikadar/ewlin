@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from csv_loader import Db, Dossier
+from csv_loader import Db, Dossier, ElementInfo
 from press_resolver import (
     get_estimate_for_impression,
     get_launches_for_impression,
@@ -115,6 +115,64 @@ def _derive_imposition_dsl(impressions, tirage, element_info, trace, nopap: str)
     return f"{_format_int(sheet_w)}x{_format_int(sheet_h)}({poses})"
 
 
+CID_MAP: dict[str, tuple[str, str]] = {
+    "Couv.": ("COUV", "Couverture"),
+    "Int.":  ("INT",  "Intérieur"),
+    "Enc.":  ("ENC",  "Encart"),
+    "Dépl.": ("DEPL", "Dépliant"),
+    "Env.":  ("ENV",  "Enveloppe"),
+    "Chem.": ("CHEM", "Chemise"),
+}
+
+
+def _compute_element_names(
+    sorted_nopap: list[str],
+    db: Db,
+    numdo_base: str,
+    defaults: dict,
+) -> dict[str, tuple[str, str]]:
+    """Pre-compute (name, label) per NOPAP using di_eleme.CID."""
+    cid_counts: dict[str, int] = defaultdict(int)
+    nopap_cid: dict[str, str | None] = {}
+    for nopap in sorted_nopap:
+        if nopap == "000":
+            continue
+        info = db.elements_by_numdo_nopap.get((numdo_base, nopap))
+        cid = info.cid if info else None
+        nopap_cid[nopap] = cid
+        if cid:
+            cid_counts[cid] += 1
+
+    result: dict[str, tuple[str, str]] = {}
+    cid_seen: dict[str, int] = defaultdict(int)
+    for nopap in sorted_nopap:
+        if nopap == "000":
+            result[nopap] = (
+                defaults.get("element_global_name", "GLOBAL"),
+                "Operations transversales",
+            )
+            continue
+        cid = nopap_cid.get(nopap)
+        if cid and cid in CID_MAP:
+            short, full = CID_MAP[cid]
+            if cid_counts[cid] > 1:
+                cid_seen[cid] += 1
+                idx = cid_seen[cid]
+                info = db.elements_by_numdo_nopap.get((numdo_base, nopap))
+                pag = info.pag if info and info.pag else None
+                pag_suffix = f" – {pag}p" if pag else ""
+                result[nopap] = (f"{short}{idx}", f"{full} {idx}{pag_suffix}")
+            else:
+                result[nopap] = (short, full)
+        else:
+            try:
+                n = int(nopap)
+            except ValueError:
+                n = nopap
+            result[nopap] = (f"PAP{n}", f"Papier {n}")
+    return result
+
+
 def _build_element(
     db: Db,
     dossier: Dossier,
@@ -122,23 +180,12 @@ def _build_element(
     ops: list,
     config: dict,
     trace: ImportTrace,
+    name: str,
+    label: str,
 ) -> dict | None:
     """Construit un dict element ; renvoie None si aucune opération valide."""
     defaults = config.get("defaults", {})
     is_global = nopap == "000"
-
-    # Nom + label
-    if is_global:
-        name = defaults.get("element_global_name", "GLOBAL")
-        label = "Operations transversales"
-    else:
-        # NOPAP "001" -> n=1, "PAP1"
-        try:
-            n = int(nopap)
-        except ValueError:
-            n = nopap
-        name = defaults.get("element_paper_name_template", "PAP{n}").format(n=n)
-        label = f"Papier {n}"
 
     # Spec (papier, format, pagination, imposition, inkingSpec) — seulement pour les éléments papier
     spec: dict = {}
@@ -371,9 +418,12 @@ def build(dossier: Dossier, db: Db, config: dict) -> tuple[dict | None, ImportTr
     # Tri NOPAP : 000 d'abord, puis 001, 002...
     sorted_nopap = sorted(ops_by_nopap.keys(), key=lambda n: (0 if n == "000" else 1, n))
 
+    nopap_names = _compute_element_names(sorted_nopap, db, dossier.numdo[:11], defaults)
+
     elements: list[dict] = []
     for nopap in sorted_nopap:
-        element = _build_element(db, dossier, nopap, ops_by_nopap[nopap], config, trace)
+        el_name, el_label = nopap_names.get(nopap, (f"PAP{nopap}", f"Papier {nopap}"))
+        element = _build_element(db, dossier, nopap, ops_by_nopap[nopap], config, trace, el_name, el_label)
         if trace.rejected_for_missing_press_time:
             # Décision utilisateur 2026-05-21 : un dossier dont une presse n'a pas de
             # di_lance n'a rien à faire dans Ordo. Le bucket les filtre normalement ;
