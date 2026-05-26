@@ -88,12 +88,20 @@ describe('worstPrerequisiteStatus', () => {
     expect(['bat_approved', 'in_stock', 'ready']).toContain(result);
   });
 
-  it('red over gray', () => {
+  it('red over n.a. (none filtered out)', () => {
     expect(worstPrerequisiteStatus(['none', 'waiting_files'])).toBe('waiting_files');
   });
 
-  it('gray over green', () => {
-    expect(worstPrerequisiteStatus(['bat_approved', 'none'])).toBe('none');
+  it('n.a. is transparent — green wins over none', () => {
+    expect(worstPrerequisiteStatus(['bat_approved', 'none'])).toBe('bat_approved');
+  });
+
+  it('returns none when all statuses are n.a.', () => {
+    expect(worstPrerequisiteStatus(['none', 'none', 'none'])).toBe('none');
+  });
+
+  it('n.a. + 3 green = green (collapsed row ignores n.a.)', () => {
+    expect(worstPrerequisiteStatus(['none', 'bat_approved', 'bat_approved', 'bat_approved'])).toBe('bat_approved');
   });
 });
 

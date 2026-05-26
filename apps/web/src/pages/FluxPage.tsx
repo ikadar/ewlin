@@ -383,8 +383,49 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-flux-base" data-testid="flux-loading">
-        <p className="text-flux-text-muted text-sm">Chargement…</p>
+      <div className="flex-1 flex flex-col overflow-hidden bg-flux-base" data-testid="flux-loading" role="status" aria-live="polite">
+        <div className="p-4 h-full">
+          <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden flex flex-col">
+            {/* Toolbar skeleton */}
+            <div className="px-4 py-3 flex items-center gap-3 border-b border-flux-border">
+              <div className="h-5 w-32 rounded bg-flux-border animate-pulse" />
+              <div className="h-8 w-64 rounded bg-flux-border animate-pulse" />
+              <div className="ml-auto h-8 w-24 rounded bg-flux-border animate-pulse" />
+            </div>
+            {/* Tab bar skeleton */}
+            <div className="px-4 py-2 flex gap-4 border-b border-flux-border">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="h-4 rounded bg-flux-border animate-pulse" style={{ width: `${60 + i * 12}px` }} />
+              ))}
+            </div>
+            {/* Header row skeleton */}
+            <div className="px-4 py-2 flex gap-3 border-b border-flux-border">
+              {Array.from({ length: 8 }, (_, i) => (
+                <div key={i} className="h-3 rounded bg-flux-border animate-pulse" style={{ width: `${40 + (i % 3) * 20}px` }} />
+              ))}
+            </div>
+            {/* Row skeletons */}
+            <div className="flex-1 overflow-hidden px-2 py-1">
+              {Array.from({ length: 12 }, (_, i) => (
+                <div key={i} className="flex items-center gap-3 px-2 py-2.5 border-b border-flux-border/50">
+                  <div className="h-3.5 w-12 rounded bg-flux-border animate-pulse" />
+                  <div className="h-3.5 rounded bg-flux-border animate-pulse" style={{ width: `${80 + (i % 4) * 30}px` }} />
+                  <div className="h-3.5 rounded bg-flux-border animate-pulse" style={{ width: `${100 + (i % 3) * 25}px` }} />
+                  <div className="h-3.5 w-14 rounded bg-flux-border animate-pulse" />
+                  {Array.from({ length: 4 }, (_, j) => (
+                    <div key={j} className="h-5 w-12 rounded-full bg-flux-border animate-pulse" />
+                  ))}
+                  <div className="ml-auto flex gap-2">
+                    {Array.from({ length: 3 }, (_, j) => (
+                      <div key={j} className="h-3 w-3 rounded-full bg-flux-border animate-pulse" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <span className="sr-only">Chargement du tableau de flux…</span>
       </div>
     );
   }

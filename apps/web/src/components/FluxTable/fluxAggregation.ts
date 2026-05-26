@@ -44,13 +44,16 @@ export const STATION_STATE_SEVERITY: Record<StationState, number> = {
 /**
  * Returns the worst (most severe) prerequisite status from a list of statuses.
  * Used for the parent row badge in collapsed multi-element jobs (spec 6.2).
+ * 'none' (n.a.) is transparent: filtered out before aggregation so it
+ * never masks a real status. Returns 'none' only when every element is n.a.
  *
  * Example: ['Stock', 'Cde', 'A cder'] → 'A cder' (red wins)
  */
 export function worstPrerequisiteStatus(statuses: PrerequisiteStatus[]): PrerequisiteStatus {
-  if (statuses.length === 0) return 'none';
+  const meaningful = statuses.filter(s => s !== 'none');
+  if (meaningful.length === 0) return 'none';
 
-  return statuses.reduce((worst, current) => {
+  return meaningful.reduce((worst, current) => {
     const worstColor = PREREQUISITE_STATUS_COLOR[worst];
     const currentColor = PREREQUISITE_STATUS_COLOR[current];
     const worstSeverity = PREREQUISITE_COLOR_SEVERITY[worstColor];
