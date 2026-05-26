@@ -24,6 +24,7 @@ import {
 import { FluxJobStatusDot } from './FluxJobStatusDot';
 import { FluxPrerequisiteBadge } from './FluxPrerequisiteBadge';
 import { FluxPrerequisiteListbox } from './FluxPrerequisiteListbox';
+import { FluxPriorityListbox } from './FluxPriorityListbox';
 import { FluxStationIndicator } from './FluxStationIndicator';
 import { FluxStackedDots } from './FluxStackedDots';
 import { TransporteurCell } from './TransporteurCell';
@@ -107,6 +108,7 @@ interface FluxTableProps {
   sortDirection?: SortDirection;
   /** Called when the user clicks a sortable column header (v0.5.21). */
   onSortChange?: (column: SortColumn) => void;
+  onUpdatePriority?: (jobInternalId: string, deadlinePriority: number) => void;
   onUpdatePrerequisite?: (
     jobId: string,
     elementId: string,
@@ -194,9 +196,16 @@ function FluxTableHeader() {
         <th className={`${stickyHeaderCell} left-0 w-6 py-3`} />
         {/* Status dot — frozen left, no header */}
         <th className={`${stickyHeaderCell} left-6 py-3`} />
+        {/* Priority — frozen left */}
+        <th
+          className={`${stickyHeaderCell} left-10 py-3 text-center text-sm font-medium text-flux-text-secondary`}
+          title="Priorité"
+        >
+          Pri.
+        </th>
         {/* ID — frozen left */}
         <th
-          className={`${stickyHeaderCell} left-10 ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[4.5rem] ${sortableHeader}`}
           title="Identifiant"
           onClick={() => onSortChange('id')}
         >
@@ -204,7 +213,7 @@ function FluxTableHeader() {
         </th>
         {/* Client — frozen left */}
         <th
-          className={`${stickyHeaderCell} left-[10.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[12.5rem] ${sortableHeader}`}
           title="Client"
           onClick={() => onSortChange('client')}
         >
@@ -212,7 +221,7 @@ function FluxTableHeader() {
         </th>
         {/* Designation — frozen left + right shadow */}
         <th
-          className={`${stickyHeaderCell} left-[26.5rem] ${sortableHeader}`}
+          className={`${stickyHeaderCell} left-[28.5rem] ${sortableHeader}`}
           style={LEFT_SHADOW}
           title="Désignation"
           onClick={() => onSortChange('designation')}
@@ -451,19 +460,28 @@ const FluxTableRow = memo(function FluxTableRow({
         </div>
       </td>
 
+      {/* Priority — frozen left */}
+      <td className={`${stickyCell} left-10 p-0`} style={stickyBg}>
+        <FluxPriorityListbox
+          jobId={job.id}
+          jobInternalId={job.internalId}
+          priority={job.deadlinePriority}
+        />
+      </td>
+
       {/* ID — frozen left */}
-      <td className={`${stickyCell} left-10 px-4 py-0 text-sm text-flux-text-primary font-mono font-medium`} style={stickyBg}>
+      <td className={`${stickyCell} left-[4.5rem] px-4 py-0 text-sm text-flux-text-primary font-mono font-medium`} style={stickyBg}>
         <TruncatedCell fullText={job.id} />
       </td>
 
       {/* Client — frozen left */}
-      <td className={`${cellBase} left-[10.5rem]`} style={stickyBg}>
+      <td className={`${cellBase} left-[12.5rem]`} style={stickyBg}>
         <TruncatedCell fullText={job.client} />
       </td>
 
       {/* Designation — frozen left + right shadow */}
       <td
-        className={`${cellBase} left-[26.5rem]`}
+        className={`${cellBase} left-[28.5rem]`}
         style={tint ? { ...LEFT_SHADOW, background: tint.sticky } : LEFT_SHADOW}
         data-testid="flux-designation"
       >
@@ -626,8 +644,10 @@ const FluxTableRow = memo(function FluxTableRow({
       <td className="px-2 py-0 whitespace-nowrap">
         <FluxToggle
           active={job.parti.shipped}
+          onToggle={() => ctx.onToggleShipped?.(job.internalId, !job.parti.shipped)}
           activeDate={job.parti.date}
-          readOnly
+          activeTitle="Marquer comme non parti"
+          inactiveTitle="Marquer comme parti"
         />
       </td>
 
@@ -709,15 +729,18 @@ function FluxSubRow({
       {/* Status dot — empty */}
       <td className={`${subRowStickyCell} left-6`} />
 
-      {/* ID — empty */}
+      {/* Priority — empty */}
       <td className={`${subRowStickyCell} left-10`} />
 
+      {/* ID — empty */}
+      <td className={`${subRowStickyCell} left-[4.5rem]`} />
+
       {/* Client — empty */}
-      <td className={`${subRowStickyCell} left-[10.5rem]`} />
+      <td className={`${subRowStickyCell} left-[12.5rem]`} />
 
       {/* Designation — label with arrow prefix */}
       <td
-        className={`${subRowStickyCell} left-[26.5rem] px-4 py-0 text-flux-text-tertiary`}
+        className={`${subRowStickyCell} left-[28.5rem] px-4 py-0 text-flux-text-tertiary`}
         style={LEFT_SHADOW}
         data-testid="flux-sub-designation"
       >
@@ -826,6 +849,7 @@ export const FluxTable = memo(function FluxTable({
   sortColumn = 'id',
   sortDirection = 'asc',
   onSortChange = () => {},
+  onUpdatePriority = () => {},
   onUpdatePrerequisite = () => {},
   onUpdateSTStatus = () => {},
   onToggleExpand = () => {},
@@ -865,6 +889,7 @@ export const FluxTable = memo(function FluxTable({
     categories,
     openListboxId,
     setOpenListboxId,
+    onUpdatePriority,
     onUpdatePrerequisite,
     onUpdateSTStatus,
     onToggleExpand,
@@ -897,12 +922,13 @@ export const FluxTable = memo(function FluxTable({
       >
         <table
           className="w-full table-fixed"
-          style={{ minWidth: '1440px', fontSize: '13px' }}
+          style={{ minWidth: '1466px', fontSize: '13px' }}
           data-testid="flux-table"
         >
           <colgroup>
             <col style={{ width: '1.5rem' }} />
             <col style={{ width: '1rem' }} />
+            <col style={{ width: '2rem' }} />
             <col style={{ width: '8rem' }} />
             <col style={{ width: '16rem' }} />
             <col style={{ width: '16rem' }} />
