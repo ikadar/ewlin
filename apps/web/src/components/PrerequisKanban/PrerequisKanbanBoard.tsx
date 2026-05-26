@@ -65,10 +65,6 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     return group.elements.map((e) => e.elementId);
   }
 
-  function handleCardMouseDown(e: React.MouseEvent) {
-    if (e.shiftKey) e.preventDefault();
-  }
-
   function handleCardClick(e: React.MouseEvent, key: string) {
     if (e.shiftKey) {
       setSelectedKeys((prev) => {
@@ -202,11 +198,10 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     return (
       <div
         key={job.jobUuid}
-        className={`bg-white/[0.015] border p-2.5 cursor-grab transition-colors ${
+        className={`bg-white/[0.015] border p-2.5 cursor-grab transition-colors select-none ${
           isSelected ? 'border-blue-500/60 ring-1 ring-blue-500/40' : 'border-white/5 hover:border-white/10'
         }`}
         draggable
-        onMouseDown={handleCardMouseDown}
         onClick={(e) => handleCardClick(e, key)}
         onDragStart={(e) => handleDragStart(e, { type: 'job', jobUuid: job.jobUuid, elementIds: allElementIds(job) }, key)}
         onDragEnd={handleDragEnd}
@@ -256,11 +251,10 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     return (
       <div
         key={group.paperKey}
-        className={`bg-white/[0.04] border-l-4 py-[7px] px-[11px] min-h-[32px] flex items-center justify-between gap-2 cursor-grab transition-all ${
+        className={`bg-white/[0.04] border-l-4 py-[7px] px-[11px] min-h-[32px] flex items-center justify-between gap-2 cursor-grab transition-all select-none ${
           isSelected ? 'border-l-blue-500/60 ring-1 ring-blue-500/40' : 'border-zinc-500 hover:brightness-125'
         }`}
         draggable
-        onMouseDown={handleCardMouseDown}
         onClick={(e) => { e.stopPropagation(); handleCardClick(e, key); }}
         onDragStart={(e) =>
           handleGroupDragStart(e, { type: 'group', jobUuid: job.jobUuid, elementIds: groupElementIds(group) }, key)
@@ -313,11 +307,10 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
     return (
       <div
         key={`${job.jobUuid}-${group.paperKey}`}
-        className={`bg-white/[0.015] border overflow-hidden cursor-grab transition-colors ${
+        className={`bg-white/[0.015] border overflow-hidden cursor-grab transition-colors select-none ${
           isSelected ? 'border-blue-500/60 ring-1 ring-blue-500/40' : 'border-white/5 hover:border-white/10'
         }`}
         draggable
-        onMouseDown={handleCardMouseDown}
         onClick={(e) => handleCardClick(e, key)}
         onDragStart={(e) =>
           handleGroupDragStart(e, { type: 'group', jobUuid: job.jobUuid, elementIds: groupElementIds(group) }, key)
