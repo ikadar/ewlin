@@ -647,14 +647,16 @@ const FluxTableRow = memo(function FluxTableRow({
           style={tint ? { ...RIGHT_SHADOW, background: tint.sticky } : RIGHT_SHADOW}
         >
           <div className="flex items-center gap-2">
-            <button
-              className="text-red-400 hover:text-red-300 transition-colors"
-              onClick={() => ctx.onDeleteJob(job.id)}
-              title="Supprimer"
-              data-testid="flux-action-delete"
-            >
-              <Trash2 className="w-4 h-4" strokeWidth={2} />
-            </button>
+            {!job.acompteIndex && (
+              <button
+                className="text-red-400 hover:text-red-300 transition-colors"
+                onClick={() => ctx.onDeleteJob(job.id)}
+                title="Supprimer"
+                data-testid="flux-action-delete"
+              >
+                <Trash2 className="w-4 h-4" strokeWidth={2} />
+              </button>
+            )}
             <button
               className="text-blue-400 hover:text-blue-300 transition-colors"
               onClick={() => ctx.onEditJob(job.id)}

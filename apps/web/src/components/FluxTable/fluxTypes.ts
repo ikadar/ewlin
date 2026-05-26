@@ -204,4 +204,10 @@ export interface FluxJob {
     /** Invoice date in JJ/MM format, e.g. "25/02". null if not invoiced. */
     date: string | null;
   };
+  /** Acompte position (1-based) when this row represents an acompte. */
+  acompteIndex?: number;
+  /** Total acompte count for the parent job. */
+  acompteTotal?: number;
+  /** Acompte UUID for acompte-specific mutations. */
+  acompteId?: string;
 }

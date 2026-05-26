@@ -85,6 +85,9 @@ interface FluxJobApiResponse {
   invoiced: boolean;
   invoicedAt: string | null;
   batDeadline: string | null;
+  acompteIndex?: number;
+  acompteTotal?: number;
+  acompteId?: string;
 }
 
 // ============================================================================
@@ -145,6 +148,11 @@ function transformFluxJobsResponse(
         invoiced: job.invoiced,
         date: job.invoicedAt ?? null,
       },
+      ...(job.acompteIndex != null && {
+        acompteIndex: job.acompteIndex,
+        acompteTotal: job.acompteTotal,
+        acompteId: job.acompteId,
+      }),
     }));
   }
 
