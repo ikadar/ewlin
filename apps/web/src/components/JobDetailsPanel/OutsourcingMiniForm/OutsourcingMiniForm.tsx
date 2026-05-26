@@ -127,7 +127,7 @@ export const OutsourcingMiniForm = memo(function OutsourcingMiniForm({
   return (
     <>
       <div
-        className="text-sm border-l-4 bg-zinc-900/50"
+        className="text-sm border-l-4"
         style={{ borderLeftColor: jobColor }}
         data-testid={`outsourcing-mini-form-${task.id}`}
       >
