@@ -6,6 +6,7 @@ import { shouldUseMockMode } from '../store/api/baseApi';
 import { isMercureMuted } from './mercureMute';
 
 const MERCURE_URL = import.meta.env.VITE_MERCURE_URL ?? '/.well-known/mercure';
+const PROGRESS_TOAST_DEBOUNCE_MS = 3_000;
 
 export interface MercureSubscription {
   toastMessage: string | null;
@@ -29,6 +30,8 @@ export function useMercureSubscription(): MercureSubscription {
   const dispatch = useAppDispatch();
   const eventSourceRef = useRef<EventSource | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const progressBatchRef = useRef<{ count: number; userName: string | null }>({ count: 0, userName: null });
+  const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dismissToast = useCallback(() => {
     setToastMessage(null);
@@ -47,9 +50,13 @@ export function useMercureSubscription(): MercureSubscription {
 
     eventSource.onmessage = (event: MessageEvent) => {
       try {
-        const payload = JSON.parse(event.data) as { type: string; reference?: string };
+        const payload = JSON.parse(event.data) as {
+          type: string;
+          reference?: string;
+          userName?: string;
+          progressPct?: number;
+        };
 
-        // Skip invalidation if this client just mutated (mute window active)
         if (isMercureMuted()) {
           return;
         }
@@ -57,9 +64,24 @@ export function useMercureSubscription(): MercureSubscription {
         dispatch(scheduleApi.util.invalidateTags(['Snapshot']));
         dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
 
-        // V1.x Phase 5 — surface a more specific toast when the event is
-        // a JobBecamePlannable transition. Operators care to know that a
-        // new job just landed in préprod (reservoir → préprod sync hook).
+        if (payload.type === 'TaskProgressRecorded') {
+          progressBatchRef.current.count++;
+          progressBatchRef.current.userName = payload.userName ?? null;
+          if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+          progressTimerRef.current = setTimeout(() => {
+            const { count, userName } = progressBatchRef.current;
+            progressBatchRef.current = { count: 0, userName: null };
+            if (count > 0 && userName) {
+              setToastMessage(
+                count === 1
+                  ? `Avancement enregistré par ${userName}`
+                  : `Avancement enregistré par ${userName} (${count} tâches)`,
+              );
+            }
+          }, PROGRESS_TOAST_DEBOUNCE_MS);
+          return;
+        }
+
         if (payload.type === 'JobBecamePlannable' && payload.reference) {
           setToastMessage(`+1 nouveau job ajouté à la préprod : ${payload.reference}`);
         } else {
@@ -71,13 +93,13 @@ export function useMercureSubscription(): MercureSubscription {
     };
 
     eventSource.onerror = () => {
-      // EventSource automatically reconnects with exponential backoff
       console.warn('[Mercure] Connection lost, reconnecting...');
     };
 
     return () => {
       eventSource.close();
       eventSourceRef.current = null;
+      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
     };
   }, [dispatch]);
 
