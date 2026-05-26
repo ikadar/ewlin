@@ -67,6 +67,7 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
 
   function handleCardClick(e: React.MouseEvent, key: string) {
     if (e.shiftKey) {
+      e.preventDefault();
       setSelectedKeys((prev) => {
         const next = new Set(prev);
         if (next.has(key)) next.delete(key);
@@ -150,13 +151,22 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
   const hasSelection = selectedKeys.size > 0;
   useEffect(() => {
     if (!hasSelection) return;
-    const onKey = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !(e.target as HTMLElement)?.closest('[role=dialog]')) {
         setSelectedKeys(new Set());
       }
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setSelectedKeys(new Set());
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
+    };
   }, [hasSelection]);
 
   function buildColumnContent(colId: string) {
