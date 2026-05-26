@@ -1068,7 +1068,7 @@ function AppContent() {
       // Silence = consent: past + no explicit saisie = presumed done.
       // Only flag as late when a saisie explicitly says not finished.
       const task = taskById.get(a.taskId);
-      const pct = task?.recordedProgressPct;
+      const pct = a.recordedProgressPct ?? task?.recordedProgressPct;
       const explicitlyNotDone = pct != null && pct < 100;
       if (explicitlyNotDone) {
         const jobId = taskToJob.get(a.taskId);
