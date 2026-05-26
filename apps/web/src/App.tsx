@@ -45,6 +45,7 @@ import type { Task, Job, InternalTask, TaskAssignment, Station, StationCategory 
 import { getDeadlineDate } from '@flux/types';
 import { calculateReturnDate } from './utils/outsourcingCalculation';
 import { isLastTaskOfJob } from './utils/taskHelpers';
+import { expandJobsForDisplay, isAcompteJob, getParentJobId } from './utils/acompteFanOut';
 import { transformJcfToRequest, transformJcfElementToRequest, hasOffsetPressInSequence, hasTypoPressInSequence } from './api';
 import { getDefaultCategoryWidth } from './utils/tileLabelResolver';
 import { getLayoutDimensions, getStationXOffset } from './utils/gridLayout';
@@ -734,15 +735,21 @@ function AppContent() {
     });
   }, [pixelsPerHour]);
 
-  // Create lookup maps
+  // Expand acompted jobs into N synthetic entries for the job list
+  const expandedJobs = useMemo(() => expandJobsForDisplay(snapshot.jobs), [snapshot.jobs]);
+
+  // Create lookup maps (includes both real and synthetic acompte jobs)
   const jobMap = useMemo(() => {
     const map = new Map<string, Job>();
-    snapshot.jobs.forEach((job) => map.set(job.id, job));
+    expandedJobs.forEach((job) => map.set(job.id, job));
     return map;
-  }, [snapshot.jobs]);
+  }, [expandedJobs]);
 
-  // Find selected job
+  // Find selected job (may be a synthetic acompte job)
   const selectedJob = selectedJobId ? jobMap.get(selectedJobId) || null : null;
+
+  // Resolve to the real parent UUID for mutations (delete, compute, edit)
+  const selectedRealJobId = selectedJob ? getParentJobId(selectedJob) : selectedJobId;
 
   // Populate JCF form fields from a Job object (shared by scheduler edit + Flux edit)
   const populateJcfFromJob = useCallback((job: Job) => {
@@ -847,7 +854,7 @@ function AppContent() {
       showToast('Bascule en Préprod pour modifier un job.', 'info');
       return;
     }
-    setEditingJobInternalId(selectedJob.id);
+    setEditingJobInternalId(getParentJobId(selectedJob));
   }, [selectedJob, scenarioMode, showToast]);
 
   // Auto-populate JCF when arriving at /job/new with editJobId in state (from Flux)
@@ -862,16 +869,16 @@ function AppContent() {
   }, [location.state, isJcfModalOpen, jobMap, populateJcfFromJob]);
 
   const handleDeleteJob = useCallback(async () => {
-    if (!selectedJobId) return;
+    if (!selectedRealJobId) return;
     try {
-      await deleteJob(selectedJobId).unwrap();
+      await deleteJob(selectedRealJobId).unwrap();
       setSelectedJobId(null);
       dispatch(fluxApi.util.invalidateTags(['FluxJobs']));
-      autoRecompute.trigger(`delete job ${selectedJobId}`);
+      autoRecompute.trigger(`delete job ${selectedRealJobId}`);
     } catch (err) {
       showToast(`Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error');
     }
-  }, [selectedJobId, deleteJob, setSelectedJobId, showToast, dispatch, autoRecompute]);
+  }, [selectedRealJobId, deleteJob, setSelectedJobId, showToast, dispatch, autoRecompute]);
 
   // REQ-14: Calculate grid/DateStrip start date (lookbackDays before today)
   const lookbackDays = snapshotData?.lookbackDays ?? 6;
@@ -944,11 +951,11 @@ function AppContent() {
       taskMarkersPerDay: new Map<string, TaskMarker[]>(),
       earliestTaskDate: null as Date | null,
     };
-    if (!selectedJobId) return emptyResult;
+    if (!selectedRealJobId) return emptyResult;
 
     const now = getNow();
     const jobTaskIds = new Set(
-      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
+      getTasksForJob(selectedRealJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
 
     const days = new Set<string>();
@@ -991,7 +998,7 @@ function AppContent() {
     }
 
     return { scheduledDays: days, taskMarkersPerDay: markers, earliestTaskDate: earliest };
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
+  }, [selectedRealJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, conflictTaskIds]);
 
   // REQ-09.2: Focused date for DateStrip sync
   const [focusedDate, setFocusedDate] = useState<Date | null>(() => getNow());
@@ -1099,7 +1106,7 @@ function AppContent() {
     const problems: Job[] = [];
     const normal: Job[] = [];
 
-    snapshot.jobs.forEach((job) => {
+    expandedJobs.forEach((job) => {
       if (lateJobIds.has(job.id) || conflictJobIds.has(job.id)) {
         problems.push(job);
       } else {
@@ -1117,24 +1124,24 @@ function AppContent() {
     });
 
     return [...problems.map((j) => j.id), ...normal.map((j) => j.id)];
-  }, [snapshot.jobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
+  }, [expandedJobs, snapshot.lateJobs, snapshot.conflicts, snapshot.tasks, snapshot.elements]);
 
   // Handle clear all tiles for selected job (ALT+Z)
   const handleClearJobAssignments = useCallback(async () => {
-    if (!selectedJobId) return;
+    if (!selectedRealJobId) return;
     try {
-      const result = await clearJobAssignments(selectedJobId).unwrap();
+      const result = await clearJobAssignments(selectedRealJobId).unwrap();
       showToast(`${result.unassignedCount} tuile(s) effacée(s)`, 'success');
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedJobId, clearJobAssignments, showToast]);
+  }, [selectedRealJobId, clearJobAssignments, showToast]);
 
   // Handle pin/unpin all placed tiles for selected job (Alt+F)
   const handlePinAllJobTiles = useCallback(async () => {
-    if (!selectedJobId) return;
+    if (!selectedRealJobId) return;
     const jobTaskIds = new Set(
-      getTasksForJob(selectedJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
+      getTasksForJob(selectedRealJobId, snapshot.tasks, snapshot.elements).map((t) => t.id)
     );
     const jobAssignments = snapshot.assignments.filter((a) => jobTaskIds.has(a.taskId));
     if (jobAssignments.length === 0) return;
@@ -1159,7 +1166,7 @@ function AppContent() {
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
+  }, [selectedRealJobId, snapshot.tasks, snapshot.elements, snapshot.assignments, batchSetPin, showToast]);
 
   // Handle compute schedule (full recalculation via ComputeModal)
   const handleComputeSchedule = useCallback(() => {
@@ -1191,10 +1198,10 @@ function AppContent() {
 
   // Handle ASAP auto-placement for selected job (ALT+P S)
   const handleAsapPlacement = useCallback(async () => {
-    if (!selectedJobId) return;
+    if (!selectedRealJobId) return;
     await autoSaveBeforeAutoplace();
     try {
-      const result = await autoPlaceJob(selectedJobId).unwrap();
+      const result = await autoPlaceJob(selectedRealJobId).unwrap();
       if (result.placedCount === 0) {
         showToast('Aucune tuile non planifiée à placer', 'info');
       } else {
@@ -1204,14 +1211,14 @@ function AppContent() {
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedJobId, autoPlaceJob, showToast, autoSaveBeforeAutoplace]);
+  }, [selectedRealJobId, autoPlaceJob, showToast, autoSaveBeforeAutoplace]);
 
   // Handle ALAP auto-placement for selected job (ALT+P L)
   const handleAlapPlacement = useCallback(async () => {
-    if (!selectedJobId) return;
+    if (!selectedRealJobId) return;
     await autoSaveBeforeAutoplace();
     try {
-      const result = await autoPlaceJobAlap(selectedJobId).unwrap();
+      const result = await autoPlaceJobAlap(selectedRealJobId).unwrap();
       if (result.placedCount === 0) {
         showToast('Aucune tuile non planifiée à placer', 'info');
       } else {
@@ -1221,7 +1228,7 @@ function AppContent() {
     } catch (error) {
       showToast(getErrorMessage(error));
     }
-  }, [selectedJobId, autoPlaceJobAlap, showToast, autoSaveBeforeAutoplace]);
+  }, [selectedRealJobId, autoPlaceJobAlap, showToast, autoSaveBeforeAutoplace]);
 
   // Track Alt key and keyboard shortcuts
   useEffect(() => {
