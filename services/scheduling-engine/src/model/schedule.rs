@@ -316,5 +316,6 @@ pub struct ScheduleStats {
 pub struct Warning {
     #[serde(default)]
     pub task_id: Option<String>,
+    pub kind: String,
     pub message: String,
 }

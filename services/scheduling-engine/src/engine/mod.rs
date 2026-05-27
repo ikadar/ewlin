@@ -389,6 +389,7 @@ fn compute_inner(
     if unplaced > 0 {
         warnings.push(Warning {
             task_id: None,
+            kind: "unplaced".to_string(),
             message: format!("{} tasks could not be placed", unplaced),
         });
     }
@@ -440,6 +441,7 @@ fn compute_inner(
         };
         warnings.push(Warning {
             task_id: Some(v.offender_task_id.clone()),
+            kind: "precedence_violation".to_string(),
             message: format!(
                 "Precedence violation ({}): task {} starts at {} before predecessor {} ends at {}",
                 kind_label,
@@ -571,7 +573,7 @@ fn validate_concurrent_groups(
 
         for group in &operator.concurrent_groups {
             if let Err(msg) = group.validate(&operator.id) {
-                warnings.push(Warning { task_id: None, message: msg });
+                warnings.push(Warning { task_id: None, kind: "config_error".to_string(), message: msg });
                 continue;
             }
 
@@ -579,6 +581,7 @@ fn validate_concurrent_groups(
                 if !station_ids.contains(station_id.as_str()) {
                     warnings.push(Warning {
                         task_id: None,
+                        kind: "config_error".to_string(),
                         message: format!(
                             "operator {}: concurrent group references unknown station {}",
                             operator.id, station_id
@@ -588,6 +591,7 @@ fn validate_concurrent_groups(
                 if !skill_station_ids.contains(station_id.as_str()) {
                     warnings.push(Warning {
                         task_id: None,
+                        kind: "config_error".to_string(),
                         message: format!(
                             "operator {}: concurrent group references station {} but operator has no skill on it",
                             operator.id, station_id

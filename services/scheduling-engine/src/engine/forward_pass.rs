@@ -3440,6 +3440,7 @@ fn revalidate_setup_inheritance_after_scoring(
             actions[i].setup_lost_reason = Some(reason.to_string());
             warnings.push(Warning {
                 task_id: Some(actions[i].task_id.clone()),
+                kind: "setup_lost".to_string(),
                 message: format!(
                     "Calage hérité finalement perdu (raison : {reason}) — \
                      l'opérateur devra recaler la machine au démarrage."
@@ -3549,6 +3550,7 @@ fn emit_in_progress_assignment(
     if productive_count < total_productive_needed {
         warnings.push(Warning {
             task_id: Some(actions[i].task_id.clone()),
+            kind: "horizon_short".to_string(),
             message: "Horizon trop court pour placer la tâche en cours — \
                  replanification complète.".to_string(),
         });
@@ -3789,6 +3791,7 @@ fn pre_place_pinned_actions(
                 // compute modal so the user sees why the tile shifted.
                 warnings.push(Warning {
                     task_id: Some(actions[i].task_id.clone()),
+                    kind: "partial_setup_lost".to_string(),
                     message: format!(
                         "Calage partiel perdu ({reason}) — replanification \
                          complète avec calage neuf depuis NOW."
@@ -3953,6 +3956,7 @@ fn pre_place_pinned_actions(
                 };
                 warnings.push(Warning {
                     task_id: Some(actions[i].task_id.clone()),
+                    kind: "pin_removed".to_string(),
                     message,
                 });
                 actions[i].is_pinned = false;
@@ -4027,6 +4031,7 @@ fn pre_place_pinned_actions(
                 };
                 warnings.push(Warning {
                     task_id: Some(actions[i].task_id.clone()),
+                    kind: "pin_removed".to_string(),
                     message,
                 });
                 actions[i].is_pinned = false;
@@ -4093,6 +4098,7 @@ fn pre_place_pinned_actions(
                     let original_minutes = start_t as u64 * tick_minutes as u64;
                     warnings.push(Warning {
                         task_id: Some(actions[i].task_id.clone()),
+                        kind: "pin_removed".to_string(),
                         message: format!(
                             "Pin safety-zone retiré pour {} : fenêtre dispo {} min < chunk-mini {} min. Replanification.",
                             super::format_minutes(original_minutes, start_date),
@@ -4172,6 +4178,7 @@ fn pre_place_pinned_actions(
                 let new_minutes = new_start as u64 * tick_minutes as u64;
                 warnings.push(Warning {
                     task_id: Some(actions[i].task_id.clone()),
+                    kind: "pin_displaced".to_string(),
                     message: format!(
                         "Pin déplacé : aucun opérateur disponible à {} ; replanifié au créneau dispo le plus proche ({})",
                         super::format_minutes(original_minutes, start_date),

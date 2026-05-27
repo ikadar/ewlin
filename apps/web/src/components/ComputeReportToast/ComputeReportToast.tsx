@@ -10,8 +10,8 @@
  * report toast is visible at a time. Re-triggering replaces it.
  */
 
-import { memo, useEffect } from 'react';
-import { CheckCircle2, Loader2, X, AlertCircle } from 'lucide-react';
+import { memo, useEffect, useState } from 'react';
+import { CheckCircle2, Loader2, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ComputeReportState, ComputeReportLateJob } from '../../hooks/useComputeReportStream';
 import { getDeadlineDate } from '@flux/types';
 import type { ScheduleSnapshot } from '@flux/types';
@@ -24,6 +24,12 @@ import { getJobIdForTask } from '../../utils/taskHelpers';
 // DeadlineConflict is excluded because it overlaps with "En retard";
 // ApprovalGateConflict is excluded because it surfaces via the BAT lane.
 const NON_LATE_CONFLICT_EXCLUSIONS = new Set(['DeadlineConflict', 'ApprovalGateConflict']);
+
+export const VISIBLE_WARNING_KINDS = new Set([
+  'unplaced',
+  'pin_removed',
+  'pin_displaced',
+]);
 
 interface Props {
   state: ComputeReportState;
@@ -152,8 +158,11 @@ export const ComputeReportToast = memo(function ComputeReportToast({ state, onDi
     : 0;
 
   const hasLate = lateJobs.length > 0;
-  const hasWarnings = !!result?.warnings?.length;
+  const visibleWarnings = result?.warnings?.filter((w) => VISIBLE_WARNING_KINDS.has(w.kind)) ?? [];
+  const hiddenWarnings = result?.warnings?.filter((w) => !VISIBLE_WARNING_KINDS.has(w.kind)) ?? [];
+  const hasWarnings = visibleWarnings.length > 0;
   const hasConflicts = nonLateConflictCount > 0;
+  const [showHidden, setShowHidden] = useState(false);
 
   // Auto-dismiss when done with NO late jobs, NO warnings, AND NO conflicts —
   // any of these signals is something the user must see, so we keep the
@@ -403,14 +412,49 @@ function FullSection({
         </>
       )}
 
-      {/* Engine warnings (pin displacements, unplaced tasks, …) */}
-      {result.warnings && result.warnings.length > 0 && (
+      {/* Engine warnings — only actionable kinds shown by default */}
+      {(visibleWarnings.length > 0 || hiddenWarnings.length > 0) && (
         <>
           <div className="my-2.5 h-px bg-flux-border" />
-          <div className="text-[9.5px] uppercase tracking-wider text-amber-500 font-semibold mb-1.5">
-            Avertissements ({result.warnings.length})
-          </div>
-          {result.warnings.map((w, i) => {
+          {visibleWarnings.length > 0 && (
+            <>
+              <div className="text-[9.5px] uppercase tracking-wider text-amber-500 font-semibold mb-1.5">
+                Avertissements ({visibleWarnings.length})
+              </div>
+              {visibleWarnings.map((w, i) => {
+                let jobRef: string | null = null;
+                if (w.taskId) {
+                  const task = snapshot.tasks.find((t) => t.id === w.taskId);
+                  if (task) {
+                    const jobId = getJobIdForTask(task, snapshot.elements);
+                    if (jobId) {
+                      const job = snapshot.jobs.find((j) => j.id === jobId);
+                      if (job) jobRef = job.reference;
+                    }
+                  }
+                }
+                return (
+                  <div key={i} className="flex items-start gap-2 py-0.5 text-[11px]">
+                    <AlertCircle size={12} className="text-amber-500 shrink-0 mt-px" />
+                    <div className="flex-1 min-w-0 leading-snug">
+                      {jobRef && <span className="font-semibold text-flux-text-primary mr-1.5">{jobRef}</span>}
+                      <span className="text-flux-text-tertiary">{w.message}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {hiddenWarnings.length > 0 && (
+            <button
+              onClick={() => setShowHidden((v) => !v)}
+              className="flex items-center gap-1 text-[10px] text-flux-text-quaternary hover:text-flux-text-tertiary mt-1"
+            >
+              {showHidden ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              {showHidden ? 'Masquer' : `${hiddenWarnings.length} détail${hiddenWarnings.length > 1 ? 's' : ''} technique${hiddenWarnings.length > 1 ? 's' : ''}`}
+            </button>
+          )}
+          {showHidden && hiddenWarnings.map((w, i) => {
             let jobRef: string | null = null;
             if (w.taskId) {
               const task = snapshot.tasks.find((t) => t.id === w.taskId);
@@ -423,11 +467,11 @@ function FullSection({
               }
             }
             return (
-              <div key={i} className="flex items-start gap-2 py-0.5 text-[11px]">
-                <span className="text-amber-500 shrink-0 mt-px">⚠</span>
+              <div key={`h-${i}`} className="flex items-start gap-2 py-0.5 text-[11px] opacity-60">
+                <AlertCircle size={12} className="text-flux-text-quaternary shrink-0 mt-px" />
                 <div className="flex-1 min-w-0 leading-snug">
                   {jobRef && <span className="font-semibold text-flux-text-primary mr-1.5">{jobRef}</span>}
-                  <span className="text-flux-text-tertiary">{w.message}</span>
+                  <span className="text-flux-text-quaternary">{w.message}</span>
                 </div>
               </div>
             );

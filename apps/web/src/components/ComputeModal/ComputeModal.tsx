@@ -1,11 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ScheduleSnapshot, Job } from '@flux/types';
 import type { ComputeScheduleResult } from '../../store';
 import { resolveScenarioHeader } from '../../store/api/realBaseQuery';
 import { useAutoRecomputeCtx } from '../../contexts/AutoRecomputeContext';
 import { getJobIdForTask } from '../../utils/taskHelpers';
+import { VISIBLE_WARNING_KINDS } from '../ComputeReportToast/ComputeReportToast';
 
 // ─── Types ───
 
@@ -667,36 +668,8 @@ export const ComputeModal = memo(function ComputeModal({
                     </div>
                   )}
 
-                  {/* Engine warnings (pin displacements, unplaced tasks, …) */}
-                  {result.warnings && result.warnings.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-zinc-800" data-testid="compute-warnings">
-                      <div className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold mb-2">
-                        Avertissements ({result.warnings.length})
-                      </div>
-                      {result.warnings.map((w, i) => {
-                        let jobRef: string | null = null;
-                        if (w.taskId) {
-                          const task = snapshot.tasks.find((t) => t.id === w.taskId);
-                          if (task) {
-                            const jobId = getJobIdForTask(task, snapshot.elements);
-                            if (jobId) {
-                              const job = snapshot.jobs.find((j) => j.id === jobId);
-                              if (job) jobRef = job.reference;
-                            }
-                          }
-                        }
-                        return (
-                          <div key={i} className="flex items-start gap-2 py-1 px-1.5 rounded text-xs hover:bg-zinc-800/50">
-                            <span className="text-amber-500 shrink-0 mt-px">⚠</span>
-                            <div className="flex-1 min-w-0">
-                              {jobRef && <span className="font-semibold text-zinc-100 mr-1.5">{jobRef}</span>}
-                              <span className="text-zinc-300">{w.message}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {/* Engine warnings — only actionable kinds shown by default */}
+                  <ComputeWarnings warnings={result.warnings} snapshot={snapshot} />
                 </>
               )}
             </>
@@ -726,5 +699,61 @@ export const ComputeModal = memo(function ComputeModal({
     document.body,
   );
 });
+
+function ComputeWarnings({ warnings, snapshot }: {
+  warnings: ComputeScheduleResult['warnings'] | undefined;
+  snapshot: ScheduleSnapshot;
+}) {
+  const [showHidden, setShowHidden] = useState(false);
+  const visible = warnings?.filter((w) => VISIBLE_WARNING_KINDS.has(w.kind)) ?? [];
+  const hidden = warnings?.filter((w) => !VISIBLE_WARNING_KINDS.has(w.kind)) ?? [];
+  if (visible.length === 0 && hidden.length === 0) return null;
+
+  const renderRow = (w: (typeof visible)[number], i: number, dimmed: boolean) => {
+    let jobRef: string | null = null;
+    if (w.taskId) {
+      const task = snapshot.tasks.find((t) => t.id === w.taskId);
+      if (task) {
+        const jobId = getJobIdForTask(task, snapshot.elements);
+        if (jobId) {
+          const job = snapshot.jobs.find((j) => j.id === jobId);
+          if (job) jobRef = job.reference;
+        }
+      }
+    }
+    return (
+      <div key={`${dimmed ? 'h' : 'v'}-${i}`} className={`flex items-start gap-2 py-1 px-1.5 rounded text-xs hover:bg-zinc-800/50 ${dimmed ? 'opacity-50' : ''}`}>
+        <AlertCircle size={12} className={`shrink-0 mt-px ${dimmed ? 'text-zinc-500' : 'text-amber-500'}`} />
+        <div className="flex-1 min-w-0">
+          {jobRef && <span className="font-semibold text-zinc-100 mr-1.5">{jobRef}</span>}
+          <span className={dimmed ? 'text-zinc-500' : 'text-zinc-300'}>{w.message}</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-zinc-800" data-testid="compute-warnings">
+      {visible.length > 0 && (
+        <>
+          <div className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold mb-2">
+            Avertissements ({visible.length})
+          </div>
+          {visible.map((w, i) => renderRow(w, i, false))}
+        </>
+      )}
+      {hidden.length > 0 && (
+        <button
+          onClick={() => setShowHidden((v) => !v)}
+          className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-400 mt-1.5"
+        >
+          {showHidden ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          {showHidden ? 'Masquer' : `${hidden.length} détail${hidden.length > 1 ? 's' : ''} technique${hidden.length > 1 ? 's' : ''}`}
+        </button>
+      )}
+      {showHidden && hidden.map((w, i) => renderRow(w, i, true))}
+    </div>
+  );
+}
 
 export default ComputeModal;

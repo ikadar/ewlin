@@ -1226,7 +1226,7 @@ export interface ComputeScheduleResult {
     calageBonusMean?: number;
     calageBonusMedian?: number;
   };
-  warnings: Array<{ taskId: string | null; message: string }>;
+  warnings: Array<{ taskId: string | null; kind: string; message: string }>;
   fbiIterations: number;
   computeTimeMs: number;
 }
