@@ -13,6 +13,7 @@
 import { memo, useEffect } from 'react';
 import { CheckCircle2, Loader2, X, AlertCircle } from 'lucide-react';
 import type { ComputeReportState, ComputeReportLateJob } from '../../hooks/useComputeReportStream';
+import { getDeadlineDate } from '@flux/types';
 import type { ScheduleSnapshot } from '@flux/types';
 import type { ComputeScheduleResult } from '../../store';
 import { useGetSnapshotQuery } from '../../store';
@@ -41,6 +42,18 @@ function formatLateness(minutes: number): string {
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
   return remHours > 0 ? `${days}j ${remHours}h` : `${days}j`;
+}
+
+function formatDelta(minutes: number): string {
+  if (minutes === 0) return '±0';
+  const abs = Math.abs(minutes);
+  const sign = minutes > 0 ? '+' : '-';
+  if (abs < 60) return `${sign}${abs}min`;
+  const hours = Math.floor(abs / 60);
+  if (hours < 24) return `${sign}${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${sign}${days}j ${remHours}h` : `${sign}${days}j`;
 }
 
 /**
@@ -74,8 +87,33 @@ function buildPriorityBreakdown(
   snapshot: ScheduleSnapshot,
   lateJobs: ComputeReportLateJob[],
   placedJobIds: Set<string>,
+  result: ComputeScheduleResult,
 ) {
   const lateByRef = new Map(lateJobs.map((l) => [l.ref, l]));
+
+  const taskToJob = new Map<string, string>();
+  for (const task of snapshot.tasks) {
+    const jid = getJobIdForTask(task, snapshot.elements);
+    if (jid) taskToJob.set(task.id, jid);
+  }
+
+  const endByTask = new Map<string, string>();
+  for (const a of result.assignments) {
+    if (a.scheduledEnd) endByTask.set(a.taskId, a.scheduledEnd);
+  }
+  for (const o of result.outsourcedAssignments ?? []) {
+    if (o.scheduledEnd) endByTask.set(o.taskId, o.scheduledEnd);
+  }
+
+  const latestEndByJob = new Map<string, Date>();
+  for (const [taskId, endStr] of endByTask) {
+    const jobId = taskToJob.get(taskId);
+    if (!jobId) continue;
+    const end = new Date(endStr);
+    const current = latestEndByJob.get(jobId);
+    if (!current || end > current) latestEndByJob.set(jobId, end);
+  }
+
   return [0, 1, 2, 3]
     .map((tier) => {
       const jobs = snapshot.jobs
@@ -83,7 +121,20 @@ function buildPriorityBreakdown(
         .filter((j) => placedJobIds.has(j.id));
       const total = jobs.length;
       const late = jobs.filter((j) => lateByRef.has(j.reference)).length;
-      return { tier, total, onTime: total - late, late };
+
+      const deltas: number[] = [];
+      for (const job of jobs) {
+        if (!job.workshopExitDate) continue;
+        const deadline = getDeadlineDate(job.workshopExitDate);
+        const latestEnd = latestEndByJob.get(job.id);
+        if (!latestEnd) continue;
+        deltas.push(Math.round((latestEnd.getTime() - deadline.getTime()) / 60000));
+      }
+      const avgDeltaMinutes = deltas.length > 0
+        ? Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length)
+        : null;
+
+      return { tier, total, onTime: total - late, late, avgDeltaMinutes };
     })
     .filter((t) => t.total > 0);
 }
@@ -287,7 +338,7 @@ function FullSection({
   const totalJobs = placedJobIds.size;
   const onTime = Math.max(0, totalJobs - lateJobs.length);
   const pct = totalJobs > 0 ? Math.round((onTime / totalJobs) * 100) : 100;
-  const tiers = buildPriorityBreakdown(snapshot, lateJobs, placedJobIds);
+  const tiers = buildPriorityBreakdown(snapshot, lateJobs, placedJobIds, result);
 
   return (
     <>
@@ -329,52 +380,26 @@ function FullSection({
                   className="w-[7px] h-[7px] rounded-full shrink-0"
                   style={{ background: PRIORITY_COLORS[t.tier] }}
                 />
-                <span className="text-[10.5px] text-flux-text-tertiary w-[62px] shrink-0">
+                <span className="text-[10.5px] text-flux-text-tertiary w-[54px] shrink-0">
                   {PRIORITY_LABELS[t.tier]}
                 </span>
                 <div className="flex-1 h-[7px] bg-zinc-800 rounded-full overflow-hidden flex">
                   {p > 0 && <div className="h-full bg-emerald-500" style={{ width: `${p}%` }} />}
                   {p < 100 && <div className="h-full bg-red-500" style={{ width: `${100 - p}%` }} />}
                 </div>
-                <span className="text-[10.5px] text-flux-text-tertiary tabular-nums w-[58px] text-right shrink-0">
+                <span className="text-[10.5px] text-flux-text-tertiary tabular-nums shrink-0">
                   {t.onTime}/{t.total}
-                  <span className="text-flux-text-muted ml-0.5">({p}%)</span>
                 </span>
+                {t.avgDeltaMinutes != null && (
+                  <span className={`text-[10px] tabular-nums shrink-0 ${
+                    t.avgDeltaMinutes > 0 ? 'text-amber-400' : 'text-emerald-400'
+                  }`}>
+                    {formatDelta(t.avgDeltaMinutes)}
+                  </span>
+                )}
               </div>
             );
           })}
-        </>
-      )}
-
-      {/* Late list */}
-      {lateJobs.length > 0 && (
-        <>
-          <div className="my-2.5 h-px bg-flux-border" />
-          <div className="text-[9.5px] uppercase tracking-wider text-flux-text-muted font-semibold mb-1.5">
-            {lateJobs.length > 5 ? `Jobs les plus en retard (${lateJobs.length} au total)` : 'Jobs en retard'}
-          </div>
-          {lateJobs.slice(0, 5).map((l, i) => (
-            <div key={i} className="flex items-center gap-2 py-0.5 text-[11px]">
-              <div
-                className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ background: PRIORITY_COLORS[l.priority] ?? PRIORITY_COLORS[2] }}
-              />
-              <span className="font-semibold text-flux-text-primary">{l.ref}</span>
-              <span className="text-flux-text-muted ml-0">{l.client}</span>
-              <span
-                className={`ml-auto font-semibold tabular-nums shrink-0 ${
-                  l.lateByMinutes > 7 * 24 * 60 ? 'text-red-400' : 'text-amber-400'
-                }`}
-              >
-                +{formatLateness(l.lateByMinutes)}
-              </span>
-            </div>
-          ))}
-          {lateJobs.length > 5 && (
-            <div className="text-[10.5px] text-flux-text-muted py-0.5">
-              et {lateJobs.length - 5} autres…
-            </div>
-          )}
         </>
       )}
 
