@@ -103,7 +103,7 @@ function drawFooter(doc: jsPDF, from: Date, to: Date, pageNum: number, totalPage
   doc.text(`${pageNum} / ${totalPages}`, PAGE_W - MARGIN, y, { align: 'right' });
 }
 
-export function generateSchedulePdf(options: PrintOptions): void {
+export function generateSchedulePdf(options: PrintOptions): ArrayBuffer {
   const { snapshot, from, to, includeStations, includeOperators } = options;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
@@ -164,8 +164,7 @@ export function generateSchedulePdf(options: PrintOptions): void {
     doc.setTextColor(120, 120, 120);
     doc.text('Aucune tâche dans la plage sélectionnée.', PAGE_W / 2, PAGE_H / 2, { align: 'center' });
     drawFooter(doc, from, to, 1, 1);
-    doc.save('planning.pdf');
-    return;
+    return doc.output('arraybuffer');
   }
 
   const totalPages = pages.length;
@@ -355,5 +354,5 @@ export function generateSchedulePdf(options: PrintOptions): void {
     drawFooter(doc, from, to, pdfPage, totalPages);
   }
 
-  doc.save('planning.pdf');
+  return doc.output('arraybuffer');
 }
