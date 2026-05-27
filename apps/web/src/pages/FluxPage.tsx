@@ -393,48 +393,55 @@ export function FluxPage({ backdrop }: { backdrop?: boolean } = {}) {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden bg-flux-base" data-testid="flux-loading" role="status" aria-live="polite">
-        <div className="p-4 h-full">
+        <div className="p-4 h-full relative">
           <div className="bg-flux-elevated rounded-lg border border-flux-border h-full overflow-hidden flex flex-col">
             {/* Toolbar skeleton */}
             <div className="px-4 py-3 flex items-center gap-3 border-b border-flux-border">
               <div className="h-5 w-32 rounded bg-flux-border animate-pulse" />
-              <div className="h-8 w-64 rounded bg-flux-border animate-pulse" />
+              <div className="h-8 flex-1 max-w-[400px] rounded bg-flux-border animate-pulse" />
               <div className="ml-auto h-8 w-24 rounded bg-flux-border animate-pulse" />
             </div>
             {/* Tab bar skeleton */}
             <div className="px-4 py-2 flex gap-4 border-b border-flux-border">
               {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="h-4 rounded bg-flux-border animate-pulse" style={{ width: `${60 + i * 12}px` }} />
+                <div key={i} className="h-4 rounded bg-flux-border animate-pulse" style={{ width: `${60 + i * 12}px`, animationDelay: `${i * 100}ms` }} />
               ))}
             </div>
-            {/* Header row skeleton */}
-            <div className="px-4 py-2 flex gap-3 border-b border-flux-border">
-              {Array.from({ length: 8 }, (_, i) => (
-                <div key={i} className="h-3 rounded bg-flux-border animate-pulse" style={{ width: `${40 + (i % 3) * 20}px` }} />
+            {/* Header row skeleton — mimics real table columns */}
+            <div className="px-2 py-2 grid grid-cols-[2rem_2rem_2.5rem_6rem_1fr_1fr_5rem_4rem_3rem_3rem_3rem_3rem_3rem_repeat(4,2.5rem)_4rem] gap-px border-b border-flux-border items-center">
+              {Array.from({ length: 18 }, (_, i) => (
+                <div key={i} className="h-3 mx-1 rounded bg-flux-border animate-pulse" style={{ animationDelay: `${i * 50}ms` }} />
               ))}
             </div>
-            {/* Row skeletons */}
-            <div className="flex-1 overflow-hidden px-2 py-1">
-              {Array.from({ length: 12 }, (_, i) => (
-                <div key={i} className="flex items-center gap-3 px-2 py-2.5 border-b border-flux-border/50">
-                  <div className="h-3.5 w-12 rounded bg-flux-border animate-pulse" />
-                  <div className="h-3.5 rounded bg-flux-border animate-pulse" style={{ width: `${80 + (i % 4) * 30}px` }} />
-                  <div className="h-3.5 rounded bg-flux-border animate-pulse" style={{ width: `${100 + (i % 3) * 25}px` }} />
-                  <div className="h-3.5 w-14 rounded bg-flux-border animate-pulse" />
-                  {Array.from({ length: 4 }, (_, j) => (
-                    <div key={j} className="h-5 w-12 rounded-full bg-flux-border animate-pulse" />
+            {/* Row skeletons — same grid */}
+            <div className="flex-1 overflow-hidden">
+              {Array.from({ length: 14 }, (_, i) => (
+                <div key={i} className="px-2 py-2.5 grid grid-cols-[2rem_2rem_2.5rem_6rem_1fr_1fr_5rem_4rem_3rem_3rem_3rem_3rem_3rem_repeat(4,2.5rem)_4rem] gap-px border-b border-flux-border/50 items-center">
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" style={{ animationDelay: `${i * 40}ms` }} />
+                  <div className="h-2.5 w-2.5 mx-auto rounded-full bg-flux-border/60 animate-pulse" style={{ animationDelay: `${i * 40 + 20}ms` }} />
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" />
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" style={{ width: `${60 + (i % 4) * 15}%`, animationDelay: `${i * 50}ms` }} />
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" style={{ width: `${50 + (i % 3) * 20}%`, animationDelay: `${i * 50 + 30}ms` }} />
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" />
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" />
+                  {Array.from({ length: 5 }, (_, j) => (
+                    <div key={j} className="h-4 w-4 mx-auto rounded-full bg-flux-border/60 animate-pulse" style={{ animationDelay: `${(i * 5 + j) * 30}ms` }} />
                   ))}
-                  <div className="ml-auto flex gap-2">
-                    {Array.from({ length: 3 }, (_, j) => (
-                      <div key={j} className="h-3 w-3 rounded-full bg-flux-border animate-pulse" />
-                    ))}
-                  </div>
+                  {Array.from({ length: 4 }, (_, j) => (
+                    <div key={`s${j}`} className="h-3 mx-1 rounded bg-flux-border/40 animate-pulse" />
+                  ))}
+                  <div className="h-3 mx-1 rounded bg-flux-border/60 animate-pulse" />
                 </div>
               ))}
             </div>
           </div>
+          {/* Spinner overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/10 border-t-blue-500" />
+            <p className="mt-3 text-xs text-flux-text-muted">Chargement en cours…</p>
+          </div>
         </div>
-        <span className="sr-only">Chargement du tableau de flux…</span>
       </div>
     );
   }

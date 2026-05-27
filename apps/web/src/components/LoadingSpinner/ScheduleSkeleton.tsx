@@ -92,7 +92,11 @@ export const ScheduleSkeleton = memo(function ScheduleSkeleton() {
         </div>
       </div>
 
-      <span className="sr-only">Chargement du planning…</span>
+      {/* Spinner overlay */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/10 border-t-blue-500" />
+        <p className="mt-3 text-xs text-flux-text-muted">Chargement en cours…</p>
+      </div>
     </div>
   );
 });
