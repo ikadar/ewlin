@@ -3,7 +3,6 @@ import { Loader2, CheckCircle2, AlertCircle, Clock, Sparkles, RefreshCw, Play } 
 import { useScenarioMode } from '../../contexts/ScenarioContext';
 import type { ComputeBarPhase } from '../../contexts/AutoRecomputeContext';
 
-const DEBOUNCE_S = 10;
 const SUCCESS_HIDE_MS = 4_000;
 const OPTIMIZED_HIDE_MS = 6_000;
 
@@ -13,14 +12,16 @@ type EnvPalette = {
   progressBar: string;
 };
 
-const PALETTES: Record<'preprod' | 'prod', EnvPalette> = {
+const PALETTES: Record<'preprod' | 'prod', EnvPalette & { baseActive: string }> = {
   preprod: {
     base: 'bg-emerald-500/[0.06] border-b-emerald-500/35 text-emerald-300',
+    baseActive: 'bg-emerald-500/[0.12] border-b-emerald-500/35 text-emerald-300',
     fill: 'bg-emerald-500/[0.18]',
     progressBar: 'bg-emerald-300',
   },
   prod: {
     base: 'bg-amber-500/[0.06] border-b-amber-500/35 text-amber-300',
+    baseActive: 'bg-amber-500/[0.12] border-b-amber-500/35 text-amber-300',
     fill: 'bg-amber-500/[0.18]',
     progressBar: 'bg-amber-300',
   },
@@ -68,17 +69,20 @@ export function ComputeBar({ phase, onFlush, onRetry }: Props) {
     return clearHideTimer;
   }, [phase, clearHideTimer]);
 
-  // Pending fill animation: reset scaleX to 0 then animate to 1
+  const fillKey = phase.type === 'pending' ? phase.fireAt : 0;
+  const fillDurationS = phase.type === 'pending'
+    ? Math.max(1, Math.ceil((phase.fireAt - Date.now()) / 1000))
+    : 0;
+
   useEffect(() => {
     const el = fillRef.current;
     if (!el) return;
     if (phase.type === 'pending') {
       el.style.transition = 'none';
       el.style.transform = 'scaleX(0)';
-      // Double rAF to ensure the browser paints scaleX(0) before animating
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          el.style.transition = `transform ${DEBOUNCE_S}s linear`;
+          el.style.transition = `transform ${fillDurationS}s linear`;
           el.style.transform = 'scaleX(1)';
         });
       });
@@ -86,19 +90,13 @@ export function ComputeBar({ phase, onFlush, onRetry }: Props) {
       el.style.transition = 'none';
       el.style.transform = 'scaleX(0)';
     }
-  }, [phase.type, phase.type === 'pending' ? (phase as { fireAt: number }).fireAt : 0]);
+  }, [phase.type, fillKey, fillDurationS]);
 
-  const isPending = phase.type === 'pending';
-  const isError = phase.type === 'failed';
-
-  const barClasses = isError ? ERROR_CLASSES : isPending ? palette.base : `${palette.base} ${phase.type !== 'idle' ? 'bg-opacity-12' : ''}`;
-
-  // Compute non-pending base: bump bg opacity
-  const baseStyle = isError
+  const baseStyle = phase.type === 'failed'
     ? ERROR_CLASSES
-    : isPending
+    : phase.type === 'pending'
       ? palette.base
-      : palette.base.replace('/[0.06]', '/[0.12]');
+      : palette.baseActive;
 
   return (
     <div className="overflow-hidden">

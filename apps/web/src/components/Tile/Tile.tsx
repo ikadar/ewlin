@@ -503,14 +503,16 @@ export const Tile = memo(function Tile({
             </span>
           )}
           {completionCell && (
-            <span
+            <button
+              type="button"
               onClick={handleToggleCompletion}
+              disabled={completionCell.isDisabled}
               className={`completion-toggle shrink-0 inline-flex items-center align-middle mr-1 transition-colors ${
                 completionCell.isDisabled
-                  ? 'pointer-events-none text-emerald-500/50'
+                  ? 'text-emerald-500/50'
                   : completionCell.isChecked
-                    ? 'pointer-events-auto cursor-pointer text-emerald-400 hover:text-emerald-300'
-                    : 'pointer-events-auto cursor-pointer text-zinc-600 hover:text-zinc-400'
+                    ? 'cursor-pointer text-emerald-400 hover:text-emerald-300'
+                    : 'cursor-pointer text-zinc-600 hover:text-zinc-400'
               }`}
               data-testid="tile-completion-toggle"
             >
@@ -519,7 +521,7 @@ export const Tile = memo(function Tile({
                   ? <><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></>
                   : <circle cx="12" cy="12" r="10" />}
               </svg>
-            </span>
+            </button>
           )}
           {displayMode === 'tirage' && tirageLabel
             ? tirageLabel

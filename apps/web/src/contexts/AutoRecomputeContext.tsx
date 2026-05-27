@@ -30,7 +30,6 @@ import {
 } from '../hooks/useComputeReportStream';
 import { ComputeToastStack } from '../components/ComputeToastStack';
 import { ComputeReportToast } from '../components/ComputeReportToast/ComputeReportToast';
-import { ComputeBar } from '../components/ComputeBar';
 import { registerAutoRecomputeTrigger } from '../store/middleware/autoRecomputeMiddleware';
 
 export type ComputeBarPhase =
