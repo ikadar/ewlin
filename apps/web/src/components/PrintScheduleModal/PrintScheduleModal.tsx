@@ -173,19 +173,23 @@ export function PrintScheduleModal({ isOpen, onClose }: Props) {
       const to = new Date(now.getTime() + horizon * 3600_000);
       const baseOpts = { snapshot, from: now, to };
 
+      const day = now.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }).replace(/\.\s?/g, '').replace(' ', '');
+      const env = mode === 'prod' ? 'prod' : 'preprod';
+      const tag = `${env}-${day}-${horizon}h`;
+
       if (includeStations && includeOperators) {
         const stationsBuf = generateSchedulePdf({ ...baseOpts, includeStations: true, includeOperators: false });
         const operatorsBuf = generateSchedulePdf({ ...baseOpts, includeStations: false, includeOperators: true });
         const zip = new JSZip();
-        zip.file('planning-stations.pdf', stationsBuf);
-        zip.file('planning-operateurs.pdf', operatorsBuf);
+        zip.file(`planning-stations-${tag}.pdf`, stationsBuf);
+        zip.file(`planning-operateurs-${tag}.pdf`, operatorsBuf);
         const blob = await zip.generateAsync({ type: 'blob' });
-        saveBlob(blob, 'planning.zip');
+        saveBlob(blob, `planning-${tag}.zip`);
       } else {
         const buf = generateSchedulePdf({ ...baseOpts, includeStations, includeOperators });
         const blob = new Blob([buf], { type: 'application/pdf' });
-        const name = includeStations ? 'planning-stations.pdf' : 'planning-operateurs.pdf';
-        saveBlob(blob, name);
+        const kind = includeStations ? 'stations' : 'operateurs';
+        saveBlob(blob, `planning-${kind}-${tag}.pdf`);
       }
       setDownloaded(true);
     } finally {
