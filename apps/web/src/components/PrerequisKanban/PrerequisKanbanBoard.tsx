@@ -87,11 +87,11 @@ export function PrerequisKanbanBoard({ title, columns, jobs, sortKey, onSortChan
         const sep = k.indexOf('::');
         if (sep === -1) {
           const job = filteredJobs.find((j) => j.jobUuid === k);
-          if (job) ids.push(...job.groups.flatMap((g) => g.elements.map((el) => el.elementId)));
+          if (job?.groups) ids.push(...job.groups.flatMap((g) => g.elements.map((el) => el.elementId)));
         } else {
           const jobUuid = k.slice(0, sep);
           const pk = k.slice(sep + 2);
-          const group = filteredJobs.find((j) => j.jobUuid === jobUuid)?.groups.find((g) => g.paperKey === pk);
+          const group = filteredJobs.find((j) => j.jobUuid === jobUuid)?.groups?.find((g) => g.paperKey === pk);
           if (group) ids.push(...group.elements.map((el) => el.elementId));
         }
       }
