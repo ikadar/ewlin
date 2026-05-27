@@ -9,20 +9,24 @@ export interface PrintOptions {
   includeOperators: boolean;
 }
 
-const PAGE_W = 210;
-const PAGE_H = 297;
-const MARGIN = 15;
+// A4 landscape
+const PAGE_W = 297;
+const PAGE_H = 210;
+const MARGIN = 12;
 const CONTENT_W = PAGE_W - 2 * MARGIN;
-const ROW_H = 6.5;
-const FOOTER_ZONE = 12;
+const ROW_H = 7.5;
+const FOOTER_ZONE = 10;
 const COLOR_STRIP_W = 2.5;
 
-const COL_START = 18;
-const COL_END = 18;
+// Column widths — order: début, fin, durée, référence, description, extra, début réel, fin réelle
+const COL_START = 15;
+const COL_END = 15;
+const COL_DURATION = 14;
 const COL_REF = 26;
-const COL_DURATION = 18;
 const COL_EXTRA = 30;
-const COL_DESC = CONTENT_W - COL_START - COL_END - COL_REF - COL_DURATION - COL_EXTRA;
+const COL_REAL_START = 24;
+const COL_REAL_END = 24;
+const COL_DESC = CONTENT_W - COLOR_STRIP_W - COL_START - COL_END - COL_DURATION - COL_REF - COL_EXTRA - COL_REAL_START - COL_REAL_END;
 
 interface PageDef {
   title: string;
@@ -64,22 +68,35 @@ function fmtDateShort(d: Date): string {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function fmtDateTime(d: Date): string {
+  return `${fmtDateShort(d)} ${fmtTime(d)}`;
+}
+
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return text.slice(0, max - 1) + '…';
 }
 
-function drawFooter(doc: jsPDF, pageNum: number, totalPages: number) {
-  const y = PAGE_H - MARGIN + 2;
+function drawDottedLine(doc: jsPDF, x1: number, y: number, x2: number) {
+  doc.setDrawColor(190, 190, 190);
+  doc.setLineWidth(0.2);
+  doc.setLineDashPattern([1.2, 1.5], 0);
+  doc.line(x1, y, x2, y);
+  doc.setLineDashPattern([], 0);
+}
+
+function drawFooter(doc: jsPDF, from: Date, to: Date, pageNum: number, totalPages: number) {
+  const y = PAGE_H - MARGIN + 1;
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.15);
-  doc.line(MARGIN, y - 4, PAGE_W - MARGIN, y - 4);
+  doc.setLineDashPattern([], 0);
+  doc.line(MARGIN, y - 3, PAGE_W - MARGIN, y - 3);
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(160, 160, 160);
   const now = new Date();
   doc.text(
-    `Flux — Imprimé le ${fmtDateShort(now)} à ${fmtTime(now)}`,
+    `Flux — ${fmtDateTime(from)} → ${fmtDateTime(to)} — Imprimé le ${fmtDateShort(now)} à ${fmtTime(now)}`,
     MARGIN,
     y,
   );
@@ -88,7 +105,7 @@ function drawFooter(doc: jsPDF, pageNum: number, totalPages: number) {
 
 export function generateSchedulePdf(options: PrintOptions): void {
   const { snapshot, from, to, includeStations, includeOperators } = options;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   const jobMap = new Map(snapshot.jobs.map(j => [j.id, j]));
   const elementMap = new Map(snapshot.elements.map(e => [e.id, e]));
@@ -146,7 +163,7 @@ export function generateSchedulePdf(options: PrintOptions): void {
     doc.setFontSize(12);
     doc.setTextColor(120, 120, 120);
     doc.text('Aucune tâche dans la plage sélectionnée.', PAGE_W / 2, PAGE_H / 2, { align: 'center' });
-    drawFooter(doc, 1, 1);
+    drawFooter(doc, from, to, 1, 1);
     doc.save('planning.pdf');
     return;
   }
@@ -154,7 +171,7 @@ export function generateSchedulePdf(options: PrintOptions): void {
   const totalPages = pages.length;
 
   for (let pi = 0; pi < pages.length; pi++) {
-    if (pi > 0) doc.addPage();
+    if (pi > 0) doc.addPage('a4', 'landscape');
     const pg = pages[pi];
     const extraHeader = pg.kind === 'station' ? 'OPÉRATEURS' : 'STATION';
     let y = MARGIN;
@@ -167,28 +184,29 @@ export function generateSchedulePdf(options: PrintOptions): void {
       doc.text(pg.kind === 'station' ? 'STATION' : 'OPÉRATEUR', MARGIN, y + 3);
       y += 5;
 
-      doc.setFontSize(continuation ? 13 : 15);
+      doc.setFontSize(continuation ? 12 : 14);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(35, 35, 35);
       const label = continuation ? `${pg.title} (suite)` : pg.title;
-      doc.text(label, MARGIN, y + 5);
+      doc.text(label, MARGIN, y + 4.5);
 
       if (pg.subtitle && !continuation) {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(110, 110, 110);
-        doc.text(pg.subtitle, MARGIN, y + 10);
-        y += 4;
+        doc.text(pg.subtitle, MARGIN, y + 9);
+        y += 3;
       }
 
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(110, 110, 110);
-      doc.text(`${fmtDateShort(from)} — ${fmtDateShort(to)}`, PAGE_W - MARGIN, y + 5, { align: 'right' });
+      doc.text(`${fmtDateTime(from)} → ${fmtDateTime(to)}`, PAGE_W - MARGIN, y + 4.5, { align: 'right' });
 
-      y += 9;
+      y += 8;
       doc.setDrawColor(190, 190, 190);
       doc.setLineWidth(0.25);
+      doc.setLineDashPattern([], 0);
       doc.line(MARGIN, y, PAGE_W - MARGIN, y);
       y += 3;
     };
@@ -198,23 +216,28 @@ export function generateSchedulePdf(options: PrintOptions): void {
       doc.rect(MARGIN, y, CONTENT_W, ROW_H, 'F');
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.15);
+      doc.setLineDashPattern([], 0);
       doc.line(MARGIN, y + ROW_H, PAGE_W - MARGIN, y + ROW_H);
 
       doc.setFontSize(6);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 100, 100);
       let x = MARGIN + COLOR_STRIP_W + 2;
-      doc.text('DÉBUT', x, y + 4);
+      doc.text('DÉBUT', x, y + 4.5);
       x += COL_START;
-      doc.text('FIN', x, y + 4);
+      doc.text('FIN', x, y + 4.5);
       x += COL_END;
-      doc.text('RÉFÉRENCE', x, y + 4);
+      doc.text('DURÉE', x, y + 4.5);
+      x += COL_DURATION;
+      doc.text('RÉFÉRENCE', x, y + 4.5);
       x += COL_REF;
-      doc.text('DESCRIPTION', x, y + 4);
+      doc.text('DESCRIPTION', x, y + 4.5);
       x += COL_DESC;
-      doc.text(extraHeader, x, y + 4);
+      doc.text(extraHeader, x, y + 4.5);
       x += COL_EXTRA;
-      doc.text('DURÉE', x, y + 4);
+      doc.text('DÉBUT RÉEL', x, y + 4.5);
+      x += COL_REAL_START;
+      doc.text('FIN RÉELLE', x, y + 4.5);
       y += ROW_H;
     };
 
@@ -226,8 +249,8 @@ export function generateSchedulePdf(options: PrintOptions): void {
 
     const ensureSpace = (needed: number): boolean => {
       if (y + needed <= PAGE_H - MARGIN - FOOTER_ZONE) return false;
-      drawFooter(doc, pdfPage, totalPages);
-      doc.addPage();
+      drawFooter(doc, from, to, pdfPage, totalPages);
+      doc.addPage('a4', 'landscape');
       pdfPage++;
       y = MARGIN;
       drawPageHeader(true);
@@ -254,7 +277,7 @@ export function generateSchedulePdf(options: PrintOptions): void {
         doc.setFontSize(7);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(55, 75, 120);
-        doc.text(dayStr, MARGIN + COLOR_STRIP_W + 2, y + 4.2);
+        doc.text(dayStr, MARGIN + COLOR_STRIP_W + 2, y + 4.5);
         y += ROW_H;
         rowCount = 0;
       }
@@ -266,6 +289,7 @@ export function generateSchedulePdf(options: PrintOptions): void {
         doc.rect(MARGIN + COLOR_STRIP_W, y, CONTENT_W - COLOR_STRIP_W, ROW_H, 'F');
       }
 
+      // Color strip
       const rgb = job?.color ? hexToRgb(job.color) : [150, 150, 150] as [number, number, number];
       const pastel = pastelify(rgb, 0.45);
       doc.setFillColor(...pastel);
@@ -277,20 +301,31 @@ export function generateSchedulePdf(options: PrintOptions): void {
       doc.setTextColor(...textColor);
 
       let x = MARGIN + COLOR_STRIP_W + 2;
-      doc.text(fmtTime(start), x, y + 4.2);
+
+      // Début
+      doc.text(fmtTime(start), x, y + 4.5);
       x += COL_START;
-      doc.text(fmtTime(end), x, y + 4.2);
+
+      // Fin
+      doc.text(fmtTime(end), x, y + 4.5);
       x += COL_END;
 
+      // Durée
+      const dur = end.getTime() - start.getTime();
+      doc.text(fmtDuration(dur), x, y + 4.5);
+      x += COL_DURATION;
+
+      // Référence
       doc.setFont('helvetica', 'bold');
-      doc.text(truncate(job?.reference ?? '—', 14), x, y + 4.2);
+      doc.text(truncate(job?.reference ?? '—', 14), x, y + 4.5);
       x += COL_REF;
 
+      // Description
       doc.setFont('helvetica', 'normal');
-      const desc = job?.description ?? '';
-      doc.text(truncate(desc, 42), x, y + 4.2);
+      doc.text(truncate(job?.description ?? '', 65), x, y + 4.5);
       x += COL_DESC;
 
+      // Extra: opérateurs ou station
       doc.setFontSize(7);
       if (pg.kind === 'station') {
         const opNames = (a.operators ?? [])
@@ -300,22 +335,24 @@ export function generateSchedulePdf(options: PrintOptions): void {
           })
           .filter(Boolean)
           .join(', ');
-        doc.text(truncate(opNames || '—', 18), x, y + 4.2);
+        doc.text(truncate(opNames || '—', 20), x, y + 4.5);
       } else {
         const station = stationMap.get(a.targetId);
-        doc.text(truncate(station?.name ?? '—', 18), x, y + 4.2);
+        doc.text(truncate(station?.name ?? '—', 20), x, y + 4.5);
       }
       x += COL_EXTRA;
 
-      doc.setFontSize(7.5);
-      const dur = end.getTime() - start.getTime();
-      doc.text(fmtDuration(dur), x, y + 4.2);
+      // Writable fields: dotted underlines for handwritten times
+      const lineY = y + ROW_H - 1.8;
+      drawDottedLine(doc, x + 1, lineY, x + COL_REAL_START - 3);
+      x += COL_REAL_START;
+      drawDottedLine(doc, x + 1, lineY, x + COL_REAL_END - 3);
 
       y += ROW_H;
       rowCount++;
     }
 
-    drawFooter(doc, pdfPage, totalPages);
+    drawFooter(doc, from, to, pdfPage, totalPages);
   }
 
   doc.save('planning.pdf');
