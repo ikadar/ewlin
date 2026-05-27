@@ -20,7 +20,7 @@ const COLOR_STRIP_W = 2.5;
 
 // Column widths — order: début, fin, durée, référence, description, extra, début réel, fin réelle
 const COL_START = 15;
-const COL_END = 15;
+const COL_END = 22;
 const COL_DURATION = 14;
 const COL_REF = 26;
 const COL_EXTRA = 30;
@@ -47,6 +47,14 @@ function pastelify(rgb: [number, number, number], strength = 0.35): [number, num
 
 function fmtTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function fmtTimeWithDate(d: Date, ref: Date): string {
+  const time = fmtTime(d);
+  if (d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate()) {
+    return time;
+  }
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${time}`;
 }
 
 function fmtDuration(ms: number): string {
@@ -331,8 +339,8 @@ export function generateSchedulePdf(options: PrintOptions): ArrayBuffer {
       doc.text(fmtTime(start), x, y + 4.5);
       x += COL_START;
 
-      // Fin
-      doc.text(fmtTime(end), x, y + 4.5);
+      // Fin (include date if different day)
+      doc.text(fmtTimeWithDate(end, start), x, y + 4.5);
       x += COL_END;
 
       // Durée
