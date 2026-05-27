@@ -5,7 +5,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { useNow } from './contexts/NowContext';
 import { getNow } from './utils/getNow';
 import { ZOOM_LEVELS } from './utils/zoom';
-import { LoadingSpinner } from './components/LoadingSpinner';
+import { ScheduleSkeleton } from './components/LoadingSpinner';
 import { ErrorState } from './components/ErrorState';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MaintenanceState } from './components/MaintenanceState';
@@ -1860,7 +1860,7 @@ function AppContent() {
       jobId: job.id,
       job: { reference: job.reference, client: job.client },
       machineName: station?.name ?? internalTask.stationId,
-      operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
+      operatorName: op ? `${op.firstName.charAt(0)}. ${op.lastName}` : '—',
       operatorId: opEntry?.operatorId ?? '',
       stationId: internalTask.stationId,
       now,
@@ -2042,7 +2042,7 @@ function AppContent() {
   // This check is placed after all hooks to comply with Rules of Hooks
   const isMockMode = shouldUseMockMode();
   if (isLoading && !isMockMode && !isJcfFromFlux) {
-    return <LoadingSpinner message="Chargement des données..." />;
+    return <ScheduleSkeleton />;
   }
 
   // v0.5.7: Show maintenance page for 503 Service Unavailable

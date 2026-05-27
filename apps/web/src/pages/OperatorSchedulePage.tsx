@@ -93,7 +93,7 @@ import { SafetyBand } from '../components/SafetyBand';
 import { buildSequenceIndexLookup, isInSafetyZone, makeSafetyKey } from '../utils/safetyZone';
 import { useSetSafetyOverrideMutation } from '../store';
 import { OperatorHeader } from '../components/OperatorHeaders';
-import { LoadingSpinner } from '../components/LoadingSpinner/LoadingSpinner';
+import { ScheduleSkeleton } from '../components/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
 import { useVirtualScroll, isAssignmentVisible, useMassUnschedule } from '../hooks';
 import { useToast } from '../hooks/useToast';
@@ -1120,9 +1120,7 @@ export default function OperatorSchedulePage() {
   // ---- Loading / error ----
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
+      <ScheduleSkeleton />
     );
   }
 
@@ -1222,7 +1220,7 @@ export default function OperatorSchedulePage() {
             jobId: job.id,
             job: { reference: job.reference, client: job.client },
             machineName: stationName ?? task.stationId,
-            operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
+            operatorName: op ? `${op.firstName.charAt(0)}. ${op.lastName}` : '—',
             operatorId: operatorId,
             stationId: task.stationId,
             now,
