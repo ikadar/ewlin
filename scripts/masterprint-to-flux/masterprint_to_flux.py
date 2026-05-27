@@ -65,6 +65,75 @@ def _request_has_lanced_elements(request: dict) -> bool:
     )
 
 
+import re
+
+_DSL_ST_RE = re.compile(r'^ST:([\w ]+)\(\d+j\):')
+
+
+def _extract_provider_names_from_built(built: list) -> dict[str, set[str]]:
+    """Scan built job requests for ST: DSL lines. Returns {provider_name: {action_types}}."""
+    providers: dict[str, set[str]] = {}
+    for req, _trace, _hash in built:
+        for element in req.get("elements", []):
+            for line in element.get("sequence", "").split("\n"):
+                line = line.strip()
+                if not line.startswith("ST:"):
+                    continue
+                m = _DSL_ST_RE.match(line)
+                if not m:
+                    continue
+                provider_raw = m.group(1).replace("_", " ").strip()
+                # Extract action_type (everything after the closing paren+colon)
+                after_paren = line.split("):", 1)
+                action_type = after_paren[1].strip() if len(after_paren) > 1 else "divers"
+                if provider_raw not in providers:
+                    providers[provider_raw] = set()
+                providers[provider_raw].add(action_type)
+    return providers
+
+
+def _sync_providers(built: list, config: dict, token: str, log: logging.Logger) -> list[str]:
+    """Ensure all referenced providers exist in Flux. Auto-creates missing ones."""
+    api_url = config["api"]["base_url"]
+    transit_days = config.get("outsourcing", {}).get("transit_days", 1)
+
+    needed = _extract_provider_names_from_built(built)
+    if not needed:
+        return []
+
+    try:
+        existing = flux_api.list_providers(api_url, token)
+    except Exception as e:
+        log.warning(f"Provider sync: cannot list existing providers: {e}")
+        return []
+
+    existing_names = {p.get("name", "").lower() for p in existing}
+
+    created: list[str] = []
+    for provider_name, action_types in sorted(needed.items()):
+        if provider_name.lower() in existing_names:
+            continue
+        try:
+            status, body = flux_api.create_provider(
+                api_url, token, provider_name, sorted(action_types), transit_days
+            )
+            if status == 201:
+                created.append(provider_name)
+                log.info(f"Provider created: '{provider_name}' (actions: {sorted(action_types)}, transit: {transit_days}d)")
+            elif status == 409:
+                log.info(f"Provider '{provider_name}' already exists (409)")
+            else:
+                log.warning(f"Provider create failed for '{provider_name}': HTTP {status} {body}")
+        except Exception as e:
+            log.warning(f"Provider create exception for '{provider_name}': {e}")
+
+    if created:
+        log.info(f"Provider sync: {len(created)} new providers created")
+    else:
+        log.info("Provider sync: all providers already exist")
+    return created
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Import MasterPrint dossiers into Flux with diff tracking")
     parser.add_argument("--config", default=str(SCRIPT_DIR / "masterprint-mapping.yaml"))
@@ -138,6 +207,13 @@ def main() -> int:
         built.append((req, trace, mp_hash))
 
     log.info(f"Transformed: {len(built)} jobs built, {len(rejected_dossiers)} dossiers rejected")
+
+    # =============== Phase 2b — Provider Sync ===============
+    # Collect all unique provider names referenced in outsourced DSL lines,
+    # fetch existing providers from the API, and auto-create missing ones.
+    providers_created: list[str] = []
+    if not args.dry_run and token:
+        providers_created = _sync_providers(built, config, token, log)
 
     # =============== Phase 3+4 — Diff + Push (per scenario) ===============
     push_stats_by_scenario: dict[str, Counter] = {}
@@ -227,6 +303,7 @@ def main() -> int:
             "jobs_built": len(built),
             "dossiers_rejected": len(rejected_dossiers),
         },
+        "providers_created": providers_created,
         "skipped_operations_by_reason": dict(skipped_ops_counter),
         "rejected_dossiers": rejected_dossiers,
         "diff_by_scenario": diff_stats_by_scenario,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -99,6 +100,74 @@ def _eval_condition(cond: dict, op: Operation, ctx: ResolverContext) -> bool:
     raise ValueError(f"Unknown condition: {cond}")
 
 
+_LIBOP_NOISE_RE = re.compile(
+    r'\b(?:DEVIS|devis)\s+[\w/.-]+|'   # "DEVIS M4473", "DEVIS DE00002040"
+    r'\bAF\s?\d+\b|'                     # "AF 37", "AF37" (when used as action prefix)
+    r'\bS/T\s+|'                          # "S/T " prefix
+    r'\bDE\d{8,}\b|'                      # long reference numbers "DE0000206701"
+    r'[RV]°',                             # "R°", "V°" (recto/verso marks)
+    re.IGNORECASE,
+)
+
+
+def _clean_libop_as_action(libop: str, strip_extra: list[str] | None = None) -> str:
+    """Clean LIBOP text into a usable action_type description.
+
+    strip_extra: additional substrings to remove (e.g. matched provider name).
+    """
+    cleaned = _LIBOP_NOISE_RE.sub("", libop)
+    if strip_extra:
+        for s in strip_extra:
+            cleaned = re.sub(re.escape(s), "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s*[-–/]+\s*$', '', cleaned)
+    cleaned = re.sub(r'^\s*[-–/]+\s*', '', cleaned)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+    if not cleaned:
+        return "divers"
+    return cleaned[:80].lower()
+
+
+def _resolve_outsourced_details(op: Operation, outsourcing: dict) -> tuple[str, str]:
+    """Extract (provider_name, action_type) from an ST operation.
+
+    Resolution order:
+      1. CDMAC rules (PLB → Pelliculage ST / pelliculage brillant)
+      2. LIBOP keyword rules (first match wins)
+      3. Fallback: provider=default, action_type from cleaned LIBOP
+    """
+    default_provider = outsourcing.get("default_provider", "Inconnu")
+    default_action = outsourcing.get("default_action_type", "divers")
+    libop = (op.libop or "").strip()
+
+    # Tier 1: CDMAC-based (pelliculage, vernis — typed operations)
+    cdmac_rules = outsourcing.get("cdmac_rules", {})
+    if op.cdmac and op.cdmac in cdmac_rules:
+        rule = cdmac_rules[op.cdmac]
+        return rule.get("provider", default_provider), rule.get("action_type", default_action)
+
+    # Tier 2: LIBOP keyword matching (known providers)
+    if libop:
+        libop_upper = libop.upper()
+        for rule in outsourcing.get("provider_rules", []):
+            match_str = rule.get("match", "").upper()
+            if match_str and match_str in libop_upper:
+                provider = rule.get("provider", default_provider)
+                if "action_type" in rule:
+                    action = rule["action_type"]
+                else:
+                    action = _clean_libop_as_action(
+                        libop,
+                        strip_extra=[rule.get("provider", ""), rule.get("match", "")],
+                    )
+                return provider, action
+
+    # Tier 3: Fallback — generic "Sous-Traitance" or empty LIBOP
+    if not libop or libop.lower() in ("sous-traitance", "sous traitance"):
+        return default_provider, default_action
+
+    return default_provider, _clean_libop_as_action(libop)
+
+
 def resolve(op: Operation, ctx: ResolverContext, config: dict) -> Resolution:
     """Décide quoi faire avec une opération MasterPrint."""
     # Skip explicite par NUSEC
@@ -114,10 +183,11 @@ def resolve(op: Operation, ctx: ResolverContext, config: dict) -> Resolution:
 
     # Tâche sous-traitée
     if is_outsourced_trigger:
+        provider_name, action_type = _resolve_outsourced_details(op, outsourcing)
         return Resolution(
             kind="outsourced",
-            provider_name=outsourcing.get("provider_name", "Inconnu"),
-            action_type=outsourcing.get("action_type", "divers"),
+            provider_name=provider_name,
+            action_type=action_type,
             days=outsourcing.get("default_days", 3),
         )
 

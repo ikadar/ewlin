@@ -14,9 +14,49 @@ skip_nusec: [CTP, TRANS, "*ENC", PAO]
 # Operations à transformer en tâches sous-traitées
 outsourcing:
   trigger_nusec: ST
-  provider_name: Inconnu
+  default_provider: Inconnu
   default_days: 3
-  action_type: divers
+  default_action_type: divers
+  transit_days: 1
+
+  # CDMAC on ST operations → specific provider + action type (pelliculage, vernis)
+  cdmac_rules:
+    PLB:  { provider: Pelliculage ST, action_type: pelliculage brillant }
+    PLM:  { provider: Pelliculage ST, action_type: pelliculage mat }
+    PLT:  { provider: Pelliculage ST, action_type: pelliculage toilé }
+    PMAT: { provider: Pelliculage ST, action_type: pelliculage mat anti-rayures }
+    VUV:  { provider: Pelliculage ST, action_type: vernis UV }
+
+  # Known provider patterns from LIBOP (first match wins, case-insensitive)
+  # "match" = substring to find in LIBOP. "provider" = canonical provider name.
+  # "action_type" overrides default; omit to derive from cleaned LIBOP.
+  provider_rules:
+    - match: "AF 37"
+      provider: AF 37
+      action_type: reliure
+    - match: "AF37"
+      provider: AF 37
+      action_type: reliure
+    - match: "ROUTAGE 86"
+      provider: Routage 86
+      action_type: routage
+    - match: "PUBLITEX"
+      provider: Publitex
+    - match: "PUBITEX"
+      provider: Publitex
+    - match: "PRESSE DE TOURAINE"
+      provider: Presse de Touraine
+    - match: "PRESSE TOURAINE"
+      provider: Presse de Touraine
+    - match: "TRANSPORTS JEANTET"
+      provider: Transports Jeantet
+      action_type: transport
+    - match: "RAYNAUD"
+      provider: Raynaud Imprimeurs
+    - match: "BROCHURE RAPIDE"
+      provider: Brochure Rapide
+    - match: "GEPSA"
+      provider: Gepsa
 
 # Mapping NUSEC -> Station (avec règles)
 # rule types : fixed | duration_threshold | postes_threshold | format_threshold | composite

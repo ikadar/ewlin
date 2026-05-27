@@ -96,6 +96,32 @@ def trigger_recompute(base_url: str, token: str, *, scenario: str = "prod") -> t
     return _action_with_retry("POST", f"{base_url}/schedule/compute", token, {"mode": "full"}, 1, scenario)
 
 
+def list_providers(base_url: str, token: str) -> list[dict]:
+    """GET /providers — returns list of all existing outsourced providers."""
+    status, body = _request("GET", f"{base_url}/providers", token=token, timeout=30)
+    if status != 200:
+        raise ApiError(status, json.dumps(body) if body else "")
+    if isinstance(body, dict):
+        return body.get("data", [])
+    return body if isinstance(body, list) else []
+
+
+def create_provider(
+    base_url: str,
+    token: str,
+    name: str,
+    action_types: list[str],
+    transit_days: int = 1,
+) -> tuple[int, dict | None]:
+    """POST /providers — create an outsourced provider. Returns (status, body)."""
+    payload = {
+        "name": name,
+        "supportedActionTypes": action_types,
+        "transitDays": transit_days,
+    }
+    return _action_with_retry("POST", f"{base_url}/providers", token, payload, 1)
+
+
 def _action_with_retry(method: str, url: str, token: str, body: dict | None, retry_5xx: int, scenario: str = "prod") -> tuple[int, dict | None]:
     attempts = 1 + retry_5xx
     last: tuple[int, dict | None] = (0, None)
