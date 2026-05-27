@@ -32,6 +32,7 @@ interface PageDef {
   title: string;
   kind: 'station' | 'operator';
   subtitle?: string;
+  operatorId?: string;
   assignments: TaskAssignment[];
 }
 
@@ -189,7 +190,7 @@ export function generateSchedulePdf(options: PrintOptions): ArrayBuffer {
       const unique = [...new Map(raw.map(a => [a.id, a])).values()];
       unique.sort((a, b) => new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime());
       const sub = op.role ? op.role : undefined;
-      pages.push({ title: `${op.firstName} ${op.lastName}`, kind: 'operator', subtitle: sub, assignments: unique });
+      pages.push({ title: `${op.firstName} ${op.lastName}`, kind: 'operator', subtitle: sub, operatorId: op.id, assignments: unique });
     }
   }
 
@@ -294,8 +295,12 @@ export function generateSchedulePdf(options: PrintOptions): ArrayBuffer {
     };
 
     for (const a of pg.assignments) {
-      const start = new Date(a.scheduledStart);
-      const end = new Date(a.scheduledEnd);
+      // For operator pages, use the operator's stint (from/to) when available
+      const opStint = pg.operatorId
+        ? a.operators?.find(o => o.operatorId === pg.operatorId)
+        : undefined;
+      const start = opStint?.from ? new Date(opStint.from) : new Date(a.scheduledStart);
+      const end = opStint?.to ? new Date(opStint.to) : new Date(a.scheduledEnd);
       const task = taskMap.get(a.taskId);
       const elementId = task && 'elementId' in task ? (task as { elementId: string }).elementId : undefined;
       const element = elementId ? elementMap.get(elementId) : undefined;
