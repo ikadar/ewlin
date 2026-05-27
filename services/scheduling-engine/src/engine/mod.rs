@@ -26,7 +26,7 @@ fn emit(tx: &ProgressSender, event: ProgressEvent) {
     }
 }
 
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, TimeZone};
 
 use crate::model::job::JobInput;
 use crate::model::operator::OperatorInput;
@@ -41,26 +41,28 @@ use self::forward_pass::Action;
 /// Resolve the engine's notion of "now" from the request.
 ///
 /// When `reference_time` is provided (PHP forwards its `ClockService::now()`),
-/// parse it and convert to local timezone — the rest of the engine derives
-/// `start_date` and tick offsets from this value, so a global now-override
-/// configured in PHP propagates here without further plumbing. Falls back
-/// to wall clock if the field is absent or unparseable, preserving prod
-/// behaviour when nothing is set.
-fn resolve_now(reference_time: &Option<String>) -> chrono::DateTime<Local> {
+/// parse it and KEEP the original timezone offset. The rest of the engine
+/// derives `start_date` and `now_tick` from `now.hour()`/`now.minute()`,
+/// and `format_minutes` emits naive datetimes that PHP interprets in
+/// Europe/Paris. Preserving the sender's offset ensures `now.hour()`
+/// matches PHP's time-of-day (e.g. 10:00+02:00 → hour=10), regardless
+/// of the server's system timezone.
+fn resolve_now(reference_time: &Option<String>) -> DateTime<FixedOffset> {
     if let Some(s) = reference_time.as_deref() {
         if !s.is_empty() {
             if let Ok(parsed) = DateTime::parse_from_rfc3339(s) {
-                return parsed.with_timezone(&Local);
+                return parsed;
             }
-            // Fallback: accept naive ISO ("2026-05-07T10:00:00") as local-time.
+            // Fallback: accept naive ISO ("2026-05-07T10:00:00") as Europe/Paris.
             if let Ok(naive) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
-                if let chrono::LocalResult::Single(dt) = Local.from_local_datetime(&naive) {
+                let paris = FixedOffset::east_opt(2 * 3600).unwrap();
+                if let chrono::LocalResult::Single(dt) = paris.from_local_datetime(&naive) {
                     return dt;
                 }
             }
         }
     }
-    Local::now()
+    Local::now().fixed_offset()
 }
 
 /// Format a tick count into an ISO datetime string relative to start_date.
@@ -3120,18 +3122,20 @@ mod resolve_now_tests {
     //! Tests for `resolve_now` — the entry point of the now-override
     //! flow on the engine side. PHP forwards its `ClockService::now()`
     //! as `reference_time`, and `resolve_now` parses it into a
-    //! `DateTime<Local>` that drives `start_date` and tick conversions.
+    //! `DateTime<FixedOffset>` that drives `start_date` and tick conversions.
+    //! The returned offset MUST match the sender's timezone so `now.hour()`
+    //! agrees with PHP's time-of-day (format_minutes emits naive datetimes).
     //! Anything unparseable must transparently fall back to wall clock
     //! so a malformed payload never breaks prod compute.
 
     use super::resolve_now;
-    use chrono::{Datelike, Local, TimeZone, Timelike};
+    use chrono::{Datelike, Local, Timelike};
 
     #[test]
     fn returns_wall_clock_when_field_absent() {
-        let before = Local::now();
+        let before = Local::now().fixed_offset();
         let now = resolve_now(&None);
-        let after = Local::now();
+        let after = Local::now().fixed_offset();
         assert!(now >= before);
         assert!(now <= after + chrono::Duration::seconds(1));
     }
@@ -3139,57 +3143,49 @@ mod resolve_now_tests {
     #[test]
     fn returns_wall_clock_when_field_empty() {
         let now = resolve_now(&Some(String::new()));
-        let wall = Local::now();
+        let wall = Local::now().fixed_offset();
         let diff = (now - wall).num_seconds().abs();
         assert!(diff <= 1, "diff {} s exceeds 1 s tolerance", diff);
     }
 
     #[test]
-    fn parses_rfc3339_with_timezone() {
-        // 2026-05-07T10:00:00+02:00 → 2026-05-07 08:00:00 UTC.
+    fn parses_rfc3339_preserving_offset() {
         let s = "2026-05-07T10:00:00+02:00".to_string();
         let parsed = resolve_now(&Some(s));
+        assert_eq!(parsed.year(), 2026);
+        assert_eq!(parsed.month(), 5);
+        assert_eq!(parsed.day(), 7);
+        assert_eq!(parsed.hour(), 10);
+        assert_eq!(parsed.minute(), 0);
         let utc = parsed.with_timezone(&chrono::Utc);
-        assert_eq!(utc.year(), 2026);
-        assert_eq!(utc.month(), 5);
-        assert_eq!(utc.day(), 7);
         assert_eq!(utc.hour(), 8);
-        assert_eq!(utc.minute(), 0);
     }
 
     #[test]
     fn parses_rfc3339_with_z_zulu() {
         let s = "2026-05-07T10:00:00Z".to_string();
         let parsed = resolve_now(&Some(s));
-        let utc = parsed.with_timezone(&chrono::Utc);
-        assert_eq!(utc.hour(), 10);
+        assert_eq!(parsed.hour(), 10);
     }
 
     #[test]
     fn falls_back_to_wall_when_unparseable() {
         let s = "not-a-date".to_string();
         let now = resolve_now(&Some(s));
-        let wall = Local::now();
+        let wall = Local::now().fixed_offset();
         let diff = (now - wall).num_seconds().abs();
         assert!(diff <= 1);
     }
 
     #[test]
-    fn parses_naive_iso_as_local_time() {
-        // Naive ISO: no timezone marker → interpreted as local wall time.
+    fn parses_naive_iso_as_paris_time() {
         let s = "2026-05-07T15:30:00".to_string();
         let parsed = resolve_now(&Some(s));
-        // Sanity: the wall-time fields should match what we wrote.
         assert_eq!(parsed.year(), 2026);
         assert_eq!(parsed.month(), 5);
         assert_eq!(parsed.day(), 7);
-        // Confirm it's the local-time interpretation (not UTC) by
-        // round-tripping through Local.
-        let expected = Local
-            .with_ymd_and_hms(2026, 5, 7, 15, 30, 0)
-            .single()
-            .expect("local time should be unambiguous on May 7");
-        assert_eq!(parsed.timestamp(), expected.timestamp());
+        assert_eq!(parsed.hour(), 15);
+        assert_eq!(parsed.minute(), 30);
     }
 }
 
