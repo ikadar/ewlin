@@ -115,6 +115,7 @@ export function TaskCard({ assignment, snapshot, mode }: TaskCardProps): ReactEl
         <>
           <NonLinearStepper
             plannedEndMin={slotEndMin}
+            nowMin={nowMin}
             label={stepperLabel}
             onTimeChange={handleTimeChange}
             showBlockedButton={cardState === 'fin-proche'}

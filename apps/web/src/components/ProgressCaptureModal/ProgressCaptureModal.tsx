@@ -1,9 +1,12 @@
 /**
- * ProgressCaptureModal v6 — 3-variant progress capture modal.
+ * ProgressCaptureModal v7 — 3-variant progress capture modal.
+ *
+ * Invariant: the stepper floor is NOW — no retroactive reporting.
+ * "Terminé maintenant" when value === NOW, "Je finirai à :" otherwise.
  *
  * Variants (derived from scheduledStart/End vs now):
- *   - in-progress: stepper "Je finirai à :" + blocked sub-mode
- *   - done-past-end: stepper "J'ai terminé à :"
+ *   - in-progress: stepper anchored at scheduledEnd + blocked sub-mode
+ *   - done-past-end: stepper anchored at NOW (scheduledEnd is in the past)
  *   - future-blocked: predecessor info, no stepper
  *
  * The modal owns the stepper state. The parent (SaisieModalContext) owns
@@ -82,21 +85,20 @@ export function ProgressCaptureModal({
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const variant = deriveSaisieVariant(scheduledStart, scheduledEnd, now);
 
-  const pickedTime = new Date(scheduledStart);
-  pickedTime.setHours(0, 0, 0, 0);
-  pickedTime.setMinutes(currentTimeMin);
-  const stepperLabel = pickedTime.getTime() > now.getTime()
-    ? "Je finirai à :"
-    : "J'ai terminé à :";
+  const stepperLabel = currentTimeMin <= nowMin
+    ? "Terminé maintenant"
+    : "Je finirai à :";
+
+  const stepperInitMin = variant === 'done-past-end' ? nowMin : slotEndMin;
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentTimeMin(slotEndMin);
+      setCurrentTimeMin(stepperInitMin);
       setSaving(false);
       setBlockedMode(false);
       setSelectedReason(null);
     }
-  }, [isOpen, slotEndMin]);
+  }, [isOpen, stepperInitMin]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -160,7 +162,7 @@ export function ProgressCaptureModal({
     >
       <div
         className="bg-flux-elevated border border-flux-border rounded-lg shadow-xl overflow-hidden"
-        style={{ maxWidth: '30rem', width: '100%' }}
+        style={{ maxWidth: '38rem', width: '100%' }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="pm-title"
@@ -224,7 +226,8 @@ export function ProgressCaptureModal({
               />
             ) : (
               <NonLinearStepper
-                plannedEndMin={slotEndMin}
+                plannedEndMin={stepperInitMin}
+                nowMin={nowMin}
                 label={stepperLabel}
                 onTimeChange={handleTimeChange}
                 showBlockedButton={variant === 'in-progress'}

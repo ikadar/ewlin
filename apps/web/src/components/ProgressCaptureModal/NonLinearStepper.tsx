@@ -4,6 +4,7 @@ import { fmtTimeMin } from './timeUtils';
 
 export interface NonLinearStepperProps {
   plannedEndMin: number;
+  nowMin: number;
   label: string;
   onTimeChange: (timeMin: number) => void;
   showBlockedButton?: boolean;
@@ -35,6 +36,7 @@ function fmtDuration(minutes: number): string {
 
 export function NonLinearStepper({
   plannedEndMin,
+  nowMin,
   label,
   onTimeChange,
   showBlockedButton,
@@ -47,11 +49,14 @@ export function NonLinearStepper({
   const offset = getOffset(stepIndex);
   const currentTime = plannedEndMin + offset;
 
+  const minusDisabled = plannedEndMin + getOffset(stepIndex - 1) < nowMin;
+
   const handleMinus = useCallback(() => {
     const next = stepIndex - 1;
+    if (plannedEndMin + getOffset(next) < nowMin) return;
     setStepIndex(next);
     onTimeChange(plannedEndMin + getOffset(next));
-  }, [stepIndex, plannedEndMin, onTimeChange]);
+  }, [stepIndex, plannedEndMin, nowMin, onTimeChange]);
 
   const handlePlus = useCallback(() => {
     const next = stepIndex + 1;
@@ -82,7 +87,8 @@ export function NonLinearStepper({
         <button
           type="button"
           onClick={handleMinus}
-          className="w-10 h-10 rounded-[6px] border border-flux-border-light bg-[rgb(45,45,45)] text-flux-text-secondary flex items-center justify-center hover:bg-[rgb(60,60,60)] hover:text-flux-text-primary active:bg-[rgb(70,70,70)] transition-colors"
+          disabled={minusDisabled}
+          className="w-10 h-10 rounded-[6px] border border-flux-border-light bg-[rgb(45,45,45)] text-flux-text-secondary flex items-center justify-center hover:bg-[rgb(60,60,60)] hover:text-flux-text-primary active:bg-[rgb(70,70,70)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[rgb(45,45,45)] disabled:hover:text-flux-text-secondary"
           data-testid="pm-stepper-minus"
         >
           <Minus size={16} />
