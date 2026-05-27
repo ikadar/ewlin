@@ -61,6 +61,13 @@ export function PromotionModal({ open, onClose, onPromoted }: PromotionModalProp
     ? changes.jcf.added + changes.jcf.removed + changes.jcf.modified
     : null;
 
+  const totalJobs = useMemo(() => {
+    if (!preprodSnapshot || !prodSnapshot) return null;
+    const preprod = preprodSnapshot.jobs.length;
+    const prod = prodSnapshot.jobs.length;
+    return { preprod, delta: preprod - prod };
+  }, [preprodSnapshot, prodSnapshot]);
+
   return (
     <Modal open={open} onClose={onClose} width={560} testId="promotion-modal">
       <ModalHeader
@@ -77,6 +84,16 @@ export function PromotionModal({ open, onClose, onPromoted }: PromotionModalProp
       />
       <ModalBody>
         <div className="px-0 py-1">
+          <StatRow label="Jobs total">
+            {!totalJobs ? '—' : (
+              <>
+                <span>{totalJobs.preprod}</span>
+                <span className={`font-mono text-[12px] ${totalJobs.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {formatDelta(totalJobs.delta)}
+                </span>
+              </>
+            )}
+          </StatRow>
           <StatRow label="Jobs planifiés">
             {isFetching || !planned ? '—' : (
               <>
