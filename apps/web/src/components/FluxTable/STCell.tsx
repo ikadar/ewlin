@@ -12,7 +12,7 @@
  * @see docs/production-flow-dashboard-spec/upgrade-colonne-st-en.md §4–5
  */
 
-import { memo, useRef, useCallback } from 'react';
+import { memo, useRef, useCallback, useState, useEffect } from 'react';
 import type { FluxOutsourcingTask, FluxSTStatus } from './fluxTypes';
 import type { TaskStatus } from '@flux/types';
 
@@ -120,50 +120,91 @@ export const STCell = memo(function STCell({ tasks, onUpdateSTStatus, advancemen
 
   return (
     <div className="st-cell" data-testid="st-cell">
-      {tasks.map(task => {
-        const label = `${task.providerName} · ${task.actionType}`;
-        return (
-          <div
-            key={task.taskId}
-            className="st-line"
-            onMouseEnter={(e) => showTooltip(label, e.clientX, e.clientY)}
-            onMouseMove={(e) => moveTooltip(e.clientX, e.clientY)}
-            onMouseLeave={hideTooltip}
-            data-testid={`st-line-${task.taskId}`}
-          >
-            {advancementMode ? (
-              <button
-                type="button"
-                className={`st-${task.status} cursor-pointer hover:opacity-80`}
-                style={{ display: 'flex', flexShrink: 0 }}
-                aria-label={`${label}: ${task.status}`}
-                data-testid={`st-toggle-${task.taskId}`}
-                data-status={task.status}
-                onClick={() => onUpdateSTStatus(task.taskId, nextSTStatus(task.status))}
-              >
-                {task.status === 'pending'  && <PendingIcon />}
-                {task.status === 'progress' && <ProgressIcon />}
-                {task.status === 'done'     && <DoneIcon />}
-              </button>
-            ) : (
-              <span
-                className={`st-${task.status}`}
-                style={{ display: 'flex', flexShrink: 0 }}
-                aria-label={`${label}: ${task.status}`}
-                data-testid={`st-toggle-${task.taskId}`}
-                data-status={task.status}
-              >
-                {task.status === 'pending'  && <PendingIcon />}
-                {task.status === 'progress' && <ProgressIcon />}
-                {task.status === 'done'     && <DoneIcon />}
-              </span>
-            )}
-            <span className="st-label">{label}</span>
-          </div>
-        );
-      })}
-      {/* Custom tooltip — position: fixed, follows cursor */}
+      {tasks.map(task => (
+        <STLine
+          key={task.taskId}
+          task={task}
+          advancementMode={advancementMode}
+          onUpdateSTStatus={onUpdateSTStatus}
+          showTooltip={showTooltip}
+          moveTooltip={moveTooltip}
+          hideTooltip={hideTooltip}
+        />
+      ))}
       <div ref={tooltipRef} className="st-tooltip" />
     </div>
   );
 });
+
+interface STLineProps {
+  task: FluxOutsourcingTask;
+  advancementMode?: boolean;
+  onUpdateSTStatus: (taskId: string, status: FluxSTStatus) => void;
+  showTooltip: (text: string, x: number, y: number) => void;
+  moveTooltip: (x: number, y: number) => void;
+  hideTooltip: () => void;
+}
+
+function STLine({ task, advancementMode, onUpdateSTStatus, showTooltip, moveTooltip, hideTooltip }: STLineProps) {
+  const [localOverride, setLocalOverride] = useState<FluxSTStatus | null>(null);
+  const prevStatusRef = useRef(task.status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== task.status) {
+      prevStatusRef.current = task.status;
+      setLocalOverride(null);
+    }
+  }, [task.status]);
+
+  const displayStatus = localOverride ?? task.status;
+  const label = `${task.providerName} · ${task.actionType}`;
+
+  const handleClick = useCallback(() => {
+    const next = nextSTStatus(displayStatus);
+    setLocalOverride(next);
+    onUpdateSTStatus(task.taskId, next);
+  }, [displayStatus, onUpdateSTStatus, task.taskId]);
+
+  const iconEl = (
+    <>
+      {displayStatus === 'pending'  && <PendingIcon />}
+      {displayStatus === 'progress' && <ProgressIcon />}
+      {displayStatus === 'done'     && <DoneIcon />}
+    </>
+  );
+
+  return (
+    <div
+      className="st-line"
+      onMouseEnter={(e) => showTooltip(label, e.clientX, e.clientY)}
+      onMouseMove={(e) => moveTooltip(e.clientX, e.clientY)}
+      onMouseLeave={hideTooltip}
+      data-testid={`st-line-${task.taskId}`}
+    >
+      {advancementMode ? (
+        <button
+          type="button"
+          className={`st-${displayStatus} cursor-pointer hover:opacity-80`}
+          style={{ display: 'flex', flexShrink: 0 }}
+          aria-label={`${label}: ${displayStatus}`}
+          data-testid={`st-toggle-${task.taskId}`}
+          data-status={displayStatus}
+          onClick={handleClick}
+        >
+          {iconEl}
+        </button>
+      ) : (
+        <span
+          className={`st-${task.status}`}
+          style={{ display: 'flex', flexShrink: 0 }}
+          aria-label={`${label}: ${task.status}`}
+          data-testid={`st-toggle-${task.taskId}`}
+          data-status={task.status}
+        >
+          {iconEl}
+        </span>
+      )}
+      <span className="st-label">{label}</span>
+    </div>
+  );
+}
