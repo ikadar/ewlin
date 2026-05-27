@@ -1215,21 +1215,21 @@ pub fn compute_stats(
 }
 
 /// Compute calage bonus aggregates (sum, mean, median) across all placed
-/// internal actions. Bonus per action is 100 if the previous action on
-/// the same station belongs to the same job, else 0 (binary).
+/// internal actions. Bonus per action is proportional to the candidate's
+/// setup_ticks / (setup_ticks + run_ticks) ratio, scaled to [0, MAX_CALAGE_BONUS].
+/// Setup-heavy tasks contribute more to the sum than run-heavy tasks.
 ///
-/// Drives the LNS secondary objective at equal late_job_count. Since the
-/// bonus is binary, the median collapses to 0 or 100 depending on
-/// whether more than half of placements benefit from continuity.
+/// Drives the LNS secondary objective at equal late_job_count.
 pub(crate) fn compute_calage_stats_from_actions(actions: &[Action]) -> (u64, f64, f64) {
-    // Group placed actions by station, sorted by start_tick, and compute
-    // bonus 100 when consecutive actions share the same job.
     use std::collections::HashMap;
+    use crate::engine::forward_pass::MAX_CALAGE_BONUS;
 
     #[derive(Clone)]
     struct Placed<'a> {
         job_id: &'a str,
         start_tick: usize,
+        setup_ticks: u32,
+        run_ticks: u32,
     }
     let mut by_station: HashMap<usize, Vec<Placed>> = HashMap::new();
     for action in actions {
@@ -1240,6 +1240,8 @@ pub(crate) fn compute_calage_stats_from_actions(actions: &[Action]) -> (u64, f64
         by_station.entry(action.station_idx).or_default().push(Placed {
             job_id: action.job_id.as_str(),
             start_tick,
+            setup_ticks: action.setup_ticks,
+            run_ticks: action.run_ticks,
         });
     }
 
@@ -1249,7 +1251,10 @@ pub(crate) fn compute_calage_stats_from_actions(actions: &[Action]) -> (u64, f64
         let mut prev_job: Option<&str> = None;
         for p in placements.iter() {
             let bonus = match prev_job {
-                Some(prev) if prev == p.job_id => 100u32,
+                Some(prev) if prev == p.job_id => {
+                    let total = (p.setup_ticks + p.run_ticks).max(1) as f64;
+                    (p.setup_ticks as f64 / total * MAX_CALAGE_BONUS as f64) as u32
+                }
                 _ => 0u32,
             };
             bonuses.push(bonus);
@@ -1290,12 +1295,15 @@ fn recompute_stats_from_assignments(
 ) -> ScheduleStats {
     let tier_weights: [f64; 5] = [10_000_000.0, 4.0, 2.0, 1.0, 0.5];
 
-    // Build task_id → job_id map from jobs
+    // Build task_id → job_id map and task_id → setup_ratio map from jobs
     let mut task_to_job: HashMap<String, String> = HashMap::new();
+    let mut task_to_setup_ratio: HashMap<String, f64> = HashMap::new();
     for job in jobs {
         for element in &job.elements {
             for task in &element.tasks {
                 task_to_job.insert(task.id.clone(), job.id.clone());
+                let total = (task.setup_minutes + task.effective_run_minutes()).max(1) as f64;
+                task_to_setup_ratio.insert(task.id.clone(), task.setup_minutes as f64 / total);
             }
         }
     }
@@ -1407,7 +1415,7 @@ fn recompute_stats_from_assignments(
     late_job_ids.sort();
 
     let (calage_bonus_sum, calage_bonus_mean, calage_bonus_median) =
-        compute_calage_stats_from_assignments(assignments, &task_to_job);
+        compute_calage_stats_from_assignments(assignments, &task_to_job, &task_to_setup_ratio);
 
     ScheduleStats {
         makespan_minutes,
@@ -1427,15 +1435,20 @@ fn recompute_stats_from_assignments(
 }
 
 /// Assignment-based counterpart to compute_calage_stats_from_actions,
-/// used after merge when we only have ComputedAssignment data.
+/// used after merge when we only have ComputedAssignment data. Bonus is
+/// proportional to each task's setup ratio, looked up via task_to_setup_ratio.
 pub(crate) fn compute_calage_stats_from_assignments(
     assignments: &[ComputedAssignment],
     task_to_job: &HashMap<String, String>,
+    task_to_setup_ratio: &HashMap<String, f64>,
 ) -> (u64, f64, f64) {
+    use crate::engine::forward_pass::MAX_CALAGE_BONUS;
+
     #[derive(Clone)]
     struct Placed<'a> {
         job_id: &'a str,
         start: &'a str,
+        setup_ratio: f64,
     }
     let mut by_station: HashMap<&str, Vec<Placed>> = HashMap::new();
     for a in assignments {
@@ -1443,9 +1456,11 @@ pub(crate) fn compute_calage_stats_from_assignments(
             Some(j) => j.as_str(),
             None => continue,
         };
+        let setup_ratio = task_to_setup_ratio.get(&a.task_id).copied().unwrap_or(0.0);
         by_station.entry(a.station_id.as_str()).or_default().push(Placed {
             job_id,
             start: a.scheduled_start.as_str(),
+            setup_ratio,
         });
     }
 
@@ -1455,7 +1470,9 @@ pub(crate) fn compute_calage_stats_from_assignments(
         let mut prev_job: Option<&str> = None;
         for p in placements.iter() {
             let bonus = match prev_job {
-                Some(prev) if prev == p.job_id => 100u32,
+                Some(prev) if prev == p.job_id => {
+                    (p.setup_ratio * MAX_CALAGE_BONUS as f64) as u32
+                }
                 _ => 0u32,
             };
             bonuses.push(bonus);

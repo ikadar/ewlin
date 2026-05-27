@@ -298,16 +298,15 @@ pub struct ScheduleStats {
     #[serde(default)]
     pub late_job_ids: Vec<String>,
     /// Sum of calage bonus points across all placed internal actions.
-    /// Calage bonus = 100 if the previous action on the same station
-    /// belongs to the same job (job-continuity reward), else 0.
+    /// Bonus is proportional to the candidate's setup/(setup+run) ratio,
+    /// scaled to [0, 300]. Setup-heavy tasks contribute more.
     /// Drives the LNS secondary objective at equal late_job_count.
     #[serde(default)]
     pub calage_bonus_sum: u64,
-    /// Mean calage bonus across placed internal actions (0.0..=100.0).
+    /// Mean calage bonus across placed internal actions (0.0..=300.0).
     #[serde(default)]
     pub calage_bonus_mean: f64,
-    /// Median calage bonus across placed internal actions (0.0 or 100.0
-    /// in practice since bonus is binary).
+    /// Median calage bonus across placed internal actions.
     #[serde(default)]
     pub calage_bonus_median: f64,
 }

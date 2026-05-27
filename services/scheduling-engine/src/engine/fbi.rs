@@ -91,6 +91,7 @@ pub fn run_with_fbi(
         .iter()
         .enumerate()
         .map(|(idx, s)| StationAttrs {
+            name: s.name.clone(),
             attention_setup: s.effective_attention_setup(),
             attention_run: s.effective_attention_run(),
             max_run_attention: s.effective_max_run_attention(),

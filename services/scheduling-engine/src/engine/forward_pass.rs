@@ -33,6 +33,7 @@ pub struct SetupCompletionEntry {
 
 /// Station attributes needed during forward pass
 pub struct StationAttrs {
+    pub name: String,
     pub attention_setup: f64,
     pub attention_run: f64,
     pub max_run_attention: f64,
@@ -657,6 +658,14 @@ const TIER_WEIGHT: [f64; 5] = [270_000_000.0, 27.0, 9.0, 3.0, 1.0];
 struct ScoredAction {
     action_idx: usize,
     score: i64,
+    // Debug components (zero-cost when not printed)
+    d_urgency: i64,
+    d_job_boost: i64,
+    d_proximity: i64,
+    d_calage: i64,
+    d_chain: i64,
+    d_contention: i64,
+    d_compat: i64,
 }
 
 /// Find operators capable of staffing a station at tick t.
@@ -1607,9 +1616,41 @@ pub fn run_forward_pass(
                     + station_boost
             };
 
-            scored.push(ScoredAction { action_idx: i, score });
+            scored.push(ScoredAction {
+                action_idx: i, score,
+                d_urgency: weighted_urgency, d_job_boost: job_boost,
+                d_proximity: proximity_bonus, d_calage: calage_bonus,
+                d_chain: chain_pressure, d_contention: contention_bonus,
+                d_compat: compatibility_bonus,
+            });
         }
         scored.sort_by(|a, b| b.score.cmp(&a.score));
+
+        // --- Score debug (gated by FLUX_SCORE_DEBUG env var) ---
+        if !scored.is_empty() {
+            use std::sync::OnceLock;
+            static DEBUG_STATION: OnceLock<Option<String>> = OnceLock::new();
+            let debug_station = DEBUG_STATION.get_or_init(|| std::env::var("FLUX_SCORE_DEBUG").ok());
+            if let Some(target) = debug_station {
+                let dominated_by_target = scored.iter().any(|s| {
+                    station_attrs[actions[s.action_idx].station_idx].name == *target
+                });
+                if dominated_by_target && scored.len() > 1 {
+                    eprintln!("=== TICK {} ({} candidates, target station '{}') ===", t, scored.len(), target);
+                    for (rank, s) in scored.iter().enumerate().take(10) {
+                        let a = &actions[s.action_idx];
+                        let sname = &station_attrs[a.station_idx].name;
+                        let is_target = if *sname == *target { " <<<" } else { "" };
+                        eprintln!(
+                            "  #{:<2} score={:<8} urg={:<7} boost={:<7} prox={:<5} calage={:<4} chain={:<4} cont={:<4} compat={:<4} | stn={:<12} job={} dp={}{is_target}",
+                            rank + 1, s.score, s.d_urgency, s.d_job_boost, s.d_proximity,
+                            s.d_calage, s.d_chain, s.d_contention, s.d_compat,
+                            sname, &a.job_id[..8], a.deadline_priority
+                        );
+                    }
+                }
+            }
+        }
 
         // ============================================================
         // Build the candidate list for this tick:
@@ -4618,11 +4659,16 @@ fn build_operator_assignments(
 }
 
 
-/// Compute calage bonus: +100 if the LAST action that occupied this
-/// station (according to the cache) belongs to the same job as the
-/// candidate. The cache is maintained by run_forward_pass and updated
-/// each time an assignment completes — this brings the cost from O(t)
-/// per call (the previous backward grid scan) down to O(1).
+/// Maximum calage bonus for same-job continuity on a station. Scaled by
+/// the candidate's setup_ticks / (setup_ticks + run_ticks) ratio so that
+/// setup-heavy tasks (e.g. 92% setup on the 754) receive proportionally
+/// higher bonuses than run-heavy tasks.
+pub(crate) const MAX_CALAGE_BONUS: i64 = 300;
+
+/// Calage bonus: rewards placing the next action from the same job on a
+/// station, scaled by the candidate's setup weight. A task that is 90%
+/// setup scores 270; one that is 10% setup scores 30. This makes the
+/// engine fight harder to preserve calage on setup-heavy stations.
 fn compute_calage_bonus(
     last_action_per_station: &[Option<usize>],
     actions: &[Action],
@@ -4640,9 +4686,139 @@ fn compute_calage_bonus(
         return 0;
     }
     if actions[prev_idx].job_id == actions[candidate_idx].job_id {
-        100
+        let candidate = &actions[candidate_idx];
+        let total = (candidate.setup_ticks + candidate.run_ticks).max(1) as f64;
+        (candidate.setup_ticks as f64 / total * MAX_CALAGE_BONUS as f64) as i64
     } else {
         0
+    }
+}
+
+#[cfg(test)]
+mod calage_bonus_tests {
+    use super::*;
+
+    fn make_calage_action(idx: usize, job_id: &str, station_idx: usize, setup_ticks: u32, run_ticks: u32) -> Action {
+        Action {
+            idx,
+            task_id: format!("task-{idx}"),
+            job_id: job_id.to_string(),
+            station_idx,
+            setup_ticks,
+            run_ticks,
+            art: setup_ticks + run_ticks,
+            eat: 0,
+            last: 1000,
+            predecessor_idx: None,
+            predecessor_gap_ticks: 0,
+            end_tick: None,
+            assigned_operators: Vec::new(),
+            start_tick: None,
+            chunk_info: None,
+            deadline_priority: 2,
+            job_deadline_tick: u64::MAX,
+            earliest_retry_tick: None,
+            earliest_start_tick: None,
+            additional_predecessors: Vec::new(),
+            work_accumulator: 0.0,
+            idle_ticks: 0,
+            tick_operator_log: Vec::new(),
+            original_art: setup_ticks + run_ticks,
+            task_total_ticks: setup_ticks + run_ticks,
+            total_productivity: 0.0,
+            ticks_counted: 0,
+            is_pinned: false,
+            is_frozen_by_safety_zone: false,
+            chain_remaining_art: setup_ticks + run_ticks,
+            pinned_start_tick: None,
+            pinned_end_tick: None,
+            peremption_count: 0,
+            pending_recalage: false,
+            current_recalage_start: None,
+            recalage_segments: Vec::new(),
+            spec_snapshot: super::super::similarity::SpecSnapshot::default(),
+            setup_progress: 0.0,
+            setup_end_tick: None,
+            outsourced_predecessor_chain: Vec::new(),
+            borrow_until_tick: None,
+            borrowed_op_to_restore: None,
+            force_max_staffing: false,
+            is_in_progress: false,
+            task_elapsed_ticks: 0,
+            forced_start_tick: None,
+            already_eaten_ticks: 0,
+            inherited_setup_at_tick: None,
+            inherited_setup_station_idx: None,
+            setup_inherited: false,
+            setup_lost_reason: None,
+        }
+    }
+
+    #[test]
+    fn proportional_high_setup() {
+        let actions = vec![
+            make_calage_action(0, "job-A", 0, 9, 1),
+            make_calage_action(1, "job-A", 0, 9, 1),
+        ];
+        let last = vec![Some(0)];
+        assert_eq!(compute_calage_bonus(&last, &actions, 1), 270);
+    }
+
+    #[test]
+    fn proportional_low_setup() {
+        let actions = vec![
+            make_calage_action(0, "job-A", 0, 1, 9),
+            make_calage_action(1, "job-A", 0, 1, 9),
+        ];
+        let last = vec![Some(0)];
+        assert_eq!(compute_calage_bonus(&last, &actions, 1), 30);
+    }
+
+    #[test]
+    fn zero_setup() {
+        let actions = vec![
+            make_calage_action(0, "job-A", 0, 0, 10),
+            make_calage_action(1, "job-A", 0, 0, 10),
+        ];
+        let last = vec![Some(0)];
+        assert_eq!(compute_calage_bonus(&last, &actions, 1), 0);
+    }
+
+    #[test]
+    fn different_job() {
+        let actions = vec![
+            make_calage_action(0, "job-A", 0, 9, 1),
+            make_calage_action(1, "job-B", 0, 9, 1),
+        ];
+        let last = vec![Some(0)];
+        assert_eq!(compute_calage_bonus(&last, &actions, 1), 0);
+    }
+
+    #[test]
+    fn no_predecessor() {
+        let actions = vec![make_calage_action(0, "job-A", 0, 9, 1)];
+        let last = vec![None];
+        assert_eq!(compute_calage_bonus(&last, &actions, 0), 0);
+    }
+
+    #[test]
+    fn zero_total_ticks() {
+        let actions = vec![
+            make_calage_action(0, "job-A", 0, 0, 0),
+            make_calage_action(1, "job-A", 0, 0, 0),
+        ];
+        let last = vec![Some(0)];
+        assert_eq!(compute_calage_bonus(&last, &actions, 1), 0);
+    }
+
+    #[test]
+    fn all_setup_no_run() {
+        let actions = vec![
+            make_calage_action(0, "job-A", 0, 10, 0),
+            make_calage_action(1, "job-A", 0, 10, 0),
+        ];
+        let last = vec![Some(0)];
+        assert_eq!(compute_calage_bonus(&last, &actions, 1), MAX_CALAGE_BONUS as i64);
     }
 }
 
@@ -5166,6 +5342,7 @@ mod peremption_tests {
         action.chain_remaining_art = action.art;
 
         let attrs = StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
@@ -5279,6 +5456,7 @@ mod peremption_tests {
         action.start_tick = Some(0);
 
         let attrs = StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
@@ -5389,6 +5567,7 @@ mod attention_capacity_tests {
     /// half speed; two ops at baseline).
     fn hohner_attrs() -> StationAttrs {
         StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 2.0,
             max_run_attention: 2.0,
@@ -5588,6 +5767,7 @@ mod attention_capacity_tests {
     #[test]
     fn solo_station_attention_run_one_unchanged_baseline() {
         let attrs = vec![StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
@@ -5634,6 +5814,7 @@ mod attention_capacity_tests {
     #[test]
     fn table_de_pliage_five_ops_runs_at_5x_speed() {
         let attrs = vec![StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             // max_run_attention left equal to attention_run = 1 means the
@@ -5713,6 +5894,7 @@ mod attention_capacity_tests {
     #[test]
     fn table_de_pliage_six_ops_capped_at_max_run_operators() {
         let attrs = vec![StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 100.0,
@@ -6018,6 +6200,7 @@ mod safety_zone_chunk_mini_tests {
 
     fn station_attrs_default() -> StationAttrs {
         StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
@@ -7255,6 +7438,7 @@ mod borrow_tests {
 
     fn permissive_attrs() -> StationAttrs {
         StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 1.0,
@@ -7642,6 +7826,7 @@ mod virtual_reservation_cleanup_tests {
         grid.init_station_capacities(&[1]);
 
         let station_attrs = vec![StationAttrs {
+            name: String::new(),
             attention_setup: 1.0,
             attention_run: 1.0,
             max_run_attention: 2.0,
