@@ -20,7 +20,7 @@ import { ProgressBand } from './ProgressBand';
 import { NonLinearStepper } from './NonLinearStepper';
 import { BlockedMode } from './BlockedMode';
 import { PredecessorCard, type PredecessorInfo } from './PredecessorCard';
-import { isoToMinFromMidnight } from '../Tile/saisieMath';
+import { isoToMinFromMidnight, isoToMinFromReference } from '../Tile/saisieMath';
 
 export type SaisieVariant = 'in-progress' | 'done-past-end' | 'future-blocked';
 
@@ -81,8 +81,8 @@ export function ProgressCaptureModal({
   const [currentTimeMin, setCurrentTimeMin] = useState(0);
 
   const slotStartMin = isoToMinFromMidnight(scheduledStart);
-  const slotEndMin = isoToMinFromMidnight(scheduledEnd);
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const slotEndMin = isoToMinFromReference(scheduledEnd, scheduledStart);
+  const nowMin = isoToMinFromReference(now, scheduledStart);
   const variant = deriveSaisieVariant(scheduledStart, scheduledEnd, now);
 
   const stepperLabel = currentTimeMin <= nowMin

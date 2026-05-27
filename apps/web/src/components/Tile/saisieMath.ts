@@ -9,6 +9,13 @@ export function isoToMinFromMidnight(iso: string): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+export function isoToMinFromReference(iso: string | Date, referenceIso: string): number {
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  const ref = new Date(referenceIso);
+  const refMidnight = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  return Math.round((d.getTime() - refMidnight.getTime()) / 60_000);
+}
+
 export function applyMinToDate(baseIso: string, minutesFromMidnight: number): string {
   const base = new Date(baseIso);
   const result = new Date(base);

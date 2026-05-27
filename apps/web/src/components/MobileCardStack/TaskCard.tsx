@@ -8,7 +8,7 @@ import { HeartbeatOverlay } from './HeartbeatOverlay';
 import { DebounceStatusBar } from './DebounceStatusBar';
 import { useDebouncedSave } from './useDebouncedSave';
 import { deriveCardState } from './useCardState';
-import { isoToMinFromMidnight } from '../Tile/saisieMath';
+import { isoToMinFromMidnight, isoToMinFromReference } from '../Tile/saisieMath';
 import type { TaskAssignment, ScheduleSnapshot, Task, InternalTask } from '@flux/types';
 
 export interface TaskCardProps {
@@ -31,8 +31,8 @@ export function TaskCard({ assignment, snapshot, mode }: TaskCardProps): ReactEl
   const durationMin = setupMin + runMin;
 
   const slotStartMin = isoToMinFromMidnight(assignment.scheduledStart);
-  const slotEndMin = isoToMinFromMidnight(assignment.scheduledEnd);
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const slotEndMin = isoToMinFromReference(assignment.scheduledEnd, assignment.scheduledStart);
+  const nowMin = isoToMinFromReference(now, assignment.scheduledStart);
 
   const { state: cardState, inEndZone, thresholdMin } = deriveCardState(
     assignment.scheduledStart, assignment.scheduledEnd, durationMin, now, assignment.isCompleted,
@@ -50,7 +50,7 @@ export function TaskCard({ assignment, snapshot, mode }: TaskCardProps): ReactEl
   const operatorName = firstOp ? `${firstOp.firstName} ${firstOp.lastName}` : '?';
   const operatorInitials = firstOp ? `${firstOp.firstName[0]}.${firstOp.lastName[0]}` : '?';
 
-  const { saveState, trigger: triggerSave } = useDebouncedSave(assignment.taskId);
+  const { saveState, trigger: triggerSave } = useDebouncedSave(assignment.taskId, assignment.scheduledStart);
 
   const handleTimeChange = useCallback((timeMin: number) => {
     setAcknowledged(true);

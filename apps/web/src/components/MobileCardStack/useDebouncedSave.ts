@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useReportSaisieMutation } from '../../store/api/saisieApi';
+import { applyMinToDate } from '../Tile/saisieMath';
 import type { SaveState } from './DebounceStatusBar';
 
 const SAVE_DEBOUNCE_MS = 2000;
 const REPLAN_COUNTDOWN_S = 60;
 
-export function useDebouncedSave(taskId: string) {
+export function useDebouncedSave(taskId: string, scheduledStart: string) {
   const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
   const [reportSaisie] = useReportSaisieMutation();
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -26,10 +27,7 @@ export function useDebouncedSave(taskId: string) {
     setSaveState({ kind: 'pending-save' });
 
     saveTimer.current = setTimeout(async () => {
-      const h = Math.floor(pendingMin.current / 60);
-      const m = pendingMin.current % 60;
-      const today = new Date();
-      const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+      const iso = applyMinToDate(scheduledStart, pendingMin.current);
 
       try {
         await reportSaisie({ taskId, estimatedEndTime: iso }).unwrap();
