@@ -3,7 +3,7 @@ import { TaskCard } from './TaskCard';
 import { GracePeek } from './GracePeek';
 import { NextPeek } from './NextPeek';
 import { Clock } from 'lucide-react';
-import { isoToMinFromMidnight } from '../Tile/saisieMath';
+import { isoToMinFromMidnight, isoToMinFromReference } from '../Tile/saisieMath';
 import { fmtTimeMin } from '../ProgressCaptureModal/timeUtils';
 import { useMarkNotCompletedMutation } from '../../store/api/saisieApi';
 import './transitions.css';
@@ -75,7 +75,7 @@ export function TaskCardStack({ assignments, snapshot, mode }: TaskCardStackProp
           designation={graceInfo.job?.designation ?? ''}
           stationName={graceInfo.station?.name ?? '?'}
           slotStart={fmtTimeMin(isoToMinFromMidnight(graceCandidate.scheduledStart))}
-          slotEnd={fmtTimeMin(isoToMinFromMidnight(graceCandidate.scheduledEnd))}
+          slotEnd={fmtTimeMin(isoToMinFromReference(graceCandidate.scheduledEnd, graceCandidate.scheduledStart))}
           scheduledEnd={graceCandidate.scheduledEnd}
           onNotDone={handleNotDone}
         />
@@ -95,7 +95,7 @@ export function TaskCardStack({ assignments, snapshot, mode }: TaskCardStackProp
           designation={nextInfo.job?.designation ?? ''}
           stationName={nextInfo.station?.name ?? '?'}
           slotStart={fmtTimeMin(isoToMinFromMidnight(nextAfterActive.scheduledStart))}
-          slotEnd={fmtTimeMin(isoToMinFromMidnight(nextAfterActive.scheduledEnd))}
+          slotEnd={fmtTimeMin(isoToMinFromReference(nextAfterActive.scheduledEnd, nextAfterActive.scheduledStart))}
         />
       )}
     </div>

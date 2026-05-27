@@ -51,7 +51,7 @@ export function useDebouncedSave(taskId: string, scheduledStart: string) {
         setSaveState({ kind: 'idle' });
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [taskId, reportSaisie]);
+  }, [taskId, scheduledStart, reportSaisie]);
 
   return { saveState, trigger };
 }
