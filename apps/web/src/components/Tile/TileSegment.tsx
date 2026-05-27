@@ -12,6 +12,7 @@ import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import { useHoverCrosslink } from '../../hooks';
+import { useScenarioModeOrNull } from '../../contexts/ScenarioContext';
 import { computeCellState } from '../FluxTable/fluxAdvancement';
 import type { Task, TaskAssignment } from '@flux/types';
 
@@ -167,7 +168,8 @@ export function TileSegment({
   const crosslink = useHoverCrosslink(taskId);
   const handleDoubleClick = isSelected ? crosslink.onDoubleClick : undefined;
 
-  const completionCell = onToggleCompletion && taskEntity && now
+  const optimisticAllowed = useScenarioModeOrNull()?.mode !== 'preprod';
+  const completionCell = onToggleCompletion && taskEntity && now && optimisticAllowed
     ? computeCellState(taskEntity, assignmentEntity, now)
     : null;
   const handleToggleCompletion = onToggleCompletion && taskId

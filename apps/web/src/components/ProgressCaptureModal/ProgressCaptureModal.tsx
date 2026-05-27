@@ -98,7 +98,10 @@ export function ProgressCaptureModal({
       setBlockedMode(false);
       setSelectedReason(null);
     }
-  }, [isOpen, stepperInitMin]);
+    // stepperInitMin intentionally excluded — snapshot at open-time only,
+    // don't reset while the operator is using the stepper
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;

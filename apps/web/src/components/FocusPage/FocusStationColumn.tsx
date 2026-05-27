@@ -180,7 +180,7 @@ export function FocusStationColumn({
 
   const operatorNameMap = useMemo(() => {
     return new Map(
-      snapshot.operators.map((op) => [op.id, `${op.firstName.charAt(0)}. ${op.lastName}`]),
+      snapshot.operators.map((op) => [op.id, `${op.firstName} ${op.lastName}`]),
     );
   }, [snapshot.operators]);
 
@@ -375,7 +375,7 @@ export function FocusStationColumn({
                 jobId: cached.job.id,
                 job: { reference: cached.job.reference, client: cached.job.client },
                 machineName: station.name,
-                operatorName: op ? `${op.firstName.charAt(0)}. ${op.lastName}` : '—',
+                operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
                 operatorId: opEntry?.operatorId ?? '',
                 stationId: task.stationId,
                 now,

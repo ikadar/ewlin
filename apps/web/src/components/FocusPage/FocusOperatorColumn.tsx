@@ -280,7 +280,7 @@ export function FocusOperatorColumn({
                 jobId: job.id,
                 job: { reference: job.reference, client: job.client },
                 machineName: station?.name ?? task.stationId,
-                operatorName: `${operator.firstName.charAt(0)}. ${operator.lastName}`,
+                operatorName: `${operator.firstName} ${operator.lastName}`.trim(),
                 operatorId: operator.id,
                 stationId: task.stationId,
                 now,
