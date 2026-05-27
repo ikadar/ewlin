@@ -70,19 +70,17 @@ export function ComputeBar({ phase, onFlush, onRetry }: Props) {
   }, [phase, clearHideTimer]);
 
   const fillKey = phase.type === 'pending' ? phase.fireAt : 0;
-  const fillDurationS = phase.type === 'pending'
-    ? Math.max(1, Math.ceil((phase.fireAt - Date.now()) / 1000))
-    : 0;
 
   useEffect(() => {
     const el = fillRef.current;
     if (!el) return;
     if (phase.type === 'pending') {
+      const durationS = Math.max(1, Math.ceil((phase.fireAt - Date.now()) / 1000));
       el.style.transition = 'none';
       el.style.transform = 'scaleX(0)';
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          el.style.transition = `transform ${fillDurationS}s linear`;
+          el.style.transition = `transform ${durationS}s linear`;
           el.style.transform = 'scaleX(1)';
         });
       });
@@ -90,7 +88,7 @@ export function ComputeBar({ phase, onFlush, onRetry }: Props) {
       el.style.transition = 'none';
       el.style.transform = 'scaleX(0)';
     }
-  }, [phase.type, fillKey, fillDurationS]);
+  }, [phase.type, fillKey]);
 
   const baseStyle = phase.type === 'failed'
     ? ERROR_CLASSES
