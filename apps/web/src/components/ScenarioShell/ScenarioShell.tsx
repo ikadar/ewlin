@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { SquareSlash } from 'lucide-react';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AutoRecomputeProvider } from '../../contexts/AutoRecomputeContext';
@@ -45,6 +46,13 @@ function ScenarioShellInner() {
   // Drop scenario-scoped caches whenever the env flips inside the
   // fork shell — same rationale as in RootLayout.
   useScenarioCacheReset();
+
+  const scenarioName = scenario?.name ?? '';
+  const subPage = location.pathname.endsWith('/flux') ? ' Flux'
+    : location.pathname.endsWith('/stations') ? ' Stations'
+    : location.pathname.includes('/settings') ? ' Réglages'
+    : '';
+  useDocumentTitle(scenarioName ? `${scenarioName}${subPage}` : `Scénario${subPage}`, 'preprod');
 
   // Bail if URL is malformed — back to the list.
   useEffect(() => {

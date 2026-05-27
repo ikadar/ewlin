@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useGetSnapshotQuery, useGetProdSnapshotQuery } from '../store';
 import { useScenarioMode } from '../contexts/ScenarioContext';
 import { TimelineColumn } from '../components/TimelineColumn';
@@ -56,6 +57,17 @@ export default function FocusPage({ mode }: FocusPageProps) {
     scrollRef.current = el;
     setScrollEl(el);
   }, []);
+
+  const focusEntityName = useMemo(() => {
+    if (!snapshot || !id) return '';
+    if (mode === 'operator') {
+      const op = snapshot.operators.find((o) => o.id === id);
+      return op ? `${op.firstName} ${op.lastName}` : '';
+    }
+    const st = snapshot.stations.find((s) => s.id === id);
+    return st?.name ?? '';
+  }, [snapshot, id, mode]);
+  useDocumentTitle(focusEntityName || (mode === 'operator' ? 'Opérateur' : 'Station'), 'prod');
 
   const gridStartDate = useMemo(() => {
     const d = new Date();

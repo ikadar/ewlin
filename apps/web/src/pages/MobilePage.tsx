@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useGetProdSnapshotQuery } from '../store/api/prodSnapshotApi';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { MobileHeader } from '../components/MobileLayout/MobileHeader';
 import { TaskCardStack } from '../components/MobileCardStack/TaskCardStack';
 import type { TaskAssignment } from '@flux/types';
@@ -17,6 +18,11 @@ function isSameDay(a: Date, b: Date): boolean {
 export function MobilePage({ mode }: MobilePageProps) {
   const { id } = useParams<{ id: string }>();
   const { data: snapshot, isLoading } = useGetProdSnapshotQuery();
+
+  const entityName = mode === 'operator'
+    ? (() => { const op = snapshot?.operators.find(o => o.id === id); return op ? `${op.firstName} ${op.lastName}` : ''; })()
+    : snapshot?.stations.find(s => s.id === id)?.name ?? '';
+  useDocumentTitle(entityName || (mode === 'operator' ? 'Opérateur' : 'Station'));
 
   if (isLoading || !snapshot) {
     return (

@@ -27,6 +27,7 @@
  */
 
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useRouteDocumentTitle } from './hooks/useDocumentTitle';
 import App from './App';
 import { RootLayout } from './components/RootLayout';
 import { RequireAuth } from './components/Auth/RequireAuth';
@@ -82,6 +83,7 @@ import { QrCodesFocusPage } from './pages/QrCodesFocusPage';
  * Settings routes are further nested under SettingsLayout which provides the submenu.
  */
 export function AppRoutes() {
+  useRouteDocumentTitle();
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
