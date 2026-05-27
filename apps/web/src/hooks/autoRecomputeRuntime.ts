@@ -68,12 +68,11 @@ interface Bindings {
   invalidateSnapshot: InvalidateSnapshot;
 }
 
-// 30s debounce window — chains of mutations (saisies en rafale,
+// 10s debounce window — chains of mutations (saisies en rafale,
 // édition JCF, replan d'opérateur, etc.) en Prod ou Préprod sont
-// absorbées dans un seul recompute. Augmenté de 300ms à 30s le
-// 2026-05-24 pour réduire le bruit visuel + la charge serveur quand
-// l'utilisateur enchaîne plusieurs actions rapprochées.
-const DEBOUNCE_MS = 30_000;
+// absorbées dans un seul recompute. Visual progress bar fills the
+// ComputeBar during the countdown so 10s feels purposeful.
+const DEBOUNCE_MS = 10_000;
 
 let bindings: Bindings | null = null;
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;

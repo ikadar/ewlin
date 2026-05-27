@@ -206,6 +206,12 @@ body {
   100% { transform: translateX(420%); }
 }
 
+/* ── Compute bar indeterminate progress (top bar) ── */
+@keyframes compute-bar-slide {
+  0%   { left: -33%; }
+  100% { left: 100%; }
+}
+
 /* ── Flux Dashboard animations (v0.5.17) ── */
 
 @keyframes flux-subrow-in {

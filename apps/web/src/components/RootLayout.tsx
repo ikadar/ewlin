@@ -9,6 +9,7 @@ import { CommandCenterProvider, useCommandCenter } from './CommandPalette/Comman
 import { useCommands } from './CommandPalette/useCommands';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { AutoRecomputeProvider, useAutoRecomputeCtx } from '../contexts/AutoRecomputeContext';
+import { ComputeBar } from './ComputeBar';
 import { ScenarioProvider, useScenarioMode, useEnvAwareNavigate } from '../contexts/ScenarioContext';
 import { SaisieModalProvider } from '../contexts/SaisieModalContext';
 import { EnvFloatingControls } from './EnvFloatingControls/EnvFloatingControls';
@@ -23,7 +24,7 @@ function RootLayoutInner() {
   const location = useLocation();
   const { isOpen, setIsOpen, pageCommands, jobs, onSelectJob } = useCommandCenter();
   const { toastMessage, dismissToast } = useMercureSubscription();
-  const { showToast } = useAutoRecomputeCtx();
+  const { showToast, barPhase, flush, retry } = useAutoRecomputeCtx();
   // The .env-readonly class on the shell drives the global CSS that
   // hides planning-only affordances (pin, snowflake) when in prod mode.
   const { mode: scenarioMode } = useScenarioMode();
@@ -164,6 +165,7 @@ function RootLayoutInner() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <NowOverrideBanner />
+        <ComputeBar phase={barPhase} onFlush={flush} onRetry={retry} />
         <PreprodFreshnessBanner />
         <Outlet />
       </div>

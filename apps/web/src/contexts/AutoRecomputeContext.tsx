@@ -14,7 +14,7 @@
  * session.
  */
 
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ScheduleSnapshot } from '@flux/types';
 import {
   useAppDispatch,
@@ -28,10 +28,18 @@ import {
   useComputeReportStream,
   type ComputeReportMode,
 } from '../hooks/useComputeReportStream';
-import type { ComputeToastMetric } from '../hooks/useComputeToaster';
 import { ComputeToastStack } from '../components/ComputeToastStack';
 import { ComputeReportToast } from '../components/ComputeReportToast/ComputeReportToast';
+import { ComputeBar } from '../components/ComputeBar';
 import { registerAutoRecomputeTrigger } from '../store/middleware/autoRecomputeMiddleware';
+
+export type ComputeBarPhase =
+  | { type: 'idle' }
+  | { type: 'pending'; fireAt: number; remainingS: number }
+  | { type: 'computing'; reason?: string }
+  | { type: 'succeeded' }
+  | { type: 'failed'; error: string }
+  | { type: 'optimized'; metrics: Array<{ label: string; value: string; bad?: boolean }> };
 
 interface ContextValue {
   /**
@@ -80,6 +88,10 @@ interface ContextValue {
   }) => void;
   /** Close the report toast immediately. */
   dismissComputeReport: () => void;
+  /** Current phase of the auto-recompute bar. */
+  barPhase: ComputeBarPhase;
+  /** Flush the pending debounce timer immediately. */
+  flush: () => void;
 }
 
 const AutoRecomputeContext = createContext<ContextValue | null>(null);
@@ -88,34 +100,21 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
   const computeToaster = useComputeToaster();
   const reportStream = useComputeReportStream();
 
+  // Bar phase: driven by auto-recompute events instead of toasts.
+  // Transient states (succeeded, failed, optimized) are set here and
+  // auto-cleared by ComputeBar via its own hide timers.
+  const [barPhase, setBarPhase] = useState<ComputeBarPhase>({ type: 'idle' });
+
   const autoRecompute = useAutoRecompute((event, reason, extra) => {
-    const toastId = 'auto-recompute';
     if (event === 'started') {
-      computeToaster.show({
-        id: toastId,
-        type: 'progress',
-        title: 'Recalcul en cours',
-        detail: reason,
-        progress: -1,
-        pinned: true,
-      });
+      setBarPhase({ type: 'computing', reason });
     } else if (event === 'succeeded') {
-      computeToaster.show({
-        id: toastId,
-        type: 'success',
-        title: 'Recalcul terminé',
-        detail: 'Optimisation en arrière-plan…',
-      });
+      setBarPhase({ type: 'succeeded' });
     } else if (event === 'failed') {
-      computeToaster.show({
-        id: toastId,
-        type: 'error',
-        title: 'Recalcul échoué',
-        detail: extra?.error ?? 'Erreur inconnue',
-      });
+      setBarPhase({ type: 'failed', error: extra?.error ?? 'Erreur inconnue' });
     } else if (event === 'optimized' && extra?.optimized) {
       const o = extra.optimized;
-      const metrics: ComputeToastMetric[] = [];
+      const metrics: Array<{ label: string; value: string; bad?: boolean }> = [];
       if (o.lateJobCountDelta !== 0) {
         metrics.push({
           label: 'Retards',
@@ -137,73 +136,31 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
           bad: o.calageBonusMeanDelta < 0,
         });
       }
-      computeToaster.show({
-        type: 'waze',
-        title: 'Optimisation auto appliquée',
-        detail: 'Le LNS a trouvé une meilleure organisation.',
-        metrics,
-      });
+      setBarPhase({ type: 'optimized', metrics });
     }
   });
 
-  // Expose this trigger to the RTK middleware so every mutation in the
-  // auto-recompute allow-list (see autoRecomputeMiddleware) can call
-  // trigger() without importing React state. The debounce inside the
-  // hook absorbs chained mutations into a single compute run.
   useEffect(() => {
     registerAutoRecomputeTrigger(autoRecompute.trigger);
     return () => registerAutoRecomputeTrigger(null);
   }, [autoRecompute.trigger]);
 
-  // Pending-recompute indicator : while the 30-s debounce timer runs,
-  // surface a pinned toast with a live countdown + "Recompute maintenant"
-  // action that flushes the timer. Auto-dismissed when the timer fires
-  // (the 'started' event upstream replaces it with "Recalcul en cours")
-  // or when the user clicks the action.
-  //
-  // CRITICAL: depend on the stable callback identities (show/dismiss are
-  // useCallback-stable inside useComputeToaster) — NOT on the
-  // `computeToaster` object literal, which is recreated on every render
-  // of the provider. Depending on the object would cause an infinite
-  // re-render loop (effect calls show → setState → re-render → new
-  // computeToaster ref → effect re-runs → ...). That loop swallowed
-  // every click in the app before the first deploy was reverted.
+  // Pending countdown: drive barPhase from pendingFireAt with 1s ticks.
   const pendingFireAt = autoRecompute.pendingFireAt;
-  const flushRecompute = autoRecompute.flush;
-  const toasterShow = computeToaster.show;
-  const toasterDismiss = computeToaster.dismiss;
   useEffect(() => {
-    const toastId = 'auto-recompute-pending';
     if (pendingFireAt === null) {
-      toasterDismiss(toastId);
+      setBarPhase((prev) => (prev.type === 'pending' ? { type: 'idle' } : prev));
       return;
     }
-
-    const render = () => {
+    const tick = () => {
       const remainingMs = Math.max(0, pendingFireAt - Date.now());
       const remainingS = Math.ceil(remainingMs / 1000);
-      toasterShow({
-        id: toastId,
-        type: 'info',
-        title: 'Recalcul dans ' + remainingS + ' s',
-        detail: 'Les modifications récentes seront groupées.',
-        pinned: true,
-        progress: -1,
-        actions: [
-          {
-            id: 'flush',
-            label: 'Recompute maintenant',
-            variant: 'primary',
-            onClick: flushRecompute,
-          },
-        ],
-      });
+      setBarPhase({ type: 'pending', fireAt: pendingFireAt, remainingS });
     };
-
-    render();
-    const interval = window.setInterval(render, 1000);
+    tick();
+    const interval = window.setInterval(tick, 1000);
     return () => window.clearInterval(interval);
-  }, [pendingFireAt, flushRecompute, toasterShow, toasterDismiss]);
+  }, [pendingFireAt]);
 
   const pendingOnDoneRef = useRef<((result: ComputeScheduleResult) => void) | null>(null);
 
@@ -243,12 +200,15 @@ export function AutoRecomputeProvider({ children }: { children: ReactNode }) {
     showToast: computeToaster.show,
     startComputeReport,
     dismissComputeReport: reportStream.clear,
+    barPhase,
+    flush: autoRecompute.flush,
   };
 
   return (
     <AutoRecomputeContext.Provider value={value}>
       {children}
-      {/* Toast stack rendered at root so it survives route changes. */}
+      {/* Toast stack — still used for non-auto-recompute feedback
+          (Mercure alerts, useToast wrapper, global errors, etc.) */}
       <ComputeToastStack toasts={computeToaster.toasts} onDismiss={computeToaster.dismiss} />
       <ComputeReportToast state={reportStream.state} onDismiss={reportStream.clear} />
       <GlobalErrorBridge />
