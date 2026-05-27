@@ -102,7 +102,7 @@ export function ComputeBar({ phase, onFlush, onRetry }: Props) {
     <div className="overflow-hidden">
       <div
         className={`relative flex items-center justify-between gap-3 px-4 py-1.5 text-[11.5px] border-b transition-all duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] ${baseStyle} ${
-          visible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 py-0 border-b-0'
+          visible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 h-0 py-0 border-b-0'
         }`}
         role="status"
         aria-live="polite"
