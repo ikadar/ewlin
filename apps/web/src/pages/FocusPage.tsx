@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { useGetSnapshotQuery, useGetProdSnapshotQuery } from '../store';
+import { useGetSnapshotQuery, useGetProdSnapshotQuery, useRecordProgressDirectMutation } from '../store';
 import { useScenarioMode } from '../contexts/ScenarioContext';
 import { TimelineColumn } from '../components/TimelineColumn';
 import { timeToYPosition } from '../components/TimelineColumn/utils';
@@ -52,6 +52,11 @@ export default function FocusPage({ mode }: FocusPageProps) {
   // `if (isLoading) return <LoadingSpinner/>` gate below, which is after these
   // effects first run. Tracking it as state re-runs the effects when the
   // container actually exists, so listeners + ResizeObserver actually attach.
+  const [recordProgressDirect] = useRecordProgressDirectMutation();
+  const handleToggleCompletion = useCallback((taskId: string, completed: boolean) => {
+    void recordProgressDirect({ taskId, progressPct: completed ? 100 : 0 });
+  }, [recordProgressDirect]);
+
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const setScrollRef = useCallback((el: HTMLDivElement | null) => {
     scrollRef.current = el;
@@ -405,6 +410,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
                   collapses={effectiveCollapses}
+                  onToggleCompletion={handleToggleCompletion}
                   onTileContextMenu={(p) => {
                     // Prod focus has a single legal tile action: saisie
                     // d'avancement on past-started tiles. Future-start tiles
@@ -436,6 +442,7 @@ export default function FocusPage({ mode }: FocusPageProps) {
                   visibleDayRange={virtualScroll.visibleRange}
                   dayCount={DAY_COUNT}
                   collapses={effectiveCollapses}
+                  onToggleCompletion={handleToggleCompletion}
                 />
               )}
             </div>

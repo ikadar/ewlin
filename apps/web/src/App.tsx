@@ -25,7 +25,7 @@ import { StalenessBadge } from './components/StalenessBadge';
 import { shouldUseFixture } from './mock/testFixtures';
 import { useGetSnapshotQuery, useGetProdSnapshotQuery, scheduleApi, useUnassignTaskMutation, useToggleCompletionMutation, useTogglePinMutation, useBatchSetPinMutation, useUpdateOutsourcingDatesMutation, useSplitTaskMutation, useFuseTaskMutation, useCreateJobMutation, useUpdateJobMutation, useDeleteJobMutation, useClearJobAssignmentsMutation, useAutoPlaceJobMutation, useAutoPlaceJobAlapMutation, useCreateTemplateMutation, useUpdateTemplateMutation, useSaveScheduleMutation, useSetSafetyOverrideMutation, useGetPaperLeadTimeQuery, useGetFormeLeadTimeQuery, useGetPlateLeadTimeQuery, useAppSelector, selectIsServiceUnavailable } from './store';
 import { shouldUseMockMode } from './store/api/baseApi';
-import { useUpdateSTStatusMutation } from './store';
+import { useUpdateSTStatusMutation, useRecordProgressDirectMutation } from './store';
 import { taskStatusToFluxST, nextSTStatus } from './components/FluxTable/STCell';
 import { useMassUnschedule } from './hooks';
 import { useToast } from './hooks/useToast';
@@ -1758,6 +1758,11 @@ function AppContent() {
     [snapshot.safetyOverrides, setSafetyOverride],
   );
 
+  const [recordProgressDirect] = useRecordProgressDirectMutation();
+  const handleToggleCompletion = useCallback((taskId: string, completed: boolean) => {
+    void recordProgressDirect({ taskId, progressPct: completed ? 100 : 0 });
+  }, [recordProgressDirect]);
+
   const handleTogglePin = useCallback(async (assignmentId: string) => {
     const assignment = snapshot.assignments.find((a) => a.id === assignmentId);
     if (!assignment) {
@@ -2160,6 +2165,7 @@ function AppContent() {
           safetyOverrides={snapshot.safetyOverrides}
           sequenceIndexByTaskId={sequenceIndexByTaskId}
           onToggleFrozenOverride={handleToggleFrozenOverride}
+          onToggleCompletion={handleToggleCompletion}
         />
         {isMinimapVisible && (
           <Minimap

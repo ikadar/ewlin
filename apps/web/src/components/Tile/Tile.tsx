@@ -14,6 +14,7 @@ import { useNow } from '../../contexts/NowContext';
 import { useScenarioModeOrNull } from '../../contexts/ScenarioContext';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import type { CalageGeometry } from '../../utils/stationTileData';
+import { computeCellState } from '../FluxTable/fluxAdvancement';
 
 export interface TileProps {
   /** Task assignment data */
@@ -103,6 +104,8 @@ export interface TileProps {
    */
   windowStart?: string;
   windowEnd?: string;
+  /** Callback to toggle task completion (✓/○ round). Prod-only, same semantics as Flux mode avancement. */
+  onToggleCompletion?: (taskId: string, completed: boolean) => void;
 }
 
 /**
@@ -153,6 +156,7 @@ export const Tile = memo(function Tile({
   stationName,
   windowStart,
   windowEnd,
+  onToggleCompletion,
 }: TileProps) {
   const crosslink = useHoverCrosslink(task.id);
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -168,6 +172,18 @@ export const Tile = memo(function Tile({
   // must come only from a real wall saisie. No provider (isolation tests) =>
   // Prod-equivalent default. Cf. computeOptimisticProgress / isCompletedEffective.
   const optimisticAllowed = useScenarioModeOrNull()?.mode !== 'preprod';
+
+  const completionCell = onToggleCompletion && optimisticAllowed
+    ? computeCellState(task, assignment, now)
+    : null;
+  const handleToggleCompletion = onToggleCompletion
+    ? (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (completionCell && !completionCell.isDisabled) {
+          onToggleCompletion(task.id, !completionCell.isChecked);
+        }
+      }
+    : undefined;
 
   // Total height comes from the caller — collapse-aware on the station grid,
   // linear in the lens / focus view. The parent owns the coordinate system;
@@ -486,6 +502,25 @@ export const Tile = memo(function Tile({
               </svg>
             </span>
           )}
+          {completionCell && (
+            <span
+              onClick={handleToggleCompletion}
+              className={`completion-toggle shrink-0 inline-flex items-center align-middle mr-1 transition-colors ${
+                completionCell.isDisabled
+                  ? 'pointer-events-none text-emerald-500/50'
+                  : completionCell.isChecked
+                    ? 'pointer-events-auto cursor-pointer text-emerald-400 hover:text-emerald-300'
+                    : 'pointer-events-auto cursor-pointer text-zinc-600 hover:text-zinc-400'
+              }`}
+              data-testid="tile-completion-toggle"
+            >
+              <svg viewBox="0 0 24 24" className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                {completionCell.isChecked
+                  ? <><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></>
+                  : <circle cx="12" cy="12" r="10" />}
+              </svg>
+            </span>
+          )}
           {displayMode === 'tirage' && tirageLabel
             ? tirageLabel
             : produitLabel ?? `${job.reference} · ${job.client}`}
@@ -544,7 +579,8 @@ function haveCallbackPropsChanged(prev: TileProps, next: TileProps): boolean {
     prev.onSelect !== next.onSelect ||
     prev.onTogglePin !== next.onTogglePin ||
     prev.onContextMenu !== next.onContextMenu ||
-    prev.onToggleFrozenOverride !== next.onToggleFrozenOverride
+    prev.onToggleFrozenOverride !== next.onToggleFrozenOverride ||
+    prev.onToggleCompletion !== next.onToggleCompletion
   );
 }
 

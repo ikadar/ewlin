@@ -111,6 +111,8 @@ export interface SchedulingGridProps {
   sequenceIndexByTaskId?: ReadonlyMap<string, number>;
   /** Callback when user clicks the Sky snowflake on a tile in the safety zone. */
   onToggleFrozenOverride?: (jobId: string, sequenceIndex: number, stationId: string) => void;
+  /** Callback when user clicks the ✓/○ completion toggle on a tile. Prod-only. */
+  onToggleCompletion?: (taskId: string, completed: boolean) => void;
 }
 
 /**
@@ -150,6 +152,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
       safetyOverrides,
       sequenceIndexByTaskId,
       onToggleFrozenOverride,
+      onToggleCompletion,
     },
     ref
   ) {
@@ -893,6 +896,7 @@ export const SchedulingGrid = forwardRef<SchedulingGridHandle, SchedulingGridPro
                         sequenceIndex={sequenceIndex}
                         onToggleFrozenOverride={onToggleFrozenOverride}
                         stationName={stationMap.get(cached.task.stationId)?.name}
+                        onToggleCompletion={onToggleCompletion}
                       />
                     ));
                   })}

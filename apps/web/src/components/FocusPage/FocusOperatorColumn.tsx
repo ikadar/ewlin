@@ -56,6 +56,8 @@ export interface FocusOperatorColumnProps {
     /** Past-start only ; undefined when the task hasn't started yet. */
     openSaisie?: () => void;
   }) => void;
+  /** Callback when user clicks the ✓/○ completion toggle on a tile. */
+  onToggleCompletion?: (taskId: string, completed: boolean) => void;
 }
 
 /**
@@ -73,6 +75,7 @@ export function FocusOperatorColumn({
   dayCount,
   collapses,
   onTileContextMenu,
+  onToggleCompletion,
 }: FocusOperatorColumnProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(320);
@@ -277,7 +280,7 @@ export function FocusOperatorColumn({
                 jobId: job.id,
                 job: { reference: job.reference, client: job.client },
                 machineName: station?.name ?? task.stationId,
-                operatorName: `${operator.firstName} ${operator.lastName}`.trim(),
+                operatorName: `${operator.firstName.charAt(0)}. ${operator.lastName}`,
                 operatorId: operator.id,
                 stationId: task.stationId,
                 now,
@@ -323,6 +326,10 @@ export function FocusOperatorColumn({
             onClick={handleOpenSaisie}
             onContextMenu={handleContextMenu}
             progressFill={progressFill}
+            task={task}
+            assignment={assignment}
+            now={now}
+            onToggleCompletion={onToggleCompletion}
           />
         );
       })}

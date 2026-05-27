@@ -343,6 +343,7 @@ export type {
 export {
   useReportSaisieMutation,
   useClearRecordedProgressMutation,
+  useRecordProgressDirectMutation,
   saisieApi,
 } from './api/saisieApi';
 export type {

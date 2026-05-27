@@ -91,7 +91,7 @@ import { TileSegment } from '../components/Tile/TileSegment';
 import { computeChunkProgress } from '../components/Tile/saisieMath';
 import { SafetyBand } from '../components/SafetyBand';
 import { buildSequenceIndexLookup, isInSafetyZone, makeSafetyKey } from '../utils/safetyZone';
-import { useSetSafetyOverrideMutation } from '../store';
+import { useSetSafetyOverrideMutation, useRecordProgressDirectMutation } from '../store';
 import { OperatorHeader } from '../components/OperatorHeaders';
 import { ScheduleSkeleton } from '../components/LoadingSpinner';
 import { ErrorState } from '../components/ErrorState';
@@ -561,6 +561,11 @@ export default function OperatorSchedulePage() {
     try { await togglePin(assignmentId).unwrap(); } catch { /* ignore */ }
   }, [togglePin]);
 
+  const [recordProgressDirect] = useRecordProgressDirectMutation();
+  const handleToggleCompletion = useCallback((taskId: string, completed: boolean) => {
+    void recordProgressDirect({ taskId, progressPct: completed ? 100 : 0 });
+  }, [recordProgressDirect]);
+
   const handleSplitTask = useCallback(async (taskId: string) => {
     try { await splitTask(taskId).unwrap(); } catch { /* ignore */ }
   }, [splitTask]);
@@ -1023,6 +1028,10 @@ export default function OperatorSchedulePage() {
           onTogglePin={scenarioMode !== 'prod' ? handleTogglePin : undefined}
           isSelected={selectedJobId === job.id}
           progressFill={progressFill}
+          task={task}
+          assignment={assignment}
+          now={now}
+          onToggleCompletion={handleToggleCompletion}
           {...positionProps}
         />
       );
@@ -1030,7 +1039,7 @@ export default function OperatorSchedulePage() {
   }, [
     lens.state.activeColumnId, lensActiveSlices, lensRange.gridStartMs, selectedJobId,
     taskMap, elementMap, jobMap, stationMap, lensAssignmentMap, lateJobIds, now,
-    elementCountByJobId, scenarioMode, handleTogglePin,
+    elementCountByJobId, scenarioMode, handleTogglePin, handleToggleCompletion,
   ]);
 
   const handleOperatorsMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1277,6 +1286,10 @@ export default function OperatorSchedulePage() {
         isSelected={selectedJobId === job.id}
         onContextMenu={handleContextMenu}
         progressFill={progressFill}
+        task={task}
+        assignment={assignment}
+        now={now}
+        onToggleCompletion={handleToggleCompletion}
         {...positionProps}
       />
     );

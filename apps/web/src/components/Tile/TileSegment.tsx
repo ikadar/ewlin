@@ -12,6 +12,8 @@ import { getStateInlineColors, type TileState } from './colorUtils';
 import type { PhaseSegment } from '@flux/types';
 import { SAW_AMPLITUDE, TILE_BORDER_WIDTH_PX, buildSawtoothSvgPath, buildCssClipPath, computeTeethCount } from './sawtooth';
 import { useHoverCrosslink } from '../../hooks';
+import { computeCellState } from '../FluxTable/fluxAdvancement';
+import type { Task, TaskAssignment } from '@flux/types';
 
 interface TileSegmentProps {
   /** Unique key for this segment */
@@ -86,6 +88,14 @@ interface TileSegmentProps {
    * and on read-only callsites that don't surface progress.
    */
   progressFill?: { pct: number; isLate: boolean };
+  /** Task entity — needed for completion toggle state derivation. */
+  task?: Task;
+  /** Assignment entity — needed for completion toggle past-tile gate. */
+  assignment?: TaskAssignment;
+  /** Current time — needed for completion toggle. */
+  now?: Date;
+  /** Callback to toggle task completion (✓/○ round). */
+  onToggleCompletion?: (taskId: string, completed: boolean) => void;
 }
 
 /**
@@ -146,12 +156,28 @@ export function TileSegment({
   onToggleFrozenOverride,
   onContextMenu,
   progressFill,
+  task: taskEntity,
+  assignment: assignmentEntity,
+  now,
+  onToggleCompletion,
 }: TileSegmentProps) {
   // JDP ↔ operator grid crosslink — pulse fires on dblclick for the
   // selected-job segments only. Was a hover trigger; switched to dblclick
   // (explicit user intent, no accidental pulses while scanning).
   const crosslink = useHoverCrosslink(taskId);
   const handleDoubleClick = isSelected ? crosslink.onDoubleClick : undefined;
+
+  const completionCell = onToggleCompletion && taskEntity && now
+    ? computeCellState(taskEntity, assignmentEntity, now)
+    : null;
+  const handleToggleCompletion = onToggleCompletion && taskId
+    ? (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (completionCell && !completionCell.isDisabled) {
+          onToggleCompletion(taskId, !completionCell.isChecked);
+        }
+      }
+    : undefined;
   // Safety zone visual integration mirrors Tile.tsx so both planning
   // surfaces (machine grid + operator grid) stay visually consistent.
   const isSafetyFrozen = inSafetyZone && !isFrozenOverridden;
@@ -375,6 +401,25 @@ export function TileSegment({
                 className="w-3 h-3 shrink-0"
               >
                 <path d="M12 2c.5 0 .9.4.9.9v3.3l2.3-2.3c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L12.9 8.9V11h2.2l3.6-3.6c.4-.4 1-.4 1.3 0 .4.4.4 1 0 1.3L17.7 11H21c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3l2.3 2.3c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0L15.1 13h-2.2v2.2l3.6 3.6c.4.4.4 1 0 1.3-.4.4-1 .4-1.3 0l-2.3-2.3V21c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-3.2l-2.3 2.3c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3l3.6-3.6V13H9l-3.6 3.6c-.4.4-1 .4-1.3 0-.4-.4-.4-1 0-1.3L6.3 13H3c-.5 0-.9-.4-.9-.9s.4-.9.9-.9h3.3L4 8.9c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0L9 11h2.1V8.8L7.4 5.2c-.4-.4-.4-1 0-1.3.4-.4 1-.4 1.3 0l2.3 2.3V2.9c0-.5.4-.9.9-.9z" />
+              </svg>
+            </span>
+          )}
+          {completionCell && (
+            <span
+              onClick={handleToggleCompletion}
+              className={`completion-toggle shrink-0 inline-flex items-center align-middle mr-1 transition-colors ${
+                completionCell.isDisabled
+                  ? 'pointer-events-none text-emerald-500/50'
+                  : completionCell.isChecked
+                    ? 'pointer-events-auto cursor-pointer text-emerald-400 hover:text-emerald-300'
+                    : 'pointer-events-auto cursor-pointer text-zinc-600 hover:text-zinc-400'
+              }`}
+              data-testid="tile-segment-completion-toggle"
+            >
+              <svg viewBox="0 0 24 24" className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                {completionCell.isChecked
+                  ? <><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></>
+                  : <circle cx="12" cy="12" r="10" />}
               </svg>
             </span>
           )}

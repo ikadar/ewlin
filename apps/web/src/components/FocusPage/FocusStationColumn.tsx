@@ -37,6 +37,8 @@ export interface FocusStationColumnProps {
   dayCount: number;
   /** Collapse bands (nights/weekends/closures). Empty array if none. */
   collapses: readonly Collapse[];
+  /** Callback when user clicks the ✓/○ completion toggle on a tile. */
+  onToggleCompletion?: (taskId: string, completed: boolean) => void;
 }
 
 function getStationDaySchedule(station: Station, date: Date): DaySchedule {
@@ -57,6 +59,7 @@ export function FocusStationColumn({
   visibleDayRange,
   dayCount,
   collapses,
+  onToggleCompletion,
 }: FocusStationColumnProps) {
   const saisieModal = useSaisieModal();
 
@@ -177,7 +180,7 @@ export function FocusStationColumn({
 
   const operatorNameMap = useMemo(() => {
     return new Map(
-      snapshot.operators.map((op) => [op.id, `${op.firstName} ${op.lastName}`]),
+      snapshot.operators.map((op) => [op.id, `${op.firstName.charAt(0)}. ${op.lastName}`]),
     );
   }, [snapshot.operators]);
 
@@ -372,7 +375,7 @@ export function FocusStationColumn({
                 jobId: cached.job.id,
                 job: { reference: cached.job.reference, client: cached.job.client },
                 machineName: station.name,
-                operatorName: op ? `${op.firstName} ${op.lastName}`.trim() : '—',
+                operatorName: op ? `${op.firstName.charAt(0)}. ${op.lastName}` : '—',
                 operatorId: opEntry?.operatorId ?? '',
                 stationId: task.stationId,
                 now,
@@ -408,6 +411,7 @@ export function FocusStationColumn({
             sawtoothBottom={interrupt?.bottom}
             stationName={station.name}
             onSelect={handleTileClick ? () => handleTileClick() : undefined}
+            onToggleCompletion={onToggleCompletion}
           />
         ));
       })}
