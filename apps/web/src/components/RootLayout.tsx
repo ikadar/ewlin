@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { SquareSlash } from 'lucide-react';
 import { Sidebar } from './Sidebar/Sidebar';
@@ -12,6 +12,7 @@ import { AutoRecomputeProvider, useAutoRecomputeCtx } from '../contexts/AutoReco
 import { ScenarioProvider, useScenarioMode, useEnvAwareNavigate } from '../contexts/ScenarioContext';
 import { SaisieModalProvider } from '../contexts/SaisieModalContext';
 import { EnvFloatingControls } from './EnvFloatingControls/EnvFloatingControls';
+import { PrintScheduleModal } from './PrintScheduleModal/PrintScheduleModal';
 import { useMercureSubscription } from '../hooks/useMercureSubscription';
 import { useScenarioCacheReset } from '../hooks/useScenarioCacheReset';
 import { detectKeyboardLayout, isAltLetter } from '../utils/keyboardLayout';
@@ -41,6 +42,8 @@ function RootLayoutInner() {
     dismissToast();
   }, [toastMessage, showToast, dismissToast]);
 
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
+
   const chordPendingRef = useRef<'compact' | 'placement' | null>(null);
   const chordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -53,6 +56,7 @@ function RootLayoutInner() {
     onCompactTimeline: useCallback((_h: CompactHorizon) => {
       // No-op at root level — compaction is page-specific and registered via context
     }, []),
+    onPrintSchedule: useCallback(() => setIsPrintOpen(true), []),
   });
 
   // Merge shared + page-specific, deduplicating by id (page commands win)
@@ -112,6 +116,13 @@ function RootLayoutInner() {
       if (isAltLetter(e, 'k')) {
         e.preventDefault();
         setIsOpen(true);
+        return;
+      }
+
+      // Alt+I: open print schedule modal
+      if (isAltLetter(e, 'i')) {
+        e.preventDefault();
+        setIsPrintOpen(true);
         return;
       }
 
@@ -182,6 +193,9 @@ function RootLayoutInner() {
         jobs={jobs}
         onSelectJob={onSelectJob}
       />
+
+      {/* Print schedule modal */}
+      <PrintScheduleModal isOpen={isPrintOpen} onClose={() => setIsPrintOpen(false)} />
     </div>
   );
 }

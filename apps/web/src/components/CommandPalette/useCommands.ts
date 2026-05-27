@@ -25,6 +25,7 @@ export interface UseCommandsOptions {
   onSearchJobs: () => void;
   onSmartCompact: () => void;
   onEvaluateSchedule: () => void;
+  onPrintSchedule?: () => void;
 
   // Scheduler-specific (optional — omitted when called from non-scheduler pages)
   selectedJobId?: string | null;
@@ -136,6 +137,7 @@ export const SHORTCUT_ZONES: ShortcutZone[] = [
     title: 'Systeme',
     shortcuts: [
       { label: 'Command Center', keys: ['Alt', 'K'] },
+      { label: 'Imprimer le planning', keys: ['Alt', 'I'] },
     ],
   },
 ];
@@ -166,6 +168,7 @@ export function useCommands(options: UseCommandsOptions): Command[] {
     onAlapPlacement,
     onAutoPlaceAll,
     onToggleMinimap,
+    onPrintSchedule,
   } = options;
 
   return useMemo(() => {
@@ -183,6 +186,10 @@ export function useCommands(options: UseCommandsOptions): Command[] {
       { id: 'evaluate-schedule', label: 'Évaluation du planning', category: 'Actions', shortcut: 'Ctrl+Alt+E', keywords: 'évaluation score calage délai retard evaluate scoring', icon: 'sparkles', action: onEvaluateSchedule },
 
     ];
+
+    if (onPrintSchedule) {
+      commands.push({ id: 'print-schedule', label: 'Imprimer le planning', category: 'Actions', shortcut: 'Alt+I', keywords: 'print imprimer pdf télécharger export papier', icon: 'printer', action: onPrintSchedule });
+    }
 
     // Scheduler-specific: Navigation
     if (onJumpToToday) {
@@ -247,5 +254,5 @@ export function useCommands(options: UseCommandsOptions): Command[] {
 
     return commands;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedJobId, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onToggleMinimap, onZoomIn, onZoomOut, onOpenSaveLoad]);
+  }, [selectedJobId, onNavigateScheduler, onNavigateFlux, onNewJob, onSearchJobs, onSmartCompact, onEvaluateSchedule, onPrintSchedule, onJumpToToday, onJumpToDeparture, onPrevJob, onNextJob, onEditJob, onClearJobAssignments, onClearAllAssignments, onAsapPlacement, onAlapPlacement, onAutoPlaceAll, onToggleDisplayMode, onToggleSidebar, onToggleMinimap, onZoomIn, onZoomOut, onOpenSaveLoad]);
 }
