@@ -77,12 +77,42 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max - 1) + '…';
 }
 
-function drawDottedLine(doc: jsPDF, x1: number, y: number, x2: number) {
-  doc.setDrawColor(190, 190, 190);
-  doc.setLineWidth(0.2);
-  doc.setLineDashPattern([1.2, 1.5], 0);
-  doc.line(x1, y, x2, y);
+/**
+ * Draw a time input placeholder: ⌐__⌐ h ⌐__⌐
+ * Two bracket pairs (bottom-quarter L shapes) with "h" separator.
+ */
+function drawTimeSlot(doc: jsPDF, x: number, cellY: number, cellW: number) {
+  const baseY = cellY + ROW_H - 2;
+  const bracketH = 3;
+  const bracketW = 1.2;
+  const slotW = (cellW - 8) / 2;
+
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.25);
   doc.setLineDashPattern([], 0);
+
+  const drawPair = (sx: number) => {
+    // left bracket: vertical up + horizontal right
+    doc.line(sx, baseY, sx, baseY - bracketH);
+    doc.line(sx, baseY, sx + bracketW, baseY);
+    // right bracket: vertical up + horizontal left
+    const rx = sx + slotW;
+    doc.line(rx, baseY, rx, baseY - bracketH);
+    doc.line(rx, baseY, rx - bracketW, baseY);
+  };
+
+  const leftStart = x + 2;
+  drawPair(leftStart);
+
+  // "h" separator
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(160, 160, 160);
+  const hX = leftStart + slotW + (cellW - 2 * slotW - 4) / 2;
+  doc.text('h', hX, baseY - 0.5, { align: 'center' });
+
+  const rightStart = x + cellW - slotW - 2;
+  drawPair(rightStart);
 }
 
 function drawFooter(doc: jsPDF, from: Date, to: Date, pageNum: number, totalPages: number) {
@@ -341,11 +371,10 @@ export function generateSchedulePdf(options: PrintOptions): ArrayBuffer {
       }
       x += COL_EXTRA;
 
-      // Writable fields: dotted underlines for handwritten times
-      const lineY = y + ROW_H - 1.8;
-      drawDottedLine(doc, x + 1, lineY, x + COL_REAL_START - 3);
+      // Writable time slots: ⌐__⌐ h ⌐__⌐
+      drawTimeSlot(doc, x, y, COL_REAL_START);
       x += COL_REAL_START;
-      drawDottedLine(doc, x + 1, lineY, x + COL_REAL_END - 3);
+      drawTimeSlot(doc, x, y, COL_REAL_END);
 
       y += ROW_H;
       rowCount++;
