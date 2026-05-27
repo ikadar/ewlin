@@ -78,41 +78,37 @@ function truncate(text: string, max: number): string {
 }
 
 /**
- * Draw a time input placeholder: ⌐__⌐ h ⌐__⌐
- * Two bracket pairs (bottom-quarter L shapes) with "h" separator.
+ * Draw a time input placeholder:  └──┘ h └──┘
+ * Two open-top boxes (bottom + sides) with "h" separator.
+ * Left box = hours, right box = minutes.
  */
 function drawTimeSlot(doc: jsPDF, x: number, cellY: number, cellW: number) {
-  const baseY = cellY + ROW_H - 2;
-  const bracketH = 3;
-  const bracketW = 1.2;
-  const slotW = (cellW - 8) / 2;
+  const baseY = cellY + ROW_H - 1.5;
+  const tickH = 2.8;
+  const boxW = 7;
+  const gap = 3;
 
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.25);
+  doc.setDrawColor(60, 60, 60);
+  doc.setLineWidth(0.35);
   doc.setLineDashPattern([], 0);
 
-  const drawPair = (sx: number) => {
-    // left bracket: vertical up + horizontal right
-    doc.line(sx, baseY, sx, baseY - bracketH);
-    doc.line(sx, baseY, sx + bracketW, baseY);
-    // right bracket: vertical up + horizontal left
-    const rx = sx + slotW;
-    doc.line(rx, baseY, rx, baseY - bracketH);
-    doc.line(rx, baseY, rx - bracketW, baseY);
+  const drawBox = (bx: number) => {
+    doc.line(bx, baseY, bx + boxW, baseY);
+    doc.line(bx, baseY, bx, baseY - tickH);
+    doc.line(bx + boxW, baseY, bx + boxW, baseY - tickH);
   };
 
-  const leftStart = x + 2;
-  drawPair(leftStart);
+  const totalW = boxW + gap + boxW;
+  const startX = x + (cellW - totalW) / 2;
 
-  // "h" separator
-  doc.setFontSize(6.5);
+  drawBox(startX);
+
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(160, 160, 160);
-  const hX = leftStart + slotW + (cellW - 2 * slotW - 4) / 2;
-  doc.text('h', hX, baseY - 0.5, { align: 'center' });
+  doc.setTextColor(60, 60, 60);
+  doc.text('h', startX + boxW + gap / 2, baseY - 0.3, { align: 'center' });
 
-  const rightStart = x + cellW - slotW - 2;
-  drawPair(rightStart);
+  drawBox(startX + boxW + gap);
 }
 
 function drawFooter(doc: jsPDF, from: Date, to: Date, pageNum: number, totalPages: number) {
@@ -126,7 +122,7 @@ function drawFooter(doc: jsPDF, from: Date, to: Date, pageNum: number, totalPage
   doc.setTextColor(160, 160, 160);
   const now = new Date();
   doc.text(
-    `Flux — ${fmtDateTime(from)} → ${fmtDateTime(to)} — Imprimé le ${fmtDateShort(now)} à ${fmtTime(now)}`,
+    `Flux - ${fmtDateTime(from)} - ${fmtDateTime(to)} - ${fmtDateShort(now)} ${fmtTime(now)}`,
     MARGIN,
     y,
   );
@@ -230,7 +226,7 @@ export function generateSchedulePdf(options: PrintOptions): ArrayBuffer {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(110, 110, 110);
-      doc.text(`${fmtDateTime(from)} → ${fmtDateTime(to)}`, PAGE_W - MARGIN, y + 4.5, { align: 'right' });
+      doc.text(`${fmtDateTime(from)} - ${fmtDateTime(to)}`, PAGE_W - MARGIN, y + 4.5, { align: 'right' });
 
       y += 8;
       doc.setDrawColor(190, 190, 190);
